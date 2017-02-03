@@ -18,14 +18,13 @@ object Main {
     )
 
     val exprCases = List(
-        """(x + y)"""
-        /*
+        """(x)""",
         """x + y * z.f""",
         """x * y + x * y""",
         """x * (y + x) * y""",
         """x + y * x + y""",
-        """x == y.f and z != x + 3"""
-        */
+        """x == y.f and z != x + 3""",
+        """(x == (y.f * (1 + ((x))))) and z == 3"""
     )
 
     def printAST(src : String) : Unit = {

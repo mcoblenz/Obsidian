@@ -46,11 +46,14 @@ object ObsidianParser extends Parsers {
                             makeExpr : (AST, AST) => AST,
                             nextParser : Parser[AST]
                            ) : Parser[AST] = {
-        val hasOpParser = nextParser ~ t ~ parseBinary(t, makeExpr, nextParser) ^^ {
-            case e1 ~ _ ~ e2 => makeExpr(e1, e2)
+        val hasOpParser = t ~ parseBinary(t, makeExpr, nextParser) ^^ {
+            case _ ~ e => e
         }
 
-        hasOpParser | nextParser
+        nextParser ~ opt(hasOpParser) ^^ {
+            case e ~ None => e
+            case e1 ~ Some(e2) => makeExpr(e1, e2)
+        }
     }
 
     private def parseUnary(t : Token,
@@ -83,11 +86,11 @@ object ObsidianParser extends Parsers {
 
 
     private def parseExprBottom : Parser[AST] = {
-        val parenExpr = LParenT ~ (parseExpr ~ RParenT) ^^ {
-            case _ ~ (e ~ _) => e
+        val parenExpr = LParenT ~ parseExpr ~ RParenT ^^ {
+            case _ ~ e ~ _ => e
         }
 
-        parenExpr | parseNumLiteral | parseField | parseVariable
+        parseNumLiteral | parseField | parseVariable | parenExpr
     }
 
     def parseAST(tokens : Seq[Token]) : Either[String, AST] = {
