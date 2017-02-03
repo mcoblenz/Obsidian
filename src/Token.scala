@@ -25,9 +25,15 @@ case object DotT extends Token
 case object CommaT extends Token
 case object SemicolonT extends Token
 case object EqT extends Token
+case object EqEqT extends Token
+case object NotEqT extends Token
 case object LtT extends Token
 case object GtT extends Token
 case object GtEqT extends Token
 case object LtEqT extends Token
 case object RightArrowT extends Token
 case object BigRightArrowT extends Token
+case object PlusT extends Token
+case object StarT extends Token
+case object ForwardSlashT extends Token
+case object MinusT extends Token
