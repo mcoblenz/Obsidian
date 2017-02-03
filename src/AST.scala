@@ -1,5 +1,6 @@
 sealed trait AST
 
+/* Expressions */
 case class Variable(x : String) extends AST 
 case class Field(x : String, f : String) extends AST 
 case class NumLiteral(value : Int) extends AST 
@@ -20,9 +21,10 @@ case class LocalInvocation(name : String, args : Seq[AST]) extends AST
 case class Invocation(recipientName : String, name : String, args : Seq[AST]) extends AST 
 case class Construction(args : Seq[AST]) extends AST 
 
+/* Statements */
 case class Return(e : AST) extends AST 
 case class Transition(newStateName : String) extends AST 
-case class Assignment(assignTo : Either[Variable, Field], e : AST) extends AST 
+case class Assignment(assignTo : AST, e : AST) extends AST
 case class Throw() extends AST 
 case class If(eCond : AST, s : AST) extends AST 
 case class IfThenElse(eCond : AST, s1 : AST, s2 : AST) extends AST 
@@ -31,6 +33,7 @@ case class Sequence(s1 : AST, s2 : AST) extends AST
 
 case class Type(isLinear : Boolean, name : String) extends AST
 
+/* Declarations */
 case class TypeDeclaration(name : String, typ : Type) extends AST
 case class VarDeclaration(typ : Type, varName : String) extends AST
 case class FuncDeclaration(name : String,

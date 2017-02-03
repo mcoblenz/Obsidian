@@ -19,6 +19,7 @@ object Lexer extends RegexParsers {
     private def notP = """not""".r ^^ (_ => NotT)
     private def andP = """and""".r ^^ (_ => AndT)
     private def orP = """or""".r ^^ (_ => OrT)
+    private def returnP = """return""".r ^^ (_ => ReturnT)
 
     /* Punctuation */
     private def plusP = """\+""".r ^^ (_ => PlusT)
@@ -46,7 +47,7 @@ object Lexer extends RegexParsers {
     private def tokenParser : Parser[Seq[Token]] =
         phrase(rep1(
             ifP | elseP | contractP | transactionP | functionP | typeP | stateP | tryP | catchP | throwP | notP |
-            andP | orP |
+            andP | orP | returnP |
 
             decimalP | hexP | identifierP |
 

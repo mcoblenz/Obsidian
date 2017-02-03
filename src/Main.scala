@@ -14,7 +14,7 @@ object Main {
                         call();
                     }
                 }""",
-        """try { external.call();"""
+        """try { external.call(); }"""
     )
 
     val exprCases = List(
@@ -25,6 +25,16 @@ object Main {
         """x + y * x + y""",
         """x == y.f and z != x + 3""",
         """(x == (y.f * (1 + ((x))))) and z == 3"""
+    )
+
+    val statementCases = List(
+        """if x == y { throw; } else { x = y }""",
+        """
+           if x == y and y == z { throw; }
+           x.f = y;
+           y.f = x;
+           try { throw; } catch { x = y; }
+        """
     )
 
     def printAST(src : String) : Unit = {
@@ -40,6 +50,6 @@ object Main {
     }
 
     def main(args: Array[String]) : Unit = {
-        exprCases.map(printAST)
+        statementCases.map(printAST)
     }
 }

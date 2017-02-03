@@ -23,23 +23,61 @@ object ObsidianParser extends Parsers {
         accept("numeric literal", { case NumLiteralT(n) => NumLiteral(n) })
     }
 
+    private def parseIdString : Parser[String] = {
+        accept("identifier", { case IdentifierT(name) => name })
+    }
+
     private def parseVariable : Parser[Variable] = {
-        accept("variable identifier", { case IdentifierT(name) => Variable(name) })
+        parseIdString ^^ { case name => Variable(name) }
     }
 
     private def parseField : Parser[Field] = {
-        val unpackId = accept("field identifier", { case IdentifierT(name) => name})
+        val unpackId = accept("field identifier", { case IdentifierT(name) => name })
         unpackId ~ DotT ~ unpackId ^^ { case x ~ _ ~ f => Field(x, f) }
     }
 
-    private def parseArgList : Parser[Seq[AST]] = {
-        val moreP = parseExpr ~ CommaT ~ parseArgList ^^ { case e1 ~ _ ~ theRest => Seq(e1) ++ theRest }
-        val oneMoreP = parseExpr ^^ { case e => Seq(e) }
-        (moreP | oneMoreP) ^^ {
-            case s : Seq[AST] => s
-            case _ => Seq()
+    private def parseArgList : Parser[Seq[AST]] = repsep(parseExpr, CommaT)
+
+    private def parseStatement : Parser[AST] = parseAtomicStatement ~ opt(parseStatement) ^^ {
+            case s ~ None => s
+            case s1 ~ Some(s2) => Sequence(s1, s2)
         }
+
+    private def parseAtomicStatement : Parser[AST] = {
+        val parseReturn = ReturnT ~ parseExpr ~ SemicolonT ^^ {
+            case _ ~ e ~ _ => Return(e)
+        }
+        val parseTransition = RightArrowT ~ parseIdString ~ SemicolonT ^^ {
+            case _ ~ name ~ _ => Transition(name)
+        }
+
+        val parseFieldAssignment = parseField ~ EqT ~ parseExpr ~ SemicolonT ^^ {
+            case f ~ _ ~ e ~ _ => Assignment(f, e)
+        }
+        val parseVarAssignment = parseVariable ~ EqT ~ parseExpr ~ SemicolonT ^^ {
+            case x ~ _ ~ e ~ _ => Assignment(x, e)
+        }
+
+
+        val parseThrow = ThrowT ~ SemicolonT ^^ { case _ => Throw() }
+
+        val parseOnlyIf = IfT ~ parseExpr ~ LBraceT ~ parseStatement ~ RBraceT
+        val parseElse = ElseT ~ LBraceT ~ parseStatement ~ RBraceT
+
+        val parseIf = parseOnlyIf ~ opt(parseElse) ^^ {
+            case _ ~ e ~ _ ~ s ~ _ ~ None => If(e, s)
+            case _ ~ e ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) => IfThenElse(e, s1, s2)
+        }
+
+        val parseTryCatch = TryT ~ LBraceT ~ parseStatement ~ RBraceT ~
+                            CatchT ~ LBraceT ~ parseStatement ~ RBraceT ^^ {
+            case _ ~ _ ~ s1 ~ _ ~ _ ~ _ ~ s2 ~ _ => TryCatch(s1, s2)
+        }
+
+        parseReturn | parseTransition | parseFieldAssignment |
+        parseVarAssignment | parseThrow | parseIf | parseTryCatch
     }
+
 
     /* this is a lot better than manually writing code for all the AST operators */
     private def parseBinary(t : Token,
@@ -95,7 +133,7 @@ object ObsidianParser extends Parsers {
 
     def parseAST(tokens : Seq[Token]) : Either[String, AST] = {
         val reader = new TokenReader(tokens)
-        parseExpr(reader) match {
+        parseStatement(reader) match {
             case Success(result, _) => Right(result)
             case Failure(msg ,_) => Left("FAILURE: " + msg)
             case Error(msg , _) => Left("ERROR: " + msg)

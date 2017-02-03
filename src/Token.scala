@@ -1,5 +1,6 @@
 sealed trait Token
 
+/* keywords */
 case object ContractT extends Token
 case object IfT extends Token
 case object ElseT extends Token
@@ -13,10 +14,12 @@ case object ThrowT extends Token
 case object NotT extends Token
 case object AndT extends Token
 case object OrT extends Token
+case object ReturnT extends Token
 
 case class IdentifierT(x : String) extends Token
 case class NumLiteralT(x : Int) extends Token
 
+/* punctuation */
 case object LBraceT extends Token
 case object RBraceT extends Token
 case object LParenT extends Token
