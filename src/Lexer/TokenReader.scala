@@ -1,3 +1,5 @@
+package Lexer
+
 import scala.util.parsing.input._
 
 class TokenReader(tokens : Seq[Token]) extends Reader[Token] {

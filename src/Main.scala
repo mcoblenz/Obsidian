@@ -1,20 +1,35 @@
 import Lexer._
-import ObsidianParser._
+import Parser._
 
 object Main {
     val cases = List(
-        """contract { transaction f() { hello = 1; world = 2; } }""",
-        """if (x == y) { 5 } else { 3 }""",
-        """ contract C {
-                state S1 {
-                    type s;
-                    transaction t1(T1 a, T2 b) {
-                        do;
-                        stuff;
-                        call();
-                    }
-                }""",
-        """try { external.call(); }"""
+        """
+contract C { transaction f() { hello = 1; world = 2; } }
+        """,
+        """
+contract C {
+    state S1 { }
+}
+        """,
+        """
+contract C {
+    state S1 {
+        transaction t1() {
+            x.x = x.x.x.x();
+            x = x.x.x.x();
+            x();
+            x().f = x();
+            x.f.f();
+            new A();
+            a = new A();
+            T x;
+            T x = x;
+            T x = x.f();
+            T x = new T();
+        }
+    }
+}
+        """
     )
 
     val exprCases = List(
@@ -37,19 +52,26 @@ object Main {
         """
     )
 
-    def printAST(src : String) : Unit = {
-        val tokens : Seq[Token] = tokenize(src) match {
+    def printAST(ast : AST) : Unit = {
+        println(ast.toString().replaceAll("Sequence", "\nSequence"))
+    }
+
+    def run(src : String) : Unit = {
+        val tokens : Seq[Token] = Lexer.tokenize(src) match {
             case Left(msg) => println(msg); return
             case Right(ts) => ts
         }
-        val ast : AST = parseAST(tokens) match {
+
+        val ast : AST = Parser.parseAST(tokens) match {
             case Left(msg) => println(msg); return
             case Right(tree) => tree
         }
-        println(ast)
+
+        printAST(ast)
+        println()
     }
 
     def main(args: Array[String]) : Unit = {
-        statementCases.map(printAST)
+        cases.map(run)
     }
 }

@@ -1,25 +1,38 @@
+package Lexer
+
 import scala.util.parsing.combinator._
 
 object Lexer extends RegexParsers {
-    private def decimalP = """(0|[1-9]\d*)""".r ^^ (x => NumLiteralT(x.toInt))
-    private def hexP = """(0x\d*)""".r ^^ (x => NumLiteralT(Integer.parseInt(x, 16)))
-    private def identifierP = """[_a-zA-Z][_a-zA-Z0-9]*""".r ^^ (x => IdentifierT(x))
+    private def decimalP = ("""(0|([1-9]\d*))""".r) ^^ {
+        case x => NumLiteralT(x.toInt)
+    }
 
-    /* Keywords */
-    private def ifP = """if""".r ^^ (_ => IfT)
-    private def elseP = """else""".r ^^ (_ => ElseT)
-    private def contractP = """contract""".r ^^ (_ => ContractT)
-    private def transactionP = """transaction""".r ^^ (_ => TransactionT)
-    private def functionP = """function""".r ^^ (_ => FunctionT)
-    private def typeP = """type""".r ^^ (_ => TypeT)
-    private def stateP = """state""".r ^^ (_ => StateT)
-    private def tryP = """try""".r ^^ (_ => TryT)
-    private def catchP = """catch""".r ^^ (_ => CatchT)
-    private def throwP = """throw""".r ^^ (_ => ThrowT)
-    private def notP = """not""".r ^^ (_ => NotT)
-    private def andP = """and""".r ^^ (_ => AndT)
-    private def orP = """or""".r ^^ (_ => OrT)
-    private def returnP = """return""".r ^^ (_ => ReturnT)
+    private def hexP = ("""(0x\d*)""".r) ^^ {
+        case x => NumLiteralT(Integer.parseInt(x, 16))
+    }
+
+    /* we could give everything here a separate parser, but we want to enforce
+     * (as most languages seem to) that keywords/literals/identifiers are
+     * separated by white space */
+    private def atomP = """[_a-zA-Z][_a-zA-Z0-9]*""".r ^^ {
+        case "if" => IfT
+        case "else" => ElseT
+        case "contract" => ContractT
+        case "transaction" => TransactionT
+        case "function" => FunctionT
+        case "type" => TypeT
+        case "state" => StateT
+        case "try" => TryT
+        case "catch" => CatchT
+        case "throw" => ThrowT
+        case "not" => NotT
+        case "and" => AndT
+        case "or" => OrT
+        case "return" => ReturnT
+        case "new" => NewT
+        case "linear" => LinearT
+        case id => IdentifierT(id)
+    }
 
     /* Punctuation */
     private def plusP = """\+""".r ^^ (_ => PlusT)
@@ -46,10 +59,7 @@ object Lexer extends RegexParsers {
 
     private def tokenParser : Parser[Seq[Token]] =
         phrase(rep1(
-            ifP | elseP | contractP | transactionP | functionP | typeP | stateP | tryP | catchP | throwP | notP |
-            andP | orP | returnP |
-
-            decimalP | hexP | identifierP |
+            decimalP | hexP | atomP |
 
             lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 

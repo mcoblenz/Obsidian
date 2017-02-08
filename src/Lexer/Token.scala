@@ -1,3 +1,5 @@
+package Lexer
+
 sealed trait Token
 
 /* keywords */
@@ -15,6 +17,8 @@ case object NotT extends Token
 case object AndT extends Token
 case object OrT extends Token
 case object ReturnT extends Token
+case object LinearT extends Token
+case object NewT extends Token
 
 case class IdentifierT(x : String) extends Token
 case class NumLiteralT(x : Int) extends Token
