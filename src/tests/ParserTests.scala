@@ -37,7 +37,10 @@ class ParserTests extends JUnitSuite {
     }
 
     private def shouldEqual(src : String, ast : AST) : Unit = {
-        parse(src) == ast
+        parse(src) match {
+            case Right(res) => assert(res == ast)
+            case Left(_) => assert(false)
+        }
     }
 
     private def shouldEqual(src1 : String, src2 : String) : Unit = {
@@ -60,6 +63,21 @@ class ParserTests extends JUnitSuite {
             """.stripMargin)
     }
 
+    @Test def goodExpressions() = {
+        shouldSucceed(
+            """
+              | contract C {
+              |     state S1 {
+              |         transaction t1() {
+              |             x = (x.f.y.z((((5)))));
+              |             (x).f = (new A()).f;
+              |         }
+              |     }
+              | }
+            """.stripMargin
+        )
+    }
+
     @Test def goodStatements() = {
         shouldSucceed(
             """
@@ -78,6 +96,9 @@ class ParserTests extends JUnitSuite {
               |             T x;
               |             T x = x;
               |             T x = x.f();
+              |             return;
+              |             return x;
+              |             return x.f;
               |         }
               |     }
               | }
@@ -88,6 +109,9 @@ class ParserTests extends JUnitSuite {
     @Test def badStatements() = {
         shouldFail("""contract C { state S { transaction t() {
               | new;
+              | }}}""".stripMargin)
+        shouldFail("""contract C { state S { transaction t() {
+              | return (;
               | }}}""".stripMargin)
     }
 

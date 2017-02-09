@@ -29,6 +29,15 @@ contract C {
         }
     }
 }
+        """,
+        """
+contract C {
+    state S1 {
+        transaction t1() {
+            return );
+        }
+    }
+}
         """
     )
 
@@ -53,7 +62,7 @@ contract C {
     )
 
     def printAST(ast : AST) : Unit = {
-        println(ast.toString().replaceAll("Sequence", "\nSequence"))
+        println(ast.toString().replaceAll(",", "\n,"))
     }
 
     def run(src : String) : Unit = {

@@ -21,14 +21,14 @@ case class NotEquals(e1 : AST, e2 : AST) extends AST
 case class Dereference(e : AST, f : String) extends AST
 
 /* Statements */
-case class Return(e : AST) extends AST
+case object Return extends AST
+case class ReturnExpr(e : AST) extends AST
 case class Transition(newStateName : String) extends AST
 case class Assignment(assignTo : AST, e : AST) extends AST
 case class Throw() extends AST
-case class If(eCond : AST, s : AST) extends AST
-case class IfThenElse(eCond : AST, s1 : AST, s2 : AST) extends AST
-case class TryCatch(s1 : AST, s2 : AST) extends AST
-case class Sequence(s1 : AST, s2 : AST) extends AST
+case class If(eCond : AST, s : Seq[AST]) extends AST
+case class IfThenElse(eCond : AST, s1 : Seq[AST], s2 : Seq[AST]) extends AST
+case class TryCatch(s1 : Seq[AST], s2 : Seq[AST]) extends AST
 
 /* These can be both statements and expressions */
 case class LocalInvocation(name : String, args : Seq[AST]) extends AST
@@ -42,10 +42,10 @@ case class TypeDecl(name : String, typ : Type) extends AST
 case class VarDecl(typ : Type, varName : String) extends AST
 case class FuncDecl(name : String,
                            args : Seq[VarDecl],
-                           body : AST) extends AST
+                           body : Seq[AST]) extends AST
 case class TransactionDecl(name : String,
                                   args : Seq[VarDecl],
-                                  body : AST) extends AST
+                                  body : Seq[AST]) extends AST
 case class StateDecl(name : String, declarations : Seq[AST]) extends AST
 case class ContractDecl(name : String, declarations : Seq[AST]) extends AST
 case class Program(contracts : Seq[ContractDecl]) extends AST

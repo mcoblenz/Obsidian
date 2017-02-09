@@ -7,6 +7,9 @@ import scala.util.parsing.combinator._
 
 /*
 
+The following sort of expression grammar is needed to eliminate left recursion
+and allow operators to have the appropriate precedence
+
 E ::= E9
 E9 ::= E8 and E9 | E8
 E8 ::= E7 or E8 | E7
@@ -43,41 +46,45 @@ object Parser extends Parsers {
         repsep(oneDecl, CommaT)
     }
 
-    private def parseStatement : Parser[AST] =
-        parseAtomicStatement ~ opt(parseStatement) ^^ {
+    private def parseBody : Parser[Seq[AST]] =
+        parseAtomicStatement ~ opt(parseBody) ^^ {
             case s ~ None => s
-            case s1 ~ Some(s2) => Sequence(s1, s2)
+            case s1 ~ Some(s2) => s1 ++ s2
         }
 
-    private def parseAtomicStatement : Parser[AST] = {
-        val parseReturn = ReturnT ~ parseExpr ~ SemicolonT ^^ {
-            case _ ~ e ~ _ => Return(e)
+    /* this parser is for Seq[AST] instead of AST to handle declaration
+     *  and assignment of a variable in a single statement */
+    private def parseAtomicStatement : Parser[Seq[AST]] = {
+        val parseReturn = ReturnT ~ opt(parseExpr) ~! SemicolonT ^^ {
+            case _ ~ Some(e) ~ _ => ReturnExpr(e)
+            case _ ~ None ~ _ => Return
         }
-        val parseTransition = RightArrowT ~ parseIdString ~ SemicolonT ^^ {
+
+        val parseTransition = RightArrowT ~ parseIdString ~! SemicolonT ^^ {
             case _ ~ name ~ _ => Transition(name)
         }
 
-        val parseVarDeclAssn = parseType ~ parseIdString ~ EqT ~ parseExpr ~ SemicolonT ^^ {
+        val parseVarDeclAssn = parseType ~ parseIdString ~ EqT ~! parseExpr ~! SemicolonT ^^ {
             case typ ~ name ~ _ ~ e ~ _ =>
-                Sequence(VarDecl(typ, name), Assignment(Variable(name), e))
+                Seq(VarDecl(typ, name), Assignment(Variable(name), e))
         }
 
-        val parseThrow = ThrowT ~ SemicolonT ^^ { case _ => Throw() }
+        val parseThrow = ThrowT ~! SemicolonT ^^ { case _ => Throw() }
 
-        val parseOnlyIf = IfT ~ parseExpr ~ LBraceT ~ parseStatement ~ RBraceT
-        val parseElse = ElseT ~ LBraceT ~ parseStatement ~ RBraceT
+        val parseOnlyIf = IfT ~! parseExpr ~! LBraceT ~! parseBody ~! RBraceT
+        val parseElse = ElseT ~! LBraceT ~! parseBody ~! RBraceT
 
         val parseIf = parseOnlyIf ~ opt(parseElse) ^^ {
             case _ ~ e ~ _ ~ s ~ _ ~ None => If(e, s)
             case _ ~ e ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) => IfThenElse(e, s1, s2)
         }
 
-        val parseTryCatch = TryT ~ LBraceT ~ parseStatement ~ RBraceT ~
-                            CatchT ~ LBraceT ~ parseStatement ~ RBraceT ^^ {
-            case _ ~ _ ~ s1 ~ _ ~ _ ~ _ ~ s2 ~ _ => TryCatch(s1, s2)
+        val parseTryCatch = TryT ~! LBraceT ~! parseBody ~! RBraceT ~!
+                            CatchT ~! LBraceT ~! parseBody <~ RBraceT ^^ {
+            case _ ~ _ ~ s1 ~ _ ~ _ ~ _ ~ s2 => TryCatch(s1, s2)
         }
 
-        val assign = EqT ~ parseExpr ^^ {
+        val assign = EqT ~! parseExpr ^^ {
                 case _ ~ e2 => (e1 : AST) => Assignment(e1, e2)
             }
 
@@ -91,8 +98,11 @@ object Parser extends Parsers {
             }
         }
 
-        parseReturn | parseTransition | parseThrow | parseVarDeclAssn |
-        parseVarDecl | parseIf | parseTryCatch | parseExprFirst
+        val seqify = (p : Parser[AST]) => p ^^ { case a => Seq(a) }
+
+        seqify(parseReturn) | seqify(parseTransition) | seqify(parseThrow) |
+        parseVarDeclAssn | seqify(parseVarDecl) | seqify(parseIf) |
+        seqify(parseTryCatch) | seqify(parseExprFirst)
     }
 
 
@@ -162,7 +172,7 @@ object Parser extends Parsers {
     }
 
     private def parseDots : Parser[AST => AST] = {
-        val parseOne = DotT ~ parseIdString ~ opt(LParenT ~ parseArgList ~ RParenT) ^^ {
+        val parseOne = DotT ~! parseIdString ~ opt(LParenT ~ parseArgList ~ RParenT) ^^ {
             case _ ~ name ~ Some(_ ~ args ~ _) => Right((name, args))
             case _ ~ name ~ None => Left(name)
         }
@@ -173,20 +183,18 @@ object Parser extends Parsers {
     }
 
     private def parseExprBottom : Parser[AST] = {
-        val parenExpr = LParenT ~ parseExpr ~ RParenT ^^ {
+        val parenExpr = LParenT ~! parseExpr ~! RParenT ^^ {
             case _ ~ e ~ _ => e
         }
 
-        val parseVar = {
-            parseIdString ^^ { Variable(_) }
-        }
+        val parseVar = parseIdString ^^ { Variable(_) }
 
         val parseNumLiteral = {
             accept("numeric literal", { case NumLiteralT(n) => NumLiteral(n) })
         }
 
         val parseNew = {
-            NewT ~ parseIdString ~ LParenT ~ parseArgList ~ RParenT ^^ {
+            NewT ~! parseIdString ~! LParenT ~! parseArgList ~! RParenT ^^ {
                 case _ ~ name ~ _ ~ args ~ _ => Construction(name, args)
             }
         }
@@ -197,27 +205,27 @@ object Parser extends Parsers {
     }
 
     private def parseVarDecl = {
-        parseType ~ parseIdString ~ SemicolonT ^^ {
+        parseType ~ parseIdString ~! SemicolonT ^^ {
             case typ ~ name ~ _ => VarDecl(typ, name)
         }
     }
 
     private def parseFuncDecl = {
-        FunctionT ~ parseIdString ~ LParenT ~ parseArgDefList ~ RParenT ~
-        LBraceT ~ parseStatement ~ RBraceT ^^ {
+        FunctionT ~! parseIdString ~! LParenT ~! parseArgDefList ~! RParenT ~!
+        LBraceT ~! parseBody ~! RBraceT ^^ {
             case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => FuncDecl(name, args, body)
         }
     }
 
     private def parseTransDecl = {
-        TransactionT ~ parseIdString ~ LParenT ~ parseArgDefList ~ RParenT ~
-        LBraceT ~ parseStatement ~ RBraceT ^^ {
+        TransactionT ~! parseIdString ~! LParenT ~! parseArgDefList ~! RParenT ~!
+        LBraceT ~! parseBody ~! RBraceT ^^ {
             case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => TransactionDecl(name, args, body)
         }
     }
 
     private def parseStateDecl = {
-        StateT ~ parseIdString ~ LBraceT ~ rep(parseDecl) ~ RBraceT ^^ {
+        StateT ~! parseIdString ~! LBraceT ~! rep(parseDecl) ~! RBraceT ^^ {
             case _ ~ name ~ _ ~ defs ~ _ => StateDecl(name, defs)
         }
     }
@@ -227,7 +235,7 @@ object Parser extends Parsers {
     }
 
     private def parseContractDecl = {
-        ContractT ~ parseIdString ~ LBraceT ~ rep(parseDecl) ~ RBraceT ^^ {
+        ContractT ~! parseIdString ~! LBraceT ~! rep(parseDecl) ~! RBraceT ^^ {
             case _ ~ name ~ _ ~ defs ~ _ => ContractDecl(name, defs)
         }
     }
