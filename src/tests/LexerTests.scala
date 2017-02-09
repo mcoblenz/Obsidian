@@ -45,9 +45,9 @@ class LexerTests extends JUnitSuite {
               | catch throw not and or return linear new newa
             """.stripMargin,
             List(
-                ContractT, IdentifierT("Contract"), IfT, ElseT, TransactionT, IdentifierT("trans"),
-                FunctionT, IdentifierT("function1"), TypeT, StateT, TryT, CatchT, ThrowT, NotT,
-                AndT, OrT, ReturnT, LinearT, NewT, IdentifierT("newa")
+                ContractT(), IdentifierT("Contract"), IfT(), ElseT(), TransactionT(), IdentifierT("trans"),
+                FunctionT(), IdentifierT("function1"), TypeT(), StateT(), TryT(), CatchT(), ThrowT(), NotT(),
+                AndT(), OrT(), ReturnT(), LinearT(), NewT(), IdentifierT("newa")
             )
         )
     }

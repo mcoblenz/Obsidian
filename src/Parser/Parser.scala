@@ -31,19 +31,19 @@ object Parser extends Parsers {
     }
 
     private def parseType = {
-        opt(LinearT) ~ parseIdString ^^ {
+        opt(LinearT()) ~ parseIdString ^^ {
             case Some(_) ~ id => Type(true, id)
             case None ~ id => Type(false, id)
         }
     }
 
-    private def parseArgList : Parser[Seq[AST]] = repsep(parseExpr, CommaT)
+    private def parseArgList : Parser[Seq[AST]] = repsep(parseExpr, CommaT())
 
     private def parseArgDefList = {
         val oneDecl = parseType ~ parseIdString ^^ {
             case typ ~ name => VarDecl(typ, name)
         }
-        repsep(oneDecl, CommaT)
+        repsep(oneDecl, CommaT())
     }
 
     private def parseBody : Parser[Seq[AST]] =
@@ -55,36 +55,36 @@ object Parser extends Parsers {
     /* this parser is for Seq[AST] instead of AST to handle declaration
      *  and assignment of a variable in a single statement */
     private def parseAtomicStatement : Parser[Seq[AST]] = {
-        val parseReturn = ReturnT ~ opt(parseExpr) ~! SemicolonT ^^ {
+        val parseReturn = ReturnT() ~ opt(parseExpr) ~! SemicolonT() ^^ {
             case _ ~ Some(e) ~ _ => ReturnExpr(e)
             case _ ~ None ~ _ => Return
         }
 
-        val parseTransition = RightArrowT ~ parseIdString ~! SemicolonT ^^ {
+        val parseTransition = RightArrowT() ~ parseIdString ~! SemicolonT() ^^ {
             case _ ~ name ~ _ => Transition(name)
         }
 
-        val parseVarDeclAssn = parseType ~ parseIdString ~ EqT ~! parseExpr ~! SemicolonT ^^ {
+        val parseVarDeclAssn = parseType ~ parseIdString ~ EqT() ~! parseExpr ~! SemicolonT() ^^ {
             case typ ~ name ~ _ ~ e ~ _ =>
                 Seq(VarDecl(typ, name), Assignment(Variable(name), e))
         }
 
-        val parseThrow = ThrowT ~! SemicolonT ^^ { case _ => Throw() }
+        val parseThrow = ThrowT() ~! SemicolonT() ^^ { case _ => Throw() }
 
-        val parseOnlyIf = IfT ~! parseExpr ~! LBraceT ~! parseBody ~! RBraceT
-        val parseElse = ElseT ~! LBraceT ~! parseBody ~! RBraceT
+        val parseOnlyIf = IfT() ~! parseExpr ~! LBraceT() ~! parseBody ~! RBraceT()
+        val parseElse = ElseT() ~! LBraceT() ~! parseBody ~! RBraceT()
 
         val parseIf = parseOnlyIf ~ opt(parseElse) ^^ {
             case _ ~ e ~ _ ~ s ~ _ ~ None => If(e, s)
             case _ ~ e ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) => IfThenElse(e, s1, s2)
         }
 
-        val parseTryCatch = TryT ~! LBraceT ~! parseBody ~! RBraceT ~!
-                            CatchT ~! LBraceT ~! parseBody <~ RBraceT ^^ {
+        val parseTryCatch = TryT() ~! LBraceT() ~! parseBody ~! RBraceT() ~!
+                            CatchT() ~! LBraceT() ~! parseBody <~ RBraceT() ^^ {
             case _ ~ _ ~ s1 ~ _ ~ _ ~ _ ~ s2 => TryCatch(s1, s2)
         }
 
-        val assign = EqT ~! parseExpr ^^ {
+        val assign = EqT() ~! parseExpr ^^ {
                 case _ ~ e2 => (e1 : AST) => Assignment(e1, e2)
             }
 
@@ -92,7 +92,7 @@ object Parser extends Parsers {
          * the expressions makes sense as the recipient of an assignment or
          * as a side-effect statement (e.g. func invocation) */
         val parseExprFirst = {
-            parseExpr ~ opt(assign) ~ SemicolonT ^^ {
+            parseExpr ~ opt(assign) ~ SemicolonT() ^^ {
                 case e ~ Some(assn) ~ _ => assn(e)
                 case e ~ None ~ _ => e
             }
@@ -133,27 +133,27 @@ object Parser extends Parsers {
     }
 
     private def parseExpr = parseAnd
-    private def parseAnd = parseBinary(AndT, Conjunction.apply, parseOr)
-    private def parseOr = parseBinary(OrT, Disjunction.apply, parseEq)
+    private def parseAnd = parseBinary(AndT(), Conjunction.apply, parseOr)
+    private def parseOr = parseBinary(OrT(), Disjunction.apply, parseEq)
 
-    private def parseEq = parseBinary(EqEqT, Equals.apply, parseNeq)
-    private def parseNeq = parseBinary(NotEqT, NotEquals.apply, parseGt)
-    private def parseGt = parseBinary(GtT, GreaterThan.apply, parseLt)
-    private def parseLt = parseBinary(LtT, LessThan.apply, parseLtEq)
-    private def parseLtEq = parseBinary(LtEqT, LessThanOrEquals.apply, parseGtEq)
-    private def parseGtEq = parseBinary(GtEqT, GreaterThanOrEquals.apply, parseAddition)
+    private def parseEq = parseBinary(EqEqT(), Equals.apply, parseNeq)
+    private def parseNeq = parseBinary(NotEqT(), NotEquals.apply, parseGt)
+    private def parseGt = parseBinary(GtT(), GreaterThan.apply, parseLt)
+    private def parseLt = parseBinary(LtT(), LessThan.apply, parseLtEq)
+    private def parseLtEq = parseBinary(LtEqT(), LessThanOrEquals.apply, parseGtEq)
+    private def parseGtEq = parseBinary(GtEqT(), GreaterThanOrEquals.apply, parseAddition)
 
-    private def parseAddition = parseBinary(PlusT, Add.apply, parseSubtraction)
-    private def parseSubtraction = parseBinary(MinusT, Subtract.apply, parseMultiplication)
-    private def parseMultiplication = parseBinary(StarT, Multiply.apply, parseDivision)
-    private def parseDivision = parseBinary(ForwardSlashT, Divide.apply, parseNot)
-    private def parseNot = parseUnary(NotT, LogicalNegation.apply, parseExprBottom)
+    private def parseAddition = parseBinary(PlusT(), Add.apply, parseSubtraction)
+    private def parseSubtraction = parseBinary(MinusT(), Subtract.apply, parseMultiplication)
+    private def parseMultiplication = parseBinary(StarT(), Multiply.apply, parseDivision)
+    private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseNot)
+    private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseExprBottom)
 
 
     /* parsing of invocations and dereferences is used in both statements and expressions */
 
     private def parseLocalInv = {
-        parseIdString ~ LParenT ~ parseArgList ~ RParenT ^^ {
+        parseIdString ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
             case name ~ _ ~ args ~ _ => LocalInvocation(name, args)
         }
     }
@@ -172,7 +172,7 @@ object Parser extends Parsers {
     }
 
     private def parseDots : Parser[AST => AST] = {
-        val parseOne = DotT ~! parseIdString ~ opt(LParenT ~ parseArgList ~ RParenT) ^^ {
+        val parseOne = DotT() ~! parseIdString ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
             case _ ~ name ~ Some(_ ~ args ~ _) => Right((name, args))
             case _ ~ name ~ None => Left(name)
         }
@@ -183,7 +183,7 @@ object Parser extends Parsers {
     }
 
     private def parseExprBottom : Parser[AST] = {
-        val parenExpr = LParenT ~! parseExpr ~! RParenT ^^ {
+        val parenExpr = LParenT() ~! parseExpr ~! RParenT() ^^ {
             case _ ~ e ~ _ => e
         }
 
@@ -194,38 +194,40 @@ object Parser extends Parsers {
         }
 
         val parseNew = {
-            NewT ~! parseIdString ~! LParenT ~! parseArgList ~! RParenT ^^ {
+            NewT() ~! parseIdString ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
                 case _ ~ name ~ _ ~ args ~ _ => Construction(name, args)
             }
         }
 
-        val simpleExpr = parseNew | parseLocalInv | parseNumLiteral | parseVar | parenExpr
+        val fail = failure("expression expected")
+
+        val simpleExpr = parseNew | parseLocalInv | parseNumLiteral | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }
 
     private def parseVarDecl = {
-        parseType ~ parseIdString ~! SemicolonT ^^ {
+        parseType ~ parseIdString ~! SemicolonT() ^^ {
             case typ ~ name ~ _ => VarDecl(typ, name)
         }
     }
 
     private def parseFuncDecl = {
-        FunctionT ~! parseIdString ~! LParenT ~! parseArgDefList ~! RParenT ~!
-        LBraceT ~! parseBody ~! RBraceT ^^ {
+        FunctionT() ~! parseIdString ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+        LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => FuncDecl(name, args, body)
         }
     }
 
     private def parseTransDecl = {
-        TransactionT ~! parseIdString ~! LParenT ~! parseArgDefList ~! RParenT ~!
-        LBraceT ~! parseBody ~! RBraceT ^^ {
+        TransactionT() ~! parseIdString ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+        LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => TransactionDecl(name, args, body)
         }
     }
 
     private def parseStateDecl = {
-        StateT ~! parseIdString ~! LBraceT ~! rep(parseDecl) ~! RBraceT ^^ {
+        StateT() ~! parseIdString ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
             case _ ~ name ~ _ ~ defs ~ _ => StateDecl(name, defs)
         }
     }
@@ -235,7 +237,7 @@ object Parser extends Parsers {
     }
 
     private def parseContractDecl = {
-        ContractT ~! parseIdString ~! LBraceT ~! rep(parseDecl) ~! RBraceT ^^ {
+        ContractT() ~! parseIdString ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
             case _ ~ name ~ _ ~ defs ~ _ => ContractDecl(name, defs)
         }
     }
@@ -248,8 +250,8 @@ object Parser extends Parsers {
         val reader = new TokenReader(tokens)
         parseProgram(reader) match {
             case Success(result, _) => Right(result)
-            case Failure(msg ,_) => Left("FAILURE: " + msg)
-            case Error(msg , _) => Left("ERROR: " + msg)
+            case Failure(msg , _) => Left(s"FAILURE: $msg")
+            case Error(msg , next) => Left(s"ERROR: $msg" + " at " + next.first.pos)
         }
     }
 }

@@ -1,46 +1,48 @@
 package Lexer
 
-sealed trait Token
+import scala.util.parsing.input.Positional
+
+sealed trait Token extends Positional
 
 /* keywords */
-case object ContractT extends Token
-case object IfT extends Token
-case object ElseT extends Token
-case object TransactionT extends Token
-case object FunctionT extends Token
-case object TypeT extends Token
-case object StateT extends Token
-case object TryT extends Token
-case object CatchT extends Token
-case object ThrowT extends Token
-case object NotT extends Token
-case object AndT extends Token
-case object OrT extends Token
-case object ReturnT extends Token
-case object LinearT extends Token
-case object NewT extends Token
+case class ContractT() extends Token { override def toString : String = "contract" }
+case class IfT() extends Token { override def toString : String = "if" }
+case class ElseT() extends Token { override def toString : String = "else" }
+case class TransactionT() extends Token { override def toString : String = "transaction" }
+case class FunctionT() extends Token { override def toString : String = "function" }
+case class TypeT() extends Token { override def toString : String = "type" }
+case class StateT() extends Token { override def toString : String = "state" }
+case class TryT() extends Token { override def toString : String = "try" }
+case class CatchT() extends Token { override def toString : String = "catch" }
+case class ThrowT() extends Token { override def toString : String = "throw" }
+case class NotT() extends Token { override def toString : String = "not" }
+case class AndT() extends Token { override def toString : String = "and" }
+case class OrT() extends Token { override def toString : String = "or" }
+case class ReturnT() extends Token { override def toString : String = "return" }
+case class LinearT() extends Token { override def toString : String = "linear" }
+case class NewT() extends Token { override def toString : String = "new" }
 
-case class IdentifierT(x : String) extends Token
-case class NumLiteralT(x : Int) extends Token
+case class IdentifierT(x : String) extends Token { override def toString : String = s"$x" }
+case class NumLiteralT(x : Int) extends Token { override def toString : String = s"$x" }
 
 /* punctuation */
-case object LBraceT extends Token
-case object RBraceT extends Token
-case object LParenT extends Token
-case object RParenT extends Token
-case object DotT extends Token
-case object CommaT extends Token
-case object SemicolonT extends Token
-case object EqT extends Token
-case object EqEqT extends Token
-case object NotEqT extends Token
-case object LtT extends Token
-case object GtT extends Token
-case object GtEqT extends Token
-case object LtEqT extends Token
-case object RightArrowT extends Token
-case object BigRightArrowT extends Token
-case object PlusT extends Token
-case object StarT extends Token
-case object ForwardSlashT extends Token
-case object MinusT extends Token
+case class LBraceT() extends Token { override def toString : String = "{" }
+case class RBraceT() extends Token { override def toString : String = "}" }
+case class LParenT() extends Token { override def toString : String = "(" }
+case class RParenT() extends Token { override def toString : String = ")" }
+case class DotT() extends Token { override def toString : String = "." }
+case class CommaT() extends Token { override def toString : String = "," }
+case class SemicolonT() extends Token { override def toString : String = ";" }
+case class EqT() extends Token { override def toString : String = "=" }
+case class EqEqT() extends Token { override def toString : String = "==" }
+case class NotEqT() extends Token { override def toString : String = "!=" }
+case class LtT() extends Token { override def toString : String = "<" }
+case class GtT() extends Token { override def toString : String = ">" }
+case class GtEqT() extends Token { override def toString : String = ">=" }
+case class LtEqT() extends Token { override def toString : String = "<=" }
+case class RightArrowT() extends Token { override def toString : String = "->" }
+case class BigRightArrowT() extends Token { override def toString : String = "=>" }
+case class PlusT() extends Token { override def toString : String = "+" }
+case class StarT() extends Token { override def toString : String = "*" }
+case class ForwardSlashT() extends Token { override def toString : String = "/" }
+case class MinusT() extends Token { override def toString : String = "-" }

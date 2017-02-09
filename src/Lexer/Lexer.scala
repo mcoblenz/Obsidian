@@ -1,6 +1,7 @@
 package Lexer
 
 import scala.util.parsing.combinator._
+import scala.util.parsing.input.{CharArrayReader, CharSequenceReader}
 
 object Lexer extends RegexParsers {
     private def decimalP = ("""(0|([1-9]\d*))""".r) ^^ {
@@ -15,59 +16,57 @@ object Lexer extends RegexParsers {
      * (as most languages seem to) that keywords/literals/identifiers are
      * separated by white space */
     private def atomP = """[_a-zA-Z][_a-zA-Z0-9]*""".r ^^ {
-        case "if" => IfT
-        case "else" => ElseT
-        case "contract" => ContractT
-        case "transaction" => TransactionT
-        case "function" => FunctionT
-        case "type" => TypeT
-        case "state" => StateT
-        case "try" => TryT
-        case "catch" => CatchT
-        case "throw" => ThrowT
-        case "not" => NotT
-        case "and" => AndT
-        case "or" => OrT
-        case "return" => ReturnT
-        case "new" => NewT
-        case "linear" => LinearT
+        case "if" => IfT()
+        case "else" => ElseT()
+        case "contract" => ContractT()
+        case "transaction" => TransactionT()
+        case "function" => FunctionT()
+        case "type" => TypeT()
+        case "state" => StateT()
+        case "try" => TryT()
+        case "catch" => CatchT()
+        case "throw" => ThrowT()
+        case "not" => NotT()
+        case "and" => AndT()
+        case "or" => OrT()
+        case "return" => ReturnT()
+        case "new" => NewT()
+        case "linear" => LinearT()
         case id => IdentifierT(id)
     }
 
     /* Punctuation */
-    private def plusP = """\+""".r ^^ (_ => PlusT)
-    private def starP = """\*""".r ^^ (_ => StarT)
-    private def forwardSlashP = """/""".r ^^ (_ => ForwardSlashT)
-    private def minusP = """-""".r ^^ (_ => MinusT)
-    private def lBraceP = """\{""".r ^^ (_ => LBraceT)
-    private def rBraceP = """\}""".r ^^ (_ => RBraceT)
-    private def lParenP = """\(""".r ^^ (_ => LParenT)
-    private def rParenP = """\)""".r ^^ (_ => RParenT)
-    private def dotP = """\.""".r ^^ (_ => DotT)
-    private def commaP = """,""".r ^^ (_ => CommaT)
-    private def semicolonP = """;""".r ^^ (_ => SemicolonT)
-    private def eqP = """=""".r ^^ (_ => EqT)
-    private def notEqP = """!=""".r ^^ (_ => NotEqT)
-    private def ltP = """<""".r ^^ (_ => LtT)
-    private def gtP = """>""".r ^^ (_ => GtT)
-    private def gtEqP = """>=""".r ^^ (_ => GtEqT)
-    private def eqEqP = """==""".r ^^ (_ => EqEqT)
-    private def ltEqP = """<=""".r ^^ (_ => LtEqT)
-    private def rightArrowP = """->""".r ^^ (_ => RightArrowT)
-    private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT)
+    private def plusP = """\+""".r ^^ (_ => PlusT())
+    private def starP = """\*""".r ^^ (_ => StarT())
+    private def forwardSlashP = """/""".r ^^ (_ => ForwardSlashT())
+    private def minusP = """-""".r ^^ (_ => MinusT())
+    private def lBraceP = """\{""".r ^^ (_ => LBraceT())
+    private def rBraceP = """\}""".r ^^ (_ => RBraceT())
+    private def lParenP = """\(""".r ^^ (_ => LParenT())
+    private def rParenP = """\)""".r ^^ (_ => RParenT())
+    private def dotP = """\.""".r ^^ (_ => DotT())
+    private def commaP = """,""".r ^^ (_ => CommaT())
+    private def semicolonP = """;""".r ^^ (_ => SemicolonT())
+    private def eqP = """=""".r ^^ (_ => EqT())
+    private def notEqP = """!=""".r ^^ (_ => NotEqT())
+    private def ltP = """<""".r ^^ (_ => LtT())
+    private def gtP = """>""".r ^^ (_ => GtT())
+    private def gtEqP = """>=""".r ^^ (_ => GtEqT())
+    private def eqEqP = """==""".r ^^ (_ => EqEqT())
+    private def ltEqP = """<=""".r ^^ (_ => LtEqT())
+    private def rightArrowP = """->""".r ^^ (_ => RightArrowT())
+    private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT())
 
+    private def oneToken : Parser[Token] = (decimalP | hexP | atomP |
 
-    private def tokenParser : Parser[Seq[Token]] =
-        phrase(rep1(
-            decimalP | hexP | atomP |
+    lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
-            lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
+    plusP | starP | forwardSlashP | minusP |
 
-            plusP | starP | forwardSlashP | minusP |
+    /* order is important here because some tokens contain the others */
+    gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP)
 
-            /* order is important here because some tokens contain the others */
-            gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP
-        ))
+    private def tokenParser : Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))
 
     def tokenize(src : String) : Either[String, Seq[Token]] = {
         parse(tokenParser, src) match {
