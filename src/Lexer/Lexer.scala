@@ -1,7 +1,6 @@
 package Lexer
 
 import scala.util.parsing.combinator._
-import scala.util.parsing.input.{CharArrayReader, CharSequenceReader}
 
 object Lexer extends RegexParsers {
     private def decimalP = ("""(0|([1-9]\d*))""".r) ^^ {
@@ -32,6 +31,11 @@ object Lexer extends RegexParsers {
         case "return" => ReturnT()
         case "new" => NewT()
         case "linear" => LinearT()
+        case "switch" => SwitchT()
+        case "case" => CaseT()
+        case "unique" => UniqueT()
+        case "shared" => SharedT()
+        case "final" => FinalT()
         case id => IdentifierT(id)
     }
 

@@ -20,7 +20,7 @@ case class LessThanOrEquals(e1 : AST, e2 : AST) extends AST
 case class NotEquals(e1 : AST, e2 : AST) extends AST
 case class Dereference(e : AST, f : String) extends AST
 
-/* Statements */
+/* statements and control flow constructs */
 case object Return extends AST
 case class ReturnExpr(e : AST) extends AST
 case class Transition(newStateName : String) extends AST
@@ -29,17 +29,26 @@ case class Throw() extends AST
 case class If(eCond : AST, s : Seq[AST]) extends AST
 case class IfThenElse(eCond : AST, s1 : Seq[AST], s2 : Seq[AST]) extends AST
 case class TryCatch(s1 : Seq[AST], s2 : Seq[AST]) extends AST
+case class Switch(e : AST, cases : Seq[SwitchCase]) extends AST
+case class SwitchCase(stateName : String, body : Seq[AST]) extends AST
 
 /* These can be both statements and expressions */
 case class LocalInvocation(name : String, args : Seq[AST]) extends AST
 case class Invocation(recipient : AST, name : String, args : Seq[AST]) extends AST
 case class Construction(name : String, args : Seq[AST]) extends AST
 
-case class Type(isLinear : Boolean, name : String) extends AST
+sealed trait TypeModifier
+case object IsFinal extends TypeModifier
+case object IsLinear extends TypeModifier
+case object IsUnique extends TypeModifier
+case object IsShared extends TypeModifier
+case class Type(modifiers : Seq[TypeModifier], name : String) extends AST
 
 /* Declarations */
 case class TypeDecl(name : String, typ : Type) extends AST
+
 case class VarDecl(typ : Type, varName : String) extends AST
+
 case class FuncDecl(name : String,
                            args : Seq[VarDecl],
                            body : Seq[AST]) extends AST

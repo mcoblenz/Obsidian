@@ -4,6 +4,9 @@ import scala.util.parsing.input.Positional
 
 sealed trait Token extends Positional
 
+/* Although most of the below tokens don't appear to have any data, they must
+ * be case classes instead of case objects because Token extends Positional */
+
 /* keywords */
 case class ContractT() extends Token { override def toString : String = "contract" }
 case class IfT() extends Token { override def toString : String = "if" }
@@ -21,6 +24,11 @@ case class OrT() extends Token { override def toString : String = "or" }
 case class ReturnT() extends Token { override def toString : String = "return" }
 case class LinearT() extends Token { override def toString : String = "linear" }
 case class NewT() extends Token { override def toString : String = "new" }
+case class SwitchT() extends Token { override def toString : String = "switch"}
+case class CaseT() extends Token { override def toString : String = "case"}
+case class UniqueT() extends Token { override def toString : String = "unique"}
+case class SharedT() extends Token { override def toString : String = "shared"}
+case class FinalT() extends Token { override def toString : String = "final"}
 
 case class IdentifierT(x : String) extends Token { override def toString : String = s"$x" }
 case class NumLiteralT(x : Int) extends Token { override def toString : String = s"$x" }

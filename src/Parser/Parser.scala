@@ -30,11 +30,17 @@ object Parser extends Parsers {
         accept("identifier", { case IdentifierT(name) => name })
     }
 
-    private def parseType = {
-        opt(LinearT()) ~ parseIdString ^^ {
-            case Some(_) ~ id => Type(true, id)
-            case None ~ id => Type(false, id)
-        }
+    private def parseTypeModifier = {
+        val linearP = LinearT() ^^ (_ => IsLinear)
+        val finalP = FinalT() ^^ (_ => IsFinal)
+        val uniqueP = UniqueT() ^^ (_ => IsUnique)
+        val sharedP = SharedT() ^^ (_ => IsShared)
+
+        linearP | finalP | uniqueP | sharedP
+    }
+
+    private def parseType = rep(parseTypeModifier) ~ parseIdString ^^ {
+        case mods ~ id => Type(mods, id)
     }
 
     private def parseArgList : Parser[Seq[AST]] = repsep(parseExpr, CommaT())
@@ -64,9 +70,14 @@ object Parser extends Parsers {
             case _ ~ name ~ _ => Transition(name)
         }
 
-        val parseVarDeclAssn = parseType ~ parseIdString ~ EqT() ~! parseExpr ~! SemicolonT() ^^ {
-            case typ ~ name ~ _ ~ e ~ _ =>
-                Seq(VarDecl(typ, name), Assignment(Variable(name), e))
+        val parseVarDeclAssn =
+            parseType ~ parseIdString ~ EqT() ~! parseExpr ~! SemicolonT() ^^ {
+                case typ ~ name ~ _ ~ e ~ _ =>
+                    Seq(VarDecl(typ, name), Assignment(Variable(name), e))
+        }
+
+        val assign = EqT() ~! parseExpr ^^ {
+            case _ ~ e2 => (e1 : AST) => Assignment(e1, e2)
         }
 
         val parseThrow = ThrowT() ~! SemicolonT() ^^ { case _ => Throw() }
@@ -84,11 +95,16 @@ object Parser extends Parsers {
             case _ ~ _ ~ s1 ~ _ ~ _ ~ _ ~ s2 => TryCatch(s1, s2)
         }
 
-        val assign = EqT() ~! parseExpr ^^ {
-                case _ ~ e2 => (e1 : AST) => Assignment(e1, e2)
-            }
+        val parseCase = CaseT() ~! parseIdString ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case _ ~ name ~ _ ~ body ~ _ => SwitchCase(name, body)
+        }
 
-        /* allow arbitrary expressions here and then check at a later stage if
+        val parseSwitch =
+            SwitchT() ~! parseExpr ~! LBraceT() ~! rep(parseCase) ~! RBraceT() ^^ {
+                case _ ~ e ~ _ ~ cases ~ _ => Switch(e, cases)
+        }
+
+        /* allow arbitrary expr as a statement and then check at later stage if
          * the expressions makes sense as the recipient of an assignment or
          * as a side-effect statement (e.g. func invocation) */
         val parseExprFirst = {
@@ -101,7 +117,7 @@ object Parser extends Parsers {
         val seqify = (p : Parser[AST]) => p ^^ { case a => Seq(a) }
 
         seqify(parseReturn) | seqify(parseTransition) | seqify(parseThrow) |
-        parseVarDeclAssn | seqify(parseVarDecl) | seqify(parseIf) |
+        parseVarDeclAssn | seqify(parseVarDecl) | seqify(parseIf) | seqify(parseSwitch) |
         seqify(parseTryCatch) | seqify(parseExprFirst)
     }
 
@@ -251,7 +267,11 @@ object Parser extends Parsers {
         parseProgram(reader) match {
             case Success(result, _) => Right(result)
             case Failure(msg , _) => Left(s"FAILURE: $msg")
-            case Error(msg , next) => Left(s"ERROR: $msg" + " at " + next.first.pos)
+            case Error(msg , next) => {
+                val line = next.first.pos.line
+                val col = next.first.pos.column
+                Left(s"Error: `$msg at $line:$col")
+            }
         }
     }
 }
