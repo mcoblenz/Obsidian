@@ -1,0 +1,19 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="LexerTests" type="ScalaTestRunConfiguration" factoryName="ScalaTest">
+    <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea" />
+    <module name="Obsidian" />
+    <setting name="path" value="" />
+    <setting name="package" value="tests" />
+    <setting name="vmparams" value="" />
+    <setting name="params" value="" />
+    <setting name="workingDirectory" value="file://$PROJECT_DIR$" />
+    <setting name="searchForTest" value="Across module dependencies" />
+    <setting name="testName" value="" />
+    <setting name="testKind" value="All in package" />
+    <setting name="showProgressMessages" value="true" />
+    <classRegexps />
+    <testRegexps />
+    <envs />
+    <method />
+  </configuration>
+</component>
