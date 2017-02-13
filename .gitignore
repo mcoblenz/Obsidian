@@ -16,6 +16,9 @@ project/plugins/project/
 .scala_dependencies
 .worksheet
 
+# macOS index files
+**/.DS_Store
+
 #IntelliJ
 # User-specific stuff:
 .idea/workspace.xml

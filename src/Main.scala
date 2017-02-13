@@ -2,48 +2,6 @@ import Lexer._
 import Parser._
 
 object Main {
-    val cases = List(
-        """
-contract C { transaction f() { hello = 1; world = 2; } }
-        """,
-        """
-contract C {
-    state S1 { }
-}
-        """,
-        """
-contract C {
-    state S1 {
-        transaction t1() {
-            x.x = x.x.x.x();
-            x = x.x.x.x();
-            x();
-            x().f = x();
-            x.f.f();
-            new A();
-            a = new A();
-            T x;
-            T x = x;
-            T x = x.f();
-            T x = new T();
-        }
-    }
-}
-        """,
-        """
-contract C {
-    state S1 {
-        transaction t1() {
-            return f(;
-        }
-    }
-}
-        """
-    )
-
-    def printAST(ast : AST) : Unit = {
-        println(ast.toString().replaceAll(",", "\n,"))
-    }
 
     def run(src : String) : Unit = {
         val tokens : Seq[Token] = Lexer.tokenize(src) match {
@@ -56,11 +14,20 @@ contract C {
             case Right(tree) => tree
         }
 
-        printAST(ast)
-        println()
+        println(ast)
     }
 
-    def main(args: Array[String]) : Unit = {
-        cases.map(run)
+    def main(args : Array[String]) : Unit = {
+        if (args.length == 0) {
+            println("Provide at least one file as an argument")
+            return
+        }
+
+        for (fileName <- args) {
+            val source = scala.io.Source.fromFile(fileName)
+            val srcString = try source.getLines() mkString "\n" finally source.close()
+            run(srcString)
+            println()
+        }
     }
 }

@@ -15,7 +15,7 @@ class LexerTests extends JUnitSuite {
     }
     private def shouldFail(src : String) : Unit = {
         Lexer.tokenize(src) match {
-            case Right(res) => assert(false)
+            case Right(_) => assert(false)
             case Left(_) => ()
         }
     }

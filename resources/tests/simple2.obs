@@ -1,0 +1,23 @@
+contract C {
+    final int x;
+    int y;
+    final address a;
+
+    state S1 {
+        transaction t1() {
+            y = 1;
+            ->S2;
+        }
+    }
+
+    state S2 {
+        function f() {
+            y = 2;
+        }
+
+        transaction t2() {
+            f();
+            ->S1;
+        }
+    }
+}

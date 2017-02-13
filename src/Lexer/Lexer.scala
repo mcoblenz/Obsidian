@@ -65,10 +65,10 @@ object Lexer extends RegexParsers {
 
     lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
-    plusP | starP | forwardSlashP | minusP |
-
     /* order is important here because some tokens contain the others */
-    gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP)
+    gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
+
+    plusP | starP | forwardSlashP | minusP)
 
     private def tokenParser : Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))
 
