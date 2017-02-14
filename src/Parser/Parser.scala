@@ -229,27 +229,27 @@ object Parser extends Parsers {
 
     private def parseFieldDecl = {
         parseType ~ parseIdString ~! SemicolonT() ^^ {
-            case typ ~ name ~ _ => FieldDecl(typ, name)
+            case typ ~ name ~ _ => Field(typ, name)
         }
     }
 
     private def parseFuncDecl = {
         FunctionT() ~! parseIdString ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => FuncDecl(name, args, body)
+            case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => Func(name, args, body)
         }
     }
 
     private def parseTransDecl = {
         TransactionT() ~! parseIdString ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => TransactionDecl(name, args, body)
+            case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => Transaction(name, args, body)
         }
     }
 
     private def parseStateDecl = {
         StateT() ~! parseIdString ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ defs ~ _ => StateDecl(name, defs)
+            case _ ~ name ~ _ ~ defs ~ _ => State(name, defs)
         }
     }
 

@@ -47,19 +47,23 @@ case object IsFinal extends TypeModifier
 case object IsLinear extends TypeModifier
 case object IsUnique extends TypeModifier
 case object IsShared extends TypeModifier
-case class Type(modifiers : Seq[TypeModifier], name : String) extends AST
+case class Type(modifiers : Seq[TypeModifier], name : String) extends AST // TODO: refine
 
 /* Declarations */
 case class TypeDecl(name : String, typ : Type) extends Declaration
 
-case class FieldDecl(typ : Type, fieldName : String) extends Declaration
+case class Field(typ : Type, fieldName : String) extends Declaration
 
-case class FuncDecl(name : String,
-                           args : Seq[VariableDecl],
-                           body : Seq[Statement]) extends Declaration
-case class TransactionDecl(name : String,
-                                  args : Seq[VariableDecl],
-                                  body : Seq[Statement]) extends Declaration
-case class StateDecl(name : String, declarations : Seq[Declaration]) extends Declaration
-case class ContractDecl(name : String, declarations : Seq[Declaration]) extends AST
-case class Program(contracts : Seq[ContractDecl]) extends AST
+case class Func(name : String,
+                args : Seq[VariableDecl],
+                body : Seq[Statement]) extends Declaration
+case class Transaction(name : String,
+                       args : Seq[VariableDecl],
+                       body : Seq[Statement]) extends Declaration
+case class State(name : String, declarations : Seq[Declaration]) extends Declaration
+
+
+case class Contract(name : String, declarations : Seq[Declaration]) extends AST
+
+/* Program */
+case class Program(contracts : Seq[Contract]) extends AST
