@@ -259,7 +259,7 @@ object Parser extends Parsers {
 
     private def parseContractDecl = {
         ContractT() ~! parseIdString ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ defs ~ _ => ContractDecl(name, defs)
+            case _ ~ name ~ _ ~ defs ~ _ => Contract(name, defs)
         }
     }
 

@@ -26,7 +26,7 @@ case class LessThanOrEquals(e1 : Expression, e2 : Expression) extends Expression
 case class NotEquals(e1 : Expression, e2 : Expression) extends Expression
 case class Dereference(e : Expression, f : String) extends Expression
 case class LocalInvocation(name : String, args : Seq[Expression]) extends Expression
-case class Invocation(recipient : Statement, name : String, args : Seq[Expression]) extends Expression
+case class Invocation(recipient : Expression, name : String, args : Seq[Expression]) extends Expression
 case class Construction(name : String, args : Seq[Expression]) extends Expression
 
 /* statements and control flow constructs */
@@ -40,7 +40,7 @@ case class If(eCond : Expression, s : Seq[Statement]) extends Statement
 case class IfThenElse(eCond : Expression, s1 : Seq[Statement], s2 : Seq[Statement]) extends Statement
 case class TryCatch(s1 : Seq[Statement], s2 : Seq[Statement]) extends Statement
 case class Switch(e : Expression, cases : Seq[SwitchCase]) extends Statement
-case class SwitchCase(stateName : String, body : Seq[Statement]) extends Statement
+case class SwitchCase(stateName : String, body : Seq[Statement]) extends AST
 
 sealed trait TypeModifier
 case object IsFinal extends TypeModifier
