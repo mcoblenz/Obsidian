@@ -1,0 +1,17 @@
+contract Simple3 {
+    final int x;
+    int y;
+    final address a;
+
+    transaction t1() {
+        y = 1;
+    }
+
+    transaction t2() {
+        if y > 3 {
+            y = 0;
+        } else {
+            throw;
+        }
+    }
+}

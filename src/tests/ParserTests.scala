@@ -16,7 +16,7 @@ class ParserTests extends JUnitSuite {
             }
             case Right(res) => res
         }
-        Parser.parseAST(tokens)
+        Parser.parseProgram(tokens)
     }
 
     private def shouldSucceed(src : String) : Unit = {

@@ -267,7 +267,7 @@ object Parser extends Parsers {
         phrase(rep1(parseContractDecl)) ^^ { Program(_) }
     }
 
-    def parseAST(tokens : Seq[Token]) : Either[String, AST] = {
+    def parseProgram(tokens : Seq[Token]) : Either[String, Program] = {
         val reader = new TokenReader(tokens)
         parseProgram(reader) match {
             case Success(result, _) => Right(result)

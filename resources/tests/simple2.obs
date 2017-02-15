@@ -1,4 +1,4 @@
-contract C {
+contract Simple2 {
     final int x;
     int y;
     final address a;
@@ -12,7 +12,7 @@ contract C {
 
     state S2 {
         function f() {
-            y = 2;
+            y = y + y;
         }
 
         transaction t2() {
