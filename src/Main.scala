@@ -5,7 +5,7 @@ import Lexer._
 import _root_.Parser._
 import CodeGen._
 
-class CompilerOptions (val printTokens : Boolean,
+class CompilerOptions (val printTokens: Boolean,
                        val printAST: Boolean) {
 }
 
@@ -13,7 +13,7 @@ class CompilerOptions (val printTokens : Boolean,
 
 object Main {
 
-    def compile(srcPath : String, options : CompilerOptions) : Unit = {
+    def compile(srcPath: String, options: CompilerOptions): Unit = {
         val bufferedSource = scala.io.Source.fromFile(srcPath)
         val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
 
@@ -53,7 +53,7 @@ object Main {
         javaModel.build(new File(where))
     }
 
-    def main(args : Array[String]) : Unit = {
+    def main(args: Array[String]): Unit = {
         if (args.length == 0) {
             println("Provide at least one file as an argument")
             return
@@ -61,10 +61,10 @@ object Main {
 
         var printTokens = false
         var printAST = false
-        var inputFiles : List[String] = Nil
+        var inputFiles: List[String] = Nil
 
-        def parseOptions(list : List[String]) : Unit = {
-            def isSwitch (s : String) = s(0) == '-'
+        def parseOptions(list: List[String]): Unit = {
+            def isSwitch (s: String) = s(0) == '-'
 
             list match {
                 case Nil =>

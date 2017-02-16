@@ -61,7 +61,7 @@ object Lexer extends RegexParsers {
     private def rightArrowP = """->""".r ^^ (_ => RightArrowT())
     private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT())
 
-    private def oneToken : Parser[Token] = (decimalP | hexP | atomP |
+    private def oneToken: Parser[Token] = (decimalP | hexP | atomP |
 
     lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
@@ -70,9 +70,9 @@ object Lexer extends RegexParsers {
 
     plusP | starP | forwardSlashP | minusP)
 
-    private def tokenParser : Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))
+    private def tokenParser: Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))
 
-    def tokenize(src : String) : Either[String, Seq[Token]] = {
+    def tokenize(src: String): Either[String, Seq[Token]] = {
         parse(tokenParser, src) match {
             case Success(matched , _) => Right(matched)
             case Failure(msg ,_) => Left("FAILURE: " + msg)

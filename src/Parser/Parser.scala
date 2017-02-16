@@ -26,7 +26,7 @@ E1 ::= ( E ) | n | x | true | false
 object Parser extends Parsers {
     override type Elem = Token
 
-    private def parseIdString : Parser[String] = {
+    private def parseIdString: Parser[String] = {
         accept("identifier", { case IdentifierT(name) => name })
     }
 
@@ -43,16 +43,16 @@ object Parser extends Parsers {
         case mods ~ id => Type(mods, id)
     }
 
-    private def parseArgList : Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
+    private def parseArgList: Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
 
-    private def parseArgDefList : Parser[Seq[VariableDecl]] = {
+    private def parseArgDefList: Parser[Seq[VariableDecl]] = {
         val oneDecl = parseType ~ parseIdString ^^ {
             case typ ~ name => VariableDecl(typ, name)
         }
         repsep(oneDecl, CommaT())
     }
 
-    private def parseBody : Parser[Seq[Statement]] =
+    private def parseBody: Parser[Seq[Statement]] =
         parseAtomicStatement ~ opt(parseBody) ^^ {
             case s ~ None => s
             case s1 ~ Some(s2) => s1 ++ s2
@@ -60,7 +60,7 @@ object Parser extends Parsers {
 
     /* this parser is for Seq[AST] instead of AST to handle declaration
      *  and assignment of a variable in a single statement */
-    private def parseAtomicStatement : Parser[Seq[Statement]] = {
+    private def parseAtomicStatement: Parser[Seq[Statement]] = {
         val parseReturn = ReturnT() ~ opt(parseExpr) ~! SemicolonT() ^^ {
             case _ ~ Some(e) ~ _ => ReturnExpr(e)
             case _ ~ None ~ _ => Return
@@ -82,7 +82,7 @@ object Parser extends Parsers {
             }
 
         val assign = EqT() ~! parseExpr ^^ {
-            case _ ~ e2 => (e1 : Expression) => Assignment(e1, e2)
+            case _ ~ e2 => (e1: Expression) => Assignment(e1, e2)
         }
 
         val parseThrow = ThrowT() ~! SemicolonT() ^^ { case _ => Throw() }
@@ -119,7 +119,7 @@ object Parser extends Parsers {
             }
         }
 
-        val seqify = (p : Parser[Statement]) => p ^^ { case a => Seq(a) }
+        val seqify = (p: Parser[Statement]) => p ^^ { case a => Seq(a) }
 
         seqify(parseReturn) | seqify(parseTransition) | seqify(parseThrow) |
         parseVarDeclAssn | seqify(parseVarDecl) | seqify(parseIf) | seqify(parseSwitch) |
@@ -128,10 +128,10 @@ object Parser extends Parsers {
 
 
     /* this is a lot better than manually writing code for all the AST operators */
-    private def parseBinary(t : Token,
-                            makeExpr : (Expression, Expression) => Expression,
-                            nextParser : Parser[Expression]
-                           ) : Parser[Expression] = {
+    private def parseBinary(t: Token,
+                            makeExpr: (Expression, Expression) => Expression,
+                            nextParser: Parser[Expression]
+                           ): Parser[Expression] = {
         val hasOpParser = t ~ parseBinary(t, makeExpr, nextParser) ^^ {
             case _ ~ e => e
         }
@@ -142,10 +142,10 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseUnary(t : Token,
-                   makeExpr : Expression => Expression,
-                   nextParser : Parser[Expression]
-                  ) : Parser[Expression] = {
+    private def parseUnary(t: Token,
+                   makeExpr: Expression => Expression,
+                   nextParser: Parser[Expression]
+                  ): Parser[Expression] = {
         val hasOpParser = t ~ parseUnary(t, makeExpr, nextParser) ^^ {
             case _ ~ e => makeExpr(e)
         }
@@ -183,27 +183,27 @@ object Parser extends Parsers {
 
     type DotExpr = Either[String, (String, Seq[Expression])]
 
-    private def foldDotExpr(e : Expression, dots : Seq[DotExpr]) : Expression = {
+    private def foldDotExpr(e: Expression, dots: Seq[DotExpr]): Expression = {
         dots.foldLeft(e)(
-            (e : Expression, inv : DotExpr) => inv match {
+            (e: Expression, inv: DotExpr) => inv match {
                 case Left(fieldName) => Dereference(e, fieldName)
                 case Right((funcName, args)) => Invocation(e, funcName, args)
             }
         )
     }
 
-    private def parseDots : Parser[Expression => Expression] = {
+    private def parseDots: Parser[Expression => Expression] = {
         val parseOne = DotT() ~! parseIdString ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
             case _ ~ name ~ Some(_ ~ args ~ _) => Right((name, args))
             case _ ~ name ~ None => Left(name)
         }
 
         rep(parseOne) ^^ {
-            case lst => (e : Expression) => foldDotExpr(e, lst)
+            case lst => (e: Expression) => foldDotExpr(e, lst)
         }
     }
 
-    private def parseExprBottom : Parser[Expression] = {
+    private def parseExprBottom: Parser[Expression] = {
         val parenExpr = LParenT() ~! parseExpr ~! RParenT() ^^ {
             case _ ~ e ~ _ => e
         }
@@ -253,7 +253,7 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseDecl : Parser[Declaration] = {
+    private def parseDecl: Parser[Declaration] = {
         parseFieldDecl | parseFuncDecl | parseTransDecl | parseStateDecl
     }
 
@@ -267,7 +267,7 @@ object Parser extends Parsers {
         phrase(rep1(parseContractDecl)) ^^ { Program(_) }
     }
 
-    def parseProgram(tokens : Seq[Token]) : Either[String, Program] = {
+    def parseProgram(tokens: Seq[Token]): Either[String, Program] = {
         val reader = new TokenReader(tokens)
         parseProgram(reader) match {
             case Success(result, _) => Right(result)

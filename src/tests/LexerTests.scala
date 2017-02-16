@@ -7,38 +7,38 @@ import Lexer._
 
 class LexerTests extends JUnitSuite {
 
-    private def shouldSucceed(src : String) : Unit = {
+    private def shouldSucceed(src: String): Unit = {
         Lexer.tokenize(src) match {
             case Right(_) => ()
             case Left(_) => assert(false)
         }
     }
-    private def shouldFail(src : String) : Unit = {
+    private def shouldFail(src: String): Unit = {
         Lexer.tokenize(src) match {
             case Right(_) => assert(false)
             case Left(_) => ()
         }
     }
 
-    private def testAndPrint(src : String) : Unit = {
+    private def testAndPrint(src: String): Unit = {
         println(Lexer.tokenize(src))
     }
 
-    private def shouldEqual(src : String, tokens : Seq[Token]) : Unit = {
+    private def shouldEqual(src: String, tokens: Seq[Token]): Unit = {
         Lexer.tokenize(src) match {
             case Right(res) => assert(res == tokens)
             case Left(_) => assert(false)
         }
     }
 
-    private def shouldEqual(src1 : String, src2 : String) : Unit = {
+    private def shouldEqual(src1: String, src2: String): Unit = {
         (Lexer.tokenize(src1), Lexer.tokenize(src2)) match {
             case (Right(res1), Right(res2)) => assert(res1 == res2)
             case _ => ()
         }
     }
 
-    @Test def keywords() : Unit = {
+    @Test def keywords(): Unit = {
         shouldEqual(
             """
               | contract Contract if else transaction trans function function1 type state try
@@ -52,7 +52,7 @@ class LexerTests extends JUnitSuite {
         )
     }
 
-    @Test def simpleProgram() : Unit = {
+    @Test def simpleProgram(): Unit = {
         shouldSucceed(
             """
               | contract C { state S { transaction a() { this.call(); this = that; }}}
@@ -60,7 +60,7 @@ class LexerTests extends JUnitSuite {
         )
     }
 
-    @Test def simpleProgramWithWeirdWhitespace() : Unit = {
+    @Test def simpleProgramWithWeirdWhitespace(): Unit = {
         shouldEqual(
             """
               | contract C{state S{transaction a  (  ){this . call(  );this=  that ;}} }
@@ -72,7 +72,7 @@ class LexerTests extends JUnitSuite {
     }
 
     /* TODO: devise a parsing scheme where these fail */
-    @Test def integerValues() : Unit = {
+    @Test def integerValues(): Unit = {
         shouldFail("0000")
         shouldFail("0aaa")
     }

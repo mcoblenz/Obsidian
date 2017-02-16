@@ -5,13 +5,13 @@ import com.sun.codemodel.internal._
 
 class CodeGen {
 
-    private val model : JCodeModel = new JCodeModel()
+    private val model: JCodeModel = new JCodeModel()
 
-    def translateProgram(program : Program) : JCodeModel = {
-        val programPackage : JPackage = model._package("edu.cmu.cs.obsidian.generated-code") // Put all generated code in the same package.
+    def translateProgram(program: Program): JCodeModel = {
+        val programPackage: JPackage = model._package("edu.cmu.cs.obsidian.generated-code") // Put all generated code in the same package.
 
 
-        for (aContract : Contract <- program.contracts) {
+        for (aContract: Contract <- program.contracts) {
             translateContract(aContract, programPackage)
         }
 
@@ -20,8 +20,8 @@ class CodeGen {
 
 
     // Contracts translate to compilation units containing one class.
-    private def translateContract (aContract : Contract, programPackage : JPackage): Unit = {
-        val newClass : JDefinedClass = programPackage._class(aContract.name)
+    private def translateContract (aContract: Contract, programPackage: JPackage): Unit = {
+        val newClass: JDefinedClass = programPackage._class(aContract.name)
         newClass.field(JMod.PRIVATE, model.ref("String"), "__state")
         val stateMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "getState")
         stateMeth.body()._return(JExpr.ref("__state"))
@@ -31,7 +31,7 @@ class CodeGen {
         }
     }
 
-    private def translateDeclaration(declaration: Declaration, newClass : JDefinedClass): Unit = {
+    private def translateDeclaration(declaration: Declaration, newClass: JDefinedClass): Unit = {
         declaration match {
             case t@TypeDecl(_,_) => () // TODO
             case f@Field(_,_) => translateFieldDecl(f, newClass)
@@ -41,7 +41,7 @@ class CodeGen {
         }
     }
 
-    private def resolveType(name : String) : JType = {
+    private def resolveType(name: String): JType = {
         name match {
             case "ether" => model.ref("Ether")
             case "int" => model.ref("BigInteger")
@@ -49,14 +49,14 @@ class CodeGen {
         }
     }
 
-    private def translateFieldDecl(decl : Field, newClass : JDefinedClass) : Unit = {
+    private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
         newClass.field(JMod.PRIVATE, resolveType(decl.typ.name), decl.fieldName)
     }
 
     /* returns an expr because exprs are built bottom-up (unlike everything else) */
-    private def translateExpr(e : Expression): JExpression = {
+    private def translateExpr(e: Expression): JExpression = {
         /* helper for invocations */
-        val foldF = (inv : JInvocation, arg : Expression) => inv.arg(translateExpr(arg))
+        val foldF = (inv: JInvocation, arg: Expression) => inv.arg(translateExpr(arg))
 
         e match {
             case Variable(x) => JExpr.ref(x)
@@ -86,7 +86,7 @@ class CodeGen {
         }
     }
 
-    private def translateStatement(body : JBlock, statement : Statement): Unit = {
+    private def translateStatement(body: JBlock, statement: Statement): Unit = {
         statement match {
             case VariableDecl(typ, name) => body.decl(resolveType(typ.name), name)
             case Return => body._return()
@@ -119,7 +119,7 @@ class CodeGen {
             case Switch(e, cases) => {
                 val h :: _ = cases
                 val jEx = translateExpr(e)
-                val eqState = (s : String) =>
+                val eqState = (s: String) =>
                     JExpr.invoke(jEx, "getState").eq(JExpr.lit(s))
 
                 val jIf = body._if(eqState(h.stateName))
@@ -151,14 +151,14 @@ class CodeGen {
         }
     }
 
-    private def translateBody(body : JBlock, statements : Seq[Statement]): Unit = {
+    private def translateBody(body: JBlock, statements: Seq[Statement]): Unit = {
         for (st <- statements) {
             translateStatement(body, st)
         }
     }
 
-    private def translateFuncDecl(decl : Func, newClass : JDefinedClass) : Unit = {
-        val meth : JMethod = newClass.method(JMod.PRIVATE, model.VOID, decl.name)
+    private def translateFuncDecl(decl: Func, newClass: JDefinedClass): Unit = {
+        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, decl.name)
 
         /* add args */
         for (arg <- decl.args) {
@@ -169,8 +169,8 @@ class CodeGen {
         translateBody(meth.body(), decl.body)
     }
 
-    private def translateTransDecl(decl : Transaction, newClass : JDefinedClass) : Unit = {
-        val meth : JMethod = newClass.method(JMod.PUBLIC, model.VOID, decl.name)
+    private def translateTransDecl(decl: Transaction, newClass: JDefinedClass): Unit = {
+        val meth: JMethod = newClass.method(JMod.PUBLIC, model.VOID, decl.name)
 
         /* add args */
         for (arg <- decl.args) {
@@ -181,7 +181,7 @@ class CodeGen {
         translateBody(meth.body(), decl.body)
     }
 
-    private def translateStateDecl(state : State, newClass : JDefinedClass) : Unit = {
+    private def translateStateDecl(state: State, newClass: JDefinedClass): Unit = {
         for (decl <- state.declarations) {
             translateDeclaration(decl, newClass)
         }

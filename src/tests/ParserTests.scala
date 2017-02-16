@@ -7,8 +7,8 @@ import Parser._
 
 class ParserTests extends JUnitSuite {
 
-    private def parse(src : String) : Either[String, AST] = {
-        val tokens : Seq[Token] = Lexer.tokenize(src) match {
+    private def parse(src: String): Either[String, AST] = {
+        val tokens: Seq[Token] = Lexer.tokenize(src) match {
             case Left(msg) => {
                 println(s"Lexing Failed: $msg")
                 assert(false)
@@ -19,31 +19,31 @@ class ParserTests extends JUnitSuite {
         Parser.parseProgram(tokens)
     }
 
-    private def shouldSucceed(src : String) : Unit = {
+    private def shouldSucceed(src: String): Unit = {
         parse(src) match {
             case Right(_) => ()
             case Left(_) => assert(false)
         }
     }
-    private def shouldFail(src : String) : Unit = {
+    private def shouldFail(src: String): Unit = {
         parse(src) match {
             case Right(res) => assert(false)
             case Left(_) => ()
         }
     }
 
-    private def testAndPrint(src : String) : Unit = {
+    private def testAndPrint(src: String): Unit = {
         println(parse(src))
     }
 
-    private def shouldEqual(src : String, ast : AST) : Unit = {
+    private def shouldEqual(src: String, ast: AST): Unit = {
         parse(src) match {
             case Right(res) => assert(res == ast)
             case Left(_) => assert(false)
         }
     }
 
-    private def shouldEqual(src1 : String, src2 : String) : Unit = {
+    private def shouldEqual(src1: String, src2: String): Unit = {
         (Lexer.tokenize(src1), Lexer.tokenize(src2)) match {
             case (Right(res1), Right(res2)) => assert(res1 == res2)
             case _ => ()
