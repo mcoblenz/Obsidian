@@ -53,11 +53,11 @@ class ParserTests extends JUnitSuite {
     @Test def simpleContracts() = {
         shouldSucceed(
             """
-              | contract C { transaction f() { hello = 1; world = 2; } }
+              | main contract C { transaction f() { hello = 1; world = 2; } }
             """.stripMargin)
         shouldSucceed(
             """
-              | contract C {
+              | main contract C {
               |     state S1 { }
               | }
             """.stripMargin)
@@ -66,7 +66,7 @@ class ParserTests extends JUnitSuite {
     @Test def goodExpressions() = {
         shouldSucceed(
             """
-              | contract C {
+              | main contract C {
               |     state S1 {
               |         transaction t1() {
               |             x = (x.f.y.z((((5)))));
@@ -81,7 +81,7 @@ class ParserTests extends JUnitSuite {
     @Test def goodStatements() = {
         shouldSucceed(
             """
-              | contract C {
+              | main contract C {
               |     state S1 {
               |         transaction t1() {
               |             x.x = x.f1.f2.f3();
@@ -107,10 +107,10 @@ class ParserTests extends JUnitSuite {
     }
 
     @Test def badStatements() = {
-        shouldFail("""contract C { state S { transaction t() {
+        shouldFail("""main contract C { state S { transaction t() {
               | new;
               | }}}""".stripMargin)
-        shouldFail("""contract C { state S { transaction t() {
+        shouldFail("""main contract C { state S { transaction t() {
               | return (;
               | }}}""".stripMargin)
     }
@@ -118,7 +118,7 @@ class ParserTests extends JUnitSuite {
     @Test def goodFuncArgs() = {
         shouldSucceed(
             """
-              | contract C {
+              | main contract C {
               |     state S1 {
               |         function f() { return x; }
               |         function f(T x) { return x; }
@@ -142,16 +142,16 @@ class ParserTests extends JUnitSuite {
     }
 
     @Test def badFuncArgs() = {
-        shouldFail("""contract C { state S {
+        shouldFail("""main contract C { state S {
               | transaction t(x) { return x; }
               | }}""".stripMargin)
-        shouldFail("""contract C { state S {
+        shouldFail("""main contract C { state S {
               | function t(x) { return x; }
               | }}""".stripMargin)
-        shouldFail("""contract C { state S {
+        shouldFail("""main contract C { state S {
               | transaction t(x, T x) { return x; }
               | }}""".stripMargin)
-        shouldFail("""contract C { state S { transaction t() {
+        shouldFail("""main contract C { state S { transaction t() {
               | f(T x);
               | }}}""".stripMargin)
     }

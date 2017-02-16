@@ -43,11 +43,8 @@ case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
 
 sealed trait TypeModifier
-case object IsFinal extends TypeModifier
 case object IsLinear extends TypeModifier
-case object IsUnique extends TypeModifier
-case object IsShared extends TypeModifier
-case class Type(modifiers: Seq[TypeModifier], name: String) extends AST // TODO: refine
+case class Type(modifiers: Option[TypeModifier], name: String) extends AST // TODO: refine
 
 /* Declarations */
 case class TypeDecl(name: String, typ: Type) extends Declaration
@@ -62,8 +59,12 @@ case class Transaction(name: String,
                        body: Seq[Statement]) extends Declaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration
 
+sealed trait ContractModifier
+case object IsUnique extends ContractModifier
+case object IsShared extends ContractModifier
+case object IsMain extends ContractModifier
 
-case class Contract(name: String, declarations: Seq[Declaration]) extends AST
+case class Contract(mod: ContractModifier, name: String, declarations: Seq[Declaration]) extends AST
 
 /* Program */
 case class Program(contracts: Seq[Contract]) extends AST

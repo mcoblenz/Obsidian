@@ -35,7 +35,7 @@ object Lexer extends RegexParsers {
         case "case" => CaseT()
         case "unique" => UniqueT()
         case "shared" => SharedT()
-        case "final" => FinalT()
+        case "main" => MainT()
         case id => IdentifierT(id)
     }
 

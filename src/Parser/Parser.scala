@@ -32,15 +32,11 @@ object Parser extends Parsers {
 
     private def parseTypeModifier = {
         val linearP = LinearT() ^^ (_ => IsLinear)
-        val finalP = FinalT() ^^ (_ => IsFinal)
-        val uniqueP = UniqueT() ^^ (_ => IsUnique)
-        val sharedP = SharedT() ^^ (_ => IsShared)
-
-        linearP | finalP | uniqueP | sharedP
+        linearP
     }
 
-    private def parseType = rep(parseTypeModifier) ~ parseIdString ^^ {
-        case mods ~ id => Type(mods, id)
+    private def parseType = opt(parseTypeModifier) ~ parseIdString ^^ {
+        case mod ~ id => Type(mod, id)
     }
 
     private def parseArgList: Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
@@ -257,9 +253,17 @@ object Parser extends Parsers {
         parseFieldDecl | parseFuncDecl | parseTransDecl | parseStateDecl
     }
 
+    private def parseContractModififier = {
+        val mainP = MainT() ^^ (_ => IsMain)
+        val uniqueP = UniqueT() ^^ (_ => IsUnique)
+        val sharedP = SharedT() ^^ (_ => IsShared)
+        mainP | uniqueP | sharedP
+    }
+
     private def parseContractDecl = {
-        ContractT() ~! parseIdString ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ defs ~ _ => Contract(name, defs)
+        parseContractModififier ~! ContractT() ~! parseIdString ~!
+            LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
+            case mod ~ _ ~ name ~ _ ~ defs ~ _ => Contract(mod, name, defs)
         }
     }
 

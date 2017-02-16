@@ -1,7 +1,7 @@
-contract Simple2 {
-    final int x;
+main contract Simple2 {
+    int x;
     int y;
-    final address a;
+    address a;
 
     state S1 {
         transaction t1() {

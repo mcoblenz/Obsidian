@@ -1,7 +1,7 @@
-contract Simple3 {
-    final int x;
+main contract Simple3 {
+    int x;
     int y;
-    final address a;
+    address a;
 
     transaction t1() {
         y = 1;
