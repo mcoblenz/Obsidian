@@ -1,8 +1,5 @@
 package CodeGen
 
-import java.io._
-import java.nio.file.{Files, Paths}
-
 import Parser._
 import com.sun.codemodel.internal._
 
@@ -10,7 +7,7 @@ class CodeGen {
 
     private val model : JCodeModel = new JCodeModel()
 
-    def translateProgram(program : Program) : Unit = {
+    def translateProgram(program : Program) : JCodeModel = {
         val programPackage : JPackage = model._package("edu.cmu.cs.obsidian.generated-code") // Put all generated code in the same package.
 
 
@@ -18,9 +15,7 @@ class CodeGen {
             translateContract(aContract, programPackage)
         }
 
-        val where = "out/generated_java"
-        Files.createDirectories(Paths.get(where))
-        model.build(new File(where))
+        model
     }
 
 

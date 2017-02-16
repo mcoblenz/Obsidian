@@ -1,38 +1,56 @@
+import java.io.File
+import java.nio.file.{Files, Paths}
+
 import Lexer._
-import Parser._
+import _root_.Parser._
 import CodeGen._
+
+class CompilerOptions (val printTokens : Boolean,
+                       val printAST: Boolean) {
+}
+
+
 
 object Main {
 
-    def run(src : String) : Unit = {
+    def compile(srcPath : String, options : CompilerOptions) : Unit = {
+        val bufferedSource = scala.io.Source.fromFile(srcPath)
+        val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
+
         val sep = "============================================================================"
-        val tokens : Seq[Token] = Lexer.tokenize(src) match {
+        val tokens: Seq[Token] = Lexer.tokenize(src) match {
             case Left(msg) => println(msg); return
             case Right(ts) => ts
         }
 
-        println("Tokens")
-        println(sep)
-        println()
-        println(tokens)
-        println()
-        println(sep)
+        if (options.printTokens) {
+            println("Tokens:")
+            println(sep)
+            println()
+            println(tokens)
+            println()
+            println(sep)
+        }
 
-        val ast : Program = Parser.parseProgram(tokens) match {
+        val ast: Program = Parser.parseProgram(tokens) match {
             case Left(msg) => println(msg); return
             case Right(tree) => tree
         }
 
-        println("AST")
-        println(sep)
-        println()
-        println(ast)
-        println()
-        println(sep)
+        if (options.printAST) {
+            println("AST")
+            println(sep)
+            println()
+            println(ast)
+            println()
+            println(sep)
+        }
 
         val codeGen = new CodeGen()
-        codeGen.translateProgram(ast)
-
+        val javaModel = codeGen.translateProgram(ast)
+        val where = "out/generated_java"
+        Files.createDirectories(Paths.get(where))
+        javaModel.build(new File(where))
     }
 
     def main(args : Array[String]) : Unit = {
@@ -41,11 +59,48 @@ object Main {
             return
         }
 
-        for (fileName <- args) {
-            val source = scala.io.Source.fromFile(fileName)
-            val srcString = try source.getLines() mkString "\n" finally source.close()
-            run(srcString)
-            println()
+        var printTokens = false
+        var printAST = false
+        var inputFiles : List[String] = Nil
+
+        def parseOptions(list : List[String]) : Unit = {
+            def isSwitch (s : String) = s(0) == '-'
+
+            list match {
+                case Nil =>
+                case "--print-tokens" :: tail =>
+                    printTokens = true
+                    parseOptions (tail)
+
+                case "--print-ast" :: tail =>
+                    printAST = true
+                    parseOptions (tail)
+
+                case option :: tail =>
+                    if (option.startsWith("--") || option.startsWith("-")) {
+                        println("Unknown option " + option)
+                        sys.exit(1)
+                    }
+                    else if (option.endsWith(".obs")) {
+                        // This is an input file.
+                        inputFiles = option :: inputFiles
+                        parseOptions (tail)
+                    }
+                    else {
+                        println("Unknown argument " + option)
+                        sys.exit(1)
+                    }
+
+            }
+        }
+
+        parseOptions(args.toList)
+
+        val options = new CompilerOptions(printTokens, printAST)
+
+
+        for (filename <- inputFiles) {
+            compile(filename, options)
         }
     }
 }
