@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/Obsidian.iml" filepath="$PROJECT_DIR$/Obsidian.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Obsidian Runtime/Obsidian Runtime.iml" filepath="$PROJECT_DIR$/Obsidian Runtime/Obsidian Runtime.iml" />
     </modules>
   </component>
 </project>

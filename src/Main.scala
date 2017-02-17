@@ -4,22 +4,28 @@ import java.nio.file.{Files, Paths}
 import Lexer._
 import _root_.Parser._
 import CodeGen._
+import ProtobufGen._
+import com.sun.codemodel.internal.JCodeModel
 
 class CompilerOptions (val printTokens: Boolean,
                        val printAST: Boolean) {
 }
 
+class ParseException (val message : String) extends Exception {
+
+}
+
 
 
 object Main {
+    val sep = "============================================================================"
 
-    def compile(srcPath: String, options: CompilerOptions): Unit = {
+    def parse(srcPath: String, options: CompilerOptions): Program = {
         val bufferedSource = scala.io.Source.fromFile(srcPath)
         val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
 
-        val sep = "============================================================================"
         val tokens: Seq[Token] = Lexer.tokenize(src) match {
-            case Left(msg) => println(msg); return
+            case Left(msg) => throw new ParseException(msg)
             case Right(ts) => ts
         }
 
@@ -33,24 +39,16 @@ object Main {
         }
 
         val ast: Program = Parser.parseProgram(tokens) match {
-            case Left(msg) => println(msg); return
+            case Left(msg) => println(msg); throw new ParseException(msg)
             case Right(tree) => tree
         }
 
-        if (options.printAST) {
-            println("AST")
-            println(sep)
-            println()
-            println(ast)
-            println()
-            println(sep)
-        }
+        ast
+    }
 
+    def compile (ast : Program) : JCodeModel = {
         val codeGen = new CodeGen()
-        val javaModel = codeGen.translateProgram(ast)
-        val where = "out/generated_java"
-        Files.createDirectories(Paths.get(where))
-        javaModel.build(new File(where))
+        codeGen.translateProgram(ast)
     }
 
     def main(args: Array[String]): Unit = {
@@ -98,9 +96,35 @@ object Main {
 
         val options = new CompilerOptions(printTokens, printAST)
 
+        val protobufOutputDir = "out/generated_protobuf"
+        val javaOutputDir = "out/generated_java"
+
+        Files.createDirectories(Paths.get(protobufOutputDir))
+        Files.createDirectories(Paths.get(javaOutputDir))
 
         for (filename <- inputFiles) {
-            compile(filename, options)
+            try {
+                val ast = parse(filename, options)
+
+                if (options.printAST) {
+                    println("AST")
+                    println(sep)
+                    println()
+                    println(ast)
+                    println()
+                    println(sep)
+                }
+
+                val javaModel = compile(ast)
+                javaModel.build(new File(javaOutputDir))
+
+                val p : Protobuf = ProtobufGen.translateProgram(ast)
+
+                p.build(new File(protobufOutputDir))
+            } catch {
+                case e: ParseException => println(e.message)
+            }
+
         }
     }
 }
