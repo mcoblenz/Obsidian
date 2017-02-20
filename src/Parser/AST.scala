@@ -1,4 +1,4 @@
-package Parser
+package edu.cmu.cs.obsidian.parser
 
 sealed trait AST
 sealed trait Statement extends AST

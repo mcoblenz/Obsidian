@@ -1,6 +1,6 @@
 package CodeGen
 
-import Parser._
+import edu.cmu.cs.obsidian.parser._
 import com.sun.codemodel.internal._
 
 class CodeGen {

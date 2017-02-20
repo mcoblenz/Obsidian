@@ -2,49 +2,71 @@ package ProtobufGen
 
 import java.io.File
 
-import Parser._
-import com.sun.codemodel.internal._
+import edu.cmu.cs.obsidian.parser._
 
 /**
   * Created by mcoblenz on 2/17/17.
+  *
+  * Unlike the JCodeModel class hierarchy, this class does code generation in a functional style.
   */
 object ProtobufGen {
+
+    // Programs translate to lists of messages (one per contract).
     def translateProgram(program: Program): Protobuf = {
-        new Protobuf(Nil)
-        /*
-        val programPackage: JPackage = model._package("edu.cmu.cs.obsidian.generated-code") // Put all generated code in the same package.
+        val protobuf = new Protobuf(Nil)
 
+        val messages = program.contracts.map(translateContract)
 
-        for (aContract: Contract <- program.contracts) {
-            translateContract(aContract, programPackage)
-        }
-
-        model
-        */
-    }
-    /*
-
-    // Contracts translate to compilation units containing one class.
-    private def translateContract (aContract: Contract, programPackage: JPackage): Unit = {
-        val newClass: JDefinedClass = programPackage._class(aContract.name)
-        newClass.field(JMod.PRIVATE, model.ref("String"), "__state")
-        val stateMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "getState")
-        stateMeth.body()._return(JExpr.ref("__state"))
-
-        for (decl <- aContract.declarations) {
-            translateDeclaration(decl, newClass)
-        }
+        new Protobuf(messages)
     }
 
-    private def translateDeclaration(declaration: Declaration, newClass: JDefinedClass): Unit = {
+
+    // Contracts translate to messages.
+    private def translateContract (aContract: Contract): ProtobufMessage = {
+        // We only care about the fields. The actual code is irrelevant.
+        val allDeclarations = aContract.declarations.map(translateDeclaration)
+
+        val decls : List[ProtobufDeclaration] = allDeclarations.foldLeft(List[ProtobufDeclaration]())((accum, optionField) =>
+            optionField match {case None => accum
+                               case Some(f : ProtobufDeclaration) => f :: accum
+                              }
+            )
+
+        new ProtobufMessage(decls)
+    }
+
+    private def translateDeclaration(declaration: Declaration) : Option[ProtobufDeclaration] = {
         declaration match {
-            case t@TypeDecl(_,_) => () // TODO
-            case f@Field(_,_) => translateFieldDecl(f, newClass)
-            case f@Func(_,_,_) => translateFuncDecl(f, newClass)
-            case t@Transaction(_,_,_) => translateTransDecl(t, newClass)
-            case s@State(_,_) => translateStateDecl(s, newClass)
+            case t@TypeDecl(_,_) => None // TODO
+            case f@edu.cmu.cs.obsidian.parser.Field(_,_) => Some (translateFieldDecl(f))
+            case f@Func(_,_,_) => None
+            case t@Transaction(_,_,_) => None
+            case s@State(_,_) => Some (translateStateDecl(s))
         }
     }
+
+    private def translateFieldDecl(f : edu.cmu.cs.obsidian.parser.Field) : ProtobufDeclaration = {
+        f.typ match {
+            // TODO; BoolType here is bogus.
+            case _ => new ProtobufField(BoolType(), f.fieldName)
+        }
+
+    }
+
+    private def translateStateDecl(s: State) : ProtobufDeclaration = {
+        // We only care about the fields. The actual code is irrelevant.
+        val allFields = s.declarations.map(translateDeclaration)
+
+        val fields : List[ProtobufDeclaration] = allFields.foldLeft(List[ProtobufDeclaration]())((accum, optionField) =>
+            optionField match {case None => accum
+            case Some(f : ProtobufDeclaration) => f :: accum
+            }
+        )
+
+        new ProtobufMessage(fields)
+    }
+
+/*
 
     private def resolveType(name: String): JType = {
         name match {

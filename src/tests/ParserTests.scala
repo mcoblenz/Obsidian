@@ -3,7 +3,7 @@ package tests
 import org.scalatest.junit.JUnitSuite
 import org.junit.Test
 import Lexer._
-import Parser._
+import edu.cmu.cs.obsidian.parser._
 
 class ParserTests extends JUnitSuite {
 
