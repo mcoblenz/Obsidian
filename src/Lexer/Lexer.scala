@@ -43,6 +43,8 @@ object Lexer extends RegexParsers {
         case "int" => IntT()
         case "bool" => BoolT()
         case "string" => StringT()
+        case "true" => TrueT()
+        case "false" => FalseT()
         case id => IdentifierT(id)
     }
 

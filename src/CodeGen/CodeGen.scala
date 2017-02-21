@@ -2,6 +2,7 @@ package CodeGen
 
 import edu.cmu.cs.obsidian.parser._
 import com.sun.codemodel.internal._
+import jdk.nashorn.internal.objects.annotations
 
 class CodeGen {
 
@@ -20,7 +21,7 @@ class CodeGen {
 
 
     // Contracts translate to compilation units containing one class.
-    private def translateContract (aContract: Contract, programPackage: JPackage): Unit = {
+    private def translateContract(aContract: Contract, programPackage: JPackage): Unit = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
         newClass.field(JMod.PRIVATE, model.ref("String"), "__state")
         val stateMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "getState")
@@ -34,6 +35,7 @@ class CodeGen {
     private def translateDeclaration(declaration: Declaration, newClass: JDefinedClass): Unit = {
         declaration match {
             case t@TypeDecl(_,_) => () // TODO
+            case c@Constructor(_,_,_) => translateConstructor(c, newClass)
             case f@Field(_,_) => translateFieldDecl(f, newClass)
             case f@Func(_,_,_) => translateFuncDecl(f, newClass)
             case t@Transaction(_,_,_) => translateTransDecl(t, newClass)
@@ -43,11 +45,16 @@ class CodeGen {
 
     private def resolveType(typ: Type): JType = {
         typ match {
-            case IntType() => model.INT
+            case IntType() => model.ref("BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
             case NonPrimitiveType(mods, name) => model.ref(name)
         }
+    }
+
+
+    private def translateConstructor(c: Constructor, newClass: JDefinedClass) = {
+        // TODO
     }
 
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
@@ -63,6 +70,8 @@ class CodeGen {
             case Variable(x) => JExpr.ref(x)
             case NumLiteral(n) => JExpr._new(model.ref("BigInteger")).arg(JExpr.lit(n))
             case StringLiteral(s) => JExpr.lit(s)
+            case TrueLiteral() => JExpr.TRUE
+            case FalseLiteral() => JExpr.FALSE
             case Conjunction(e1, e2) => translateExpr(e1).band(translateExpr(e2))
             case Disjunction(e1, e2) => translateExpr(e1).bor(translateExpr(e2))
             case LogicalNegation(e) => translateExpr(e).not()

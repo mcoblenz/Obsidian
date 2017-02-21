@@ -227,10 +227,14 @@ object Parser extends Parsers {
             }
         }
 
+        val parseTrue = { accept("bool literal", { case TrueT() => TrueLiteral() })}
+        val parseFalse = { accept("bool literal", { case FalseT() => FalseLiteral() })}
+
         val fail = failure("expression expected")
 
-        val simpleExpr = parseNew | parseLocalInv | parseNumLiteral |
-                         parseStringLiteral | parseVar | parenExpr | fail
+        val parseLiterals = parseTrue | parseFalse | parseNumLiteral | parseStringLiteral
+
+        val simpleExpr = parseNew | parseLocalInv | parseLiterals | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }
@@ -261,8 +265,18 @@ object Parser extends Parsers {
         }
     }
 
+    // TODO
+    // maybe we can check here that the constructor has the appropriate name?
+    private def parseConstructor = {
+        parseIdString ~ LParenT() ~! parseArgDefList ~! RParenT() ~! LBraceT() ~!
+        parseBody ~! RBraceT() ^^ {
+            case name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => Constructor(name, args, body)
+        }
+    }
+
     private def parseDecl: Parser[Declaration] = {
-        parseFieldDecl | parseFuncDecl | parseTransDecl | parseStateDecl
+        parseFieldDecl | parseFuncDecl | parseTransDecl |
+        parseStateDecl | parseConstructor | failure("declaration expected")
     }
 
     private def parseContractModififier = {

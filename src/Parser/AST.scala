@@ -13,6 +13,8 @@ sealed trait Type extends AST
 case class Variable(x: String) extends Expression
 case class NumLiteral(value: Int) extends Expression
 case class StringLiteral(value: String) extends Expression
+case class TrueLiteral() extends Expression
+case class FalseLiteral() extends Expression
 case class Conjunction(e1: Expression, e2: Expression) extends Expression
 case class Disjunction(e1: Expression, e2: Expression) extends Expression
 case class LogicalNegation(e: Expression) extends Expression
@@ -57,6 +59,9 @@ case class TypeDecl(name: String, typ: Type) extends Declaration
 
 case class Field(typ: Type, fieldName: String) extends Declaration
 
+case class Constructor(name: String,
+                       args: Seq[VariableDecl],
+                       body: Seq[Statement]) extends Declaration
 case class Func(name: String,
                 args: Seq[VariableDecl],
                 body: Seq[Statement]) extends Declaration
