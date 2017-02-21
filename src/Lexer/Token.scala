@@ -29,9 +29,13 @@ case class CaseT() extends Token { override def toString: String = "case"}
 case class UniqueT() extends Token { override def toString: String = "unique"}
 case class SharedT() extends Token { override def toString: String = "shared"}
 case class MainT() extends Token { override def toString: String = "main"}
+case class IntT() extends Token { override def toString: String = "int"}
+case class StringT() extends Token { override def toString: String = "string"}
+case class BoolT() extends Token { override def toString: String = "bool"}
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }
+case class StringLiteralT(x: String) extends Token { override def toString: String =  s""" "$x" """".trim }
 
 /* punctuation */
 case class LBraceT() extends Token { override def toString: String = "{" }

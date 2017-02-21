@@ -35,8 +35,15 @@ object Parser extends Parsers {
         linearP
     }
 
-    private def parseType = opt(parseTypeModifier) ~ parseIdString ^^ {
-        case mod ~ id => Type(mod, id)
+    private def parseType = {
+        val nonPrim = opt(parseTypeModifier) ~ parseIdString ^^ {
+            case mod ~ id => NonPrimitiveType(mod, id)
+        }
+        val intPrim = IntT() ^^ { _ => IntType() }
+        val boolPrim = BoolT() ^^ { _ => BoolType() }
+        val stringPrim = StringT() ^^ { _ => BoolType() }
+
+        nonPrim | intPrim | boolPrim | stringPrim
     }
 
     private def parseArgList: Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
@@ -210,6 +217,10 @@ object Parser extends Parsers {
             accept("numeric literal", { case NumLiteralT(n) => NumLiteral(n) })
         }
 
+        val parseStringLiteral = {
+            accept("string literal", { case StringLiteralT(s) => StringLiteral(s) })
+        }
+
         val parseNew = {
             NewT() ~! parseIdString ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
                 case _ ~ name ~ _ ~ args ~ _ => Construction(name, args)
@@ -218,7 +229,8 @@ object Parser extends Parsers {
 
         val fail = failure("expression expected")
 
-        val simpleExpr = parseNew | parseLocalInv | parseNumLiteral | parseVar | parenExpr | fail
+        val simpleExpr = parseNew | parseLocalInv | parseNumLiteral |
+                         parseStringLiteral | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }

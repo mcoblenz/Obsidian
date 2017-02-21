@@ -41,16 +41,17 @@ class CodeGen {
         }
     }
 
-    private def resolveType(name: String): JType = {
-        name match {
-            case "ether" => model.ref("Ether")
-            case "int" => model.ref("BigInteger")
-            case other => model.ref(other)
+    private def resolveType(typ: Type): JType = {
+        typ match {
+            case IntType() => model.INT
+            case BoolType() => model.BOOLEAN
+            case StringType() => model.ref("String")
+            case NonPrimitiveType(mods, name) => model.ref(name)
         }
     }
 
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
-        newClass.field(JMod.PRIVATE, resolveType(decl.typ.name), decl.fieldName)
+        newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
     }
 
     /* returns an expr because exprs are built bottom-up (unlike everything else) */
@@ -61,6 +62,7 @@ class CodeGen {
         e match {
             case Variable(x) => JExpr.ref(x)
             case NumLiteral(n) => JExpr._new(model.ref("BigInteger")).arg(JExpr.lit(n))
+            case StringLiteral(s) => JExpr.lit(s)
             case Conjunction(e1, e2) => translateExpr(e1).band(translateExpr(e2))
             case Disjunction(e1, e2) => translateExpr(e1).bor(translateExpr(e2))
             case LogicalNegation(e) => translateExpr(e).not()
@@ -88,7 +90,7 @@ class CodeGen {
 
     private def translateStatement(body: JBlock, statement: Statement): Unit = {
         statement match {
-            case VariableDecl(typ, name) => body.decl(resolveType(typ.name), name)
+            case VariableDecl(typ, name) => body.decl(resolveType(typ), name)
             case Return => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e))
             case Transition(newState) => body.assign(JExpr.ref("__state"), JExpr.lit(newState))
@@ -162,7 +164,7 @@ class CodeGen {
 
         /* add args */
         for (arg <- decl.args) {
-            meth.param(model.ref(arg.typ.name), arg.varName)
+            meth.param(resolveType(arg.typ), arg.varName)
         }
 
         /* add body */
@@ -174,7 +176,7 @@ class CodeGen {
 
         /* add args */
         for (arg <- decl.args) {
-            meth.param(model.ref(arg.typ.name), arg.varName)
+            meth.param(resolveType(arg.typ), arg.varName)
         }
 
         /* add body */

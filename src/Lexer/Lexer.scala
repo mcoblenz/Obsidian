@@ -11,6 +11,10 @@ object Lexer extends RegexParsers {
         case x => NumLiteralT(Integer.parseInt(x, 16))
     }
 
+    private def stringLitP = ("\".*\"".r) ^^ {
+        case s => StringLiteralT(s)
+    }
+
     /* we could give everything here a separate parser, but we want to enforce
      * (as most languages seem to) that keywords/literals/identifiers are
      * separated by white space */
@@ -36,6 +40,9 @@ object Lexer extends RegexParsers {
         case "unique" => UniqueT()
         case "shared" => SharedT()
         case "main" => MainT()
+        case "int" => IntT()
+        case "bool" => BoolT()
+        case "string" => StringT()
         case id => IdentifierT(id)
     }
 
@@ -61,7 +68,7 @@ object Lexer extends RegexParsers {
     private def rightArrowP = """->""".r ^^ (_ => RightArrowT())
     private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT())
 
-    private def oneToken: Parser[Token] = (decimalP | hexP | atomP |
+    private def oneToken: Parser[Token] = (decimalP | hexP | stringLitP | atomP |
 
     lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 

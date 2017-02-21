@@ -7,10 +7,12 @@ sealed trait Statement extends AST
  * that don't have effects to a later analysis */
 sealed trait Expression extends Statement
 sealed trait Declaration extends AST
+sealed trait Type extends AST
 
 /* Expressions */
 case class Variable(x: String) extends Expression
 case class NumLiteral(value: Int) extends Expression
+case class StringLiteral(value: String) extends Expression
 case class Conjunction(e1: Expression, e2: Expression) extends Expression
 case class Disjunction(e1: Expression, e2: Expression) extends Expression
 case class LogicalNegation(e: Expression) extends Expression
@@ -44,7 +46,11 @@ case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
 
 sealed trait TypeModifier
 case object IsLinear extends TypeModifier
-case class Type(modifiers: Option[TypeModifier], name: String) extends AST // TODO: refine
+
+case class IntType() extends Type
+case class BoolType() extends Type
+case class StringType() extends Type
+case class NonPrimitiveType(modifiers: Option[TypeModifier], name: String) extends Type
 
 /* Declarations */
 case class TypeDecl(name: String, typ: Type) extends Declaration
