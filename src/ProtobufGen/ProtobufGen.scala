@@ -37,6 +37,7 @@ object ProtobufGen {
 
     private def translateDeclaration(declaration: Declaration) : Option[ProtobufDeclaration] = {
         declaration match {
+            case c@Constructor(_,_,_) => None // TODO
             case t@TypeDecl(_,_) => None // TODO
             case f@edu.cmu.cs.obsidian.parser.Field(_,_) => Some (translateFieldDecl(f))
             case f@Func(_,_,_) => None

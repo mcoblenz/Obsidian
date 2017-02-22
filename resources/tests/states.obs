@@ -1,0 +1,24 @@
+main contract States {
+    int x;
+    int y;
+
+    state S1 {
+        transaction s1_only() {
+            x = 1;
+        }
+    }
+
+    state S2 {
+        transaction s2_only() {
+            y = 1;
+        }
+    }
+
+    transaction all_states() {
+        throw;
+    }
+
+    States() {
+        ->S1;
+    }
+}
