@@ -69,8 +69,20 @@ object Parser extends Parsers {
             case _ ~ None ~ _ => Return
         }
 
-        val parseTransition = RightArrowT() ~ parseIdString ~! SemicolonT() ^^ {
-            case _ ~ name ~ _ => Transition(name)
+        val parseUpdate = {
+            val oneUpdate = parseIdString ~! EqT() ~! parseExpr ^^ {
+                case f ~ _ ~ e => Assignment(Variable(f), e)
+            }
+            LParenT() ~ LBraceT() ~ repsep(oneUpdate, CommaT()) ~
+                RBraceT() ~ RParenT() ^^ {
+                case _ ~ _ ~ updates ~ _ ~ _ => updates
+            }
+        }
+
+        val parseTransition = RightArrowT() ~ parseIdString ~
+                              opt(parseUpdate) ~! SemicolonT() ^^ {
+            case _ ~ name ~ None ~ _ => Transition(name, List.empty)
+            case _ ~ name ~ Some(updates) ~ _ => Transition(name, updates)
         }
 
         val parseVarDeclAssn =

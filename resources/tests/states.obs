@@ -1,8 +1,8 @@
 main contract States {
-    int x;
     int y;
 
     state S1 {
+        int x;
         transaction s1_only() {
             x = 1;
         }
@@ -19,6 +19,6 @@ main contract States {
     }
 
     States() {
-        ->S1;
+        ->S1({x = y});
     }
 }

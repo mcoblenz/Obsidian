@@ -37,7 +37,7 @@ case class Construction(name: String, args: Seq[Expression]) extends Expression
 case class VariableDecl(typ: Type, varName: String) extends Statement
 case object Return extends Statement
 case class ReturnExpr(e: Expression) extends Statement
-case class Transition(newStateName: String) extends Statement
+case class Transition(newStateName: String, updates: Seq[Assignment]) extends Statement
 case class Assignment(assignTo: Expression, e: Expression) extends Statement
 case class Throw() extends Statement
 case class If(eCond: Expression, s: Seq[Statement]) extends Statement

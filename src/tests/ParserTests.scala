@@ -155,4 +155,27 @@ class ParserTests extends JUnitSuite {
               | f(T x);
               | }}}""".stripMargin)
     }
+
+    @Test def transitions() = {
+        shouldSucceed(
+            """ main contract C { state S {
+              | transaction t(T x) { ->S({x = y, y = x}); }
+              | }}
+            """.stripMargin)
+        shouldSucceed(
+            """ main contract C { state S {
+              | transaction t(T x) { ->S({}); }
+              | }}
+            """.stripMargin)
+        shouldSucceed(
+            """ main contract C { state S {
+              | transaction t(T x) { ->S; }
+              | }}
+            """.stripMargin)
+        shouldSucceed(
+            """ main contract C { state S {
+              | transaction t(T x) { ->S({x = y}); }
+              | }}
+            """.stripMargin)
+    }
 }

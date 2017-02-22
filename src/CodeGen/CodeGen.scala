@@ -258,7 +258,8 @@ class CodeGen {
             case VariableDecl(typ, name) => body.decl(resolveType(typ), name)
             case Return => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e))
-            case Transition(newState) =>
+            case Transition(newState, updates) =>
+                translateBody(body, updates, stateEnum)
                 body.assign(JExpr.ref(stateField), stateEnum.enumConstant(newState))
             case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: this should call method to set state, not assign manually
