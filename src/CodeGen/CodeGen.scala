@@ -1,4 +1,4 @@
-package CodeGen
+package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.parser._
 import com.sun.codemodel.internal._

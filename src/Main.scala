@@ -1,10 +1,10 @@
 import java.io.File
 import java.nio.file.{Files, Paths}
 
-import Lexer._
+import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.parser._
-import CodeGen._
-import ProtobufGen._
+import edu.cmu.cs.obsidian.codegen._
+import edu.cmu.cs.obsidian.protobufgen._
 import com.sun.codemodel.internal.JCodeModel
 
 class CompilerOptions (val printTokens: Boolean,

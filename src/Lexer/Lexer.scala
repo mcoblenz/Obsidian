@@ -1,5 +1,4 @@
-package Lexer
-
+package edu.cmu.cs.obsidian.lexer
 import scala.util.parsing.combinator._
 
 object Lexer extends RegexParsers {

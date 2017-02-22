@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian.parser
 
-import Lexer._
+import edu.cmu.cs.obsidian.lexer._
 
 import scala.collection._
 import scala.util.parsing.combinator._

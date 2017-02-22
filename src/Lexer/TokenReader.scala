@@ -1,4 +1,4 @@
-package Lexer
+package edu.cmu.cs.obsidian.lexer
 
 import scala.util.parsing.input._
 

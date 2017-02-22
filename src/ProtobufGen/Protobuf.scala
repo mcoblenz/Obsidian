@@ -1,8 +1,6 @@
-package ProtobufGen
+package edu.cmu.cs.obsidian.protobufgen
 
 import java.io.File
-
-import edu.cmu.cs.obsidian.parser.Contract
 
 /**
   * Created by mcoblenz on 2/17/17.

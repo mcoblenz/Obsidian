@@ -1,4 +1,4 @@
-package ProtobufGen
+package edu.cmu.cs.obsidian.protobufgen
 
 import java.io.File
 
