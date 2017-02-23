@@ -52,7 +52,7 @@ class CodeGen {
 
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
-        if (aContract.mod == IsMain) {
+        if (aContract.mod == Some(IsMain)) {
             generateMain(newClass, stateEnum)
         }
     }
