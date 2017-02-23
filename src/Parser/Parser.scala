@@ -288,18 +288,18 @@ object Parser extends Parsers {
 
     private def parseDecl: Parser[Declaration] = {
         parseFieldDecl | parseFuncDecl | parseTransDecl |
-        parseStateDecl | parseConstructor | failure("declaration expected")
+        parseStateDecl | parseConstructor | parseContractDecl | failure("declaration expected")
     }
 
-    private def parseContractModififier = {
+    private def parseContractModifier = {
         val mainP = MainT() ^^ (_ => IsMain)
         val uniqueP = UniqueT() ^^ (_ => IsUnique)
         val sharedP = SharedT() ^^ (_ => IsShared)
-        mainP | uniqueP | sharedP
+        opt(mainP | uniqueP | sharedP)
     }
 
     private def parseContractDecl = {
-        parseContractModififier ~! ContractT() ~! parseIdString ~!
+        parseContractModifier ~ ContractT() ~! parseIdString ~!
             LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
             case mod ~ _ ~ name ~ _ ~ defs ~ _ => Contract(mod, name, defs)
         }

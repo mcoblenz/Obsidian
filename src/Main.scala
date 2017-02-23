@@ -4,7 +4,7 @@ import java.nio.file.{Files, Paths}
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.codegen._
-import edu.cmu.cs.obsidian.protobufgen._
+import edu.cmu.cs.obsidian.protobuf._
 import com.sun.codemodel.internal.JCodeModel
 
 class CompilerOptions (val printTokens: Boolean,
@@ -118,12 +118,11 @@ object Main {
                 val javaModel = compile(ast)
                 javaModel.build(new File(javaOutputDir))
 
-                val p : Protobuf = ProtobufGen.translateProgram(ast)
                 val lastSlash = filename.lastIndexOf("/")
-
                 val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
-
                 val protobufFilename: String = sourceFilename.replace(".obs", ".proto")
+
+                val p : Protobuf = ProtobufGen.translateProgram(ast)
                 p.build(new File(protobufOutputDir, protobufFilename))
             } catch {
                 case e: ParseException => println(e.message)

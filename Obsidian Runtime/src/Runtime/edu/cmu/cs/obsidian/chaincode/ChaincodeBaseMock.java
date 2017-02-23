@@ -47,10 +47,11 @@ class ChaincodeBaseServer {
 public class ChaincodeBaseMock {
     public static void main (String args[]) throws IOException {
         final ChaincodeBaseServer server = new ChaincodeBaseServer();
+
+         /*
         server.start();
         server.blockUntilShutdown();
 
-        /*
 
         ServerSocket listener = new ServerSocket(4000);
 

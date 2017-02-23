@@ -75,7 +75,7 @@ case object IsUnique extends ContractModifier
 case object IsShared extends ContractModifier
 case object IsMain extends ContractModifier
 
-case class Contract(mod: ContractModifier, name: String, declarations: Seq[Declaration]) extends AST
+case class Contract(mod: Option[ContractModifier], name: String, declarations: Seq[Declaration]) extends Declaration
 
 /* Program */
 case class Program(contracts: Seq[Contract]) extends AST

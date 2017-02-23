@@ -130,18 +130,18 @@ class CodeGen {
                     newClass: JDefinedClass,
                     stateEnum: JDefinedClass,
                     currentState: Option[String],
-                    mod: ContractModifier): Unit = {
+                    mod: Option[ContractModifier]): Unit = {
         (mod, declaration) match {
-            case (IsMain, c@Constructor(_,_,_)) =>
+            case (Some(IsMain), c@Constructor(_,_,_)) =>
                 mainConstructor = translateConstructor(c, newClass, stateEnum)
-            case (IsMain, f@Field(_,_)) =>
+            case (Some(IsMain), f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
-            case (IsMain, f@Func(_,_,_)) =>
+            case (Some(IsMain), f@Func(_,_,_)) =>
                 translateFuncDecl(f, newClass, stateEnum)
-            case (IsMain, t@Transaction(_,_,_)) =>
+            case (Some(IsMain), t@Transaction(_,_,_)) =>
                 val entry = (currentState, translateTransDecl(t, newClass, stateEnum))
                 mainTransactions.add(entry)
-            case (IsMain, s@State(_,_)) =>
+            case (Some(IsMain), s@State(_,_)) =>
                 translateStateDecl(s, newClass, stateEnum, mod)
             case _ => () // TODO : type declarations, also declarations for shared
         }
@@ -224,7 +224,7 @@ class CodeGen {
                     state: State,
                     newClass: JDefinedClass,
                     stateEnum: JDefinedClass,
-                    mod: ContractModifier): Unit = {
+                    mod: Option[ContractModifier]): Unit = {
         /* add this state to the enum */
         stateEnum.enumConstant(state.name)
         for (decl <- state.declarations) {

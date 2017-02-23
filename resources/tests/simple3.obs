@@ -1,7 +1,6 @@
 main contract Simple3 {
     int x;
     int y;
-    address a;
 
     transaction t1() {
         y = 1;
