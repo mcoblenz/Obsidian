@@ -143,6 +143,16 @@ class CodeGen {
                 mainTransactions.add(entry)
             case (Some(IsMain), s@State(_,_)) =>
                 translateStateDecl(s, newClass, stateEnum, mod)
+            case (Some(IsUnique), c@Constructor(_,_,_)) =>
+                translateConstructor(c, newClass, stateEnum)
+            case (Some(IsUnique), f@Field(_,_)) =>
+                translateFieldDecl(f, newClass)
+            case (Some(IsUnique), f@Func(_,_,_)) =>
+                translateFuncDecl(f, newClass, stateEnum)
+            case (Some(IsUnique), t@Transaction(_,_,_)) =>
+                translateTransDecl(t, newClass, stateEnum)
+            case (Some(IsUnique), s@State(_,_)) =>
+                translateStateDecl(s, newClass, stateEnum, mod)
             case _ => () // TODO : type declarations, also declarations for shared
         }
     }
