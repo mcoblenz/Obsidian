@@ -8,6 +8,8 @@ import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
 import com.sun.codemodel.internal.JCodeModel
 
+import scala.sys.process._
+
 class CompilerOptions (val printTokens: Boolean,
                        val printAST: Boolean) {
 }
@@ -137,17 +139,29 @@ object Main {
                 val lastSlash = filename.lastIndexOf("/")
                 val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
                 val protobufFilename: String = sourceFilename.replace(".obs", ".proto")
+                val protobufPath = protobufOutputDir + "/" + protobufFilename
 
                 val p : Protobuf = ProtobufGen.translateProgram(ast)
                 p.build(new File(protobufOutputDir, protobufFilename))
 
+                // Invoke protoc to compile from protobuf to Java.
+                val protocInvocation : String = "protoc --java_out=" + javaSrcOutputDir + " " + protobufPath
+
+                try {
+                    val exitCode = protocInvocation.!
+                    if (exitCode != 0) {
+                        println("`" + protocInvocation + "` exited abnormally: " + exitCode)
+                    }
+                } catch {
+                    case e: Throwable => println("Error running protoc: " + e)
+                }
 
                 /* compile the java code */
                 val mainName = findMainContractName(ast)
                 val classPath = "Obsidian Runtime/src/Runtime/:out/generated_java/"
                 val srcFile = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.java"
                 val compileCmd: Array[String] = Array("javac", "-classpath", classPath, srcFile)
-                val proc: Process = Runtime.getRuntime().exec(compileCmd)
+                val proc: java.lang.Process = Runtime.getRuntime().exec(compileCmd)
 
                 if (printJavacOutput) {
                     val compilerOutput = proc.getErrorStream()
@@ -172,7 +186,7 @@ object Main {
                     val classFile = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.class"
                     val outputJar = s"out/generated_jars/$mainName.jar"
                     val jarCmd: Array[String] = Array("jar", "-cf", outputJar, classFile)
-                    val procJar: Process = Runtime.getRuntime().exec(jarCmd)
+                    val procJar: java.lang.Process = Runtime.getRuntime().exec(jarCmd)
                     procJar.waitFor()
                 }
 
