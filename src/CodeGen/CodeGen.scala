@@ -23,7 +23,7 @@ class CodeGen {
     private def stateEnumName(className: String): String = {
         "State_" + className
     }
-    final val packageName: String = "edu.cmu.cs.obsidian.generated-code"
+    final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
 
     def translateProgram(program: Program): JCodeModel = {
         // Put all generated code in the same package.
@@ -58,11 +58,12 @@ class CodeGen {
     }
 
     private def generateMain(newClass: JDefinedClass, stateEnum: JDefinedClass): Unit = {
-        newClass._extends(model.ref("ChaincodeBase"))
+        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
+        val stubType = model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
 
         /* run method */
         val runMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "run")
-        runMeth.param(model.ref("ChaincodeStub"), "stub")
+        runMeth.param(stubType, "stub")
         runMeth.param(model.ref("String"), "transName")
         runMeth.param(model.ref("String").array(), "args")
 
@@ -89,11 +90,12 @@ class CodeGen {
             // TODO : need to parse args here and use for invocation
             stateCond._then().invoke(tr)
         }
+        runMeth.body()._return(JExpr.lit(""))
 
         /* init method */
         // TODO : do we need this? How does construction work with Java chaincode
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.ref("String"), "init")
-        initMeth.param(model.ref("ChaincodeStub"), "stub")
+        initMeth.param(stubType, "stub")
         initMeth.param(model.ref("String").array(), "args")
 
         if (mainConstructor != null) {
@@ -104,7 +106,7 @@ class CodeGen {
 
         /* query method */
         val queryMeth: JMethod = newClass.method(JMod.PUBLIC, model.ref("String"), "query")
-        queryMeth.param(model.ref("ChaincodeStub"), "stub")
+        queryMeth.param(stubType, "stub")
         queryMeth.param(model.ref("String"), "transName")
         queryMeth.param(model.ref("String").array(), "args")
 
@@ -133,7 +135,7 @@ class CodeGen {
                     mod: Option[ContractModifier]): Unit = {
         (mod, declaration) match {
             case (Some(IsMain), c@Constructor(_,_,_)) =>
-                mainConstructor = translateConstructor(c, newClass, stateEnum)
+                mainConstructor = translateMainConstructor(c, newClass, stateEnum)
             case (Some(IsMain), f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
             case (Some(IsMain), f@Func(_,_,_)) =>
@@ -144,7 +146,7 @@ class CodeGen {
             case (Some(IsMain), s@State(_,_)) =>
                 translateStateDecl(s, newClass, stateEnum, mod)
             case (Some(IsUnique), c@Constructor(_,_,_)) =>
-                translateConstructor(c, newClass, stateEnum)
+                translateUniqueConstructor(c, newClass, stateEnum)
             case (Some(IsUnique), f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
             case (Some(IsUnique), f@Func(_,_,_)) =>
@@ -159,21 +161,39 @@ class CodeGen {
 
     private def resolveType(typ: Type): JType = {
         typ match {
-            case IntType() => model.ref("BigInteger")
+            case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
+            case NonPrimitiveType(mods, "address") => model.directClass("java.math.BigInteger")
             case NonPrimitiveType(mods, name) => model.ref(name)
         }
     }
 
 
-    private def translateConstructor(
+    private def translateMainConstructor(
                     c: Constructor,
                     newClass: JDefinedClass,
                     stateEnum: JDefinedClass) : JMethod = {
         val name = "new_" + newClass.name()
 
         val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
+
+        /* add args */
+        for (arg <- c.args) {
+            meth.param(resolveType(arg.typ), arg.varName)
+        }
+
+        /* add body */
+        translateBody(meth.body(), c.body, stateEnum)
+
+        meth
+    }
+
+    private def translateUniqueConstructor(
+                    c: Constructor,
+                    newClass: JDefinedClass,
+                    stateEnum: JDefinedClass) : JMethod = {
+        val meth: JMethod = newClass.constructor(JMod.PUBLIC)
 
         /* add args */
         for (arg <- c.args) {
@@ -198,7 +218,8 @@ class CodeGen {
 
         e match {
             case Variable(x) => JExpr.ref(x)
-            case NumLiteral(n) => JExpr._new(model.ref("BigInteger")).arg(JExpr.lit(n))
+            case NumLiteral(n) => model.directClass("java.math.BigInteger").
+                                    staticInvoke("valueOf").arg(JExpr.lit(n))
             case StringLiteral(s) => JExpr.lit(s)
             case TrueLiteral() => JExpr.TRUE
             case FalseLiteral() => JExpr.FALSE
