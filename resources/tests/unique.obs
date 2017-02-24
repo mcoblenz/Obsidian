@@ -1,0 +1,23 @@
+unique contract IsUnique {
+    int x;
+
+    transaction setX(int y) {
+        x = y;
+    }
+
+    IsUnique(int x_init) {
+        x = x_init;
+    }
+}
+
+main contract UsesUnique {
+    IsUnique u;
+
+    transaction changeUnique(int y) {
+        u.setX(y);
+    }
+
+    UsesUnique() {
+        u = new IsUnique(5);
+    }
+}
