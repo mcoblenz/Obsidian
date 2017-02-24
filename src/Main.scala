@@ -1,5 +1,6 @@
 import java.io.File
 import java.nio.file.{Files, Paths}
+import java.util.Scanner
 
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.parser._
@@ -46,7 +47,16 @@ object Main {
         ast
     }
 
-    def compile (ast : Program) : JCodeModel = {
+    def findMainContractName(prog: Program): String = {
+        for (aContract <- prog.contracts) {
+            if (aContract.mod == Some(IsMain)) {
+                return aContract.name
+            }
+        }
+        throw new RuntimeException("No main contract found")
+    }
+
+    def compile (ast: Program): JCodeModel = {
         val codeGen = new CodeGen()
         codeGen.translateProgram(ast)
     }
@@ -59,6 +69,7 @@ object Main {
 
         var printTokens = false
         var printAST = false
+        var printJavacOutput = false
         var inputFiles: List[String] = Nil
 
         def parseOptions(list: List[String]): Unit = {
@@ -66,6 +77,9 @@ object Main {
 
             list match {
                 case Nil =>
+                case "--print-javac" :: tail =>
+                    printJavacOutput = true
+                    parseOptions (tail)
                 case "--print-tokens" :: tail =>
                     printTokens = true
                     parseOptions (tail)
@@ -124,6 +138,33 @@ object Main {
 
                 val p : Protobuf = ProtobufGen.translateProgram(ast)
                 p.build(new File(protobufOutputDir, protobufFilename))
+
+
+                /* compile the java code */
+                val mainName = findMainContractName(ast)
+                val classPath = "Obsidian Runtime/src/Runtime/:out/generated_java/"
+                val file = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.java"
+                val compileCmd: Array[String] = Array("javac", "-classpath", classPath, file)
+                val proc: Process = Runtime.getRuntime().exec(compileCmd)
+
+                if (printJavacOutput) {
+                    val compilerOutput = proc.getErrorStream()
+                    val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
+                    val result = if (untilEOF.hasNext()) {
+                        untilEOF.next()
+                    } else {
+                        ""
+                    }
+
+                    print(result)
+                }
+
+                proc.waitFor()
+                val exitCode = proc.exitValue()
+                if (printJavacOutput) {
+                    println("javac exited with value " + exitCode)
+                }
+
             } catch {
                 case e: ParseException => println(e.message)
             }
