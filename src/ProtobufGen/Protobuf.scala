@@ -7,7 +7,9 @@ import java.io.{File, PrintWriter}
   */
 
 class Protobuf (var messages: Seq[ProtobufMessage]) {
-    def build(outputFile: File): Unit = {
+    final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
+
+    def build(outputFile: File, targetOuterClassName: String): Unit = {
         outputFile.delete()
         outputFile.createNewFile()
 
@@ -16,7 +18,8 @@ class Protobuf (var messages: Seq[ProtobufMessage]) {
         val writer: PrintWriter = new PrintWriter(outputFile)
 
         writer.write("syntax = \"proto3\";\n\n")
-
+        writer.write("option java_outer_classname = \"" + targetOuterClassName + "\";\n\n")
+        writer.write("option java_package = \"" + packageName + "\";\n\n")
         for (t <- translatedMessages) {
             writer.write(t)
             writer.write("\n")
@@ -58,6 +61,17 @@ case class ProtobufMessage (decls: Seq[ProtobufDeclaration], messageName: String
 case class ProtobufField (fieldType: FieldType, fieldName: String) extends ProtobufDeclaration {
     def build(nextFieldIndex: Int, nestingLevel: Int) : (String, Int) = {
         (spaces(nestingLevel)  + fieldType.typeString() + " " + fieldName + " = " + nextFieldIndex + ";", nextFieldIndex + 1)
+    }
+}
+
+case class ProtobufEnum (name: String, values: List[String]) extends ProtobufDeclaration {
+    def build(nextFieldIndex: Int, nestingLevel: Int) : (String, Int) = {
+        val valuesSpec = values.foldLeft("")((out: String, value: String) =>
+            out + spaces(nestingLevel+1) + value.toUpperCase(java.util.Locale.US))
+
+        val spec = spaces(nestingLevel) + "enum " + name + "{\n" + valuesSpec + spaces(nestingLevel) + "}"
+
+        (spec, nestingLevel)
     }
 }
 

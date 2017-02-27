@@ -1,6 +1,6 @@
 import java.io.File
 import java.nio.file.{Files, Paths}
-import java.util.Scanner
+import java.util.{Locale, Scanner}
 
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.parser._
@@ -58,14 +58,14 @@ object Main {
         throw new RuntimeException("No main contract found")
     }
 
-    def compile (ast: Program): JCodeModel = {
-        val codeGen = new CodeGen()
+    def compile (ast: Program, protobufOuterClassName: String): JCodeModel = {
+        val codeGen = new CodeGen(protobufOuterClassName)
         codeGen.translateProgram(ast)
     }
 
     /* returns the exit code of the javac process */
     def compileCode(printJavacOutput: Boolean, mainName: String): Int  = {
-        val classPath = "Obsidian Runtime/src/Runtime/:out/generated_java/"
+        val classPath = "Obsidian Runtime/src/Runtime/:out/generated_java/:lib/protobuf-java-3.2.0.jar"
         val srcFile = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.java"
         val compileCmd: Array[String] = Array("javac", "-d", "out/generated_bytecode",
                                                        "-classpath", classPath,
@@ -186,16 +186,22 @@ object Main {
                     println(sep)
                 }
 
-                val javaModel = compile(ast)
-                javaModel.build(new File(javaSrcOutputDir))
 
                 val lastSlash = filename.lastIndexOf("/")
                 val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
-                val protobufFilename: String = sourceFilename.replace(".obs", ".proto")
+
+
+                val initialOuterClassName = sourceFilename.replace(".obs", "") + "OuterClass"
+                val protobufOuterClassName = initialOuterClassName.substring(0, 1).toUpperCase(java.util.Locale.US) + initialOuterClassName.substring(1)
+                val protobufFilename = protobufOuterClassName + ".proto"
+
                 val protobufPath = protobufOutputDir + "/" + protobufFilename
 
                 val p : Protobuf = ProtobufGen.translateProgram(ast)
-                p.build(new File(protobufOutputDir, protobufFilename))
+                p.build(new File(protobufOutputDir, protobufFilename), protobufOuterClassName)
+
+                val javaModel = compile(ast, protobufOuterClassName)
+                javaModel.build(new File(javaSrcOutputDir))
 
                 // Invoke protoc to compile from protobuf to Java.
                 val protocInvocation : String = "protoc --java_out=" + javaSrcOutputDir + " " + protobufPath

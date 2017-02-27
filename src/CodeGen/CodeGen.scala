@@ -3,9 +3,9 @@ package edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.parser._
 import com.sun.codemodel.internal._
 import scala.collection._
+import collection.JavaConversions._
 
-class CodeGen {
-
+class CodeGen (protobufOuterClassName: String) {
     private val model: JCodeModel = new JCodeModel()
 
     /* we must keep track of the transactions in main so that we can match on
@@ -141,8 +141,53 @@ class CodeGen {
         mainMeth.param(model.ref("String").array(), "args")
         mainMeth.body().directStatement("""System.out.println("hello world\n");""")
         // TODO
+        
+        /* Generate serialization code */
+        generateSerialization(newClass)
     }
 
+
+    private def generateSerialization(newClass : JDefinedClass): Unit = {
+        generateArchiver(newClass)
+        generateArchiveConstructor(newClass)
+    }
+
+    // "set" followed by lowercasing the field name.
+    private def setterNameForField(fieldName: String) = {
+        if (fieldName.length < 1) {
+            assert(false, "Bug: field name is empty")
+            "set"
+        }
+        else {
+            // Always use US locale, regardless of the user's locale, so that all code is compatible.
+            val firstChar = fieldName.substring(0, 1).toUpperCase(java.util.Locale.US)
+            val rest = fieldName.substring(1)
+            "set" + firstChar + rest
+        }
+    }
+
+    // Generates a method, archiveString(), which outputs a string in protobuf format.
+    private def generateArchiver(newClass: JDefinedClass): Unit = {
+        val archiveMethod = newClass.method(JMod.PRIVATE, model.parseType("String"), "archiveString")
+
+        val archiveBody = archiveMethod.body()
+
+        val protobufMessageClassBuilder: String = packageName + "." + protobufOuterClassName + "." + newClass.name() + ".Builder"
+        val builderVariable: JVar = archiveBody.decl(model.parseType(protobufMessageClassBuilder), "builder")
+        // Iterate through fields of this class and archive each one by calling setters on a builder.
+
+        for ((fieldName: String, fieldVariable: JFieldVar) <- newClass.fields()) {
+            // generate: builder.setField(field);
+            val setterName: String = setterNameForField(fieldName)
+
+            val invocation: JInvocation = archiveBody.invoke(builderVariable, setterName)
+            invocation.arg(fieldVariable)
+        }
+    }
+
+    private def generateArchiveConstructor(newClass: JDefinedClass): Unit = {
+        // TODO
+    }
 
     private def translateDeclaration(
                     declaration: Declaration,
