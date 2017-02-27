@@ -39,25 +39,36 @@ class CodeGen {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
 
         /* setup the state enum */
-        val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumName(aContract.name))
+        val stateDeclarations: Seq[Declaration] = aContract.declarations.filter((d: Declaration) => d match {
+            case s@State(_, _) => true
+            case _ => false
+        })
 
-        /* setup the state field and the [getState] method */
-        newClass.field(JMod.PRIVATE, stateEnum, stateField)
-        val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
-        stateMeth.body()._return(JExpr.ref(stateField))
+        var stateEnumOption: Option[JDefinedClass] = None
+        if (stateDeclarations.nonEmpty) {
+            val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumName(aContract.name))
+            stateEnumOption = Some(stateEnum)
+
+            /* setup the state field and the [getState] method */
+            newClass.field(JMod.PRIVATE, stateEnum, stateField)
+            val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
+            stateMeth.body()._return(JExpr.ref(stateField))
+
+        }
+
 
         for (decl <- aContract.declarations) {
-            translateDeclaration(decl, newClass, stateEnum, None, aContract.mod)
+            translateDeclaration(decl, newClass, stateEnumOption, None, aContract.mod)
         }
 
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
         if (aContract.mod == Some(IsMain)) {
-            generateMain(newClass, stateEnum)
+            generateMain(newClass, stateEnumOption)
         }
     }
 
-    private def generateMain(newClass: JDefinedClass, stateEnum: JDefinedClass): Unit = {
+    private def generateMain(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
         newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
         val stubType = model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
 
@@ -68,13 +79,13 @@ class CodeGen {
         runMeth.param(model.ref("String").array(), "args")
 
 
-        for ((st, tr) <- mainTransactions) {
+        for ((state, tr) <- mainTransactions) {
             val cond = {
-                st match {
+                state match {
                     case Some(stName) =>
                         JExpr.ref(stateField)
                             .eq(
-                        stateEnum.enumConstant(stName))
+                        stateEnumOption.get.enumConstant(stName))
                             .band(
                         JExpr.ref("transName")
                             .eq(
@@ -130,31 +141,31 @@ class CodeGen {
     private def translateDeclaration(
                     declaration: Declaration,
                     newClass: JDefinedClass,
-                    stateEnum: JDefinedClass,
+                    stateEnumOption: Option[JDefinedClass],
                     currentState: Option[String],
                     mod: Option[ContractModifier]): Unit = {
         (mod, declaration) match {
             case (Some(IsMain), c@Constructor(_,_,_)) =>
-                mainConstructor = translateMainConstructor(c, newClass, stateEnum)
+                mainConstructor = translateMainConstructor(c, newClass, stateEnumOption)
             case (Some(IsMain), f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
             case (Some(IsMain), f@Func(_,_,_)) =>
-                translateFuncDecl(f, newClass, stateEnum)
+                translateFuncDecl(f, newClass, stateEnumOption)
             case (Some(IsMain), t@Transaction(_,_,_)) =>
-                val entry = (currentState, translateTransDecl(t, newClass, stateEnum))
+                val entry = (currentState, translateTransDecl(t, newClass, stateEnumOption))
                 mainTransactions.add(entry)
             case (Some(IsMain), s@State(_,_)) =>
-                translateStateDecl(s, newClass, stateEnum, mod)
+                translateStateDecl(s, newClass, stateEnumOption, mod)
             case (Some(IsUnique), c@Constructor(_,_,_)) =>
-                translateUniqueConstructor(c, newClass, stateEnum)
+                translateUniqueConstructor(c, newClass, stateEnumOption)
             case (Some(IsUnique), f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
             case (Some(IsUnique), f@Func(_,_,_)) =>
-                translateFuncDecl(f, newClass, stateEnum)
+                translateFuncDecl(f, newClass, stateEnumOption)
             case (Some(IsUnique), t@Transaction(_,_,_)) =>
-                translateTransDecl(t, newClass, stateEnum)
+                translateTransDecl(t, newClass, stateEnumOption)
             case (Some(IsUnique), s@State(_,_)) =>
-                translateStateDecl(s, newClass, stateEnum, mod)
+                translateStateDecl(s, newClass, stateEnumOption, mod)
             case _ => () // TODO : type declarations, also declarations for shared
         }
     }
@@ -173,7 +184,7 @@ class CodeGen {
     private def translateMainConstructor(
                     c: Constructor,
                     newClass: JDefinedClass,
-                    stateEnum: JDefinedClass) : JMethod = {
+                    stateEnumOption: Option[JDefinedClass]) : JMethod = {
         val name = "new_" + newClass.name()
 
         val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
@@ -184,7 +195,7 @@ class CodeGen {
         }
 
         /* add body */
-        translateBody(meth.body(), c.body, stateEnum)
+        translateBody(meth.body(), c.body, stateEnumOption)
 
         meth
     }
@@ -192,7 +203,7 @@ class CodeGen {
     private def translateUniqueConstructor(
                     c: Constructor,
                     newClass: JDefinedClass,
-                    stateEnum: JDefinedClass) : JMethod = {
+                    stateEnumOption: Option[JDefinedClass]) : JMethod = {
         val meth: JMethod = newClass.constructor(JMod.PUBLIC)
 
         /* add args */
@@ -201,7 +212,7 @@ class CodeGen {
         }
 
         /* add body */
-        translateBody(meth.body(), c.body, stateEnum)
+        translateBody(meth.body(), c.body, stateEnumOption)
 
         meth
     }
@@ -254,19 +265,17 @@ class CodeGen {
     private def translateStateDecl(
                     state: State,
                     newClass: JDefinedClass,
-                    stateEnum: JDefinedClass,
+                    stateEnumOption: Option[JDefinedClass],
                     mod: Option[ContractModifier]): Unit = {
-        /* add this state to the enum */
-        stateEnum.enumConstant(state.name)
         for (decl <- state.declarations) {
-            translateDeclaration(decl, newClass, stateEnum, Some(state.name), mod)
+            translateDeclaration(decl, newClass, stateEnumOption, Some(state.name), mod)
         }
     }
 
     private def translateTransDecl(
                     decl: Transaction,
                     newClass: JDefinedClass,
-                    stateEnum: JDefinedClass): JMethod = {
+                    stateEnumOption: Option[JDefinedClass]): JMethod = {
         val meth: JMethod = newClass.method(JMod.PUBLIC, model.VOID, decl.name)
 
         /* add args */
@@ -275,7 +284,7 @@ class CodeGen {
         }
 
         /* add body */
-        translateBody(meth.body(), decl.body, stateEnum)
+        translateBody(meth.body(), decl.body, stateEnumOption)
 
         meth
     }
@@ -284,14 +293,14 @@ class CodeGen {
     private def translateStatement(
                     body: JBlock,
                     statement: Statement,
-                    stateEnum: JDefinedClass): Unit = {
+                    stateEnumOption: Option[JDefinedClass]): Unit = {
         statement match {
             case VariableDecl(typ, name) => body.decl(resolveType(typ), name)
             case Return => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e))
             case Transition(newState, updates) =>
-                translateBody(body, updates, stateEnum)
-                body.assign(JExpr.ref(stateField), stateEnum.enumConstant(newState))
+                translateBody(body, updates, stateEnumOption)
+                body.assign(JExpr.ref(stateField), stateEnumOption.get.enumConstant(newState))
             case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: this should call method to set state, not assign manually
                 val fRef = JExpr.ref(translateExpr(eDeref), field)
@@ -305,17 +314,17 @@ class CodeGen {
                 body._throw(JExpr._new(model.ref("RuntimeException")))
             }
             case If(e, s) =>
-                translateBody(body._if(translateExpr(e))._then(), s, stateEnum)
+                translateBody(body._if(translateExpr(e))._then(), s, stateEnumOption)
             case IfThenElse(e, s1, s2) => {
                 val jIf = body._if(translateExpr(e))
-                translateBody(jIf._then(), s1, stateEnum)
-                translateBody(jIf._else(), s2, stateEnum)
+                translateBody(jIf._then(), s1, stateEnumOption)
+                translateBody(jIf._else(), s2, stateEnumOption)
             }
             case TryCatch(s1, s2) => {
                 val jTry = body._try()
                 val jCatch = jTry._catch(model.ref("RuntimeException"))
-                translateBody(jTry.body(), s1, stateEnum)
-                translateBody(jCatch.body(), s2, stateEnum)
+                translateBody(jTry.body(), s1, stateEnumOption)
+                translateBody(jCatch.body(), s2, stateEnumOption)
             }
             case Switch(e, cases) => {
                 val h :: _ = cases
@@ -324,12 +333,12 @@ class CodeGen {
                     JExpr.invoke(jEx, "getState").eq(JExpr.lit(s))
 
                 val jIf = body._if(eqState(h.stateName))
-                translateBody(jIf._then(), h.body, stateEnum)
+                translateBody(jIf._then(), h.body, stateEnumOption)
 
                 var jPrev = jIf
                 for (_case <- cases) {
                     jPrev = jPrev._elseif(eqState(_case.stateName))
-                    translateBody(jPrev._then(), _case.body, stateEnum)
+                    translateBody(jPrev._then(), _case.body, stateEnumOption)
                 }
             }
             case LocalInvocation(methName, args) => {
@@ -355,16 +364,16 @@ class CodeGen {
     private def translateBody(
                     body: JBlock,
                     statements: Seq[Statement],
-                    stateEnum: JDefinedClass): Unit = {
+                    stateEnumOption: Option[JDefinedClass]): Unit = {
         for (st <- statements) {
-            translateStatement(body, st, stateEnum)
+            translateStatement(body, st, stateEnumOption)
         }
     }
 
     private def translateFuncDecl(
                     decl: Func,
                     newClass: JDefinedClass,
-                    stateEnum: JDefinedClass): Unit = {
+                    stateEnumOption: Option[JDefinedClass]): Unit = {
         val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, decl.name)
 
         /* add args */
@@ -373,6 +382,6 @@ class CodeGen {
         }
 
         /* add body */
-        translateBody(meth.body(), decl.body, stateEnum)
+        translateBody(meth.body(), decl.body, stateEnumOption)
     }
 }
