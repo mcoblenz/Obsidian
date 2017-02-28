@@ -237,11 +237,14 @@ class CodeGen (protobufOuterClassName: String) {
             val innerContract: Contract = c.asInstanceOf[Contract]
             val javaInnerClasses = inClass.listClasses()
             val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
-            generateArchiver(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass])
+            if (javaInnerClassOption.isDefined) {
+                generateArchiver(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass])
+            }
+            else {
+                println("Bug: can't find inner class in generated Java code for inner class " + innerContract.name)
+            }
         }
 
-
-        // TODO: recursively serialize nested contracts.
         // TODO: serialize state enum.
 
         val buildInvocation = JExpr.invoke(builderVariable, "build")

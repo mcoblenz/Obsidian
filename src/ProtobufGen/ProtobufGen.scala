@@ -28,14 +28,14 @@ object ProtobufGen {
         // We only care about the fields. The actual code is irrelevant.
         val allDeclarations = aContract.declarations.map(translateDeclaration)
 
-        val stateNames: List[String] = aContract.declarations.foldLeft(Nil: List[String])((states, decl) => decl match
+        val stateNames: List[String] = aContract.declarations.foldRight(Nil: List[String])((decl, states) => decl match
             {
                 case State(name, _) => name::states
                 case _ => states
             }
         )
 
-        val decls: List[ProtobufDeclaration] = allDeclarations.foldLeft(List[ProtobufDeclaration]())((accum, optionField) =>
+        val decls: List[ProtobufDeclaration] = allDeclarations.foldRight(List[ProtobufDeclaration]())((optionField, accum) =>
             optionField match {
                 case None => accum
                 case Some(f: ProtobufDeclaration) => f :: accum
@@ -43,8 +43,10 @@ object ProtobufGen {
         )
 
         if (stateNames.length > 0) {
-            val stateDecl = ProtobufEnum("__state", stateNames)
-            new ProtobufMessage(stateDecl::decls, aContract.name)
+            val stateDecl = ProtobufEnum("__state_enum", stateNames)
+
+            val stateMessageDecl = ProtobufField(EnumType("__state_enum"), "__state")
+            new ProtobufMessage(stateMessageDecl::stateDecl::decls, aContract.name)
         }
         else {
             new ProtobufMessage(decls, aContract.name)

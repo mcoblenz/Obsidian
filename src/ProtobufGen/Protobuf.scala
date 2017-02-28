@@ -54,8 +54,8 @@ case class ProtobufMessage (decls: Seq[ProtobufDeclaration], messageName: String
             translatedMessages = buildResult._1 :: translatedMessages
         }
 
-        val allMessages = translatedMessages.foldLeft("")((out, msg) => out + msg + "\n")
-        (spaces(nestingLevel) + "message " + messageName + " {" + "\n" + allMessages + spaces(nestingLevel) + "}\n", nextFieldIndex)
+        val allMessages = translatedMessages.foldRight("")((msg, out) => out + msg + "\n\n")
+        (spaces(nestingLevel) + "message " + messageName + " {" + "\n" + allMessages + spaces(nestingLevel) + "}", nextFieldIndex)
     }
 }
 case class ProtobufField (fieldType: FieldType, fieldName: String) extends ProtobufDeclaration {
@@ -71,13 +71,17 @@ case class ProtobufEnum (name: String, values: List[String]) extends ProtobufDec
 
         val spec = spaces(nestingLevel) + "enum " + name + " {\n" + valuesSpec._1 + spaces(nestingLevel) + "}"
 
-        (spec, nestingLevel)
+        (spec, nextFieldIndex)
     }
 }
 
 
 abstract class FieldType {
     def typeString() : String
+}
+
+case class EnumType(enumName: String) extends FieldType {
+    def typeString() = enumName
 }
 
 case class BoolType() extends FieldType {
