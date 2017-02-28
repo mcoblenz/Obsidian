@@ -66,10 +66,10 @@ case class ProtobufField (fieldType: FieldType, fieldName: String) extends Proto
 
 case class ProtobufEnum (name: String, values: List[String]) extends ProtobufDeclaration {
     def build(nextFieldIndex: Int, nestingLevel: Int) : (String, Int) = {
-        val valuesSpec = values.foldLeft("")((out: String, value: String) =>
-            out + spaces(nestingLevel+1) + value.toUpperCase(java.util.Locale.US))
+        val valuesSpec = values.foldLeft(("", 0))((state: (String, Int), value: String) =>
+            (state._1 + spaces(nestingLevel+1) + "__" + value.toUpperCase(java.util.Locale.US) + " = " + state._2 + ";\n", state._2 + 1))
 
-        val spec = spaces(nestingLevel) + "enum " + name + "{\n" + valuesSpec + spaces(nestingLevel) + "}"
+        val spec = spaces(nestingLevel) + "enum " + name + " {\n" + valuesSpec._1 + spaces(nestingLevel) + "}"
 
         (spec, nestingLevel)
     }
