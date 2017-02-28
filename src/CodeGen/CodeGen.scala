@@ -70,7 +70,7 @@ class CodeGen (protobufOuterClassName: String) {
         }
 
         /* Generate serialization code */
-        generateSerialization(newClass)
+        generateSerialization(aContract, newClass)
     }
 
     private def generateMain(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
@@ -149,10 +149,10 @@ class CodeGen (protobufOuterClassName: String) {
     }
 
 
-    private def generateSerialization(newClass : JDefinedClass): Unit = {
-        generateSerializer(newClass)
-        generateArchiver(newClass)
-        generateArchiveConstructor(newClass)
+    private def generateSerialization(contract: Contract, inClass: JDefinedClass): Unit = {
+        generateSerializer(contract, inClass)
+        generateArchiver(contract, inClass)
+        generateArchiveConstructor(contract, inClass)
     }
 
     // "set" followed by lowercasing the field name.
@@ -177,68 +177,80 @@ class CodeGen (protobufOuterClassName: String) {
     }
 
     // Generates a method, archive(), which outputs a protobuf object corresponding to the archive of this class.
-    private def generateArchiver(newClass: JDefinedClass): Unit = {
-        val protobufMessageClassName = protobufMessageClassNameForClassName(newClass.name())
-        val archiveMethod = newClass.method(JMod.PUBLIC, model.parseType(protobufMessageClassName), "archive")
+    private def generateArchiver(contract: Contract, inClass: JDefinedClass): Unit = {
+        val protobufMessageClassName = protobufMessageClassNameForClassName(contract.name)
+        val archiveType = model.parseType(protobufMessageClassName).asInstanceOf[JClass]
+        val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufMessageClassName + ".Builder"
-        val builderVariable: JVar = archiveBody.decl(model.parseType(protobufMessageClassBuilder), "builder")
+        val builderType = model.parseType(protobufMessageClassBuilder)
+        val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
-        for ((fieldName: String, fieldVariable: JFieldVar) <- newClass.fields()) {
-            // generate: FieldArchive fieldArchive = field.archive();
-            val fieldVariableType: JType = fieldVariable.`type`()
 
-            if (fieldVariableType.isPrimitive) {
+        val declarations = contract.declarations
+        val fields = contract.declarations.filter(d => d.isInstanceOf[Field])
+
+        for (f <- fields if f.isInstanceOf[Field]) {
+            val field: Field = f.asInstanceOf[Field]
+
+            // generate: FieldArchive fieldArchive = field.archive();
+            val javaFieldName: String = field.fieldName
+            val javaFieldType: JType = resolveType(field.typ)
+            val javaFieldMap = inClass.fields()
+            val javaFieldVariable: JVar = javaFieldMap.get(javaFieldName)
+
+            if (javaFieldType.isPrimitive) {
                 // TODO
             }
-            else if (fieldVariableType.fullName().equals("java.math.BigInteger")) {
+            else if (javaFieldType.fullName().equals("java.math.BigInteger")) {
                 // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
                 // The protobuf type for this is just bytes.
                 // builder.setField(ByteString.CopyFrom(field.toByteArray()))
-                val setterName: String = setterNameForField(fieldName)
+                val setterName: String = setterNameForField(javaFieldName)
                 val setInvocation = archiveBody.invoke(builderVariable, setterName)
 
                 val byteStringClass: JClass = model.parseType("com.google.protobuf.ByteString").asInstanceOf[JClass]
-                val toByteArrayInvocation = JExpr.invoke(fieldVariable, "toByteArray")
+                val toByteArrayInvocation = JExpr.invoke(javaFieldVariable, "toByteArray")
                 val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
                 copyFromInvocation.arg(toByteArrayInvocation)
                 setInvocation.arg(copyFromInvocation)
             }
             else {
-                val archiveVariableTypeName = protobufMessageClassNameForClassName(fieldVariableType.name())
+                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name())
                 val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
 
-                val archiveVariableInvocation = JExpr.invoke(fieldVariable, "archive")
-                val archiveVariable = archiveBody.decl(archiveVariableType, fieldName + "Archive", archiveVariableInvocation)
+                val archiveVariableInvocation = JExpr.invoke(javaFieldVariable, "archive")
+                val archiveVariable = archiveBody.decl(archiveVariableType, javaFieldName + "Archive", archiveVariableInvocation)
 
                 // generate: builder.setField(field);
-                val setterName: String = setterNameForField(fieldName)
+                val setterName: String = setterNameForField(javaFieldName)
 
                 val invocation: JInvocation = archiveBody.invoke(builderVariable, setterName)
                 invocation.arg(archiveVariable)
             }
         }
 
+        // TODO: recursively serialize nested contracts.
+        // TODO: serialize state enum.
+
         val buildInvocation = JExpr.invoke(builderVariable, "build")
         archiveBody._return(buildInvocation)
     }
 
+
     // Generates a method, archiveString(), which outputs a string in protobuf format.
-    private def generateSerializer(newClass: JDefinedClass): Unit = {
-        val archiveMethod = newClass.method(JMod.PUBLIC, model.parseType("String"), "archiveString")
+    private def generateSerializer(contract: Contract, inClass: JDefinedClass): Unit = {
+        // TODO
+        /*
+        val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("String"), "archiveString")
 
         val archiveBody = archiveMethod.body()
-        // return archive().
-
-
-
-        // TODO
-
+        */
     }
 
-    private def generateArchiveConstructor(newClass: JDefinedClass): Unit = {
+    private def generateArchiveConstructor(contract: Contract, newClass: JDefinedClass): Unit = {
         // TODO
     }
 
