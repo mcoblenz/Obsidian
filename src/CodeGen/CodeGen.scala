@@ -135,6 +135,12 @@ class CodeGen {
          * in the real chaincode, this will just load the fields from the store */
         val newMeth = newClass.constructor(JMod.PUBLIC)
         newMeth.body().invoke("init").arg(JExpr._null()).arg(JExpr._null())
+
+        /* Main Method */
+        val mainMeth = newClass.method(JMod.STATIC | JMod.PUBLIC, model.VOID, "main")
+        mainMeth.param(model.ref("String").array(), "args")
+        mainMeth.body().directStatement("""System.out.println("hello world\n");""")
+        // TODO
     }
 
 

@@ -45,32 +45,6 @@ class ChaincodeBaseServer {
 }
 
 public class ChaincodeBaseMock {
-    public static void main (String args[]) throws IOException {
-        final ChaincodeBaseServer server = new ChaincodeBaseServer();
-
-         /*
-        server.start();
-        server.blockUntilShutdown();
-
-
-        ServerSocket listener = new ServerSocket(4000);
-
-        while (true) {
-            Socket socket = null;
-            try {
-                socket = listener.accept();
-                ConnectionHandler h = new ConnectionHandler(socket);
-                h.start();
-            }
-            catch (IOException e) {
-                if (socket != null) {
-                    socket.close();
-                }
-            }
-        }
-        */
-    }
-
 }
 
 

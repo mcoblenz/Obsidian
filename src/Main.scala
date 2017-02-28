@@ -63,6 +63,57 @@ object Main {
         codeGen.translateProgram(ast)
     }
 
+    /* returns the exit code of the javac process */
+    def compileCode(printJavacOutput: Boolean, mainName: String): Int  = {
+        val classPath = "Obsidian Runtime/src/Runtime/:out/generated_java/"
+        val srcFile = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.java"
+        val compileCmd: Array[String] = Array("javac", "-d", "out/generated_bytecode",
+                                                       "-classpath", classPath,
+                                                        srcFile)
+        val proc: java.lang.Process = Runtime.getRuntime().exec(compileCmd)
+
+        if (printJavacOutput) {
+            val compilerOutput = proc.getErrorStream()
+            val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
+            val result = if (untilEOF.hasNext()) {
+                untilEOF.next()
+            } else {
+                ""
+            }
+
+            print(result)
+        }
+
+        proc.waitFor()
+        proc.exitValue()
+    }
+
+    /* returns the exit code of the jar process */
+    def makeJar(printJavacOutput: Boolean, mainName: String): Int  = {
+        val outputJar = s"out/generated_jars/$mainName.jar"
+        val manifest = s"Obsidian Runtime/protobuf_manifest.mf"
+        val entryClass = s"edu.cmu.cs.obsidian.generated_code.$mainName"
+        val jarCmd: Array[String] =
+            Array("jar", "-cmfe", manifest, outputJar, entryClass, "-C",
+                  "out/generated_bytecode", "edu")
+        val procJar = Runtime.getRuntime().exec(jarCmd)
+
+        if (printJavacOutput) {
+            val compilerOutput = procJar.getErrorStream()
+            val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
+            val result = if (untilEOF.hasNext()) {
+                untilEOF.next()
+            } else {
+                ""
+            }
+
+            print(result)
+        }
+
+        procJar.waitFor()
+        procJar.exitValue()
+    }
+
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
             println("Provide at least one file as an argument")
@@ -115,10 +166,12 @@ object Main {
         val protobufOutputDir = "out/generated_protobuf"
         val javaSrcOutputDir = "out/generated_java"
         val javaJarOutputDir = "out/generated_jars"
+        val javaClassOutputDir = "out/generated_bytecode"
 
         Files.createDirectories(Paths.get(protobufOutputDir))
         Files.createDirectories(Paths.get(javaJarOutputDir))
         Files.createDirectories(Paths.get(javaSrcOutputDir))
+        Files.createDirectories(Paths.get(javaClassOutputDir))
 
         for (filename <- inputFiles) {
             try {
@@ -156,38 +209,16 @@ object Main {
                     case e: Throwable => println("Error running protoc: " + e)
                 }
 
-                /* compile the java code */
                 val mainName = findMainContractName(ast)
-                val classPath = "Obsidian Runtime/src/Runtime/:out/generated_java/"
-                val srcFile = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.java"
-                val compileCmd: Array[String] = Array("javac", "-classpath", classPath, srcFile)
-                val proc: java.lang.Process = Runtime.getRuntime().exec(compileCmd)
-
+                val javacExit = compileCode(printJavacOutput, mainName)
                 if (printJavacOutput) {
-                    val compilerOutput = proc.getErrorStream()
-                    val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
-                    val result = if (untilEOF.hasNext()) {
-                        untilEOF.next()
-                    } else {
-                        ""
+                    println("javac exited with value " + javacExit)
+                }
+                if (javacExit == 0) {
+                    val jarExit = makeJar(printJavacOutput, mainName)
+                    if (printJavacOutput) {
+                        println("jar exited with value " + jarExit)
                     }
-
-                    print(result)
-                }
-
-                proc.waitFor()
-                val exitCode = proc.exitValue()
-                if (printJavacOutput) {
-                    println("javac exited with value " + exitCode)
-                }
-
-                if (exitCode == 0) {
-
-                    val classFile = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.class"
-                    val outputJar = s"out/generated_jars/$mainName.jar"
-                    val jarCmd: Array[String] = Array("jar", "-cf", outputJar, classFile)
-                    val procJar: java.lang.Process = Runtime.getRuntime().exec(jarCmd)
-                    procJar.waitFor()
                 }
 
             } catch {
