@@ -190,9 +190,8 @@ class CodeGen (protobufOuterClassName: String) {
 
 
         val declarations = contract.declarations
-        val fields = contract.declarations.filter(d => d.isInstanceOf[Field])
 
-        for (f <- fields if f.isInstanceOf[Field]) {
+        for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
 
             // generate: FieldArchive fieldArchive = field.archive();
@@ -231,6 +230,16 @@ class CodeGen (protobufOuterClassName: String) {
                 invocation.arg(archiveVariable)
             }
         }
+
+        val subcontracts = contract.declarations.filter(d => d.isInstanceOf[Contract])
+
+        for (c <- contract.declarations if c.isInstanceOf[Contract]) {
+            val innerContract: Contract = c.asInstanceOf[Contract]
+            val javaInnerClasses = inClass.listClasses()
+            val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
+            generateArchiver(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass])
+        }
+
 
         // TODO: recursively serialize nested contracts.
         // TODO: serialize state enum.
