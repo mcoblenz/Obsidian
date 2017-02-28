@@ -6,6 +6,7 @@ import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
+import edu.cmu.cs.obsidian.util._
 import com.sun.codemodel.internal.JCodeModel
 
 import scala.sys.process._
@@ -190,9 +191,8 @@ object Main {
                 val lastSlash = filename.lastIndexOf("/")
                 val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
-
+                val protobufOuterClassName = Util.protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
                 val initialOuterClassName = sourceFilename.replace(".obs", "") + "OuterClass"
-                val protobufOuterClassName = initialOuterClassName.substring(0, 1).toUpperCase(java.util.Locale.US) + initialOuterClassName.substring(1)
                 val protobufFilename = protobufOuterClassName + ".proto"
 
                 val protobufPath = protobufOutputDir + "/" + protobufFilename

@@ -1,7 +1,9 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.parser._
-import com.sun.codemodel.internal._
+import edu.cmu.cs.obsidian.util._
+import com.sun.codemodel.internal.{JClass, _}
+
 import scala.collection._
 import collection.JavaConversions._
 
@@ -66,6 +68,9 @@ class CodeGen (protobufOuterClassName: String) {
         if (aContract.mod == Some(IsMain)) {
             generateMain(newClass, stateEnumOption)
         }
+
+        /* Generate serialization code */
+        generateSerialization(newClass)
     }
 
     private def generateMain(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
@@ -141,13 +146,11 @@ class CodeGen (protobufOuterClassName: String) {
         mainMeth.param(model.ref("String").array(), "args")
         mainMeth.body().directStatement("""System.out.println("hello world\n");""")
         // TODO
-        
-        /* Generate serialization code */
-        generateSerialization(newClass)
     }
 
 
     private def generateSerialization(newClass : JDefinedClass): Unit = {
+        generateSerializer(newClass)
         generateArchiver(newClass)
         generateArchiveConstructor(newClass)
     }
@@ -166,23 +169,73 @@ class CodeGen (protobufOuterClassName: String) {
         }
     }
 
-    // Generates a method, archiveString(), which outputs a string in protobuf format.
-    private def generateArchiver(newClass: JDefinedClass): Unit = {
-        val archiveMethod = newClass.method(JMod.PRIVATE, model.parseType("String"), "archiveString")
+    private def protobufMessageClassNameForClassName(className: String): String = {
+        val outerClassName = Util.protobufOuterClassNameForClass(className)
+        val messageTypeName: String = packageName + "." + protobufOuterClassName + "." + className
 
+        return messageTypeName
+    }
+
+    // Generates a method, archive(), which outputs a protobuf object corresponding to the archive of this class.
+    private def generateArchiver(newClass: JDefinedClass): Unit = {
+        val protobufMessageClassName = protobufMessageClassNameForClassName(newClass.name())
+        val archiveMethod = newClass.method(JMod.PUBLIC, model.parseType(protobufMessageClassName), "archive")
         val archiveBody = archiveMethod.body()
 
-        val protobufMessageClassBuilder: String = packageName + "." + protobufOuterClassName + "." + newClass.name() + ".Builder"
+        val protobufMessageClassBuilder: String = protobufMessageClassName + ".Builder"
         val builderVariable: JVar = archiveBody.decl(model.parseType(protobufMessageClassBuilder), "builder")
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
         for ((fieldName: String, fieldVariable: JFieldVar) <- newClass.fields()) {
-            // generate: builder.setField(field);
-            val setterName: String = setterNameForField(fieldName)
+            // generate: FieldArchive fieldArchive = field.archive();
+            val fieldVariableType: JType = fieldVariable.`type`()
 
-            val invocation: JInvocation = archiveBody.invoke(builderVariable, setterName)
-            invocation.arg(fieldVariable)
+            if (fieldVariableType.isPrimitive) {
+                // TODO
+            }
+            else if (fieldVariableType.fullName().equals("java.math.BigInteger")) {
+                // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
+                // The protobuf type for this is just bytes.
+                // builder.setField(ByteString.CopyFrom(field.toByteArray()))
+                val setterName: String = setterNameForField(fieldName)
+                val setInvocation = archiveBody.invoke(builderVariable, setterName)
+
+                val byteStringClass: JClass = model.parseType("com.google.protobuf.ByteString").asInstanceOf[JClass]
+                val toByteArrayInvocation = JExpr.invoke(fieldVariable, "toByteArray")
+                val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
+                copyFromInvocation.arg(toByteArrayInvocation)
+                setInvocation.arg(copyFromInvocation)
+            }
+            else {
+                val archiveVariableTypeName = protobufMessageClassNameForClassName(fieldVariableType.name())
+                val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
+
+                val archiveVariableInvocation = JExpr.invoke(fieldVariable, "archive")
+                val archiveVariable = archiveBody.decl(archiveVariableType, fieldName + "Archive", archiveVariableInvocation)
+
+                // generate: builder.setField(field);
+                val setterName: String = setterNameForField(fieldName)
+
+                val invocation: JInvocation = archiveBody.invoke(builderVariable, setterName)
+                invocation.arg(archiveVariable)
+            }
         }
+
+        val buildInvocation = JExpr.invoke(builderVariable, "build")
+        archiveBody._return(buildInvocation)
+    }
+
+    // Generates a method, archiveString(), which outputs a string in protobuf format.
+    private def generateSerializer(newClass: JDefinedClass): Unit = {
+        val archiveMethod = newClass.method(JMod.PUBLIC, model.parseType("String"), "archiveString")
+
+        val archiveBody = archiveMethod.body()
+        // return archive().
+
+
+
+        // TODO
+
     }
 
     private def generateArchiveConstructor(newClass: JDefinedClass): Unit = {
