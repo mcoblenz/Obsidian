@@ -5,7 +5,6 @@ import edu.cmu.cs.obsidian.util._
 import com.sun.codemodel.internal.{JClass, _}
 
 import scala.collection._
-import collection.JavaConversions._
 
 class CodeGen (protobufOuterClassName: String) {
     private val model: JCodeModel = new JCodeModel()
@@ -18,7 +17,7 @@ class CodeGen (protobufOuterClassName: String) {
         new mutable.HashSet[(Option[String], JMethod)]()
 
     /* we track the constructor for essentially the same reason */
-    private var mainConstructor: JMethod = null
+    private var mainConstructor: Option[JMethod] = None
 
     private final val stateField: String = "__state"
     private final val getStateMeth: String = "getState"
@@ -31,18 +30,19 @@ class CodeGen (protobufOuterClassName: String) {
         // Put all generated code in the same package.
         val programPackage: JPackage = model._package(packageName)
         for (c <- program.contracts) {
-            translateContract(c, programPackage)
+            translateOuterContract(c, programPackage)
         }
         model
     }
 
-    // Contracts translate to compilation units containing one class.
-    private def translateContract(aContract: Contract, programPackage: JPackage): Unit = {
-        val newClass: JDefinedClass = programPackage._class(aContract.name)
-
+    /* factors out shared functionality for translate[Outer|Inner]Contract.
+     * returns Some(stateEnum) if the contract has any states (None otherwise). */
+    private def translateContract(
+                    aContract: Contract,
+                    newClass: JDefinedClass): Option[JDefinedClass] = {
         /* setup the state enum */
         val stateDeclarations: Seq[Declaration] = aContract.declarations.filter((d: Declaration) => d match {
-            case s@State(_, _) => true
+            case State(_, _) => true
             case _ => false
         })
 
@@ -58,19 +58,32 @@ class CodeGen (protobufOuterClassName: String) {
 
         }
 
-
         for (decl <- aContract.declarations) {
             translateDeclaration(decl, newClass, stateEnumOption, None, aContract.mod)
         }
 
+        stateEnumOption
+    }
+
+    // Contracts translate to compilation units containing one class.
+    private def translateOuterContract(aContract: Contract, programPackage: JPackage): Unit = {
+        val newClass: JDefinedClass = programPackage._class(aContract.name)
+
+        val stateEnumOption = translateContract(aContract, newClass)
+
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
-        if (aContract.mod == Some(IsMain)) {
+        if (aContract.mod.contains(IsMain)) {
             generateMain(newClass, stateEnumOption)
         }
 
         /* Generate serialization code */
         generateSerialization(aContract, newClass)
+    }
+
+    private def translateInnerContract(aContract: Contract, parent: JDefinedClass): Unit = {
+        val newClass: JDefinedClass = parent._class(JMod.PUBLIC, aContract.name)
+        val _ = translateContract(aContract, newClass)
     }
 
     private def generateMain(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
@@ -114,9 +127,8 @@ class CodeGen (protobufOuterClassName: String) {
         initMeth.param(stubType, "stub")
         initMeth.param(model.ref("String").array(), "args")
 
-        if (mainConstructor != null) {
-            initMeth.body().invoke(mainConstructor)
-        }
+        mainConstructor.foreach(c => initMeth.body().invoke(c))
+
         initMeth.body()._return(JExpr.lit(""))
 
 
@@ -273,8 +285,10 @@ class CodeGen (protobufOuterClassName: String) {
                     currentState: Option[String],
                     mod: Option[ContractModifier]): Unit = {
         (mod, declaration) match {
+
+            /* the main contract has special generated code, so many functions are different */
             case (Some(IsMain), c@Constructor(_,_,_)) =>
-                mainConstructor = translateMainConstructor(c, newClass, stateEnumOption)
+                mainConstructor = Some(translateMainConstructor(c, newClass, stateEnumOption))
             case (Some(IsMain), f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
             case (Some(IsMain), f@Func(_,_,_)) =>
@@ -284,17 +298,32 @@ class CodeGen (protobufOuterClassName: String) {
                 mainTransactions.add(entry)
             case (Some(IsMain), s@State(_,_)) =>
                 translateStateDecl(s, newClass, stateEnumOption, mod)
-            case (Some(IsUnique), c@Constructor(_,_,_)) =>
-                translateUniqueConstructor(c, newClass, stateEnumOption)
-            case (Some(IsUnique), f@Field(_,_)) =>
+            case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass)
+
+            // TODO : shared contracts
+            /* shared contracts will generate a sort of shim to interact with
+             * a remotely deployed chaincode. */
+            case (Some(IsShared), c@Constructor(_,_,_)) => ()
+            case (Some(IsShared), f@Field(_,_)) => ()
+            case (Some(IsShared), f@Func(_,_,_)) => ()
+            case (Some(IsShared), t@Transaction(_,_,_)) => ()
+            case (Some(IsShared), s@State(_,_)) => ()
+            case (Some(IsShared), c@Contract(_,_,_)) => ()
+
+            /* Unique contracts and nested contracts are translated the same way */
+            case (_, c@Constructor(_,_,_)) =>
+                translateConstructor(c, newClass, stateEnumOption)
+            case (_, f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
-            case (Some(IsUnique), f@Func(_,_,_)) =>
+            case (_, f@Func(_,_,_)) =>
                 translateFuncDecl(f, newClass, stateEnumOption)
-            case (Some(IsUnique), t@Transaction(_,_,_)) =>
+            case (_, t@Transaction(_,_,_)) =>
                 translateTransDecl(t, newClass, stateEnumOption)
-            case (Some(IsUnique), s@State(_,_)) =>
+            case (_, s@State(_,_)) =>
                 translateStateDecl(s, newClass, stateEnumOption, mod)
-            case _ => () // TODO : type declarations, also declarations for shared
+            case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass)
+
+            case _ => () // TODO : type declarations
         }
     }
 
@@ -303,12 +332,14 @@ class CodeGen (protobufOuterClassName: String) {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
-            case NonPrimitiveType(mods, "address") => model.directClass("java.math.BigInteger")
-            case NonPrimitiveType(mods, name) => model.ref(name)
+            case NonPrimitiveType(_, "address") => model.directClass("java.math.BigInteger")
+            case NonPrimitiveType(_, name) => model.ref(name)
         }
     }
 
-
+    /* The java constructor in the main contract runs every transaction.
+     * The obsidian constructor only runs when the contract is deployed.
+     * Thus, the obsidian constructor must be placed in a distinct method. */
     private def translateMainConstructor(
                     c: Constructor,
                     newClass: JDefinedClass,
@@ -328,7 +359,7 @@ class CodeGen (protobufOuterClassName: String) {
         meth
     }
 
-    private def translateUniqueConstructor(
+    private def translateConstructor(
                     c: Constructor,
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass]) : JMethod = {
@@ -364,7 +395,7 @@ class CodeGen (protobufOuterClassName: String) {
             case FalseLiteral() => JExpr.FALSE
             case Conjunction(e1, e2) => translateExpr(e1).band(translateExpr(e2))
             case Disjunction(e1, e2) => translateExpr(e1).bor(translateExpr(e2))
-            case LogicalNegation(e) => translateExpr(e).not()
+            case LogicalNegation(e1) => translateExpr(e1).not()
             case Add(e1, e2) => translateExpr(e1).invoke("add").arg(translateExpr(e2))
             case Subtract(e1, e2) => translateExpr(e1).invoke("subtract").arg(translateExpr(e2))
             case Multiply(e1, e2) => translateExpr(e1).invoke("multiply").arg(translateExpr(e2))
@@ -380,7 +411,7 @@ class CodeGen (protobufOuterClassName: String) {
                 translateExpr(e1).invoke("compareTo").arg(translateExpr(e2)).ne(JExpr.lit(1))
             case NotEquals(e1, e2) =>
                 translateExpr(e1).invoke("equals").arg(translateExpr(e2)).not()
-            case Dereference(e, f) => translateExpr(e).ref(f)
+            case Dereference(e1, f) => translateExpr(e1).ref(f)
             case LocalInvocation(name, args) =>
                 args.foldLeft(JExpr.invoke(name))(foldF)
             case Invocation(rec, name, args) =>
@@ -429,32 +460,32 @@ class CodeGen (protobufOuterClassName: String) {
             case Transition(newState, updates) =>
                 translateBody(body, updates, stateEnumOption)
                 body.assign(JExpr.ref(stateField), stateEnumOption.get.enumConstant(newState))
-            case Assignment(Dereference(eDeref, field), e) => {
+            case Assignment(Dereference(eDeref, field), e) =>
                 // TODO: this should call method to set state, not assign manually
                 val fRef = JExpr.ref(translateExpr(eDeref), field)
                 body.assign(fRef, translateExpr(e))
-            }
-            case Assignment(Variable(x), e) => {
+
+            case Assignment(Variable(x), e) =>
                 val ref = JExpr.ref(x)
                 body.assign(ref, translateExpr(e))
-            }
-            case Throw() => {
+
+            case Throw() =>
                 body._throw(JExpr._new(model.ref("RuntimeException")))
-            }
+
             case If(e, s) =>
                 translateBody(body._if(translateExpr(e))._then(), s, stateEnumOption)
-            case IfThenElse(e, s1, s2) => {
+            case IfThenElse(e, s1, s2) =>
                 val jIf = body._if(translateExpr(e))
                 translateBody(jIf._then(), s1, stateEnumOption)
                 translateBody(jIf._else(), s2, stateEnumOption)
-            }
-            case TryCatch(s1, s2) => {
+
+            case TryCatch(s1, s2) =>
                 val jTry = body._try()
                 val jCatch = jTry._catch(model.ref("RuntimeException"))
                 translateBody(jTry.body(), s1, stateEnumOption)
                 translateBody(jCatch.body(), s2, stateEnumOption)
-            }
-            case Switch(e, cases) => {
+
+            case Switch(e, cases) =>
                 val h :: _ = cases
                 val jEx = translateExpr(e)
                 val eqState = (s: String) =>
@@ -468,21 +499,21 @@ class CodeGen (protobufOuterClassName: String) {
                     jPrev = jPrev._elseif(eqState(_case.stateName))
                     translateBody(jPrev._then(), _case.body, stateEnumOption)
                 }
-            }
-            case LocalInvocation(methName, args) => {
+
+            case LocalInvocation(methName, args) =>
                 val inv = body.invoke(methName)
 
                 for (arg <- args) {
                     inv.arg(translateExpr(arg))
                 }
-            }
-            case Invocation(e, methName, args) => {
+
+            case Invocation(e, methName, args) =>
                 val inv = body.invoke(translateExpr(e), methName)
 
                 for (arg <- args) {
                     inv.arg(translateExpr(arg))
                 }
-            }
+
 
             /* all expressions can be statements but no other expressions have a reasonable meaning */
             case _ => ()
