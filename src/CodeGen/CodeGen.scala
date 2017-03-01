@@ -41,21 +41,26 @@ class CodeGen (protobufOuterClassName: String) {
                     aContract: Contract,
                     newClass: JDefinedClass): Option[JDefinedClass] = {
         /* setup the state enum */
-        val stateDeclarations: Seq[Declaration] = aContract.declarations.filter((d: Declaration) => d match {
-            case State(_, _) => true
-            case _ => false
-        })
+        val stateDeclarations: Seq[Declaration] =
+            aContract.declarations.filter((d: Declaration) => d match {
+                case State(_, _) => true
+                case _ => false
+            })
 
         var stateEnumOption: Option[JDefinedClass] = None
         if (stateDeclarations.nonEmpty) {
             val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumName(aContract.name))
             stateEnumOption = Some(stateEnum)
 
+            /* Declare the states in the enum */
+            for (State(name, _) <- stateDeclarations) {
+                stateEnum.enumConstant(name)
+            }
+
             /* setup the state field and the [getState] method */
             newClass.field(JMod.PRIVATE, stateEnum, stateField)
             val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
             stateMeth.body()._return(JExpr.ref(stateField))
-
         }
 
         for (decl <- aContract.declarations) {
