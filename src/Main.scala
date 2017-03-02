@@ -1,6 +1,6 @@
+import java.nio.file.{Files, Paths, Path}
 import java.io.File
-import java.nio.file.{Files, Paths}
-import java.util.{Locale, Scanner}
+import java.util.Scanner
 
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.parser._
@@ -11,20 +11,83 @@ import com.sun.codemodel.internal.JCodeModel
 
 import scala.sys.process._
 
-class CompilerOptions (val printTokens: Boolean,
-                       val printAST: Boolean) {
-}
-
 class ParseException (val message : String) extends Exception {
 
 }
 
 
+case class CompilerOptions (outputJar: Option[String],
+                            inputFiles: List[String],
+                            verbose: Boolean,
+                            printTokens: Boolean,
+                            printAST: Boolean)
 
 object Main {
-    val sep = "============================================================================"
 
-    def parse(srcPath: String, options: CompilerOptions): Program = {
+
+    val usage: String =
+        """Usage: obsidian [options] file.obs
+          |Options:
+          |    --output-jar path/to/output.jar    outputs the jar at the given directory
+          |    --verbose                          print error codes and messages for jar and javac
+          |    --print-tokens                     print output of the lexer
+          |    --print-ast                        print output of the parser
+        """.stripMargin
+
+    def parseOptions(args: List[String]): CompilerOptions = {
+        var outputJar: Option[String] = None
+        var inputFiles: List[String] = List.empty
+        var verbose = false
+        var printTokens = false
+        var printAST = false
+
+        def parseOptionsRec(remainingArgs: List[String]) : Unit = {
+            remainingArgs match {
+                case Nil => ()
+                case "--verbose" :: tail =>
+                    verbose = true
+                    parseOptionsRec(tail)
+                case "--print-tokens" :: tail =>
+                    printTokens = true
+                    parseOptionsRec(tail)
+                case "--print-ast" :: tail =>
+                    printAST = true
+                    parseOptionsRec(tail)
+                case "--output-jar" :: jarName :: tail =>
+                    outputJar = Some(jarName)
+                    parseOptionsRec(tail)
+                case option :: tail =>
+                    if (option.startsWith("--") || option.startsWith("-")) {
+                        println("Unknown option " + option)
+                        sys.exit(1)
+                    }
+                    else if (option.endsWith(".obs")) {
+                        // This is an input file.
+                        inputFiles = option :: inputFiles
+                        parseOptionsRec(tail)
+                    }
+                    else {
+                        println("Unknown argument " + option)
+                        sys.exit(1)
+                    }
+            }
+        }
+
+        parseOptionsRec(args)
+
+        if (inputFiles.isEmpty) {
+            println("Must pass at least one file")
+            sys.exit(1)
+        }
+
+        if (inputFiles.length > 1) {
+            println("For now: contracts can only consist of a single file")
+        }
+
+        CompilerOptions(outputJar, inputFiles, verbose, printTokens, printAST)
+    }
+
+    def parseToAST(srcPath: String, options: CompilerOptions): Program = {
         val bufferedSource = scala.io.Source.fromFile(srcPath)
         val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
 
@@ -35,11 +98,9 @@ object Main {
 
         if (options.printTokens) {
             println("Tokens:")
-            println(sep)
             println()
             println(tokens)
             println()
-            println(sep)
         }
 
         val ast: Program = Parser.parseProgram(tokens) match {
@@ -52,7 +113,7 @@ object Main {
 
     def findMainContractName(prog: Program): String = {
         for (aContract <- prog.contracts) {
-            if (aContract.mod == Some(IsMain)) {
+            if (aContract.mod.contains(IsMain)) {
                 return aContract.name
             }
         }
@@ -65,12 +126,19 @@ object Main {
     }
 
     /* returns the exit code of the javac process */
-    def compileCode(printJavacOutput: Boolean, mainName: String): Int  = {
-        val classPath = "Obsidian Runtime/src/Runtime/:out/generated_java/:lib/protobuf-java-3.2.0.jar"
-        val srcFile = s"out/generated_java/edu/cmu/cs/obsidian/generated_code/$mainName.java"
-        val compileCmd: Array[String] = Array("javac", "-d", "out/generated_bytecode",
+    def compileCode(
+            printJavacOutput: Boolean,
+            mainName: String,
+            sourceDir: Path,
+            compileTo: Path): Int  = {
+
+        val sourcePath = sourceDir.toString
+        val classPath = s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.2.0.jar"
+        val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
+        val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
                                                        "-classpath", classPath,
-                                                        srcFile)
+                                                        srcFile.toString)
+
         val proc: java.lang.Process = Runtime.getRuntime().exec(compileCmd)
 
         if (printJavacOutput) {
@@ -90,13 +158,17 @@ object Main {
     }
 
     /* returns the exit code of the jar process */
-    def makeJar(printJavacOutput: Boolean, mainName: String): Int  = {
-        val outputJar = s"out/generated_jars/$mainName.jar"
+    def makeJar(
+            printJavacOutput: Boolean,
+            mainName: String,
+            outputJar: Path,
+            bytecode: Path): Int  = {
+
         val manifest = s"Obsidian Runtime/protobuf_manifest.mf"
         val entryClass = s"edu.cmu.cs.obsidian.generated_code.$mainName"
         val jarCmd: Array[String] =
-            Array("jar", "-cmfe", manifest, outputJar, entryClass, "-C",
-                  "out/generated_bytecode", "edu")
+            Array("jar", "-cmfe", manifest, outputJar.toString, entryClass, "-C",
+                  bytecode.toString, "edu")
         val procJar = Runtime.getRuntime().exec(jarCmd)
 
         if (printJavacOutput) {
@@ -115,122 +187,101 @@ object Main {
         procJar.exitValue()
     }
 
+    def recDelete(f: File): Unit = {
+        if (f.isDirectory) {
+            for (sub_f <- f.listFiles()) {
+                recDelete(sub_f)
+            }
+        }
+
+        f.delete()
+    }
+
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
-            println("Provide at least one file as an argument")
-            return
+            println(usage)
+            sys.exit(1)
         }
 
-        var printTokens = false
-        var printAST = false
-        var printJavacOutput = false
-        var inputFiles: List[String] = Nil
+        val options = parseOptions(args.toList)
 
-        def parseOptions(list: List[String]): Unit = {
-            def isSwitch (s: String) = s(0) == '-'
+        val tmpDir = Files.createTempDirectory("obsidian")
+        val tmpPath = tmpDir.toAbsolutePath
 
-            list match {
-                case Nil =>
-                case "--print-javac" :: tail =>
-                    printJavacOutput = true
-                    parseOptions (tail)
-                case "--print-tokens" :: tail =>
-                    printTokens = true
-                    parseOptions (tail)
+        val protobufDir = tmpPath.resolve("generated_protobuf")
+        val srcDir = tmpPath.resolve("generated_java")
+        val bytecodeDir = tmpPath.resolve("generated_bytecode")
 
-                case "--print-ast" :: tail =>
-                    printAST = true
-                    parseOptions (tail)
+        Files.createDirectories(protobufDir)
+        Files.createDirectories(srcDir)
+        Files.createDirectories(bytecodeDir)
 
-                case option :: tail =>
-                    if (option.startsWith("--") || option.startsWith("-")) {
-                        println("Unknown option " + option)
-                        sys.exit(1)
-                    }
-                    else if (option.endsWith(".obs")) {
-                        // This is an input file.
-                        inputFiles = option :: inputFiles
-                        parseOptions (tail)
-                    }
-                    else {
-                        println("Unknown argument " + option)
-                        sys.exit(1)
-                    }
+        /* we just look at the first file because we don't have a module system yet */
+        val filename = options.inputFiles.head
 
+        try {
+            val ast = parseToAST(filename, options)
+
+            if (options.printAST) {
+                println("AST")
+                println()
+                println(ast)
+                println()
             }
-        }
 
-        parseOptions(args.toList)
 
-        val options = new CompilerOptions(printTokens, printAST)
+            val lastSlash = filename.lastIndexOf("/")
+            val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
-        val protobufOutputDir = "out/generated_protobuf"
-        val javaSrcOutputDir = "out/generated_java"
-        val javaJarOutputDir = "out/generated_jars"
-        val javaClassOutputDir = "out/generated_bytecode"
+            val protobufOuterClassName = Util.protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
+            val initialOuterClassName = sourceFilename.replace(".obs", "") + "OuterClass"
+            val protobufFilename = protobufOuterClassName + ".proto"
 
-        Files.createDirectories(Paths.get(protobufOutputDir))
-        Files.createDirectories(Paths.get(javaJarOutputDir))
-        Files.createDirectories(Paths.get(javaSrcOutputDir))
-        Files.createDirectories(Paths.get(javaClassOutputDir))
+            // TODO
+            /* We construct the protobuf file in the current working directory. This
+             * construction cannot be done in the tmp directory because protoc doesn't
+             * accept absolute paths. Not sure how to work around this... */
+            val protoPath = Paths.get(protobufFilename)
 
-        for (filename <- inputFiles) {
+            val p : Protobuf = ProtobufGen.translateProgram(ast)
+            p.build(protoPath.toFile, protobufOuterClassName)
+
+            val javaModel = compile(ast, protobufOuterClassName)
+            javaModel.build(srcDir.toFile)
+
+            // Invoke protoc to compile from protobuf to Java.
+            val protocInvocation : String =
+                "protoc --java_out=" + srcDir + " " + protobufFilename
+
             try {
-                val ast = parse(filename, options)
-
-                if (options.printAST) {
-                    println("AST")
-                    println(sep)
-                    println()
-                    println(ast)
-                    println()
-                    println(sep)
+                val exitCode = protocInvocation.!
+                if (exitCode != 0) {
+                    println("`" + protocInvocation + "` exited abnormally: " + exitCode)
                 }
-
-
-                val lastSlash = filename.lastIndexOf("/")
-                val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
-
-                val protobufOuterClassName = Util.protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
-                val initialOuterClassName = sourceFilename.replace(".obs", "") + "OuterClass"
-                val protobufFilename = protobufOuterClassName + ".proto"
-
-                val protobufPath = protobufOutputDir + "/" + protobufFilename
-
-                val p : Protobuf = ProtobufGen.translateProgram(ast)
-                p.build(new File(protobufOutputDir, protobufFilename), protobufOuterClassName)
-
-                val javaModel = compile(ast, protobufOuterClassName)
-                javaModel.build(new File(javaSrcOutputDir))
-
-                // Invoke protoc to compile from protobuf to Java.
-                val protocInvocation : String = "protoc --java_out=" + javaSrcOutputDir + " " + protobufPath
-
-                try {
-                    val exitCode = protocInvocation.!
-                    if (exitCode != 0) {
-                        println("`" + protocInvocation + "` exited abnormally: " + exitCode)
-                    }
-                } catch {
-                    case e: Throwable => println("Error running protoc: " + e)
-                }
-
-                val mainName = findMainContractName(ast)
-                val javacExit = compileCode(printJavacOutput, mainName)
-                if (printJavacOutput) {
-                    println("javac exited with value " + javacExit)
-                }
-                if (javacExit == 0) {
-                    val jarExit = makeJar(printJavacOutput, mainName)
-                    if (printJavacOutput) {
-                        println("jar exited with value " + jarExit)
-                    }
-                }
-
             } catch {
-                case e: ParseException => println(e.message)
+                case e: Throwable => println("Error running protoc: " + e)
             }
 
+            Files.delete(protoPath)
+
+            // invoke javac and make a jar from the result
+            val mainName = findMainContractName(ast)
+            val javacExit = compileCode(options.verbose, mainName, srcDir, bytecodeDir)
+            if (options.verbose) {
+                println("javac exited with value " + javacExit)
+            }
+            if (javacExit == 0) {
+                val jarPath = Paths.get(options.outputJar.getOrElse(s"mainName.jar"))
+                val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+                if (options.verbose) {
+                    println("jar exited with value " + jarExit)
+                }
+            }
+
+        } catch {
+            case e: ParseException => println(e.message)
         }
+
+        recDelete(tmpDir.toFile)
     }
 }
