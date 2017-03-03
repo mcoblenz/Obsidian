@@ -121,8 +121,8 @@ object Main {
     }
 
     def compile (ast: Program, protobufOuterClassName: String): JCodeModel = {
-        val codeGen = new CodeGen(protobufOuterClassName)
-        codeGen.translateProgram(ast)
+        val codeGen = new CodeGen()
+        codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
     /* returns the exit code of the javac process */
@@ -197,6 +197,13 @@ object Main {
         f.delete()
     }
 
+
+    private def protobufOuterClassNameForClass(className: String): String = {
+        className.substring(0, 1).toUpperCase(java.util.Locale.US) + className.substring(1) + "OuterClass"
+    }
+
+    // For input foo.obs, we generate foo.proto, from which we generate FooOuterClass.java.
+    //    We also generate a jar at the specified directory, containing the generated classes.
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
             println(usage)
@@ -233,8 +240,8 @@ object Main {
             val lastSlash = filename.lastIndexOf("/")
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
-            val protobufOuterClassName = Util.protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
-            val initialOuterClassName = sourceFilename.replace(".obs", "") + "OuterClass"
+            // The outer class name has to depend on the filename, not the contract name, because there may be many contracts in one file.
+            val protobufOuterClassName = protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
             val protobufFilename = protobufOuterClassName + ".proto"
 
             // TODO

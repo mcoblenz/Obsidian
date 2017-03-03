@@ -10,9 +10,4 @@ object Util {
         ""
     }
 
-    def protobufOuterClassNameForClass(className: String): String = {
-        val initialOuterClassName = className.replace(".obs", "") + "OuterClass"
-
-        initialOuterClassName.substring(0, 1).toUpperCase(java.util.Locale.US) + initialOuterClassName.substring(1)
-    }
 }

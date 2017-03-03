@@ -6,7 +6,7 @@ import com.sun.codemodel.internal.{JClass, _}
 
 import scala.collection._
 
-class CodeGen (protobufOuterClassName: String) {
+class CodeGen () {
     private val model: JCodeModel = new JCodeModel()
 
     /* we must keep track of the transactions in main so that we can match on
@@ -26,11 +26,11 @@ class CodeGen (protobufOuterClassName: String) {
     }
     final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
 
-    def translateProgram(program: Program): JCodeModel = {
+    def translateProgram(program: Program, protobufOuterClassName: String): JCodeModel = {
         // Put all generated code in the same package.
         val programPackage: JPackage = model._package(packageName)
         for (c <- program.contracts) {
-            translateOuterContract(c, programPackage)
+            translateOuterContract(c, programPackage, protobufOuterClassName)
         }
         model
     }
@@ -39,7 +39,8 @@ class CodeGen (protobufOuterClassName: String) {
      * returns Some(stateEnum) if the contract has any states (None otherwise). */
     private def translateContract(
                     aContract: Contract,
-                    newClass: JDefinedClass): Option[JDefinedClass] = {
+                    newClass: JDefinedClass,
+                    outerClassNames: List[String]): Option[JDefinedClass] = {
         /* setup the state enum */
         val stateDeclarations: Seq[Declaration] =
             aContract.declarations.filter((d: Declaration) => d match {
@@ -64,17 +65,17 @@ class CodeGen (protobufOuterClassName: String) {
         }
 
         for (decl <- aContract.declarations) {
-            translateDeclaration(decl, newClass, stateEnumOption, None, aContract.mod)
+            translateDeclaration(decl, newClass, stateEnumOption, None, aContract.mod, outerClassNames)
         }
 
         stateEnumOption
     }
 
     // Contracts translate to compilation units containing one class.
-    private def translateOuterContract(aContract: Contract, programPackage: JPackage): Unit = {
+    private def translateOuterContract(aContract: Contract, programPackage: JPackage, protobufOuterClassName: String): Unit = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
 
-        val stateEnumOption = translateContract(aContract, newClass)
+        val stateEnumOption = translateContract(aContract, newClass, protobufOuterClassName::Nil)
 
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
@@ -83,12 +84,12 @@ class CodeGen (protobufOuterClassName: String) {
         }
 
         /* Generate serialization code */
-        generateSerialization(aContract, newClass)
+        generateSerialization(aContract, newClass, protobufOuterClassName::Nil)
     }
 
-    private def translateInnerContract(aContract: Contract, parent: JDefinedClass): Unit = {
+    private def translateInnerContract(aContract: Contract, parent: JDefinedClass, outerClassNames: List[String]): Unit = {
         val newClass: JDefinedClass = parent._class(JMod.PUBLIC, aContract.name)
-        val _ = translateContract(aContract, newClass)
+        val _ = translateContract(aContract, newClass, outerClassNames)
     }
 
     private def generateMain(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
@@ -166,9 +167,9 @@ class CodeGen (protobufOuterClassName: String) {
     }
 
 
-    private def generateSerialization(contract: Contract, inClass: JDefinedClass): Unit = {
+    private def generateSerialization(contract: Contract, inClass: JDefinedClass, outerClassNames: List[String]): Unit = {
         generateSerializer(contract, inClass)
-        generateArchiver(contract, inClass)
+        generateArchiver(contract, inClass, outerClassNames)
         generateArchiveConstructor(contract, inClass)
     }
 
@@ -186,16 +187,19 @@ class CodeGen (protobufOuterClassName: String) {
         }
     }
 
-    private def protobufMessageClassNameForClassName(className: String): String = {
-        val outerClassName = Util.protobufOuterClassNameForClass(className)
-        val messageTypeName: String = packageName + "." + protobufOuterClassName + "." + className
+    private def protobufMessageClassNameForClassName(className: String, outerClassNames: List[String]): String = {
+        val outerClassPath = outerClassNames.foldRight(packageName)(
+            (c: String, accum: String) => accum + "." + c
+        )
+
+        val messageTypeName: String = outerClassPath + "." + className
 
         return messageTypeName
     }
 
     // Generates a method, archive(), which outputs a protobuf object corresponding to the archive of this class.
-    private def generateArchiver(contract: Contract, inClass: JDefinedClass): Unit = {
-        val protobufMessageClassName = protobufMessageClassNameForClassName(contract.name)
+    private def generateArchiver(contract: Contract, inClass: JDefinedClass, outerClassNames: List[String]): Unit = {
+        val protobufMessageClassName = protobufMessageClassNameForClassName(contract.name, outerClassNames)
         val archiveType = model.parseType(protobufMessageClassName).asInstanceOf[JClass]
         val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
         val archiveBody = archiveMethod.body()
@@ -234,7 +238,9 @@ class CodeGen (protobufOuterClassName: String) {
                 setInvocation.arg(copyFromInvocation)
             }
             else {
-                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name())
+                val javaFieldTypeName = javaFieldType.fullName()
+                //
+                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), outerClassNames)
                 val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
 
                 val archiveVariableInvocation = JExpr.invoke(javaFieldVariable, "archive")
@@ -255,14 +261,15 @@ class CodeGen (protobufOuterClassName: String) {
             val javaInnerClasses = inClass.listClasses()
             val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
             if (javaInnerClassOption.isDefined) {
-                generateArchiver(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass])
+                generateArchiver(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], contract.name :: outerClassNames)
             }
             else {
                 println("Bug: can't find inner class in generated Java code for inner class " + innerContract.name)
             }
         }
 
-        // TODO: serialize state enum.
+        // Serialize state enum.
+        // builder.set__State(...)
 
         val buildInvocation = JExpr.invoke(builderVariable, "build")
         archiveBody._return(buildInvocation)
@@ -288,7 +295,8 @@ class CodeGen (protobufOuterClassName: String) {
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass],
                     currentState: Option[String],
-                    mod: Option[ContractModifier]): Unit = {
+                    mod: Option[ContractModifier],
+                    outerClassNames: List[String]): Unit = {
         (mod, declaration) match {
 
             /* the main contract has special generated code, so many functions are different */
@@ -302,8 +310,8 @@ class CodeGen (protobufOuterClassName: String) {
                 val entry = (currentState, translateTransDecl(t, newClass, stateEnumOption))
                 mainTransactions.add(entry)
             case (Some(IsMain), s@State(_,_)) =>
-                translateStateDecl(s, newClass, stateEnumOption, mod)
-            case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass)
+                translateStateDecl(s, newClass, stateEnumOption, mod, outerClassNames)
+            case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass, outerClassNames)
 
             // TODO : shared contracts
             /* shared contracts will generate a sort of shim to interact with
@@ -325,8 +333,8 @@ class CodeGen (protobufOuterClassName: String) {
             case (_, t@Transaction(_,_,_)) =>
                 translateTransDecl(t, newClass, stateEnumOption)
             case (_, s@State(_,_)) =>
-                translateStateDecl(s, newClass, stateEnumOption, mod)
-            case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass)
+                translateStateDecl(s, newClass, stateEnumOption, mod, outerClassNames)
+            case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass, outerClassNames)
 
             case _ => () // TODO : type declarations
         }
@@ -430,9 +438,10 @@ class CodeGen (protobufOuterClassName: String) {
                     state: State,
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass],
-                    mod: Option[ContractModifier]): Unit = {
+                    mod: Option[ContractModifier],
+                    outerClassNames: List[String]): Unit = {
         for (decl <- state.declarations) {
-            translateDeclaration(decl, newClass, stateEnumOption, Some(state.name), mod)
+            translateDeclaration(decl, newClass, stateEnumOption, Some(state.name), mod, outerClassNames)
         }
     }
 
@@ -464,12 +473,12 @@ class CodeGen (protobufOuterClassName: String) {
             case ReturnExpr(e) => body._return(translateExpr(e))
             case Transition(newState, updates) =>
                 translateBody(body, updates, stateEnumOption)
-                body.assign(JExpr.ref(stateField), stateEnumOption.get.enumConstant(newState))
-            case Assignment(Dereference(eDeref, field), e) =>
+                body.assign(JExpr.ref(stateField), stateEnumOption.get.enumConstant(newState)) // XXX DO NOT MODITY ENUM HERE
+            case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: this should call method to set state, not assign manually
                 val fRef = JExpr.ref(translateExpr(eDeref), field)
                 body.assign(fRef, translateExpr(e))
-
+            }
             case Assignment(Variable(x), e) =>
                 val ref = JExpr.ref(x)
                 body.assign(ref, translateExpr(e))
