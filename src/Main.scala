@@ -16,7 +16,8 @@ class ParseException (val message : String) extends Exception {
 }
 
 
-case class CompilerOptions (outputJar: Option[String],
+case class CompilerOptions (outputPath: Option[String],
+                            debugPath: Option[String],
                             inputFiles: List[String],
                             verbose: Boolean,
                             printTokens: Boolean,
@@ -28,14 +29,16 @@ object Main {
     val usage: String =
         """Usage: obsidian [options] file.obs
           |Options:
-          |    --output-jar path/to/output.jar    outputs the jar at the given directory
-          |    --verbose                          print error codes and messages for jar and javac
-          |    --print-tokens                     print output of the lexer
-          |    --print-ast                        print output of the parser
+          |    --output-path path/to/dir    outputs jar and proto files at the given directory
+          |    --dump-debug path/to/dir     save intermediate files at the given directory
+          |    --verbose                    print error codes and messages for jar and javac
+          |    --print-tokens               print output of the lexer
+          |    --print-ast                  print output of the parser
         """.stripMargin
 
     def parseOptions(args: List[String]): CompilerOptions = {
-        var outputJar: Option[String] = None
+        var outputPath: Option[String] = None
+        var debugPath: Option[String] = None
         var inputFiles: List[String] = List.empty
         var verbose = false
         var printTokens = false
@@ -53,8 +56,11 @@ object Main {
                 case "--print-ast" :: tail =>
                     printAST = true
                     parseOptionsRec(tail)
-                case "--output-jar" :: jarName :: tail =>
-                    outputJar = Some(jarName)
+                case "--output-path" :: path :: tail =>
+                    outputPath = Some(path)
+                    parseOptionsRec(tail)
+                case "--dump-debug" :: path :: tail =>
+                    debugPath = Some(path)
                     parseOptionsRec(tail)
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
@@ -84,7 +90,7 @@ object Main {
             println("For now: contracts can only consist of a single file")
         }
 
-        CompilerOptions(outputJar, inputFiles, verbose, printTokens, printAST)
+        CompilerOptions(outputPath, debugPath, inputFiles, verbose, printTokens, printAST)
     }
 
     def parseToAST(srcPath: String, options: CompilerOptions): Program = {
@@ -212,14 +218,31 @@ object Main {
 
         val options = parseOptions(args.toList)
 
-        val tmpDir = Files.createTempDirectory("obsidian")
-        val tmpPath = tmpDir.toAbsolutePath
+        val tmpPath: Path = options.debugPath match {
+            case Some(p) =>
+                val path = Paths.get(p)
+                /* create the dir if it doesn't exist */
+                Files.createDirectories(path)
+                path
+            case None => Files.createTempDirectory("obsidian").toAbsolutePath
+        }
 
-        val protobufDir = tmpPath.resolve("generated_protobuf")
+        val shouldDelete = options.debugPath.isEmpty
+
         val srcDir = tmpPath.resolve("generated_java")
         val bytecodeDir = tmpPath.resolve("generated_bytecode")
 
-        Files.createDirectories(protobufDir)
+        /* if an output path is specified, use it; otherwise, use working directory */
+        val outputPath = options.outputPath match {
+            case Some(p) =>
+                val path = Paths.get(p)
+                /* create the dir if it doesn't exist */
+                Files.createDirectories(path)
+                path
+            case None => Paths.get(".")
+        }
+
+
         Files.createDirectories(srcDir)
         Files.createDirectories(bytecodeDir)
 
@@ -243,22 +266,17 @@ object Main {
             // The outer class name has to depend on the filename, not the contract name, because there may be many contracts in one file.
             val protobufOuterClassName = protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
             val protobufFilename = protobufOuterClassName + ".proto"
-
-            // TODO
-            /* We construct the protobuf file in the current working directory. This
-             * construction cannot be done in the tmp directory because protoc doesn't
-             * accept absolute paths. Not sure how to work around this... */
-            val protoPath = Paths.get(protobufFilename)
+            val protobufPath = outputPath.resolve(protobufFilename)
 
             val p : Protobuf = ProtobufGen.translateProgram(ast)
-            p.build(protoPath.toFile, protobufOuterClassName)
+            p.build(protobufPath.toFile, protobufOuterClassName)
 
             val javaModel = compile(ast, protobufOuterClassName)
             javaModel.build(srcDir.toFile)
 
             // Invoke protoc to compile from protobuf to Java.
             val protocInvocation : String =
-                "protoc --java_out=" + srcDir + " " + protobufFilename
+                "protoc --java_out=" + srcDir + " " + protobufPath.toString
 
             try {
                 val exitCode = protocInvocation.!
@@ -269,8 +287,6 @@ object Main {
                 case e: Throwable => println("Error running protoc: " + e)
             }
 
-            Files.delete(protoPath)
-
             // invoke javac and make a jar from the result
             val mainName = findMainContractName(ast)
             val javacExit = compileCode(options.verbose, mainName, srcDir, bytecodeDir)
@@ -278,7 +294,7 @@ object Main {
                 println("javac exited with value " + javacExit)
             }
             if (javacExit == 0) {
-                val jarPath = Paths.get(options.outputJar.getOrElse(s"mainName.jar"))
+                val jarPath = outputPath.resolve(s"$mainName.jar")
                 val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
                 if (options.verbose) {
                     println("jar exited with value " + jarExit)
@@ -289,6 +305,8 @@ object Main {
             case e: ParseException => println(e.message)
         }
 
-        recDelete(tmpDir.toFile)
+        if (shouldDelete) {
+            recDelete(tmpPath.toFile)
+        }
     }
 }
