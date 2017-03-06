@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="LexerTests" type="JUnit" factoryName="JUnit" nameIsGenerated="true">
+  <configuration default="false" name="ParserTests" type="JUnit" factoryName="JUnit" nameIsGenerated="true">
     <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea">
       <pattern>
         <option name="PATTERN" value="tests.*" />
@@ -10,7 +10,7 @@
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
     <option name="ALTERNATIVE_JRE_PATH" />
     <option name="PACKAGE_NAME" value="tests" />
-    <option name="MAIN_CLASS_NAME" value="edu.cmu.cs.obsidian.tests.LexerTests" />
+    <option name="MAIN_CLASS_NAME" value="edu.cmu.cs.obsidian.tests.ParserTests" />
     <option name="METHOD_NAME" value="" />
     <option name="TEST_OBJECT" value="class" />
     <option name="VM_PARAMETERS" value="-ea" />

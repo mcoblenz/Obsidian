@@ -1,4 +1,4 @@
-package tests
+package edu.cmu.cs.obsidian.tests
 
 import org.scalatest.junit.JUnitSuite
 import org.junit.Test
