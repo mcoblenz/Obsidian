@@ -1,0 +1,73 @@
+unique contract NodeMaybe {
+    NodeMaybe(IntNode node) {
+        ->NodeSome({ node = node });
+    }
+
+    NodeMaybe() {
+        ->NodeNone;
+    }
+
+    state NodeSome {
+        IntNode node;
+
+        transaction getNode() returns IntNode {
+            return node;
+        }
+    }
+    state NodeNone {}
+}
+
+unique contract IntNode {
+    IntNode(int elem, NodeMaybe next) {
+        this.elem = elem;
+        this.next = next;
+    }
+
+    int elem;
+    NodeMaybe next;
+
+    transaction prepend(int new_elem) {
+        switch next {
+            case NodeSome {
+                next.getNode().prepend(new_elem);
+            }
+
+            case NodeNone {
+                next = new NodeMaybe(new IntNode(new_elem, new NodeMaybe()));
+            }
+        }
+    }
+}
+
+unique contract IntList {
+
+    NodeMaybe first;
+
+    IntList() {
+        first = new NodeMaybe();
+    }
+
+    transaction prepend(int elem) {
+        switch first {
+            case NodeSome {
+                first.getNode().prepend(elem);
+            }
+            case NodeNone {
+                first = new NodeMaybe(new IntNode(elem, new NodeMaybe()));
+            }
+        }
+    }
+}
+
+main contract UsesLinkedList {
+
+    IntList ll;
+
+    UsesLinkedList() {
+        ll = new IntList();
+    }
+
+    transaction add() {
+        ll.prepend(5);
+    }
+}
