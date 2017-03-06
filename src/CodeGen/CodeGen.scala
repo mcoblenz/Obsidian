@@ -406,6 +406,7 @@ class CodeGen () {
             case StringLiteral(s) => JExpr.lit(s)
             case TrueLiteral() => JExpr.TRUE
             case FalseLiteral() => JExpr.FALSE
+            case This() => JExpr._this()
             case Conjunction(e1, e2) => translateExpr(e1).band(translateExpr(e2))
             case Disjunction(e1, e2) => translateExpr(e1).bor(translateExpr(e2))
             case LogicalNegation(e1) => translateExpr(e1).not()

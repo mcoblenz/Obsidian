@@ -44,6 +44,7 @@ object Lexer extends RegexParsers {
         case "string" => StringT()
         case "true" => TrueT()
         case "false" => FalseT()
+        case "this" => ThisT()
         case id => IdentifierT(id)
     }
 

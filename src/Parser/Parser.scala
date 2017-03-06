@@ -71,7 +71,7 @@ object Parser extends Parsers {
 
         val parseUpdate = {
             val oneUpdate = parseIdString ~! EqT() ~! parseExpr ^^ {
-                case f ~ _ ~ e => Assignment(Variable(f), e)
+                case f ~ _ ~ e => Assignment(Dereference(This(), f), e)
             }
             LParenT() ~ LBraceT() ~ repsep(oneUpdate, CommaT()) ~
                 RBraceT() ~ RParenT() ^^ {
@@ -246,7 +246,9 @@ object Parser extends Parsers {
 
         val parseLiterals = parseTrue | parseFalse | parseNumLiteral | parseStringLiteral
 
-        val simpleExpr = parseNew | parseLocalInv | parseLiterals | parseVar | parenExpr | fail
+        val parseThis = { ThisT() ^^ { case _ => This() } }
+
+        val simpleExpr = parseThis | parseNew | parseLocalInv | parseLiterals | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }
