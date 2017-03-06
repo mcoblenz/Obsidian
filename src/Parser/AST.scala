@@ -65,9 +65,11 @@ case class Constructor(name: String,
                        body: Seq[Statement]) extends Declaration
 case class Func(name: String,
                 args: Seq[VariableDecl],
+                retType: Option[Type],
                 body: Seq[Statement]) extends Declaration
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
+                       retType: Option[Type],
                        body: Seq[Statement]) extends Declaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration
 

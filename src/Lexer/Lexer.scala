@@ -32,6 +32,7 @@ object Lexer extends RegexParsers {
         case "and" => AndT()
         case "or" => OrT()
         case "return" => ReturnT()
+        case "returns" => ReturnsT()
         case "new" => NewT()
         case "linear" => LinearT()
         case "switch" => SwitchT()

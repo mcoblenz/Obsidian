@@ -259,17 +259,21 @@ object Parser extends Parsers {
         }
     }
 
+    private def parseReturns = ReturnsT() ~! parseType ^^ {
+        case _ ~ typ => typ
+    }
+
     private def parseFuncDecl = {
         FunctionT() ~! parseIdString ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => Func(name, args, body)
+            opt(parseReturns) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case _ ~ name ~ _ ~ args ~ _ ~ ret ~ _ ~ body ~ _ => Func(name, args, ret, body)
         }
     }
 
     private def parseTransDecl = {
         TransactionT() ~! parseIdString ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => Transaction(name, args, body)
+        opt(parseReturns) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case _ ~ name ~ _ ~ args ~ _ ~ ret ~ _ ~ body ~ _ => Transaction(name, args, ret, body)
         }
     }
 

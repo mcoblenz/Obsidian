@@ -22,6 +22,7 @@ case class NotT() extends Token { override def toString: String = "not" }
 case class AndT() extends Token { override def toString: String = "and" }
 case class OrT() extends Token { override def toString: String = "or" }
 case class ReturnT() extends Token { override def toString: String = "return" }
+case class ReturnsT() extends Token { override def toString: String = "returns" }
 case class LinearT() extends Token { override def toString: String = "linear" }
 case class NewT() extends Token { override def toString: String = "new" }
 case class SwitchT() extends Token { override def toString: String = "switch"}

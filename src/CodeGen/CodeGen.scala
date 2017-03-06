@@ -304,9 +304,9 @@ class CodeGen () {
                 mainConstructor = Some(translateMainConstructor(c, newClass, stateEnumOption))
             case (Some(IsMain), f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
-            case (Some(IsMain), f@Func(_,_,_)) =>
+            case (Some(IsMain), f@Func(_,_,_,_)) =>
                 translateFuncDecl(f, newClass, stateEnumOption)
-            case (Some(IsMain), t@Transaction(_,_,_)) =>
+            case (Some(IsMain), t@Transaction(_,_,_,_)) =>
                 val entry = (currentState, translateTransDecl(t, newClass, stateEnumOption))
                 mainTransactions.add(entry)
             case (Some(IsMain), s@State(_,_)) =>
@@ -318,8 +318,8 @@ class CodeGen () {
              * a remotely deployed chaincode. */
             case (Some(IsShared), c@Constructor(_,_,_)) => ()
             case (Some(IsShared), f@Field(_,_)) => ()
-            case (Some(IsShared), f@Func(_,_,_)) => ()
-            case (Some(IsShared), t@Transaction(_,_,_)) => ()
+            case (Some(IsShared), f@Func(_,_,_,_)) => ()
+            case (Some(IsShared), t@Transaction(_,_,_,_)) => ()
             case (Some(IsShared), s@State(_,_)) => ()
             case (Some(IsShared), c@Contract(_,_,_)) => ()
 
@@ -328,9 +328,9 @@ class CodeGen () {
                 translateConstructor(c, newClass, stateEnumOption)
             case (_, f@Field(_,_)) =>
                 translateFieldDecl(f, newClass)
-            case (_, f@Func(_,_,_)) =>
+            case (_, f@Func(_,_,_,_)) =>
                 translateFuncDecl(f, newClass, stateEnumOption)
-            case (_, t@Transaction(_,_,_)) =>
+            case (_, t@Transaction(_,_,_,_)) =>
                 translateTransDecl(t, newClass, stateEnumOption)
             case (_, s@State(_,_)) =>
                 translateStateDecl(s, newClass, stateEnumOption, mod, outerClassNames)
@@ -450,7 +450,11 @@ class CodeGen () {
                     decl: Transaction,
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass]): JMethod = {
-        val meth: JMethod = newClass.method(JMod.PUBLIC, model.VOID, decl.name)
+        val retType = decl.retType match {
+            case Some(typ) => resolveType(typ)
+            case None => model.VOID
+        }
+        val meth: JMethod = newClass.method(JMod.PUBLIC, retType, decl.name)
 
         /* add args */
         for (arg <- decl.args) {
@@ -504,8 +508,11 @@ class CodeGen () {
                 val h :: _ = cases
                 val jEx = translateExpr(e)
                 val eqState = (s: String) =>
-                    JExpr.invoke(jEx, "getState").eq(JExpr.lit(s))
-
+                    // TODO
+                    /* somewhat of a bad workaround, but the alternative involves knowing the
+                     * type of the expression jEx: in general, this requires an analysis
+                     * to link references to declarations */
+                    JExpr.invoke(jEx, "getState").invoke("toString").eq(JExpr.lit(s))
                 val jIf = body._if(eqState(h.stateName))
                 translateBody(jIf._then(), h.body, stateEnumOption)
 
@@ -548,7 +555,11 @@ class CodeGen () {
                     decl: Func,
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass]): Unit = {
-        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, decl.name)
+        val retType = decl.retType match {
+            case Some(typ) => resolveType(typ)
+            case None => model.VOID
+        }
+        val meth: JMethod = newClass.method(JMod.PRIVATE, retType, decl.name)
 
         /* add args */
         for (arg <- decl.args) {
