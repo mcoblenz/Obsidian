@@ -59,8 +59,8 @@ object ProtobufGen {
             case c@Contract(modifiers, name, decls) => Some(translateContract(c))
             case t@TypeDecl(_, _) => None // TODO
             case f@edu.cmu.cs.obsidian.parser.Field(_, _) => Some(translateFieldDecl(f))
-            case f@Func(_, _, _) => None
-            case t@Transaction(_, _, _) => None
+            case f@Func(_,_,_, _) => None
+            case t@Transaction(_,_,_,_) => None
             case s@State(_, _) => Some(translateStateDecl(s))
         }
     }
