@@ -2,22 +2,18 @@ package edu.cmu.cs.obsidian.tests
 
 import org.scalatest.junit.JUnitSuite
 import org.junit.Test
-
+import org.junit.Assert.assertTrue
 import edu.cmu.cs.obsidian.lexer._
 
 class LexerTests extends JUnitSuite {
 
     private def shouldSucceed(src: String): Unit = {
-        Lexer.tokenize(src) match {
-            case Right(_) => ()
-            case Left(_) => assert(false)
-        }
+        val result = Lexer.tokenize(src)
+        assertTrue(result.isRight)
     }
     private def shouldFail(src: String): Unit = {
-        Lexer.tokenize(src) match {
-            case Right(_) => assert(false)
-            case Left(_) => ()
-        }
+        val result = Lexer.tokenize(src)
+        assertTrue(result.isLeft)
     }
 
     private def testAndPrint(src: String): Unit = {
@@ -25,15 +21,16 @@ class LexerTests extends JUnitSuite {
     }
 
     private def shouldEqual(src: String, tokens: Seq[Token]): Unit = {
-        Lexer.tokenize(src) match {
-            case Right(res) => assert(res == tokens)
-            case Left(_) => assert(false)
-        }
+        val result = Lexer.tokenize(src)
+        assertTrue(result.isRight && result.right.get == tokens)
     }
 
     private def shouldEqual(src1: String, src2: String): Unit = {
-        (Lexer.tokenize(src1), Lexer.tokenize(src2)) match {
-            case (Right(res1), Right(res2)) => assert(res1 == res2)
+        val result1 = Lexer.tokenize(src1)
+        val result2 = Lexer.tokenize(src2)
+        assertTrue((result1.isRight && result2.isRight) || (result1.isLeft && result2.isLeft))
+        (result1, result2) match {
+            case (Right(res1), Right(res2)) => assertTrue(res1 == res2)
             case _ => ()
         }
     }
