@@ -1,9 +1,12 @@
 main contract C1 {
     int x;
 
+    C2 c2;
+
     contract C2 {
         int y;
 
+        C3 c3;
         contract C3 {
             int z;
         }

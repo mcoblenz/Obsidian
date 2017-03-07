@@ -184,6 +184,21 @@ class CodeGen () {
         generateSerializer(contract, inClass)
         generateArchiver(contract, inClass, outerClassNames)
         generateArchiveInitializer(contract, inClass, outerClassNames)
+
+
+        val subcontracts = contract.declarations.filter(d => d.isInstanceOf[Contract])
+
+        for (c <- contract.declarations if c.isInstanceOf[Contract]) {
+            val innerContract: Contract = c.asInstanceOf[Contract]
+            val javaInnerClasses = inClass.listClasses()
+            val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
+            if (javaInnerClassOption.isDefined) {
+                generateSerialization(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], contract.name::outerClassNames)
+            }
+            else {
+                println("Bug: can't find inner class in generated Java code for inner class " + innerContract.name)
+            }
+        }
     }
 
     // "set" followed by lowercasing the field name.
@@ -197,6 +212,20 @@ class CodeGen () {
             val firstChar = fieldName.substring(0, 1).toUpperCase(java.util.Locale.US)
             val rest = fieldName.substring(1)
             "set" + firstChar + rest
+        }
+    }
+
+    // "set" followed by lowercasing the field name.
+    private def getterNameForField(fieldName: String) = {
+        if (fieldName.length < 1) {
+            assert(false, "Bug: field name is empty")
+            "get"
+        }
+        else {
+            // Always use US locale, regardless of the user's locale, so that all code is compatible.
+            val firstChar = fieldName.substring(0, 1).toUpperCase(java.util.Locale.US)
+            val rest = fieldName.substring(1)
+            "get" + firstChar + rest
         }
     }
 
@@ -221,6 +250,7 @@ class CodeGen () {
         val builderType = model.parseType(protobufMessageClassBuilder)
         val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
 
+        val classNamePath = contract.name :: outerClassNames
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
 
@@ -258,8 +288,8 @@ class CodeGen () {
             }
             else {
                 val javaFieldTypeName = javaFieldType.fullName()
-                //
-                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), outerClassNames)
+
+                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
                 val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
 
                 val archiveVariableInvocation = JExpr.invoke(javaFieldVariable, "archive")
@@ -268,24 +298,11 @@ class CodeGen () {
                 // generate: builder.setField(field);
                 val setterName: String = setterNameForField(javaFieldName)
 
-                val invocation: JInvocation = archiveBody.invoke(builderVariable, setterName)
+                val invocation: JInvocation = ifNonNull._then().invoke(builderVariable, setterName)
                 invocation.arg(archiveVariable)
             }
         }
 
-        val subcontracts = contract.declarations.filter(d => d.isInstanceOf[Contract])
-
-        for (c <- contract.declarations if c.isInstanceOf[Contract]) {
-            val innerContract: Contract = c.asInstanceOf[Contract]
-            val javaInnerClasses = inClass.listClasses()
-            val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
-            if (javaInnerClassOption.isDefined) {
-                generateSerialization(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], contract.name :: outerClassNames)
-            }
-            else {
-                println("Bug: can't find inner class in generated Java code for inner class " + innerContract.name)
-            }
-        }
 
         // Serialize state enum.
         // builder.set__State(...)
@@ -322,9 +339,52 @@ class CodeGen () {
 
         val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
         parseInvocation.arg(archiveBytes)
-        val decl = methodBody.decl(archiveType, "archive", parseInvocation)
+        val archive = methodBody.decl(archiveType, "archive", parseInvocation)
+        val classNamePath = contract.name :: outerClassNames
 
-        // TODO: call setters.
+        // Call setters.
+        val declarations = contract.declarations
+
+        for (f <- declarations if f.isInstanceOf[Field]) {
+            val field: Field = f.asInstanceOf[Field]
+
+            // generate: FieldArchive fieldArchive = field.archive();
+            val javaFieldName: String = field.fieldName
+            val javaFieldType: JType = resolveType(field.typ)
+            val javaFieldMap = newClass.fields()
+            val javaFieldVariable: JVar = javaFieldMap.get(javaFieldName)
+
+
+
+            if (javaFieldType.isPrimitive) {
+                // TODO
+            }
+            else if (javaFieldType.fullName().equals("java.math.BigInteger")) {
+                // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
+                // The protobuf type for this is just bytes.
+                // if (!archive.getFoo().isEmpty) {
+                //     foo = new BigInteger(archive.getFoo().toByteArray())
+                // }
+                val getterName = getterNameForField(javaFieldName)
+                val ifNonempty = methodBody._if(archive.invoke(getterName).invoke("isEmpty").not())
+
+                val newInteger = JExpr._new(model.parseType("java.math.BigInteger"))
+
+                newInteger.arg(archive.invoke(getterName).invoke("toByteArray"))
+                ifNonempty._then().assign(javaFieldVariable, newInteger)
+            }
+            else {
+                // foo = new Foo(); foo.initFromArchive(archive.getFoo());
+                val javaFieldTypeName = javaFieldType.fullName()
+
+                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
+                val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
+
+                methodBody.assign(javaFieldVariable, JExpr._new(javaFieldType))
+                val initFromArchiveInvocation = javaFieldVariable.invoke("initFromArchive")
+                initFromArchiveInvocation.arg(archive.invoke(getterNameForField(javaFieldName)))
+            }
+        }
     }
 
     private def translateDeclaration(
