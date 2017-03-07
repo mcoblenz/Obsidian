@@ -68,6 +68,44 @@ class LexerTests extends JUnitSuite {
         )
     }
 
+    @Test def programWithComments(): Unit = {
+        shouldSucceed(
+            """
+              | contract C {
+              |     // this is a state
+              |     state S {
+              |         // this is a transaction
+              |         transaction a() {
+              |             this.call(); this = that;
+              |         }
+              |     }
+              | }
+            """.stripMargin
+        )
+        shouldEqual(
+            """
+              | contract C {
+              |     // this is a state
+              |     state S {
+              |         // this is a transaction
+              |         transaction a() {
+              |             this.call(); this = that;
+              |         }
+              |     }
+              | }
+            """.stripMargin,
+            """
+              | contract C {
+              |     state S {
+              |         transaction a() {
+              |             this.call(); this = that;
+              |         }
+              |     }
+              | }
+            """.stripMargin
+        )
+    }
+
     /*
     /* TODO: devise a parsing scheme where these fail */
     @Test def integerValues(): Unit = {

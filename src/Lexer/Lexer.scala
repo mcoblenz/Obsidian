@@ -49,6 +49,15 @@ object Lexer extends RegexParsers {
         case id => IdentifierT(id)
     }
 
+    /* comment parser: must be parsed before [forwardSlashP] */
+    private def commentP = {
+        val beginning = """//""".r ^^ { _ => () }
+
+        /* the comment-beginning marker can also be interpreted as
+         * [forwardSlashT(); ForwardSlashT()] unless we have this workaround */
+        beginning ~! """.*""".r ^^ ( _ => CommentT() )
+    }
+
     /* Punctuation */
     private def plusP = """\+""".r ^^ (_ => PlusT())
     private def starP = """\*""".r ^^ (_ => StarT())
@@ -71,20 +80,28 @@ object Lexer extends RegexParsers {
     private def rightArrowP = """->""".r ^^ (_ => RightArrowT())
     private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT())
 
-    private def oneToken: Parser[Token] = (decimalP | hexP | stringLitP | atomP |
+    private def oneToken: Parser[Token] =
 
-    lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
+    (
+        commentP | decimalP | hexP | stringLitP | atomP |
 
-    /* order is important here because some tokens contain the others */
-    gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
+        lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
-    plusP | starP | forwardSlashP | minusP)
+        /* order is important here because some tokens contain the others */
+        gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
+
+        plusP | starP | forwardSlashP | minusP
+    )
 
     private def tokenParser: Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))
 
+    private def removeComments(tokens: Seq[Token]): Seq[Token] = {
+        tokens.filter({ _ match { case CommentT() => false ; case _ => true } })
+    }
+
     def tokenize(src: String): Either[String, Seq[Token]] = {
         parse(tokenParser, src) match {
-            case Success(matched , _) => Right(matched)
+            case Success(matched , _) => Right(removeComments(matched))
             case Failure(msg ,_) => Left("FAILURE: " + msg)
             case Error(msg , _) => Left("ERROR: " + msg)
         }
