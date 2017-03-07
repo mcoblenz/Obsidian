@@ -80,7 +80,7 @@ class CodeGen () {
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
         if (aContract.mod.contains(IsMain)) {
-            generateMain(newClass, stateEnumOption)
+            generateMainClassMethods(newClass, stateEnumOption)
         }
 
         /* Generate serialization code */
@@ -92,7 +92,7 @@ class CodeGen () {
         val _ = translateContract(aContract, newClass, outerClassNames)
     }
 
-    private def generateMain(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
+    private def generateMainClassMethods(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
         newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
         val stubType = model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
 
@@ -160,17 +160,30 @@ class CodeGen () {
         newMeth.body().invoke("init").arg(JExpr._null()).arg(JExpr._null())
 
         /* Main Method */
-        val mainMeth = newClass.method(JMod.STATIC | JMod.PUBLIC, model.VOID, "main")
-        mainMeth.param(model.ref("String").array(), "args")
-        mainMeth.body().directStatement("""System.out.println("hello world\n");""")
-        // TODO
+        generateMainMethod(newClass)
     }
 
+    private def generateMainMethod(newClass: JDefinedClass) = {
+        val mainMeth = newClass.method(JMod.STATIC | JMod.PUBLIC, model.VOID, "main")
+        val args = mainMeth.param(model.ref("String").array(), "args")
+
+        // main takes one argument specifying the location of the store.
+        // If the specified file does not exist, it creates a new store when it exits.
+
+        val body = mainMeth.body()
+
+
+        val instance = body.decl(newClass, "instance", JExpr._new(newClass))
+
+
+        val invocation = body.invoke(instance, "delegatedMain")
+        invocation.arg(args)
+    }
 
     private def generateSerialization(contract: Contract, inClass: JDefinedClass, outerClassNames: List[String]): Unit = {
         generateSerializer(contract, inClass)
         generateArchiver(contract, inClass, outerClassNames)
-        generateArchiveConstructor(contract, inClass)
+        generateArchiveInitializer(contract, inClass, outerClassNames)
     }
 
     // "set" followed by lowercasing the field name.
@@ -207,6 +220,7 @@ class CodeGen () {
         val protobufMessageClassBuilder: String = protobufMessageClassName + ".Builder"
         val builderType = model.parseType(protobufMessageClassBuilder)
         val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
+
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
 
@@ -221,6 +235,9 @@ class CodeGen () {
             val javaFieldMap = inClass.fields()
             val javaFieldVariable: JVar = javaFieldMap.get(javaFieldName)
 
+            val ifNonNull: JConditional = archiveBody._if(javaFieldVariable.ne(JExpr._null()))
+
+
             if (javaFieldType.isPrimitive) {
                 // TODO
             }
@@ -229,13 +246,15 @@ class CodeGen () {
                 // The protobuf type for this is just bytes.
                 // builder.setField(ByteString.CopyFrom(field.toByteArray()))
                 val setterName: String = setterNameForField(javaFieldName)
-                val setInvocation = archiveBody.invoke(builderVariable, setterName)
+                val setInvocation = JExpr.invoke(builderVariable, setterName)
 
                 val byteStringClass: JClass = model.parseType("com.google.protobuf.ByteString").asInstanceOf[JClass]
                 val toByteArrayInvocation = JExpr.invoke(javaFieldVariable, "toByteArray")
                 val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
                 copyFromInvocation.arg(toByteArrayInvocation)
                 setInvocation.arg(copyFromInvocation)
+
+                ifNonNull._then.add(setInvocation)
             }
             else {
                 val javaFieldTypeName = javaFieldType.fullName()
@@ -244,7 +263,7 @@ class CodeGen () {
                 val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
 
                 val archiveVariableInvocation = JExpr.invoke(javaFieldVariable, "archive")
-                val archiveVariable = archiveBody.decl(archiveVariableType, javaFieldName + "Archive", archiveVariableInvocation)
+                val archiveVariable = ifNonNull._then().decl(archiveVariableType, javaFieldName + "Archive", archiveVariableInvocation)
 
                 // generate: builder.setField(field);
                 val setterName: String = setterNameForField(javaFieldName)
@@ -261,7 +280,7 @@ class CodeGen () {
             val javaInnerClasses = inClass.listClasses()
             val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
             if (javaInnerClassOption.isDefined) {
-                generateArchiver(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], contract.name :: outerClassNames)
+                generateSerialization(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], contract.name :: outerClassNames)
             }
             else {
                 println("Bug: can't find inner class in generated Java code for inner class " + innerContract.name)
@@ -276,18 +295,36 @@ class CodeGen () {
     }
 
 
-    // Generates a method, archiveString(), which outputs a string in protobuf format.
+    // Generates a method, archiveBytes(), which outputs a string in protobuf format.
     private def generateSerializer(contract: Contract, inClass: JDefinedClass): Unit = {
-        // TODO
-        /*
-        val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("String"), "archiveString")
+        val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "archiveBytes")
 
         val archiveBody = archiveMethod.body()
-        */
+
+        val archive = JExpr.invoke(JExpr._this(), "archive")
+        val archiveBytes = archive.invoke("toByteArray")
+        archiveBody._return(archiveBytes);
     }
 
-    private def generateArchiveConstructor(contract: Contract, newClass: JDefinedClass): Unit = {
-        // TODO
+    private def generateArchiveInitializer(contract: Contract, newClass: JDefinedClass, outerClassNames: List[String]): Unit = {
+        // Overrides initFromArchiveBytes() in superclass if this is the main contract.
+
+        val initFromArchiveBytesMethod = newClass.method(JMod.PUBLIC, model.parseType("void"), "initFromArchiveBytes")
+        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[JClass]
+        initFromArchiveBytesMethod._throws(exceptionType)
+        val archiveBytes = initFromArchiveBytesMethod.param(model.parseType("byte[]"), "archiveBytes")
+        val methodBody = initFromArchiveBytesMethod.body()
+
+        val protobufMessageClassName = protobufMessageClassNameForClassName(contract.name, outerClassNames)
+        val archiveType: JClass = model.parseType(protobufMessageClassName).asInstanceOf[JClass]
+
+        // ArchiveType archive = ArchiveType.parseFrom(archiveBytes)
+
+        val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
+        parseInvocation.arg(archiveBytes)
+        val decl = methodBody.decl(archiveType, "archive", parseInvocation)
+
+        // TODO: call setters.
     }
 
     private def translateDeclaration(
