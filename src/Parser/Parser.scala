@@ -41,7 +41,7 @@ object Parser extends Parsers {
         }
         val intPrim = IntT() ^^ { _ => IntType() }
         val boolPrim = BoolT() ^^ { _ => BoolType() }
-        val stringPrim = StringT() ^^ { _ => BoolType() }
+        val stringPrim = StringT() ^^ { _ => StringType() }
 
         nonPrim | intPrim | boolPrim | stringPrim
     }
