@@ -267,39 +267,43 @@ class CodeGen () {
 
             val ifNonNull: JConditional = archiveBody._if(javaFieldVariable.ne(JExpr._null()))
 
+            field.typ match {
+                case IntType() => {
+                    // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
+                    // The protobuf type for this is just bytes.
+                    // builder.setField(ByteString.CopyFrom(field.toByteArray()))
+                    val setterName: String = setterNameForField(javaFieldName)
+                    val setInvocation = JExpr.invoke(builderVariable, setterName)
 
-            if (javaFieldType.isPrimitive) {
-                // TODO
-            }
-            else if (javaFieldType.fullName().equals("java.math.BigInteger")) {
-                // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
-                // The protobuf type for this is just bytes.
-                // builder.setField(ByteString.CopyFrom(field.toByteArray()))
-                val setterName: String = setterNameForField(javaFieldName)
-                val setInvocation = JExpr.invoke(builderVariable, setterName)
+                    val byteStringClass: JClass = model.parseType("com.google.protobuf.ByteString").asInstanceOf[JClass]
+                    val toByteArrayInvocation = JExpr.invoke(javaFieldVariable, "toByteArray")
+                    val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
+                    copyFromInvocation.arg(toByteArrayInvocation)
+                    setInvocation.arg(copyFromInvocation)
 
-                val byteStringClass: JClass = model.parseType("com.google.protobuf.ByteString").asInstanceOf[JClass]
-                val toByteArrayInvocation = JExpr.invoke(javaFieldVariable, "toByteArray")
-                val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
-                copyFromInvocation.arg(toByteArrayInvocation)
-                setInvocation.arg(copyFromInvocation)
+                    ifNonNull._then.add(setInvocation)
+                }
+                case BoolType() => {
+                    // TODO
+                }
+                case StringType() => {
+                    // TODO
+                }
+                case NonPrimitiveType(_, name) => {
+                    val javaFieldTypeName = javaFieldType.fullName()
 
-                ifNonNull._then.add(setInvocation)
-            }
-            else {
-                val javaFieldTypeName = javaFieldType.fullName()
+                    val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
+                    val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
 
-                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
-                val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
+                    val archiveVariableInvocation = JExpr.invoke(javaFieldVariable, "archive")
+                    val archiveVariable = ifNonNull._then().decl(archiveVariableType, javaFieldName + "Archive", archiveVariableInvocation)
 
-                val archiveVariableInvocation = JExpr.invoke(javaFieldVariable, "archive")
-                val archiveVariable = ifNonNull._then().decl(archiveVariableType, javaFieldName + "Archive", archiveVariableInvocation)
+                    // generate: builder.setField(field);
+                    val setterName: String = setterNameForField(javaFieldName)
 
-                // generate: builder.setField(field);
-                val setterName: String = setterNameForField(javaFieldName)
-
-                val invocation: JInvocation = ifNonNull._then().invoke(builderVariable, setterName)
-                invocation.arg(archiveVariable)
+                    val invocation: JInvocation = ifNonNull._then().invoke(builderVariable, setterName)
+                    invocation.arg(archiveVariable)
+                }
             }
         }
 
@@ -355,34 +359,38 @@ class CodeGen () {
             val javaFieldVariable: JVar = javaFieldMap.get(javaFieldName)
 
 
+            field.typ match {
+                case IntType() => {
+                    // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
+                    // The protobuf type for this is just bytes.
+                    // if (!archive.getFoo().isEmpty) {
+                    //     foo = new BigInteger(archive.getFoo().toByteArray())
+                    // }
+                    val getterName = getterNameForField(javaFieldName)
+                    val ifNonempty = methodBody._if(archive.invoke(getterName).invoke("isEmpty").not())
 
-            if (javaFieldType.isPrimitive) {
-                // TODO
-            }
-            else if (javaFieldType.fullName().equals("java.math.BigInteger")) {
-                // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
-                // The protobuf type for this is just bytes.
-                // if (!archive.getFoo().isEmpty) {
-                //     foo = new BigInteger(archive.getFoo().toByteArray())
-                // }
-                val getterName = getterNameForField(javaFieldName)
-                val ifNonempty = methodBody._if(archive.invoke(getterName).invoke("isEmpty").not())
+                    val newInteger = JExpr._new(model.parseType("java.math.BigInteger"))
 
-                val newInteger = JExpr._new(model.parseType("java.math.BigInteger"))
+                    newInteger.arg(archive.invoke(getterName).invoke("toByteArray"))
+                    ifNonempty._then().assign(javaFieldVariable, newInteger)
+                }
+                case BoolType() => {
+                    // TODO
+                }
+                case StringType() => {
+                    // TODO
+                }
+                case NonPrimitiveType(_, name) => {
+                    // foo = new Foo(); foo.initFromArchive(archive.getFoo());
+                    val javaFieldTypeName = javaFieldType.fullName()
 
-                newInteger.arg(archive.invoke(getterName).invoke("toByteArray"))
-                ifNonempty._then().assign(javaFieldVariable, newInteger)
-            }
-            else {
-                // foo = new Foo(); foo.initFromArchive(archive.getFoo());
-                val javaFieldTypeName = javaFieldType.fullName()
+                    val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
+                    val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
 
-                val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
-                val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
-
-                methodBody.assign(javaFieldVariable, JExpr._new(javaFieldType))
-                val initFromArchiveInvocation = javaFieldVariable.invoke("initFromArchive")
-                initFromArchiveInvocation.arg(archive.invoke(getterNameForField(javaFieldName)))
+                    methodBody.assign(javaFieldVariable, JExpr._new(javaFieldType))
+                    val initFromArchiveInvocation = javaFieldVariable.invoke("initFromArchive")
+                    initFromArchiveInvocation.arg(archive.invoke(getterNameForField(javaFieldName)))
+                }
             }
         }
     }
