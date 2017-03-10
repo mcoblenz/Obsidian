@@ -610,7 +610,7 @@ class CodeGen () {
                 translateBody(jCatch.body(), s2, stateEnumOption)
 
             case Switch(e, cases) =>
-                val h :: _ = cases
+                val h :: remainingCases = cases
                 val jEx = translateExpr(e)
                 val eqState = (s: String) =>
                     // TODO
@@ -622,7 +622,7 @@ class CodeGen () {
                 translateBody(jIf._then(), h.body, stateEnumOption)
 
                 var jPrev = jIf
-                for (_case <- cases) {
+                for (_case <- remainingCases) {
                     jPrev = jPrev._elseif(eqState(_case.stateName))
                     translateBody(jPrev._then(), _case.body, stateEnumOption)
                 }

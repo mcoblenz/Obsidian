@@ -50,6 +50,7 @@ class ChaincodeBaseServer {
 
         BufferedReader in =
                 new BufferedReader(new InputStreamReader(clientSk.getInputStream()));
+        OutputStreamWriter out = new OutputStreamWriter(clientSk.getOutputStream());
 
         JSONTokener tokener = new JSONTokener(in);
         JSONObject root = new JSONObject(tokener);
@@ -66,9 +67,11 @@ class ChaincodeBaseServer {
             txArgs[i] = txArgsJson.getString(i);
         }
 
+        String retStr = "";
+
         if (method.equals("deploy")) {
             if (printDebug) System.out.println("Calling constructor...");
-            base.init(base.stub, txArgs);
+            retStr = base.init(base.stub, txArgs);
         }
         else if (method.equals("invoke")) {
             /* [txName] is parsed here because "deploy" doesn't take a name */
@@ -77,10 +80,24 @@ class ChaincodeBaseServer {
                     .getString("function");
 
             if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
-            base.run(base.stub, txName, txArgs);
+            retStr = base.run(base.stub, txName, txArgs);
         }
         else if (method.equals("query")) {
             /* TODO : do we support queries? */
+        }
+        else {
+            /* like other places in this method where this exception is thrown,
+             * this will conceptually indicate that the JSON in malformed */
+            throw new ClassCastException();
+        }
+
+        /* we should try to send the return value back, but not fail,
+         * e.g. if the client closes the socket after the tx is sent */
+        try {
+            out.write(retStr);
+            if (printDebug) System.out.println("Successfully sent return value");
+        } catch (IOException e) {
+            if (printDebug) System.out.println("Client rejected return value");
         }
 
         if (printDebug) System.out.println("Transaction completed");
