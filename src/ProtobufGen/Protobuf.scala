@@ -64,6 +64,21 @@ case class ProtobufField (fieldType: FieldType, fieldName: String) extends Proto
     }
 }
 
+case class ProtobufOneOf(name: String, options: List[(FieldType, String)]) extends ProtobufDeclaration {
+    def build(nextFieldIndex: Int, nestingLevel: Int) : (String, Int) = {
+        val (specBody, nextNextFieldIndex) = options.foldLeft(("", nextFieldIndex))(
+            (state: (String, Int), option: (FieldType, String)) => {
+                val buildStr = state._1 + spaces(nestingLevel + 1) +
+                    option._1.typeString() + " " + option._2 + " = " + state._2 + ";\n"
+                val newFieldIndex = state._2 + 1
+                (buildStr, newFieldIndex)
+            })
+
+        val spec = spaces(nestingLevel) + "oneof " + name + " {\n" + specBody + spaces(nestingLevel) + "}"
+        (spec, nextNextFieldIndex)
+    }
+}
+
 case class ProtobufEnum (name: String, values: List[String]) extends ProtobufDeclaration {
     def build(nextFieldIndex: Int, nestingLevel: Int) : (String, Int) = {
         val valuesSpec = values.foldLeft(("", 0))((state: (String, Int), value: String) =>

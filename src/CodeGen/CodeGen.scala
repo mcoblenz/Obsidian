@@ -10,11 +10,11 @@ class CodeGen () {
     private val model: JCodeModel = new JCodeModel()
 
     /* we must keep track of the transactions in main so that we can match on
-     * them in the "invoke" function. Each pair [(Some(s), m)] is a transaction
-     * represented by a method [m], in a state identified by [s]. If the first
+     * them in the "invoke" function. Each tuple [(Some(s), tr)] is a transaction
+     * represented by a transaction [tr], in a state identified by [s]. If the first
      * element in the pair is [None], then the transaction works in all states */
-    private val mainTransactions: mutable.Set[(Option[String], JMethod)] =
-        new mutable.HashSet[(Option[String], JMethod)]()
+    private val mainTransactions: mutable.Set[(Option[String], Transaction)] =
+        new mutable.HashSet[(Option[String], Transaction)]()
 
     /* we track the constructor for essentially the same reason */
     private var mainConstructor: Option[JMethod] = None
@@ -35,12 +35,32 @@ class CodeGen () {
         model
     }
 
+    /* [true] iff the contract [c] has a constructor that takes no args */
+    private def hasEmptyConstructor(c: Contract): Boolean = {
+        for (d <- c.declarations) {
+            d match {
+                case Constructor(_, args, _) => if (args.length == 0) return true
+                case _ => ()
+            }
+        }
+        return false
+    }
+
     /* factors out shared functionality for translate[Outer|Inner]Contract.
      * returns Some(stateEnum) if the contract has any states (None otherwise). */
     private def translateContract(
                     aContract: Contract,
                     newClass: JDefinedClass,
                     outerClassNames: List[String]): Option[JDefinedClass] = {
+
+        /* if we're not in the main contract, we need to ensure there's an empty constructor.
+         * This constructor will be used in unarchiving; e.g. to unarchive class C:
+         *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
+         */
+        if (!aContract.mod.contains(IsMain) && !hasEmptyConstructor(aContract)) {
+            newClass.constructor(JMod.PUBLIC)
+        }
+
         /* setup the state enum */
         val stateDeclarations: Seq[Declaration] =
             aContract.declarations.filter((d: Declaration) => d match {
@@ -97,38 +117,9 @@ class CodeGen () {
         val stubType = model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
 
         /* run method */
-        val runMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "run")
-        runMeth.param(stubType, "stub")
-        runMeth.param(model.ref("String"), "transName")
-        runMeth.param(model.ref("String").array(), "args")
-
-
-        for ((state, tr) <- mainTransactions) {
-            val cond = {
-                state match {
-                    case Some(stName) =>
-                        JExpr.ref(stateField)
-                            .eq(
-                        stateEnumOption.get.enumConstant(stName))
-                            .band(
-                        JExpr.ref("transName")
-                            .eq(
-                        JExpr.lit(tr.name()))
-                            )
-                    case None =>
-                        JExpr.ref("transName")
-                            .eq(
-                        JExpr.lit(tr.name()))
-                }
-            }
-            val stateCond = runMeth.body()._if(cond)
-            // TODO : need to parse args here and use for invocation
-            stateCond._then().invoke(tr)
-        }
-        runMeth.body()._return(JExpr.lit(""))
+        generateRunMethod(newClass, stateEnumOption, stubType)
 
         /* init method */
-        // TODO : do we need this? How does construction work with Java chaincode
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.ref("String"), "init")
         initMeth.param(stubType, "stub")
         initMeth.param(model.ref("String").array(), "args")
@@ -153,14 +144,76 @@ class CodeGen () {
         idMeth.body()._return(JExpr.lit(""))
         // TODO
 
-        // TODO
-        /* this is TEMPORARY: we don't want this constructor for real chaincode.
-         * in the real chaincode, this will just load the fields from the store */
-        val newMeth = newClass.constructor(JMod.PUBLIC)
-        newMeth.body().invoke("init").arg(JExpr._null()).arg(JExpr._null())
-
         /* Main Method */
         generateMainMethod(newClass)
+    }
+
+    private def generateRunMethod(
+                    newClass: JDefinedClass,
+                    stateEnumOption: Option[JDefinedClass],
+                    stubType: JClass): Unit = {
+        val runMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "run")
+        runMeth.param(stubType, "stub")
+        runMeth.param(model.ref("String"), "transName")
+        val runArgs = runMeth.param(model.ref("String").array(), "args")
+
+
+        for ((state, tx) <- mainTransactions) {
+            val cond = {
+                state match {
+                    case Some(stName) =>
+                        JExpr.ref(stateField)
+                            .eq(
+                                stateEnumOption.get.enumConstant(stName))
+                            .band(
+                                JExpr.ref("transName")
+                                    .eq(
+                                        JExpr.lit(tx.name))
+                            )
+                    case None =>
+                        JExpr.ref("transName")
+                            .eq(
+                                JExpr.lit(tx.name))
+                }
+            }
+
+            val stateCond = runMeth.body()._if(cond)
+            val stateCondBody = stateCond._then()
+
+            var txArgsList: List[JVar] = List.empty
+            var runArgNumber = 0
+            for (txArg <- tx.args) {
+
+                var newTxArg: JVar = null
+                if (txArg.typ.isInstanceOf[IntType]) {
+                    newTxArg = stateCondBody.decl(
+                        resolveType(txArg.typ),
+                        txArg.varName,
+                        JExpr._new(resolveType(txArg.typ)).arg(
+                            runArgs.component(JExpr.lit(runArgNumber))
+                        ))
+                } else {
+                    newTxArg = stateCondBody.decl(
+                        resolveType(txArg.typ),
+                        txArg.varName,
+                        JExpr._new(resolveType(txArg.typ)))
+                    stateCondBody.invoke(newTxArg, "initFromArchiveBytes")
+                        .arg(runArgs.component(JExpr.lit(runArgNumber)))
+                }
+                txArgsList = newTxArg :: txArgsList
+                runArgNumber += 1
+            }
+
+            // TODO : need to parse args here and use for invocation
+            val invocation = stateCondBody.invoke(tx.name)
+
+            for (txArg <- txArgsList.reverse) {
+                invocation.arg(txArg)
+            }
+
+
+        }
+        runMeth.body()._return(JExpr.lit(""))
     }
 
     private def generateMainMethod(newClass: JDefinedClass) = {
@@ -230,11 +283,13 @@ class CodeGen () {
     }
 
     private def protobufMessageClassNameForClassName(className: String, outerClassNames: List[String]): String = {
+        /*
         val outerClassPath = outerClassNames.foldRight(packageName)(
             (c: String, accum: String) => accum + "." + c
         )
+        */
 
-        val messageTypeName: String = outerClassPath + "." + className
+        val messageTypeName: String = outerClassNames.last + "." + className
 
         return messageTypeName
     }
@@ -242,14 +297,18 @@ class CodeGen () {
     // Generates a method, archive(), which outputs a protobuf object corresponding to the archive of this class.
     private def generateArchiver(contract: Contract, inClass: JDefinedClass, outerClassNames: List[String]): Unit = {
         val protobufMessageClassName = protobufMessageClassNameForClassName(contract.name, outerClassNames)
-        val archiveType = model.parseType(protobufMessageClassName).asInstanceOf[JClass]
+        val archiveType = model.directClass(protobufMessageClassName)
         val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufMessageClassName + ".Builder"
         val builderType = model.parseType(protobufMessageClassBuilder)
-        val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
 
+        /* TODO obviously this workaround is bad; see if there's another way */
+        archiveBody.directStatement(protobufMessageClassBuilder + " builder = " +
+                                    protobufMessageClassName + ".newBuilder();")
+        val builderVariable = JExpr.ref("builder")
+        // val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
         val classNamePath = contract.name :: outerClassNames
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
@@ -327,70 +386,108 @@ class CodeGen () {
         archiveBody._return(archiveBytes);
     }
 
-    private def generateArchiveInitializer(contract: Contract, newClass: JDefinedClass, outerClassNames: List[String]): Unit = {
+    private def generateFieldInitializer(
+                    field: Field,
+                    fieldVar: JVar,
+                    body: JBlock,
+                    archive: JVar,
+                    classNamePath: List[String]): Unit = {
+        // generate: FieldArchive fieldArchive = field.archive();
+        val javaFieldName: String = field.fieldName
+        val javaFieldType: JType = resolveType(field.typ)
+
+        field.typ match {
+            case IntType() => {
+                // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
+                // The protobuf type for this is just bytes.
+                // if (!archive.getFoo().isEmpty) {
+                //     foo = new BigInteger(archive.getFoo().toByteArray())
+                // }
+                val getterName = getterNameForField(javaFieldName)
+                val ifNonempty = body._if(archive.invoke(getterName).invoke("isEmpty").not())
+
+                val newInteger = JExpr._new(model.parseType("java.math.BigInteger"))
+
+                newInteger.arg(archive.invoke(getterName).invoke("toByteArray"))
+                ifNonempty._then().assign(fieldVar, newInteger)
+            }
+            case BoolType() => {
+                // TODO
+            }
+            case StringType() => {
+                // TODO
+            }
+            case NonPrimitiveType(_, name) => {
+                // foo = new Foo(); foo.initFromArchive(archive.getFoo());
+                val javaFieldTypeName = javaFieldType.fullName()
+
+                val archiveName =
+                    protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
+                val archiveType: JType = model.parseType(archiveName)
+
+                // TODO
+                /* generate another method that takes the actual archive type
+                 * so we don't have to uselessly convert to bytes here */
+                body.assign(fieldVar, JExpr._new(javaFieldType))
+                val init = body.invoke(fieldVar, "initFromArchiveBytes")
+                init.arg(archive.invoke(getterNameForField(javaFieldName)).invoke("toByteArray"))
+
+            }
+        }
+    }
+
+    /* generates the method [initFromArchiveBytes] */
+    private def generateArchiveInitializer(
+                    contract: Contract,
+                    newClass: JDefinedClass,
+                    outerClassNames: List[String]): Unit = {
         // Overrides initFromArchiveBytes() in superclass if this is the main contract.
 
-        val initFromArchiveBytesMethod = newClass.method(JMod.PUBLIC, model.parseType("void"), "initFromArchiveBytes")
-        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[JClass]
-        initFromArchiveBytesMethod._throws(exceptionType)
-        val archiveBytes = initFromArchiveBytesMethod.param(model.parseType("byte[]"), "archiveBytes")
-        val methodBody = initFromArchiveBytesMethod.body()
+        val protobufClassName = protobufMessageClassNameForClassName(contract.name, outerClassNames)
+        val archiveType = model.directClass(protobufClassName)
 
-        val protobufMessageClassName = protobufMessageClassNameForClassName(contract.name, outerClassNames)
-        val archiveType: JClass = model.parseType(protobufMessageClassName).asInstanceOf[JClass]
-
-        // ArchiveType archive = ArchiveType.parseFrom(archiveBytes)
-
+        val meth = newClass.method(JMod.PUBLIC, model.parseType("void"), "initFromArchiveBytes")
+        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+        meth._throws(exceptionType.asInstanceOf[JClass])
+        val archiveBytes = meth.param(model.parseType("byte[]"), "archiveBytes")
+        val methodBody = meth.body()
         val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
         parseInvocation.arg(archiveBytes)
         val archive = methodBody.decl(archiveType, "archive", parseInvocation)
+
         val classNamePath = contract.name :: outerClassNames
 
         // Call setters.
         val declarations = contract.declarations
 
+        /* this takes care of whole contract fields */
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
+            val javaFieldVar = newClass.fields().get(field.fieldName)
+            generateFieldInitializer(field, javaFieldVar, methodBody, archive, classNamePath)
+        }
 
-            // generate: FieldArchive fieldArchive = field.archive();
-            val javaFieldName: String = field.fieldName
-            val javaFieldType: JType = resolveType(field.typ)
-            val javaFieldMap = newClass.fields()
-            val javaFieldVariable: JVar = javaFieldMap.get(javaFieldName)
+        /* this takes care of state-specific fields */
+        for (stDecl <- declarations if stDecl.isInstanceOf[State]) {
+            val st = stDecl.asInstanceOf[State]
 
+            val enumGetter = "getStateCase"
+            val stArchiveName = protobufClassName + "." + st.name
+            val stArchiveType: JType = model.parseType(stArchiveName)
+            val enumName =
+                protobufClassName + "." + "StateCase" + "." + ("STATE" + st.name).toUpperCase
+            val thisStateBody = methodBody._if(
+                    archive.invoke(enumGetter).invoke("equals").arg(JExpr.direct(enumName))
+                )._then()
 
-            field.typ match {
-                case IntType() => {
-                    // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
-                    // The protobuf type for this is just bytes.
-                    // if (!archive.getFoo().isEmpty) {
-                    //     foo = new BigInteger(archive.getFoo().toByteArray())
-                    // }
-                    val getterName = getterNameForField(javaFieldName)
-                    val ifNonempty = methodBody._if(archive.invoke(getterName).invoke("isEmpty").not())
+            val stArchiveGetter = "getState" + st.name
+            val stArchive =
+                thisStateBody.decl(stArchiveType, "stateArchive", archive.invoke(stArchiveGetter))
 
-                    val newInteger = JExpr._new(model.parseType("java.math.BigInteger"))
-
-                    newInteger.arg(archive.invoke(getterName).invoke("toByteArray"))
-                    ifNonempty._then().assign(javaFieldVariable, newInteger)
-                }
-                case BoolType() => {
-                    // TODO
-                }
-                case StringType() => {
-                    // TODO
-                }
-                case NonPrimitiveType(_, name) => {
-                    // foo = new Foo(); foo.initFromArchive(archive.getFoo());
-                    val javaFieldTypeName = javaFieldType.fullName()
-
-                    val archiveVariableTypeName = protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
-                    val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
-
-                    methodBody.assign(javaFieldVariable, JExpr._new(javaFieldType))
-                    val initFromArchiveInvocation = javaFieldVariable.invoke("initFromArchive")
-                    initFromArchiveInvocation.arg(archive.invoke(getterNameForField(javaFieldName)))
-                }
+            for (f <- st.asInstanceOf[State].declarations if f.isInstanceOf[Field]) {
+                val field: Field = f.asInstanceOf[Field]
+                val javaFieldVar = newClass.fields().get(field.fieldName)
+                generateFieldInitializer(field, javaFieldVar, thisStateBody, stArchive, classNamePath)
             }
         }
     }
@@ -412,8 +509,8 @@ class CodeGen () {
             case (Some(IsMain), f@Func(_,_,_,_)) =>
                 translateFuncDecl(f, newClass, stateEnumOption)
             case (Some(IsMain), t@Transaction(_,_,_,_)) =>
-                val entry = (currentState, translateTransDecl(t, newClass, stateEnumOption))
-                mainTransactions.add(entry)
+                translateTransDecl(t, newClass, stateEnumOption)
+                mainTransactions.add((currentState, t))
             case (Some(IsMain), s@State(_,_)) =>
                 translateStateDecl(s, newClass, stateEnumOption, mod, outerClassNames)
             case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass, outerClassNames)

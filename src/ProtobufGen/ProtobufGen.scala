@@ -43,10 +43,11 @@ object ProtobufGen {
         )
 
         if (stateNames.length > 0) {
-            val stateDecl = ProtobufEnum("__state_enum", stateNames)
+            val oneOfOptions = stateNames.map((stateName: String) =>
+                (ObjectType(stateName), "state" + stateName))
+            val stateDecl = ProtobufOneOf("state", oneOfOptions)
 
-            val stateMessageDecl = ProtobufField(EnumType("__state_enum"), "__state")
-            new ProtobufMessage(stateMessageDecl::stateDecl::decls, aContract.name)
+            new ProtobufMessage(stateDecl::decls, aContract.name)
         }
         else {
             new ProtobufMessage(decls, aContract.name)
