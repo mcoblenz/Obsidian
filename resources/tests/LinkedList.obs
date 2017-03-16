@@ -67,7 +67,8 @@ main contract UsesLinkedList {
         ll = new IntList();
     }
 
-    transaction add() {
-        ll.prepend(5);
+    transaction add(int x) returns int {
+        ll.prepend(x);
+        return x;
     }
 }

@@ -1,7 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.parser._
-import edu.cmu.cs.obsidian.util._
 import com.sun.codemodel.internal.{JClass, _}
 
 import scala.collection._
@@ -120,44 +119,53 @@ class CodeGen () {
         generateRunMethod(newClass, stateEnumOption, stubType)
 
         /* init method */
-        val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.ref("String"), "init")
-        initMeth.param(stubType, "stub")
-        initMeth.param(model.ref("String").array(), "args")
-
-        mainConstructor.foreach(c => initMeth.body().invoke(c))
-
-        initMeth.body()._return(JExpr.lit(""))
-
+        generateInitMethod(newClass, stubType)
 
         /* query method */
-        val queryMeth: JMethod = newClass.method(JMod.PUBLIC, model.ref("String"), "query")
+        val queryMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "query")
         queryMeth.param(stubType, "stub")
         queryMeth.param(model.ref("String"), "transName")
-        queryMeth.param(model.ref("String").array(), "args")
+        queryMeth.param(model.BYTE.array().array(), "args")
 
         // TODO
-        queryMeth.body()._return(JExpr.lit(""))
+        queryMeth.body()._return(JExpr.newArray(model.BYTE, 0))
 
 
         /* getChaincodeID */
-        val idMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "getChaincodeID")
-        idMeth.body()._return(JExpr.lit(""))
+        val idMeth = newClass.method(JMod.PUBLIC, model.BYTE.array(), "getChaincodeID")
+        idMeth.body()._return(JExpr.newArray(model.BYTE, 0))
         // TODO
 
         /* Main Method */
         generateMainMethod(newClass)
     }
 
+    private def generateInitMethod(
+                    newClass: JDefinedClass,
+                    stubType: JClass): Unit = {
+        val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
+        initMeth.param(stubType, "stub")
+        initMeth.param(model.BYTE.array().array(), "args")
+
+        mainConstructor.foreach(c => initMeth.body().invoke(c))
+
+        initMeth.body()._return(JExpr.newArray(model.BYTE, 0));
+    }
+
     private def generateRunMethod(
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass],
                     stubType: JClass): Unit = {
-        val runMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "run")
+        val runMeth = newClass.method(JMod.PUBLIC, model.BYTE.array(), "run")
         runMeth.param(stubType, "stub")
         runMeth.param(model.ref("String"), "transName")
-        val runArgs = runMeth.param(model.ref("String").array(), "args")
+        val runArgs = runMeth.param(model.BYTE.array().array(), "args")
 
+        val returnBytes = runMeth.body().decl(
+                              model.BYTE.array(), "returnBytes",
+                              JExpr.newArray(model.BYTE, 0))
 
+        /* for each possible transaction, we have a branch in the run method */
         for ((state, tx) <- mainTransactions) {
             val cond = {
                 state match {
@@ -167,12 +175,12 @@ class CodeGen () {
                                 stateEnumOption.get.enumConstant(stName))
                             .band(
                                 JExpr.ref("transName")
-                                    .eq(
+                                    .invoke("equals").arg(
                                         JExpr.lit(tx.name))
                             )
                     case None =>
                         JExpr.ref("transName")
-                            .eq(
+                            .invoke("equals").arg(
                                 JExpr.lit(tx.name))
                 }
             }
@@ -180,6 +188,7 @@ class CodeGen () {
             val stateCond = runMeth.body()._if(cond)
             val stateCondBody = stateCond._then()
 
+            /* parse the (typed) args from raw bytes */
             var txArgsList: List[JVar] = List.empty
             var runArgNumber = 0
             for (txArg <- tx.args) {
@@ -204,16 +213,27 @@ class CodeGen () {
                 runArgNumber += 1
             }
 
-            // TODO : need to parse args here and use for invocation
-            val invocation = stateCondBody.invoke(tx.name)
+            var txInvoke: JInvocation = null
+
+            if (tx.retType.isDefined) {
+                txInvoke = JExpr.invoke(tx.name)
+                if (tx.retType.get.isInstanceOf[IntType]) {
+                    stateCondBody.assign(returnBytes, txInvoke.invoke("toByteArray"))
+                } else {
+                    stateCondBody.assign(returnBytes, txInvoke.invoke("archiveBytes"))
+                }
+            } else {
+                txInvoke = stateCondBody.invoke(tx.name)
+            }
 
             for (txArg <- txArgsList.reverse) {
-                invocation.arg(txArg)
+                txInvoke.arg(txArg)
             }
 
 
         }
-        runMeth.body()._return(JExpr.lit(""))
+
+        runMeth.body()._return(returnBytes)
     }
 
     private def generateMainMethod(newClass: JDefinedClass) = {
@@ -652,11 +672,11 @@ class CodeGen () {
                     decl: Transaction,
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass]): JMethod = {
-        val retType = decl.retType match {
+        val javaRetType = decl.retType match {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
         }
-        val meth: JMethod = newClass.method(JMod.PUBLIC, retType, decl.name)
+        val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name)
 
         /* add args */
         for (arg <- decl.args) {
@@ -757,11 +777,11 @@ class CodeGen () {
                     decl: Func,
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass]): Unit = {
-        val retType = decl.retType match {
+        val javaRetType = decl.retType match {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
         }
-        val meth: JMethod = newClass.method(JMod.PRIVATE, retType, decl.name)
+        val meth: JMethod = newClass.method(JMod.PRIVATE, javaRetType, decl.name)
 
         /* add args */
         for (arg <- decl.args) {

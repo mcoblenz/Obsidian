@@ -20,6 +20,49 @@ class ChaincodeBaseServer {
     private final ChaincodeBaseMock base;
     private final boolean printDebug;
 
+    private static char[] hexCharList = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+
+    /* always returns a length-two string */
+    private static String byteToString(byte b) {
+        int bAsInt = b & 0x000000ff;
+        StringBuilder builder = new StringBuilder();
+
+        /* most significant byte goes first */
+        builder.append(hexCharList[bAsInt >>> 4]);
+
+        /* least significant byte goes second */
+        builder.append(hexCharList[(bAsInt << 28) >>> 28]);
+        return builder.toString();
+    }
+
+    /* [c1] is least significant; [c1] and [c2] should be characters in [hexCharList] */
+    private static byte charsToByte(char c1, char c2) {
+        byte b = 0;
+        for (int i = 0; i < 16; i++) {
+            if (hexCharList[i] == c1) b |= i;
+        }
+        for (int i = 0; i < 16; i++) {
+            if (hexCharList[i] == c2) b |= (i << 4);
+        }
+        return b;
+    }
+
+    private static String bytesToHexStr(byte[] bytes) {
+        StringBuilder builder = new StringBuilder();
+        for (byte b : bytes) builder.append(byteToString(b));
+        return builder.toString();
+    }
+
+    /* hex string should not remove trailing 0's: e.g. length(hex) must be even */
+    private static byte[] hexStringToBytes(String hex) {
+        int length = hex.length() / 2 + (hex.length() % 2);
+        byte[] bytes = new byte[length];
+        for (int i = 0; i < length; i++) {
+            bytes[i] = charsToByte(hex.charAt(2 * i + 1), hex.charAt(2 * i));
+        }
+        return bytes;
+    }
+
     public ChaincodeBaseServer(int port, ChaincodeBaseMock base, boolean printDebug) {
         this.port = port;
         this.base = base;
@@ -36,6 +79,15 @@ class ChaincodeBaseServer {
                 }
             },
         }
+
+        Example response format:
+        {
+            "result": {
+                "status": "OK",
+                "message": [return value encoded]
+            }
+        }
+
      */
 
     /* Waits for a request and then runs a transaction based on the request.
@@ -62,16 +114,16 @@ class ChaincodeBaseServer {
                 .getJSONObject("ctorMsg")
                 .getJSONArray("args");
 
-        String[] txArgs = new String[txArgsJson.length()];
+        byte[][] txArgs = new byte[txArgsJson.length()][];
         for (int i = 0; i < txArgsJson.length(); i++) {
-            txArgs[i] = txArgsJson.getString(i);
+            txArgs[i] = hexStringToBytes(txArgsJson.getString(i));
         }
 
-        String retStr = "";
+        byte[] retBytes = new byte[0];
 
         if (method.equals("deploy")) {
             if (printDebug) System.out.println("Calling constructor...");
-            retStr = base.init(base.stub, txArgs);
+            retBytes = base.init(base.stub, txArgs);
         }
         else if (method.equals("invoke")) {
             /* [txName] is parsed here because "deploy" doesn't take a name */
@@ -80,7 +132,7 @@ class ChaincodeBaseServer {
                     .getString("function");
 
             if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
-            retStr = base.run(base.stub, txName, txArgs);
+            retBytes = base.run(base.stub, txName, txArgs);
         }
         else if (method.equals("query")) {
             /* TODO : do we support queries? */
@@ -93,8 +145,20 @@ class ChaincodeBaseServer {
 
         /* we should try to send the return value back, but not fail,
          * e.g. if the client closes the socket after the tx is sent */
+        JSONObject retObject = new JSONObject();
+        JSONObject result = new JSONObject();
+        result.put("status", "OK");
+        result.put("message", bytesToHexStr(retBytes));
+        retObject.put("result", result);
+
+        if (printDebug) {
+            System.out.println("Sending back JSON: ");
+            System.out.println(retObject.toString());
+        }
+
         try {
-            out.write(retStr);
+            out.write(retObject.toString());
+            out.flush();
             if (printDebug) System.out.println("Successfully sent return value");
         } catch (IOException e) {
             if (printDebug) System.out.println("Client rejected return value");
@@ -193,8 +257,8 @@ public abstract class ChaincodeBaseMock {
     }
 
     // Must be overridden in generated class.
-    public abstract String init(ChaincodeStubMock stub, String[] args);
-    public abstract String run(ChaincodeStubMock stub, String transactionName, String[] args);
+    public abstract byte[] init(ChaincodeStubMock stub, byte[][] args);
+    public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args);
 
     public abstract void initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] archiveBytes();
