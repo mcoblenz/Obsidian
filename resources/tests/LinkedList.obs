@@ -13,6 +13,10 @@ unique contract NodeMaybe {
         transaction getNode() returns IntNode {
             return node;
         }
+
+        transaction getValue() returns int {
+            return node.getValue();
+        }
     }
     state NodeNone {}
 }
@@ -26,10 +30,42 @@ unique contract IntNode {
     int elem;
     NodeMaybe next;
 
-    transaction prepend(int new_elem) {
+    transaction getValue() returns int {
+        return elem;
+    }
+
+    transaction length() returns int {
+        int i = 1;
         switch next {
             case NodeSome {
-                next.getNode().prepend(new_elem);
+                i = i + next.getNode().length();
+            }
+        }
+        return i;
+    }
+
+    transaction nth(int n) returns NodeMaybe {
+        if (n == 0) {
+            return new NodeMaybe(this);
+        }
+
+        NodeMaybe ret;
+        switch next {
+            case NodeSome {
+                ret = next.getNode().nth(n - 1);
+            }
+            case NodeNone {
+                ret = new NodeMaybe();
+            }
+        }
+
+        return ret;
+    }
+
+    transaction postpend(int new_elem) {
+        switch next {
+            case NodeSome {
+                next.getNode().postpend(new_elem);
             }
 
             case NodeNone {
@@ -47,10 +83,34 @@ unique contract IntList {
         first = new NodeMaybe();
     }
 
-    transaction prepend(int elem) {
+    transaction length() returns int {
+        int i = 0;
         switch first {
             case NodeSome {
-                first.getNode().prepend(elem);
+                i = first.getNode().length();
+            }
+        }
+        return i;
+    }
+
+    // this violates linearity, obviously, but it is useful for testing
+    transaction nth(int n) returns NodeMaybe {
+        NodeMaybe node;
+        switch first {
+            case NodeSome {
+                node = first.getNode().nth(n);
+            }
+            case NodeNone {
+                node = new NodeMaybe();
+            }
+        }
+        return node;
+    }
+
+    transaction postpend(int elem) {
+        switch first {
+            case NodeSome {
+                first.getNode().postpend(elem);
             }
             case NodeNone {
                 first = new NodeMaybe(new IntNode(elem, new NodeMaybe()));
@@ -68,7 +128,27 @@ main contract UsesLinkedList {
     }
 
     transaction add(int x) returns int {
-        ll.prepend(x);
+        ll.postpend(x);
         return x;
+    }
+
+    transaction getLength() returns int {
+        return ll.length();
+    }
+
+    transaction getNth(int n, int deflt) returns int {
+        if (n < 0) {
+            return deflt;
+        }
+        NodeMaybe maybeNth = ll.nth(n);
+
+        int i = deflt;
+        switch maybeNth {
+            case NodeSome {
+                i = maybeNth.getValue();
+            }
+        }
+
+        return i;
     }
 }

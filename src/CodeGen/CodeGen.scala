@@ -695,7 +695,7 @@ class CodeGen () {
                     statement: Statement,
                     stateEnumOption: Option[JDefinedClass]): Unit = {
         statement match {
-            case VariableDecl(typ, name) => body.decl(resolveType(typ), name)
+            case VariableDecl(typ, name) => body.decl(resolveType(typ), name, JExpr._null())
             case Return => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e))
             case Transition(newState, updates) =>
@@ -734,7 +734,7 @@ class CodeGen () {
                     /* somewhat of a bad workaround, but the alternative involves knowing the
                      * type of the expression jEx: in general, this requires an analysis
                      * to link references to declarations */
-                    JExpr.invoke(jEx, "getState").invoke("toString").eq(JExpr.lit(s))
+                    JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
                 val jIf = body._if(eqState(h.stateName))
                 translateBody(jIf._then(), h.body, stateEnumOption)
 
