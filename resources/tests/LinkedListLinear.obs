@@ -1,0 +1,157 @@
+unique contract NodeMaybe {
+    NodeMaybe(IntNode node) {
+        ->NodeSome({ node = node });
+    }
+
+    NodeMaybe() {
+        ->NodeNone;
+    }
+
+    state NodeSome {
+        IntNode node;
+
+        // this needs to destroy the reference to [this]. In fact, we need a
+        // declaration here to indicate this fact ("destroys"), otherwise
+        // linear usage of references cannot be checked in a modular fashion
+        transaction unpack() returns IntNode {
+            return node;
+        }
+    }
+    state NodeNone {}
+}
+
+unique contract IntNode {
+    IntNode(int elem, NodeMaybe next) {
+        this.elem = elem;
+        this.next = next;
+    }
+
+    int elem;
+    NodeMaybe next;
+
+    // This could be reasonably checked: we copy a reference to the integer,
+    // but we don't need to destroy the reference to [this], because we know
+    // that [elem] can be safely aliased
+    transaction getElem() returns int {
+        return elem;
+    }
+
+    // this tx would destroy [this]
+    transaction getNext() returns NodeMaybe {
+        return next;
+    }
+
+    // regarding query/tx distinction: intuitively, length is a "query":
+    // it doesn't mutate the contract's state.
+    // Currently, though, it mutates [this] by unpacking [next]; even though
+    // it reassigns next to (semantically) the same value, the compiler
+    // wouldn't know this
+    transaction length() returns int {
+        int length = 1;
+        switch next {
+            case NoneSome {
+                IntNode nextNode = next.unpack();
+                length = length + nextNode.length();
+                next = new NodeMaybe(nextNode);
+            }
+        }
+        return length;
+    }
+
+    // mutable borrowing would be beneficial here in order to mutate the
+    // node inside the [NodeMaybe] without unpacking and repacking
+    transaction postpend(int new_elem) {
+         switch next {
+             case NodeSome {
+                 // this destroys [next]
+                 IntNode nextNode = next.unpack();
+                 nextNode.postpend(new_elem);
+
+                 // construct a new [NodeSome] with the updated IntNode
+                 next = new NodeMaybe(nextNode);
+             }
+
+             case NodeNone {
+                 next = new NodeMaybe(new IntNode(new_elem, new NodeMaybe()));
+             }
+         }
+    }
+}
+
+unique contract IntList {
+
+    NodeMaybe first;
+
+    IntList() {
+        first = new NodeMaybe();
+    }
+
+    transaction prepend(int elem) {
+        IntNode newFirst = new IntNode(elem, first);
+        first = new NodeMaybe(newFirst);
+    }
+
+    transaction length() returns int {
+        int length = 0;
+        switch first {
+            case NodeSome {
+                IntNode firstNode = first.unpack();
+                length = firstNode.length();
+                first = new NodeMaybe(firstNode);
+            }
+        }
+        return length;
+    }
+
+    transaction removeFirst(int def) returns int {
+        int ret = def;
+        switch first {
+            case NodeSome {
+                IntNode firstNode = first.unpack();
+                ret = firstNode.getElem();
+                first = firstNode.getNext();
+            }
+        }
+        return ret;
+    }
+
+    transaction postpend(int elem) {
+        switch first {
+            case NodeSome {
+                // this destroys [first]
+                IntNode firstNode = first.unpack();
+                firstNode.postpend(elem);
+                // construct a new [NodeSome] with the updated IntNode
+                first = new NodeMaybe(firstNode);
+            }
+            case NodeNone {
+                first = new NodeMaybe(new IntNode(elem, new NodeMaybe()));
+            }
+        }
+    }
+}
+
+main contract UsesLinkedList {
+
+    IntList ll;
+
+    UsesLinkedList() {
+        ll = new IntList();
+    }
+
+    transaction getLength() returns int {
+        return ll.length();
+    }
+
+    transaction removeFromFront(int def) returns int {
+        return ll.removeFirst(def);
+    }
+
+    transaction addToFront(int x) {
+        ll.prepend(x);
+    }
+
+    transaction addToEnd(int x) {
+        ll.postpend(x);
+    }
+}
