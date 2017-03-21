@@ -466,7 +466,9 @@ class CodeGen () {
 
                 val newInteger = JExpr._new(model.parseType("java.math.BigInteger"))
 
-                newInteger.arg(archive.invoke(getterName).invoke("toByteArray"))
+                val getCall = archive.invoke(getterName)
+                newInteger.arg(JExpr.invoke(getCall, "toByteArray"))
+
                 ifNonempty._then().assign(fieldVar, newInteger)
             }
             case BoolType() => {
@@ -487,43 +489,59 @@ class CodeGen () {
                 /* generate another method that takes the actual archive type
                  * so we don't have to uselessly convert to bytes here */
                 body.assign(fieldVar, JExpr._new(javaFieldType))
-                val init = body.invoke(fieldVar, "initFromArchiveBytes")
-                init.arg(archive.invoke(getterNameForField(javaFieldName)).invoke("toByteArray"))
+                val init = body.invoke(fieldVar, "initFromArchive")
+                init.arg(archive.invoke(getterNameForField(javaFieldName)))
 
             }
         }
     }
 
-    /* generates the method [initFromArchiveBytes] */
+    /* generates the method [initFromArchiveBytes] and [initFromArchive];
+     * these methods load the recipient class from a protobuf message in the
+     * form of raw bytes and a java message protobuf object, respectively.
+     * Overrides initFromArchiveBytes() in superclass if this is the main contract */
     private def generateArchiveInitializer(
                     contract: Contract,
                     newClass: JDefinedClass,
                     stateEnum: Option[JDefinedClass],
                     outerClassNames: List[String]): Unit = {
-        // Overrides initFromArchiveBytes() in superclass if this is the main contract.
 
-        val protobufClassName = protobufMessageClassNameForClassName(contract.name, outerClassNames)
+        val protobufClassName =
+            protobufMessageClassNameForClassName(contract.name, outerClassNames)
         val archiveType = model.directClass(protobufClassName)
 
-        val meth = newClass.method(JMod.PUBLIC, model.parseType("void"), "initFromArchiveBytes")
+        /* [initFromArchive] setup */
+        val fromArchiveMeth = newClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
+        val archive = fromArchiveMeth.param(archiveType, "archive")
+        val fromArchiveBody = fromArchiveMeth.body()
+
+        /* [initFromArchiveBytes] declaration: this just parses the archive and
+         * calls [initFromArchive] */
+        val fromBytesMeth =
+            newClass.method(JMod.PUBLIC, model.VOID, "initFromArchiveBytes")
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
-        meth._throws(exceptionType.asInstanceOf[JClass])
-        val archiveBytes = meth.param(model.parseType("byte[]"), "archiveBytes")
-        val methodBody = meth.body()
+        fromBytesMeth._throws(exceptionType.asInstanceOf[JClass])
+        val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
+
+        val fromBytesBody = fromBytesMeth.body()
         val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
         parseInvocation.arg(archiveBytes)
-        val archive = methodBody.decl(archiveType, "archive", parseInvocation)
+        val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
+        fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
 
+
+        /* [initFromArchive] does most of the grunt work of mapping the protobuf message to
+         * fields of the class: the following code does this */
         val classNamePath = contract.name :: outerClassNames
 
         // Call setters.
         val declarations = contract.declarations
 
-        /* this takes care of whole contract fields */
+        /* this takes care of fields that are not specific to any particular state */
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
             val javaFieldVar = newClass.fields().get(field.fieldName)
-            generateFieldInitializer(field, javaFieldVar, methodBody, archive, classNamePath)
+            generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, classNamePath)
         }
 
         val enumGetter = "getStateCase"
@@ -531,10 +549,9 @@ class CodeGen () {
             protobufClassName + "." + "StateCase" + "." + ("STATE" + stateName).toUpperCase
 
         /* set state enum */
-        /* this takes care of state-specific fields */
         for (stDecl <- declarations if stDecl.isInstanceOf[State]) {
             val st = stDecl.asInstanceOf[State]
-            val thisStateBody = methodBody._if(
+            val thisStateBody = fromArchiveBody._if(
                 archive.invoke(enumGetter).invoke("equals").arg(
                     JExpr.direct(enumName(st.name)))
             )._then()
@@ -549,7 +566,7 @@ class CodeGen () {
             val stArchiveName = protobufClassName + "." + st.name
             val stArchiveType: JType = model.parseType(stArchiveName)
 
-            val thisStateBody = methodBody._if(
+            val thisStateBody = fromArchiveBody._if(
                     archive.invoke(enumGetter).invoke("equals").arg(
                     JExpr.direct(enumName(st.name)))
                 )._then()
