@@ -1,9 +1,9 @@
 package edu.cmu.cs.obsidian.tests
 
-import org.scalatest.junit.JUnitSuite
-import org.junit.Test
-import org.junit.Assert.assertTrue
 import edu.cmu.cs.obsidian.lexer._
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.scalatest.junit.JUnitSuite
 
 class LexerTests extends JUnitSuite {
 
@@ -68,13 +68,24 @@ class LexerTests extends JUnitSuite {
         )
     }
 
-    @Test def programWithComments(): Unit = {
-        shouldSucceed(
+    @Test def singleLineComments(): Unit = {
+        val commentedCode =
+                """
+                  | contract C {
+                  |     // this is a state
+                  |     state S {
+                  |         // this is a transaction
+                  |         transaction a() {
+                  |             this.call(); this = that;
+                  |         }
+                  |     }
+                  | }
+                """.stripMargin
+        shouldSucceed(commentedCode)
+        shouldEqual(commentedCode,
             """
               | contract C {
-              |     // this is a state
               |     state S {
-              |         // this is a transaction
               |         transaction a() {
               |             this.call(); this = that;
               |         }
@@ -82,18 +93,29 @@ class LexerTests extends JUnitSuite {
               | }
             """.stripMargin
         )
-        shouldEqual(
+    }
+
+    @Test def arbitraryLengthComments(): Unit = {
+        val commentedCode =
             """
               | contract C {
-              |     // this is a state
+              |     /* this is a state */
               |     state S {
-              |         // this is a transaction
-              |         transaction a() {
+              |     /* this is a comment
+              |      * that lasts
+              |      * for multiple
+              |      * lines */
+              |         transaction a(/* this is a comment within a line of code */) {
               |             this.call(); this = that;
               |         }
+              |      /* this is a different style of comment
+              |       */
               |     }
               | }
-            """.stripMargin,
+            """.stripMargin
+        testAndPrint(commentedCode)
+        shouldSucceed(commentedCode)
+        shouldEqual(commentedCode,
             """
               | contract C {
               |     state S {

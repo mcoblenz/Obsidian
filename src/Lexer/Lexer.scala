@@ -50,11 +50,17 @@ object Lexer extends RegexParsers {
     }
 
     /* comment parser: must be parsed before [forwardSlashP] */
+    private def longCommentP = {
+        val beginning = """/\*""".r ^^ { _ => () }
+
+        beginning ~! """((.|\n)*?)\*/""".r ^^ ( _ => CommentT() )
+    }
+
+
+    /* comment parser: must be parsed before [forwardSlashP] */
     private def commentP = {
         val beginning = """//""".r ^^ { _ => () }
 
-        /* the comment-beginning marker can also be interpreted as
-         * [forwardSlashT(); ForwardSlashT()] unless we have this workaround */
         beginning ~! """.*""".r ^^ ( _ => CommentT() )
     }
 
@@ -83,7 +89,7 @@ object Lexer extends RegexParsers {
     private def oneToken: Parser[Token] =
 
     (
-        commentP | decimalP | hexP | stringLitP | atomP |
+        longCommentP | commentP | decimalP | hexP | stringLitP | atomP |
 
         lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
