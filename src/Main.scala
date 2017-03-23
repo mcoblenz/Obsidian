@@ -21,7 +21,8 @@ case class CompilerOptions (outputPath: Option[String],
                             inputFiles: List[String],
                             verbose: Boolean,
                             printTokens: Boolean,
-                            printAST: Boolean)
+                            printAST: Boolean,
+                            buildClient: Boolean)
 
 object Main {
 
@@ -34,6 +35,7 @@ object Main {
           |    --verbose                    print error codes and messages for jar and javac
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
+          |    --build-client               build a client application rather than a server
         """.stripMargin
 
     def parseOptions(args: List[String]): CompilerOptions = {
@@ -43,6 +45,7 @@ object Main {
         var verbose = false
         var printTokens = false
         var printAST = false
+        var buildClient = false
 
         def parseOptionsRec(remainingArgs: List[String]) : Unit = {
             remainingArgs match {
@@ -61,6 +64,9 @@ object Main {
                     parseOptionsRec(tail)
                 case "--dump-debug" :: path :: tail =>
                     debugPath = Some(path)
+                    parseOptionsRec(tail)
+                case "--client" :: tail =>
+                    buildClient = true
                     parseOptionsRec(tail)
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
@@ -90,7 +96,7 @@ object Main {
             println("For now: contracts can only consist of a single file")
         }
 
-        CompilerOptions(outputPath, debugPath, inputFiles, verbose, printTokens, printAST)
+        CompilerOptions(outputPath, debugPath, inputFiles, verbose, printTokens, printAST, buildClient)
     }
 
     def parseToAST(srcPath: String, options: CompilerOptions): Program = {
@@ -140,7 +146,7 @@ object Main {
 
         val sourcePath = sourceDir.toString
         val classPath =
-            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.2.0.jar:lib/json-20140107.jar"
+            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.2.0.jar:lib/json-20160810.jar"
         val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
         val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
                                                        "-classpath", classPath,

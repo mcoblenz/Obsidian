@@ -36,6 +36,8 @@ case class BoolT() extends Token { override def toString: String = "bool"}
 case class TrueT() extends Token { override def toString: String = "true"}
 case class FalseT() extends Token { override def toString: String = "false"}
 case class ThisT() extends Token { override def toString: String = "this"}
+case class ImportT() extends Token { override def toString: String = "import"}
+
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }

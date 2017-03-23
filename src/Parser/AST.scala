@@ -78,6 +78,8 @@ case object IsUnique extends ContractModifier
 case object IsShared extends ContractModifier
 case object IsMain extends ContractModifier
 
+case class Import(name: String)
+
 case class Contract(mod: Option[ContractModifier], name: String, declarations: Seq[Declaration]) extends Declaration
 
 /* Program */

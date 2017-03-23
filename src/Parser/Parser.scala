@@ -311,8 +311,16 @@ object Parser extends Parsers {
         }
     }
 
+    private def parseImport = {
+        ImportT() ~! parseIdString ^^ {
+            case _ ~ name => Import(name)
+        }
+    }
+
     private def parseProgram = {
-        phrase(rep1(parseContractDecl)) ^^ { Program(_) }
+        phrase(rep(parseImport) ~! rep1(parseContractDecl)) ^^ {
+            case imp ~ contracts => Program(contracts) // TODO!
+        }
     }
 
     def parseProgram(tokens: Seq[Token]): Either[String, Program] = {
