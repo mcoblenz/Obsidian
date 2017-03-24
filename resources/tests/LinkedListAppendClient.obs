@@ -1,4 +1,4 @@
-import LinkedList.obs
+import "resources/tests/LinkedList.obs"
 
 contract LinkedListAppendClient {
     // TODO: support arbitrary parameters to main.
