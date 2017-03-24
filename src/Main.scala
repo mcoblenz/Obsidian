@@ -11,9 +11,6 @@ import com.sun.codemodel.internal.JCodeModel
 
 import scala.sys.process._
 
-class ParseException (val message : String) extends Exception {
-
-}
 
 
 case class CompilerOptions (outputPath: Option[String],
@@ -99,30 +96,6 @@ object Main {
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, printTokens, printAST, buildClient)
     }
 
-    def parseToAST(srcPath: String, options: CompilerOptions): Program = {
-        val bufferedSource = scala.io.Source.fromFile(srcPath)
-        val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
-
-        val tokens: Seq[Token] = Lexer.tokenize(src) match {
-            case Left(msg) => throw new ParseException(msg)
-            case Right(ts) => ts
-        }
-
-        if (options.printTokens) {
-            println("Tokens:")
-            println()
-            println(tokens)
-            println()
-        }
-
-        val ast: Program = Parser.parseProgram(tokens) match {
-            case Left(msg) => println(msg); throw new ParseException(msg)
-            case Right(tree) => tree
-        }
-
-        ast
-    }
-
     def findMainContractName(prog: Program): String = {
         for (aContract <- prog.contracts) {
             if (aContract.mod.contains(IsMain)) {
@@ -132,13 +105,18 @@ object Main {
         throw new RuntimeException("No main contract found")
     }
 
-    def compile (ast: Program, protobufOuterClassName: String): JCodeModel = {
+    def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
         val codeGen = new CodeGen()
-        codeGen.translateProgram(ast, protobufOuterClassName)
+        codeGen.translateServerProgram(ast, protobufOuterClassName)
+    }
+
+    def translateClientASTToJava (ast: Program): JCodeModel = {
+        val codeGen = new CodeGen()
+        codeGen.translateClientProgram(ast)
     }
 
     /* returns the exit code of the javac process */
-    def compileCode(
+    def invokeJavac(
             printJavacOutput: Boolean,
             mainName: String,
             sourceDir: Path,
@@ -257,7 +235,7 @@ object Main {
         val filename = options.inputFiles.head
 
         try {
-            val ast = parseToAST(filename, options)
+            val ast = Parser.parseFileAtPath(filename, options.printTokens)
 
             if (options.printAST) {
                 println("AST")
@@ -270,44 +248,48 @@ object Main {
             val lastSlash = filename.lastIndexOf("/")
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
-            // The outer class name has to depend on the filename, not the contract name, because there may be many contracts in one file.
-            val protobufOuterClassName = protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
-            val protobufFilename = protobufOuterClassName + ".proto"
-            val protobufPath = outputPath.resolve(protobufFilename)
+            if (options.buildClient) {
+                val javaModel = translateClientASTToJava(ast);
+            }
+            else { // Build a server process.
+                // The outer class name has to depend on the filename, not the contract name, because there may be many contracts in one file.
+                val protobufOuterClassName = protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
+                val protobufFilename = protobufOuterClassName + ".proto"
+                val protobufPath = outputPath.resolve(protobufFilename)
 
-            val p : Protobuf = ProtobufGen.translateProgram(ast)
-            p.build(protobufPath.toFile, protobufOuterClassName)
+                val p: Protobuf = ProtobufGen.translateProgram(ast)
+                p.build(protobufPath.toFile, protobufOuterClassName)
 
-            val javaModel = compile(ast, protobufOuterClassName)
-            javaModel.build(srcDir.toFile)
+                val javaModel = translateServerASTToJava(ast, protobufOuterClassName)
+                javaModel.build(srcDir.toFile)
 
-            // Invoke protoc to compile from protobuf to Java.
-            val protocInvocation : String =
-                "protoc --java_out=" + srcDir + " " + protobufPath.toString
+                // Invoke protoc to compile from protobuf to Java.
+                val protocInvocation: String =
+                    "protoc --java_out=" + srcDir + " " + protobufPath.toString
 
-            try {
-                val exitCode = protocInvocation.!
-                if (exitCode != 0) {
-                    println("`" + protocInvocation + "` exited abnormally: " + exitCode)
+                try {
+                    val exitCode = protocInvocation.!
+                    if (exitCode != 0) {
+                        println("`" + protocInvocation + "` exited abnormally: " + exitCode)
+                    }
+                } catch {
+                    case e: Throwable => println("Error running protoc: " + e)
                 }
-            } catch {
-                case e: Throwable => println("Error running protoc: " + e)
-            }
 
-            // invoke javac and make a jar from the result
-            val mainName = findMainContractName(ast)
-            val javacExit = compileCode(options.verbose, mainName, srcDir, bytecodeDir)
-            if (options.verbose) {
-                println("javac exited with value " + javacExit)
-            }
-            if (javacExit == 0) {
-                val jarPath = outputPath.resolve(s"$mainName.jar")
-                val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+                // invoke javac and make a jar from the result
+                val mainName = findMainContractName(ast)
+                val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
                 if (options.verbose) {
-                    println("jar exited with value " + jarExit)
+                    println("javac exited with value " + javacExit)
+                }
+                if (javacExit == 0) {
+                    val jarPath = outputPath.resolve(s"$mainName.jar")
+                    val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+                    if (options.verbose) {
+                        println("jar exited with value " + jarExit)
+                    }
                 }
             }
-
         } catch {
             case e: ParseException => println(e.message)
         }

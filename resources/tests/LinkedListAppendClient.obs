@@ -1,0 +1,9 @@
+import LinkedList.obs
+
+contract LinkedListAppendClient {
+    // TODO: support arbitrary parameters to main.
+    // For now, the parameters are limited to on-chain contract instances.
+    transaction main(remote LinkedList list) {
+        list.append(42);
+    }
+}

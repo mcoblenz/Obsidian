@@ -62,10 +62,10 @@ unique contract IntNode {
         return ret;
     }
 
-    transaction postpend(int new_elem) {
+    transaction append(int new_elem) {
         switch next {
             case NodeSome {
-                next.getNode().postpend(new_elem);
+                next.getNode().append(new_elem);
             }
 
             case NodeNone {
@@ -107,10 +107,10 @@ unique contract IntList {
         return node;
     }
 
-    transaction postpend(int elem) {
+    transaction append(int elem) {
         switch first {
             case NodeSome {
-                first.getNode().postpend(elem);
+                first.getNode().append(elem);
             }
             case NodeNone {
                 first = new NodeMaybe(new IntNode(elem, new NodeMaybe()));
@@ -128,7 +128,7 @@ main contract UsesLinkedList {
     }
 
     transaction add(int x) returns int {
-        ll.postpend(x);
+        ll.append(x);
         return x;
     }
 

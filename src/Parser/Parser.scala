@@ -24,6 +24,10 @@ E1 ::= ( E ) | n | x | true | false
  */
 
 object Parser extends Parsers {
+    class ParseException (val message : String) extends Exception {
+
+    }
+
     override type Elem = Token
 
     private def parseIdString: Parser[String] = {
@@ -319,7 +323,7 @@ object Parser extends Parsers {
 
     private def parseProgram = {
         phrase(rep(parseImport) ~! rep1(parseContractDecl)) ^^ {
-            case imp ~ contracts => Program(contracts) // TODO!
+            case imports ~ contracts => Program(imports, contracts)
         }
     }
 
@@ -334,5 +338,29 @@ object Parser extends Parsers {
                 Left(s"Error: `$msg at $line:$col")
             }
         }
+    }
+
+    def parseFileAtPath(srcPath: String, printTokens: Boolean): Program = {
+        val bufferedSource = scala.io.Source.fromFile(srcPath)
+        val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
+
+        val tokens: Seq[Token] = Lexer.tokenize(src) match {
+            case Left(msg) => throw new ParseException(msg)
+            case Right(ts) => ts
+        }
+
+        if (printTokens) {
+            println("Tokens:")
+            println()
+            println(tokens)
+            println()
+        }
+
+        val ast: Program = parseProgram(tokens) match {
+            case Left(msg) => println(msg); throw new ParseException(msg)
+            case Right(tree) => tree
+        }
+
+        ast
     }
 }

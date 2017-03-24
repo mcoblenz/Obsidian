@@ -1,12 +1,5 @@
 <component name="libraryTable">
-  <library name="scala-sdk-2.11.8" type="Scala">
-    <properties>
-      <compiler-classpath>
-        <root url="file://$PROJECT_DIR$/lib/scala-compiler-2.11.8.jar" />
-        <root url="file://$PROJECT_DIR$/lib/scala-library-2.11.8.jar" />
-        <root url="file://$PROJECT_DIR$/lib/scala-reflect-2.11.8.jar" />
-      </compiler-classpath>
-    </properties>
+  <library name="scala-sdk-2.11.8">
     <CLASSES>
       <root url="jar://$PROJECT_DIR$/lib/scala-library-2.11.8.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/scala-parser-combinators_2.11-1.0.4.jar!/" />

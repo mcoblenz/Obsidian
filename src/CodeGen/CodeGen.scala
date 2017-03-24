@@ -25,13 +25,25 @@ class CodeGen () {
     }
     final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
 
-    def translateProgram(program: Program, protobufOuterClassName: String): JCodeModel = {
+    def translateServerProgram(program: Program, protobufOuterClassName: String): JCodeModel = {
+        translateProgram(program, Some(protobufOuterClassName));
+    }
+
+    def translateProgram(program: Program, protobufOuterClassName: Option[String]): JCodeModel = {
         // Put all generated code in the same package.
         val programPackage: JPackage = model._package(packageName)
+        for (imp <- program.imports) {
+            translateImport(programPackage, imp)
+        }
+
         for (c <- program.contracts) {
             translateOuterContract(c, programPackage, protobufOuterClassName)
         }
         model
+    }
+
+    def translateClientProgram(program: Program): JCodeModel = {
+        translateProgram(program, None);
     }
 
     /* [true] iff the contract [c] has a constructor that takes no args */
@@ -45,12 +57,18 @@ class CodeGen () {
         return false
     }
 
+    private def translateImport(programPackage: JPackage, imp: Import): Unit = {
+        // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
+        val filename = imp.name;
+
+    }
+
     /* factors out shared functionality for translate[Outer|Inner]Contract.
      * returns Some(stateEnum) if the contract has any states (None otherwise). */
     private def translateContract(
                     aContract: Contract,
                     newClass: JDefinedClass,
-                    outerClassNames: List[String]): Option[JDefinedClass] = {
+                    outerClassNames: Option[List[String]]): Option[JDefinedClass] = {
 
         /* if we're not in the main contract, we need to ensure there's an empty constructor.
          * This constructor will be used in unarchiving; e.g. to unarchive class C:
@@ -91,27 +109,34 @@ class CodeGen () {
     }
 
     // Contracts translate to compilation units containing one class.
-    private def translateOuterContract(aContract: Contract, programPackage: JPackage, protobufOuterClassName: String): Unit = {
+    private def translateOuterContract(aContract: Contract, programPackage: JPackage, protobufOuterClassName: Option[String]): Unit = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
 
-        val stateEnumOption = translateContract(aContract, newClass, protobufOuterClassName::Nil)
+        val nestedProtobufClassNames = if (protobufOuterClassName.isDefined) Some(protobufOuterClassName.get::Nil) else None
+
+        val stateEnumOption = translateContract(aContract, newClass, nestedProtobufClassNames)
 
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
         if (aContract.mod.contains(IsMain)) {
-            generateMainClassMethods(newClass, stateEnumOption)
+            generateMainServerClassMethods(newClass, stateEnumOption)
         }
 
         /* Generate serialization code */
-        generateSerialization(aContract, newClass, stateEnumOption, protobufOuterClassName::Nil)
+        if (protobufOuterClassName.isDefined) {
+            generateSerialization(aContract, newClass, stateEnumOption, nestedProtobufClassNames.get)
+        }
+        else {
+            generateClientRunMethod(aContract, newClass)
+        }
     }
 
-    private def translateInnerContract(aContract: Contract, parent: JDefinedClass, outerClassNames: List[String]): Unit = {
+    private def translateInnerContract(aContract: Contract, parent: JDefinedClass, outerClassNames: Option[List[String]]): Unit = {
         val newClass: JDefinedClass = parent._class(JMod.PUBLIC, aContract.name)
         val _ = translateContract(aContract, newClass, outerClassNames)
     }
 
-    private def generateMainClassMethods(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
+    private def generateMainServerClassMethods(newClass: JDefinedClass, stateEnumOption: Option[JDefinedClass]): Unit = {
         newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
         val stubType = model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
 
@@ -137,7 +162,7 @@ class CodeGen () {
         // TODO
 
         /* Main Method */
-        generateMainMethod(newClass)
+        generateServerMainMethod(newClass)
     }
 
     private def generateInitMethod(
@@ -236,21 +261,38 @@ class CodeGen () {
         runMeth.body()._return(returnBytes)
     }
 
-    private def generateMainMethod(newClass: JDefinedClass) = {
+    private def generateServerMainMethod(newClass: JDefinedClass) = {
         val mainMeth = newClass.method(JMod.STATIC | JMod.PUBLIC, model.VOID, "main")
         val args = mainMeth.param(model.ref("String").array(), "args")
 
         // main takes one argument specifying the location of the store.
         // If the specified file does not exist, it creates a new store when it exits.
 
+        // newClass instance = new newClass();
+        // instance.delegatedMain(args);
         val body = mainMeth.body()
-
-
         val instance = body.decl(newClass, "instance", JExpr._new(newClass))
-
-
         val invocation = body.invoke(instance, "delegatedMain")
         invocation.arg(args)
+    }
+
+    private def generateClientMainMethod(newClass: JDefinedClass) = {
+        val mainMeth = newClass.method(JMod.STATIC | JMod.PUBLIC, model.VOID, "main")
+        val args = mainMeth.param(model.ref("String").array(), "args")
+
+        // main takes an address and a port of a server to connect to.
+
+        // newClass instance = new newClass();
+        // instance.delegatedMain(args);
+        val body = mainMeth.body()
+        val instance = body.decl(newClass, "instance", JExpr._new(newClass))
+        val invocation = body.invoke(instance, "delegatedMain")
+        invocation.arg(args)
+    }
+
+    // The "run" method is where the contents of the
+    private def generateClientRunMethod(newClass: JDefinedClass, aContract: Contract) = {
+
     }
 
     private def generateSerialization(
@@ -589,7 +631,7 @@ class CodeGen () {
                     stateEnumOption: Option[JDefinedClass],
                     currentState: Option[String],
                     mod: Option[ContractModifier],
-                    outerClassNames: List[String]): Unit = {
+                    outerClassNames: Option[List[String]]): Unit = {
         (mod, declaration) match {
 
             /* the main contract has special generated code, so many functions are different */
@@ -733,7 +775,7 @@ class CodeGen () {
                     newClass: JDefinedClass,
                     stateEnumOption: Option[JDefinedClass],
                     mod: Option[ContractModifier],
-                    outerClassNames: List[String]): Unit = {
+                    outerClassNames: Option[List[String]]): Unit = {
         for (decl <- state.declarations) {
             translateDeclaration(decl, newClass, stateEnumOption, Some(state.name), mod, outerClassNames)
         }

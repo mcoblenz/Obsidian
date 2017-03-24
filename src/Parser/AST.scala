@@ -83,4 +83,4 @@ case class Import(name: String)
 case class Contract(mod: Option[ContractModifier], name: String, declarations: Seq[Declaration]) extends Declaration
 
 /* Program */
-case class Program(contracts: Seq[Contract]) extends AST
+case class Program(imports: Seq[Import], contracts: Seq[Contract]) extends AST

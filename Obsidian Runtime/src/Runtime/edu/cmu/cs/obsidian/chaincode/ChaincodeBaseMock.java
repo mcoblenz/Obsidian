@@ -38,6 +38,7 @@ class ChaincodeBaseServer {
         this.printDebug = printDebug;
     }
 
+    // TODO: change this to gRPC.
     /* Example of expected format:
         {
             "method" : "deploy" or "invoke" or "query",
