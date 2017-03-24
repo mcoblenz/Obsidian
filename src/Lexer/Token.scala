@@ -37,11 +37,12 @@ case class TrueT() extends Token { override def toString: String = "true"}
 case class FalseT() extends Token { override def toString: String = "false"}
 case class ThisT() extends Token { override def toString: String = "this"}
 case class ImportT() extends Token { override def toString: String = "import"}
+case class RemoteT() extends Token { override def toString: String = "remote"}
 
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }
-case class StringLiteralT(x: String) extends Token { override def toString: String =  s""" "$x" """".trim }
+case class StringLiteralT(x: String) extends Token { override def toString: String =  s""""$x"""" }
 
 /* punctuation */
 case class LBraceT() extends Token { override def toString: String = "{" }

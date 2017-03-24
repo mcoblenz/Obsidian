@@ -36,11 +36,12 @@ object Parser extends Parsers {
 
     private def parseTypeModifier = {
         val linearP = LinearT() ^^ (_ => IsLinear)
-        linearP
+        val remoteP = RemoteT() ^^ (_ => IsRemote)
+        linearP | remoteP
     }
 
     private def parseType = {
-        val nonPrim = opt(parseTypeModifier) ~ parseIdString ^^ {
+        val nonPrim = rep(parseTypeModifier) ~ parseIdString ^^ {
             case mod ~ id => NonPrimitiveType(mod, id)
         }
         val intPrim = IntT() ^^ { _ => IntType() }
@@ -222,6 +223,10 @@ object Parser extends Parsers {
         }
     }
 
+    val parseStringLiteral = {
+        accept("string literal", { case StringLiteralT(s) => StringLiteral(s) })
+    }
+
     private def parseExprBottom: Parser[Expression] = {
         val parenExpr = LParenT() ~! parseExpr ~! RParenT() ^^ {
             case _ ~ e ~ _ => e
@@ -233,9 +238,6 @@ object Parser extends Parsers {
             accept("numeric literal", { case NumLiteralT(n) => NumLiteral(n) })
         }
 
-        val parseStringLiteral = {
-            accept("string literal", { case StringLiteralT(s) => StringLiteral(s) })
-        }
 
         val parseNew = {
             NewT() ~! parseIdString ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
@@ -275,9 +277,14 @@ object Parser extends Parsers {
     }
 
     private def parseTransDecl = {
-        TransactionT() ~! parseIdString ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+        TransactionT() ~! (parseIdString | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
         opt(parseReturns) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ args ~ _ ~ ret ~ _ ~ body ~ _ => Transaction(name, args, ret, body)
+            case _ ~ name ~ _ ~ args ~ _ ~ ret ~ _ ~ body ~ _ =>
+                val nameString = name match {
+                    case s: String => s
+                    case MainT() => "main"
+                }
+                Transaction(nameString, args, ret, body)
         }
     }
 
@@ -316,13 +323,13 @@ object Parser extends Parsers {
     }
 
     private def parseImport = {
-        ImportT() ~! parseIdString ^^ {
-            case _ ~ name => Import(name)
+        ImportT() ~! parseStringLiteral ^^ {
+            case _ ~ StringLiteral(name) => Import(name)
         }
     }
 
     private def parseProgram = {
-        phrase(rep(parseImport) ~! rep1(parseContractDecl)) ^^ {
+        phrase(rep(parseImport) ~ rep1(parseContractDecl)) ^^ {
             case imports ~ contracts => Program(imports, contracts)
         }
     }

@@ -3,11 +3,17 @@ package edu.cmu.cs.obsidian.codegen
 import CodeGen._
 import edu.cmu.cs.obsidian.parser._
 import com.sun.codemodel.internal.{JClass, _}
+import edu.cmu.cs.obsidian.util._
 
 import scala.collection.{mutable, _}
 
 
-class CodeGen () {
+trait Target
+case class Client() extends Target
+case class Server() extends Target
+
+class CodeGen (val target: Target) {
+
     private val model: JCodeModel = new JCodeModel()
 
     /* we must keep track of the transactions in main so that we can match on
@@ -54,16 +60,23 @@ class CodeGen () {
     }
 
     def translateProgram(program: Program,
-                         protobufOuterClassName: Option[String]): JCodeModel = {
+                         protobufOuterClassName: String): JCodeModel = {
         // Put all generated code in the same package.
         val programPackage: JPackage = model._package(packageName)
+        translateProgramInPackage(program, protobufOuterClassName, programPackage)
+    }
 
+    private def translateProgramInPackage(program: Program,
+                                          protobufOuterClassName: String,
+                                          programPackage: JPackage): JCodeModel =
+    {
         // TODO: refactor this to support imports properly
         val contractNameResolutionMap: Map[Contract, String] = TranslationContext.contractNameResolutionMapForProgram(program)
         val protobufOuterClassNames = mutable.HashMap.empty[String, String]
         for (c <- program.contracts) {
-            populateProtobufOuterClassNames(c, protobufOuterClassName.get, contractNameResolutionMap, protobufOuterClassNames)
+            populateProtobufOuterClassNames(c, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
         }
+
 
         for (imp <- program.imports) {
             translateImport(programPackage, imp)
@@ -87,10 +100,61 @@ class CodeGen () {
         return false
     }
 
+
     private def translateImport(programPackage: JPackage, imp: Import): Unit = {
         // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
         val filename = imp.name;
 
+        val ast = Parser.parseFileAtPath(filename, printTokens = false)
+
+        target match {
+            case Client() =>
+                val program = translateProgramInPackage(ast, Util.protobufOuterClassNameForFilename(filename), programPackage)
+                val stub = translateStubProgram(ast, programPackage)
+
+            case Server() => assert(false, "imports not yet supported in servers") // TODO
+        }
+    }
+
+    private def translateStubProgram(program: Program, programPackage: JPackage): Unit = {
+        // TODO: support imports in programs to be translated as stubs
+        assert(program.imports.isEmpty, "imports in imported contracts are not yet supported");
+
+        for (contract <- program.contracts) {
+            translateStubContract(contract, programPackage)
+        }
+    }
+
+    private def translateStubContract(contract: Contract, programPackage: JPackage): Unit = {
+        var contractClass = programPackage._class(JMod.PUBLIC, contract.name + "__Stub__")
+
+        for (decl <- contract.declarations) {
+            translateStubDeclaration(decl, contractClass)
+        }
+    }
+
+    private def translateStubDeclaration(decl: Declaration, inClass: JDefinedClass) : Unit = {
+        decl match {
+            case TypeDecl(_, _) => assert(false, "unsupported"); // TODO
+            case Field(_, _) => // Fields aren't translated because they shouldn't be accessed directly.
+            case Constructor(name, args, body) => // Constructors aren't translated becuase stubs are only for remote instances.
+            case f@Func(name, args, retType, body) => translateStubFunction(f, inClass)
+            case t@Transaction(_, _, _, _) => translateStubTransaction(t, inClass)
+            case s@State(_, _) => translateStubState(s, inClass)
+            case c@Contract(mod, name, decls) => translateStubContract(c, inClass.getPackage())
+        }
+    }
+
+    private def translateStubFunction(f: Func, inClass: JDefinedClass) : Unit = {
+        // TODO
+    }
+
+    private def translateStubTransaction(t: Transaction, inClass: JDefinedClass) : Unit = {
+        // TODO
+    }
+
+    private def translateStubState(s: State, inClass: JDefinedClass) : Unit = {
+        // TODO
     }
 
     def makeFieldInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
@@ -330,7 +394,7 @@ class CodeGen () {
     // Contracts translate to compilation units containing one class.
     private def translateOuterContract(aContract: Contract,
                                        programPackage: JPackage,
-                                       protobufOuterClassName: Option[String],
+                                       protobufOuterClassName: String,
                                        contractNameResolutionMap: Map[Contract, String],
                                        protobufOuterClassNames: Map[String, String]) = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
@@ -340,17 +404,15 @@ class CodeGen () {
 
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
-        if (aContract.mod.contains(IsMain)) {
+        if (target == Server() && aContract.mod.contains(IsMain)) {
             generateMainServerClassMethods(newClass, translationContext)
+        }
+        else if (target == Client()) {
+            generateClientRunMethod(aContract, newClass)
         }
 
         /* Generate serialization code */
-        if (protobufOuterClassName.isDefined) {
-            generateSerialization(aContract, newClass, translationContext)
-        }
-        else {
-            generateClientRunMethod(aContract, newClass)
-        }
+        generateSerialization(aContract, newClass, translationContext)
     }
 
     private def translateInnerContract(aContract: Contract,

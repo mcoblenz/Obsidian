@@ -62,7 +62,7 @@ object Main {
                 case "--dump-debug" :: path :: tail =>
                     debugPath = Some(path)
                     parseOptionsRec(tail)
-                case "--client" :: tail =>
+                case "--build-client" :: tail =>
                     buildClient = true
                     parseOptionsRec(tail)
                 case option :: tail =>
@@ -106,14 +106,13 @@ object Main {
     }
 
     def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
-        val codeGen = new CodeGen()
-        codeGen.translateProgram(ast, Some(protobufOuterClassName))
-
+        val codeGen = new CodeGen(Server())
+        codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
     def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
-        val codeGen = new CodeGen()
-        codeGen.translateProgram(ast, Some(protobufOuterClassName))
+        val codeGen = new CodeGen(Client())
+        codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
     /* returns the exit code of the javac process */
@@ -250,13 +249,13 @@ object Main {
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
             if (options.buildClient) {
-                val protobufOuterClassName = protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
+                val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
                 val javaModel = translateClientASTToJava(ast, protobufOuterClassName);
             }
             else { // Build a server process.
                 // The outer class name has to depend on the filename, not the contract name, because there may be many contracts in one file.
-                val protobufOuterClassName = protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
+                val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
                 val protobufFilename = protobufOuterClassName + ".proto"
                 val protobufPath = outputPath.resolve(protobufFilename)
 

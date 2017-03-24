@@ -11,7 +11,9 @@ object Lexer extends RegexParsers {
     }
 
     private def stringLitP = ("\".*\"".r) ^^ {
-        case s => StringLiteralT(s)
+        case s =>
+            val content = s.substring(1, s.length - 1)
+            StringLiteralT(content)
     }
 
     /* we could give everything here a separate parser, but we want to enforce
@@ -46,6 +48,8 @@ object Lexer extends RegexParsers {
         case "true" => TrueT()
         case "false" => FalseT()
         case "this" => ThisT()
+        case "import" => ImportT()
+        case "remote" => RemoteT()
         case id => IdentifierT(id)
     }
 

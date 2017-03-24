@@ -49,11 +49,12 @@ case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
 
 sealed trait TypeModifier
 case object IsLinear extends TypeModifier
+case object IsRemote extends TypeModifier
 
 case class IntType() extends Type
 case class BoolType() extends Type
 case class StringType() extends Type
-case class NonPrimitiveType(modifiers: Option[TypeModifier], name: String) extends Type
+case class NonPrimitiveType(modifiers: Seq[TypeModifier], name: String) extends Type
 
 /* Declarations */
 case class TypeDecl(name: String, typ: Type) extends Declaration

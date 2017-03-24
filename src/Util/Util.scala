@@ -10,4 +10,9 @@ object Util {
         ""
     }
 
+    def protobufOuterClassNameForFilename(filename: String): String = {
+        val filePrefix = filename.replace(".obs", "")
+        filePrefix.substring(0, 1).toUpperCase(java.util.Locale.US) + filePrefix.substring(1) + "OuterClass"
+    }
+
 }
