@@ -1,14 +1,15 @@
 import json
 import socket
 import sys
+import base64
 
 # this script requires python3
 
 def toBigIntSerial(val):
-    return (val.to_bytes(32, byteorder='big', signed=True)).hex()
+    return base64.b64encode(val.to_bytes(32, byteorder='big', signed=True)).decode("utf-8")
 
-def fromBigIntSerial(hexStr):
-    return int.from_bytes(bytes.fromhex(hexStr), byteorder='big', signed=True)
+def fromBigIntSerial(base64Str):
+    return int.from_bytes(base64.b64decode(base64Str), byteorder='big', signed=True)
 
 # all received values are assumed to be integers
 def send_json(port, meth, fn, args=[]):

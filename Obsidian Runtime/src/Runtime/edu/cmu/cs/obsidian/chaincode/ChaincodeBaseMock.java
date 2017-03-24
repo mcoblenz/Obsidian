@@ -14,53 +14,22 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.Base64;
 
 class ChaincodeBaseServer {
     private final int port;
     private final ChaincodeBaseMock base;
     private final boolean printDebug;
 
-    private static char[] hexCharList = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
-
-    /* always returns a length-two string */
-    private static String byteToString(byte b) {
-        int bAsInt = b & 0x000000ff;
-        StringBuilder builder = new StringBuilder();
-
-        /* most significant byte goes first */
-        builder.append(hexCharList[bAsInt >>> 4]);
-
-        /* least significant byte goes second */
-        builder.append(hexCharList[(bAsInt << 28) >>> 28]);
-        return builder.toString();
+    /* Encoding and decoding bytes in a JSON-friendly format is necessary
+     * to send them back to the client */
+    private static String bytesToString(byte[] bytes) {
+        return Base64.getEncoder().encodeToString(bytes);
     }
 
-    /* [c1] is least significant; [c1] and [c2] should be characters in [hexCharList] */
-    private static byte charsToByte(char c1, char c2) {
-        byte b = 0;
-        for (int i = 0; i < 16; i++) {
-            if (hexCharList[i] == c1) b |= i;
-        }
-        for (int i = 0; i < 16; i++) {
-            if (hexCharList[i] == c2) b |= (i << 4);
-        }
-        return b;
-    }
-
-    private static String bytesToHexStr(byte[] bytes) {
-        StringBuilder builder = new StringBuilder();
-        for (byte b : bytes) builder.append(byteToString(b));
-        return builder.toString();
-    }
-
-    /* hex string should not remove trailing 0's: e.g. length(hex) must be even */
-    private static byte[] hexStringToBytes(String hex) {
-        int length = hex.length() / 2 + (hex.length() % 2);
-        byte[] bytes = new byte[length];
-        for (int i = 0; i < length; i++) {
-            bytes[i] = charsToByte(hex.charAt(2 * i + 1), hex.charAt(2 * i));
-        }
-        return bytes;
+    private static byte[] stringToBytes(String base64Str) {
+        return Base64.getDecoder().decode(base64Str);
     }
 
     public ChaincodeBaseServer(int port, ChaincodeBaseMock base, boolean printDebug) {
@@ -116,7 +85,7 @@ class ChaincodeBaseServer {
 
         byte[][] txArgs = new byte[txArgsJson.length()][];
         for (int i = 0; i < txArgsJson.length(); i++) {
-            txArgs[i] = hexStringToBytes(txArgsJson.getString(i));
+            txArgs[i] = stringToBytes(txArgsJson.getString(i));
         }
 
         byte[] retBytes = new byte[0];
@@ -145,10 +114,16 @@ class ChaincodeBaseServer {
 
         /* we should try to send the return value back, but not fail,
          * e.g. if the client closes the socket after the tx is sent */
+
+        if (printDebug) {
+            System.out.println("Raw return bytes:");
+            System.out.println(Arrays.toString(retBytes));
+        }
+
         JSONObject retObject = new JSONObject();
         JSONObject result = new JSONObject();
         result.put("status", "OK");
-        result.put("message", bytesToHexStr(retBytes));
+        result.put("message", bytesToString(retBytes));
         retObject.put("result", result);
 
         if (printDebug) {
