@@ -29,7 +29,7 @@ class CodeGen (val target: Target) {
     /* naming conventions for various generated Java constructs */
     private final val stateField: String = "__state"
     private final val getStateMeth: String = "getState"
-    private def stateEnumName(className: String): String = {
+    private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
     }
     private def fieldGetMethodName(fieldName: String): String = {
@@ -327,7 +327,7 @@ class CodeGen (val target: Target) {
         var stateEnumOption: Option[JDefinedClass] = None
         var stateEnumField: Option[JFieldVar] = None
         if (stateDeclarations.nonEmpty) {
-            val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumName(aContract.name))
+            val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumNameForClassName(aContract.name))
             stateEnumOption = Some(stateEnum)
 
             /* Declare the states in the enum */
@@ -597,9 +597,13 @@ class CodeGen (val target: Target) {
             val innerContract: Contract = c.asInstanceOf[Contract]
             val javaInnerClasses = inClass.listClasses()
             val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
-            /* TODO : find state enum, if the inner contract has states */
+
+
             if (javaInnerClassOption.isDefined) {
-                generateSerialization(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], translationContext)
+                val javaInnerClass = javaInnerClassOption.get.asInstanceOf[JDefinedClass]
+                val stateEnumName = stateEnumNameForClassName(javaInnerClass.name)
+
+                generateSerialization(innerContract, javaInnerClass.asInstanceOf[JDefinedClass], translationContext)
             }
             else {
                 println("Bug: can't find inner class in generated Java code for inner class " + innerContract.name)
