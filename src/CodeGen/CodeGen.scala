@@ -38,26 +38,40 @@ class CodeGen () {
 
     final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
 
-    def translateServerProgram(program: Program, protobufOuterClassName: String): JCodeModel = {
-        translateProgram(program, Some(protobufOuterClassName));
+    def populateProtobufOuterClassNames (contract: Contract,
+                                         protobufOuterClassName: String,
+                                         contractNameResolutionMap: Map[Contract, String],
+                                         protobufOuterClassNames: mutable.HashMap[String, String]): Unit = {
+        protobufOuterClassNames += (contractNameResolutionMap(contract) -> protobufOuterClassName)
+
+        for (d <- contract.declarations if d.isInstanceOf[Contract]) {
+            val innerContract = d.asInstanceOf[Contract]
+            populateProtobufOuterClassNames(innerContract, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+        }
     }
 
-    def translateProgram(program: Program, protobufOuterClassName: Option[String]): JCodeModel = {
+    def translateProgram(program: Program,
+                         protobufOuterClassName: Option[String]): JCodeModel = {
         // Put all generated code in the same package.
         val programPackage: JPackage = model._package(packageName)
+
+        // TODO: refactor this to support imports properly
+        val contractNameResolutionMap: Map[Contract, String] = TranslationContext.contractNameResolutionMapForProgram(program)
+        val protobufOuterClassNames = mutable.HashMap.empty[String, String]
+        for (c <- program.contracts) {
+            populateProtobufOuterClassNames(c, protobufOuterClassName.get, contractNameResolutionMap, protobufOuterClassNames)
+        }
+
         for (imp <- program.imports) {
             translateImport(programPackage, imp)
         }
 
         for (c <- program.contracts) {
-            translateOuterContract(c, programPackage, protobufOuterClassName)
+            translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
         }
         model
     }
 
-    def translateClientProgram(program: Program): JCodeModel = {
-        translateProgram(program, None);
-    }
 
     /* [true] iff the contract [c] has a constructor that takes no args */
     private def hasEmptyConstructor(c: Contract): Boolean = {
@@ -125,10 +139,12 @@ class CodeGen () {
 
     /* factors out shared functionality for translate[Outer|Inner]Contract.
      * returns Some(stateEnum) if the contract has any states (None otherwise). */
-    private def translateContract(
-                    aContract: Contract,
-                    newClass: JDefinedClass,
-                    outerClassNames: Option[List[String]]): TranslationContext = {
+    private def makeTranslationContext(
+                                          aContract: Contract,
+                                          newClass: JDefinedClass,
+                                          contractNameResolutionMap: Map[Contract, String],
+                                          protobufOuterClassNames: Map[String, String]
+                                      ): TranslationContext = {
 
         /* if we're not in the main contract, we need to ensure there's an empty constructor.
          * This constructor will be used in unarchiving; e.g. to unarchive class C:
@@ -184,14 +200,15 @@ class CodeGen () {
         }
 
         /* setup tx/fun/field lookup tables */
-        val txLookup = collectDeclarations[Transaction](aContract,{ d: Declaration => d.isInstanceOf[Transaction] })
-        val funLookup = collectDeclarations[Func](aContract,{ d: Declaration => d.isInstanceOf[Func] })
-        val fieldLookup = collectDeclarations[Field](aContract,{ d: Declaration => d.isInstanceOf[Field] })
+        val txLookup = collectDeclarations[Transaction](aContract, { d: Declaration => d.isInstanceOf[Transaction] })
+        val funLookup = collectDeclarations[Func](aContract, { d: Declaration => d.isInstanceOf[Func] })
+        val fieldLookup = collectDeclarations[Field](aContract, { d: Declaration => d.isInstanceOf[Field] })
 
         /* setup the TranslationContext */
         val translationContext = TranslationContext(
             currentState = None,
-            outerClassNames = outerClassNames,
+            contractNameResolutionMap = contractNameResolutionMap,
+            protobufOuterClassNames = protobufOuterClassNames,
             states = stateLookup,
             stateEnumClass = stateEnumOption,
             stateEnumField = stateEnumField,
@@ -200,20 +217,30 @@ class CodeGen () {
             fieldLookup = fieldLookup
         )
 
+        translationContext
+    }
+    private def translateContract(
+                                     aContract: Contract,
+                                     newClass: JDefinedClass,
+                                     translationContext: TranslationContext) = {
+
         for (decl <- aContract.declarations) {
-            translateDeclaration(decl, newClass, translationContext, None, aContract.mod, outerClassNames)
+            translateDeclaration(decl, newClass, translationContext, None, aContract.mod)
         }
 
         translationContext
     }
 
     // Contracts translate to compilation units containing one class.
-    private def translateOuterContract(aContract: Contract, programPackage: JPackage, protobufOuterClassName: Option[String]): Unit = {
+    private def translateOuterContract(aContract: Contract,
+                                       programPackage: JPackage,
+                                       protobufOuterClassName: Option[String],
+                                       contractNameResolutionMap: Map[Contract, String],
+                                       protobufOuterClassNames: Map[String, String]) = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
 
-        val nestedProtobufClassNames = if (protobufOuterClassName.isDefined) Some(protobufOuterClassName.get::Nil) else None
-
-        val translationContext = translateContract(aContract, newClass, nestedProtobufClassNames)
+        val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames)
+        translateContract(aContract, newClass, translationContext)
 
         /* We need to generate special methods for the main contract to align
          * with the Hyperledger chaincode format */
@@ -223,16 +250,19 @@ class CodeGen () {
 
         /* Generate serialization code */
         if (protobufOuterClassName.isDefined) {
-            generateSerialization(aContract, newClass, translationContext, nestedProtobufClassNames.get)
+            generateSerialization(aContract, newClass, translationContext)
         }
         else {
             generateClientRunMethod(aContract, newClass)
         }
     }
 
-    private def translateInnerContract(aContract: Contract, parent: JDefinedClass, outerClassNames: Option[List[String]]): Unit = {
+    private def translateInnerContract(aContract: Contract,
+                                       parent: JDefinedClass,
+                                       translationContext: TranslationContext
+                                      ): Unit = {
         val newClass: JDefinedClass = parent._class(JMod.PUBLIC, aContract.name)
-        val _ = translateContract(aContract, newClass, outerClassNames)
+        val _ = translateContract(aContract, newClass, translationContext)
     }
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
@@ -397,11 +427,10 @@ class CodeGen () {
     private def generateSerialization(
                     contract: Contract,
                     inClass: JDefinedClass,
-                    translationContext: TranslationContext,
-                    outerClassNames: List[String]): Unit = {
+                    translationContext: TranslationContext): Unit = {
         generateSerializer(contract, inClass)
-        generateArchiver(contract, inClass, translationContext, outerClassNames)
-        generateArchiveInitializer(contract, inClass, translationContext, outerClassNames)
+        generateArchiver(contract, inClass, translationContext)
+        generateArchiveInitializer(contract, inClass, translationContext)
 
 
         val subcontracts = contract.declarations.filter(d => d.isInstanceOf[Contract])
@@ -412,7 +441,7 @@ class CodeGen () {
             val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
             /* TODO : find state enum, if the inner contract has states */
             if (javaInnerClassOption.isDefined) {
-                generateSerialization(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], null, contract.name::outerClassNames)
+                generateSerialization(innerContract, javaInnerClassOption.get.asInstanceOf[JDefinedClass], translationContext)
             }
             else {
                 println("Bug: can't find inner class in generated Java code for inner class " + innerContract.name)
@@ -448,24 +477,13 @@ class CodeGen () {
         }
     }
 
-    private def protobufMessageClassNameForClassName(className: String, outerClassNames: List[String]): String = {
-        /*
-        val outerClassPath = outerClassNames.foldRight(packageName)(
-            (c: String, accum: String) => accum + "." + c
-        )
-        */
-
-        val messageTypeName: String = outerClassNames.last + "." + className
-
-        return messageTypeName
-    }
-
     private def generateFieldArchiver(
                     field: Field,
                     fieldVar: JVar,
                     builderVar: JFieldRef,
                     body: JBlock,
-                    classNamePath: List[String]): Unit = {
+                    translationContext: TranslationContext,
+                    inContract: Contract): Unit = {
 
         val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
         val nonNullBody = ifNonNull._then()
@@ -493,21 +511,26 @@ class CodeGen () {
             case StringType() => {
                 // TODO
             }
-            case NonPrimitiveType(_, name) => {
-                val archiveVariableTypeName =
-                    protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
-                val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
+            case n@NonPrimitiveType(_, name) => {
+                val contract = resolveNonPrimitiveTypeToContract(n, translationContext, inContract)
+                if (contract.isEmpty) {
+                    println("Compilation error: unable to resolve type " + name)
+                }
+                else {
+                    val archiveVariableTypeName = translationContext.getProtobufClassName(contract.get)
+                    val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
 
-                val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
-                val archiveVariable = nonNullBody.decl(archiveVariableType,
-                                                       field.fieldName + "Archive",
-                                                       archiveVariableInvocation)
+                    val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
+                    val archiveVariable = nonNullBody.decl(archiveVariableType,
+                        field.fieldName + "Archive",
+                        archiveVariableInvocation)
 
-                // generate: builder.setField(field);
-                val setterName: String = setterNameForField(field.fieldName)
+                    // generate: builder.setField(field);
+                    val setterName: String = setterNameForField(field.fieldName)
 
-                val invocation: JInvocation = nonNullBody.invoke(builderVar, setterName)
-                invocation.arg(archiveVariable)
+                    val invocation: JInvocation = nonNullBody.invoke(builderVar, setterName)
+                    invocation.arg(archiveVariable)
+                }
             }
         }
     }
@@ -517,9 +540,9 @@ class CodeGen () {
     private def generateArchiver(
                     contract: Contract,
                     inClass: JDefinedClass,
-                    translationContext: TranslationContext,
-                    outerClassNames: List[String]): Unit = {
-        val protobufClassName = protobufMessageClassNameForClassName(contract.name, outerClassNames)
+                    translationContext: TranslationContext): Unit = {
+        val protobufClassName = translationContext.getProtobufClassName(contract)
+
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
         val archiveBody = archiveMethod.body()
@@ -532,7 +555,6 @@ class CodeGen () {
                                     protobufClassName + ".newBuilder();")
         val builderVariable = JExpr.ref("builder")
         // val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
-        val classNamePath = contract.name :: outerClassNames
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
         val declarations = contract.declarations
@@ -540,7 +562,7 @@ class CodeGen () {
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
             val javaFieldVar = inClass.fields().get(field.fieldName)
-            generateFieldArchiver(field, javaFieldVar, builderVariable, archiveBody, classNamePath)
+            generateFieldArchiver(field, javaFieldVar, builderVariable, archiveBody, translationContext, contract)
         }
 
         /* handle states if there are any */
@@ -561,7 +583,7 @@ class CodeGen () {
                 for (f <- st.declarations.filter(d => d.isInstanceOf[Field])) {
                     val field = f.asInstanceOf[Field]
                     val javaFieldVar = inClass.fields().get(field.fieldName)
-                    generateFieldArchiver(field, javaFieldVar, stBuilderVar, thisStateBody, classNamePath)
+                    generateFieldArchiver(field, javaFieldVar, stBuilderVar, thisStateBody, translationContext, contract)
                 }
 
                 thisStateBody.invoke(builderVariable, "setState" + st.name)
@@ -590,7 +612,8 @@ class CodeGen () {
                     fieldVar: JVar,
                     body: JBlock,
                     archive: JVar,
-                    classNamePath: List[String]): Unit = {
+                    translationContext: TranslationContext,
+                    inContract: Contract): Unit = {
         // generate: FieldArchive fieldArchive = field.archive();
         val javaFieldName: String = field.fieldName
         val javaFieldType: JType = resolveType(field.typ)
@@ -618,21 +641,25 @@ class CodeGen () {
             case StringType() => {
                 // TODO
             }
-            case NonPrimitiveType(_, name) => {
+            case n@NonPrimitiveType(_, name) => {
                 // foo = new Foo(); foo.initFromArchive(archive.getFoo());
                 val javaFieldTypeName = javaFieldType.fullName()
+                val contract = resolveNonPrimitiveTypeToContract(n, translationContext, inContract)
+                if (contract.isEmpty) {
+                    println("Error: unresolved contract name " + name)
+                }
+                else {
+                    val protobufClassName = translationContext.getProtobufClassName(contract.get)
 
-                val archiveName =
-                    protobufMessageClassNameForClassName(javaFieldType.name(), classNamePath)
-                val archiveType: JType = model.parseType(archiveName)
+                    val archiveType: JType = model.parseType(protobufClassName)
 
-                // TODO
-                /* generate another method that takes the actual archive type
+                    // TODO
+                    /* generate another method that takes the actual archive type
                  * so we don't have to uselessly convert to bytes here */
-                body.assign(fieldVar, JExpr._new(javaFieldType))
-                val init = body.invoke(fieldVar, "initFromArchive")
-                init.arg(archive.invoke(getterNameForField(javaFieldName)))
-
+                    body.assign(fieldVar, JExpr._new(javaFieldType))
+                    val init = body.invoke(fieldVar, "initFromArchive")
+                    init.arg(archive.invoke(getterNameForField(javaFieldName)))
+                }
             }
         }
     }
@@ -644,11 +671,8 @@ class CodeGen () {
     private def generateArchiveInitializer(
                     contract: Contract,
                     newClass: JDefinedClass,
-                    translationContext: TranslationContext,
-                    outerClassNames: List[String]): Unit = {
-
-        val protobufClassName =
-            protobufMessageClassNameForClassName(contract.name, outerClassNames)
+                    translationContext: TranslationContext): Unit = {
+        val protobufClassName = translationContext.getProtobufClassName(contract)
         val archiveType = model.directClass(protobufClassName)
 
         /* [initFromArchive] setup */
@@ -673,7 +697,6 @@ class CodeGen () {
 
         /* [initFromArchive] does most of the grunt work of mapping the protobuf message to
          * fields of the class: the following code does this */
-        val classNamePath = contract.name :: outerClassNames
 
         // Call setters.
         val declarations = contract.declarations
@@ -682,7 +705,7 @@ class CodeGen () {
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
             val javaFieldVar = newClass.fields().get(field.fieldName)
-            generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, classNamePath)
+            generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, translationContext, contract)
         }
 
         val enumGetter = "getStateCase"
@@ -719,7 +742,7 @@ class CodeGen () {
             for (f <- st.asInstanceOf[State].declarations if f.isInstanceOf[Field]) {
                 val field: Field = f.asInstanceOf[Field]
                 val javaFieldVar = newClass.fields().get(field.fieldName)
-                generateFieldInitializer(field, javaFieldVar, thisStateBody, stArchive, classNamePath)
+                generateFieldInitializer(field, javaFieldVar, thisStateBody, stArchive, translationContext, contract)
             }
         }
     }
@@ -729,8 +752,7 @@ class CodeGen () {
                     newClass: JDefinedClass,
                     translationContext: TranslationContext,
                     currentState: Option[String],
-                    mod: Option[ContractModifier],
-                    outerClassNames: Option[List[String]]): Unit = {
+                    mod: Option[ContractModifier]): Unit = {
         (mod, declaration) match {
 
             /* the main contract has special generated code, so many functions are different */
@@ -744,8 +766,8 @@ class CodeGen () {
                 translateTransDecl(t, newClass, translationContext)
                 mainTransactions.add((currentState, t))
             case (Some(IsMain), s@State(_,_)) =>
-                translateStateDecl(s, newClass, translationContext, mod, outerClassNames)
-            case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass, outerClassNames)
+                translateStateDecl(s, newClass, translationContext, mod)
+            case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
 
             // TODO : shared contracts
             /* shared contracts will generate a sort of shim to interact with
@@ -767,8 +789,8 @@ class CodeGen () {
             case (_, t@Transaction(_,_,_,_)) =>
                 translateTransDecl(t, newClass, translationContext)
             case (_, s@State(_,_)) =>
-                translateStateDecl(s, newClass, translationContext, mod, outerClassNames)
-            case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass, outerClassNames)
+                translateStateDecl(s, newClass, translationContext, mod)
+            case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
 
             case _ => () // TODO : type declarations
         }
@@ -781,6 +803,60 @@ class CodeGen () {
             case StringType() => model.ref("String")
             case NonPrimitiveType(_, "address") => model.directClass("java.math.BigInteger")
             case NonPrimitiveType(_, name) => model.ref(name)
+        }
+    }
+
+    // The NonPrimitiveType stores the type name as a string; this method figures out which contract that maps to
+    // according to the scope in which the type name is used.
+    private def resolveNonPrimitiveTypeToContract(typ: NonPrimitiveType,
+                                                  translationContext: TranslationContext,
+                                                  containingContract: Contract): Option[Contract] = {
+        var typeComponents = typ.name.split(".")
+        if (typeComponents.isEmpty) {
+            typeComponents = Array(typ.name)
+        }
+        //val fullyQualifiedContainingContractName = translationContext.contractNameResolutionMap(containingContract)
+        //val containingContractComponents = fullyQualifiedContainingContractName.split(".")
+
+        // Suppose the containing contract is A.B.C and we're looking up B. We want to find A.B unless there's A.B.C.B.
+        // We start our search with the innermost contract and ascend until we find a contract with the name we want.
+
+        // recursiveTypeLookup does the actual search.
+        def recursiveTypeLookup(containingContract: Contract, typeComponents: Seq[String]): Option[Contract] = {
+
+            // matchContract looks for a contract WITHIN the given contract.
+            def matchContract(containingContract: Contract, typeComponents: Seq[String]): Option[Contract] = {
+                if (typeComponents.length == 0) Some(containingContract)
+                else {
+                    val innerContracts = containingContract.declarations.filter((decl: Declaration) => decl.isInstanceOf[Contract])
+                    val innerContract = innerContracts.find((decl: Declaration) => decl.asInstanceOf[Contract].name.equals(typeComponents.head))
+                    if (innerContract.isDefined) matchContract(innerContract.get.asInstanceOf[Contract], typeComponents.tail)
+                    else None
+                }
+            }
+
+            // Check to see if typeComponents are inside this contract. If not, recurse one level up.
+            val matchedContract: Option[Contract] = matchContract(containingContract, typeComponents)
+
+            val result = if (matchedContract.isDefined) matchedContract
+            else {
+                val outerContract = translationContext.getContainingContract(containingContract)
+                if (outerContract.isDefined)
+                    recursiveTypeLookup(outerContract.get, typeComponents)
+                else None
+            }
+
+
+            result
+        }
+
+        val insideContractResult = recursiveTypeLookup(containingContract, typeComponents)
+        if (insideContractResult.isDefined)
+            insideContractResult
+        else {
+            // Check for a top-level contract by this name.
+            val foundPair = translationContext.contractNameResolutionMap.find((pair: (Contract, String)) => pair._2.equals(typ.name))
+            if (foundPair.isDefined) Some(foundPair.get._1) else None
         }
     }
 
@@ -873,10 +949,9 @@ class CodeGen () {
                     state: State,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext,
-                    mod: Option[ContractModifier],
-                    outerClassNames: Option[List[String]]): Unit = {
+                    mod: Option[ContractModifier]): Unit = {
         for (decl <- state.declarations) {
-            translateDeclaration(decl, newClass, translationContext, Some(state.name), mod, outerClassNames)
+            translateDeclaration(decl, newClass, translationContext, Some(state.name), mod)
         }
     }
 

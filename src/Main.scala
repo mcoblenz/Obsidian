@@ -107,12 +107,13 @@ object Main {
 
     def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
         val codeGen = new CodeGen()
-        codeGen.translateServerProgram(ast, protobufOuterClassName)
+        codeGen.translateProgram(ast, Some(protobufOuterClassName))
+
     }
 
-    def translateClientASTToJava (ast: Program): JCodeModel = {
+    def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
         val codeGen = new CodeGen()
-        codeGen.translateClientProgram(ast)
+        codeGen.translateProgram(ast, Some(protobufOuterClassName))
     }
 
     /* returns the exit code of the javac process */
@@ -249,7 +250,9 @@ object Main {
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
             if (options.buildClient) {
-                val javaModel = translateClientASTToJava(ast);
+                val protobufOuterClassName = protobufOuterClassNameForClass(sourceFilename.replace(".obs", ""))
+
+                val javaModel = translateClientASTToJava(ast, protobufOuterClassName);
             }
             else { // Build a server process.
                 // The outer class name has to depend on the filename, not the contract name, because there may be many contracts in one file.
