@@ -10,9 +10,11 @@ case class StateContext(
     /* the AST node representing the state */
     astState: State,
     /* the enum value that represents this state */
-    enumVal: JExpr,
-    /* the inner */
+    enumVal: JEnumConstant,
+    /* the inner class has the fields and methods for the state */
     innerClass: JDefinedClass,
+    /* this the the field in the parent class (of type [innerClass]) that is
+     * defined when the contract is in this particular state */
     innerClassField: JFieldVar
 )
 
@@ -33,12 +35,17 @@ case class TranslationContext(
     /* the states of the contract we're currently translating */
     states: Map[String, StateContext],
     /* the state enum class */
-    stateEnumClass: JDefinedClass,
+    stateEnumClass: Option[JDefinedClass],
     /* a field of the state enum type representing the current state */
-    stateEnumField: JFieldVar,
+    stateEnumField: Option[JFieldVar],
     /* aggregates information about [transaction/function/field] declarations:
      * maps the [tx/fun/field] name to [DeclarationContext]  */
     txLookup: Map[String, DeclarationContext[Transaction]],
     funLookup: Map[String, DeclarationContext[Func]],
     fieldLookup: Map[String, DeclarationContext[Field]]
-)
+) {
+    /* gets the enum if it exists, fails otherwise */
+    def getEnum(stName: String): JEnumConstant = {
+        states.get(stName).get.enumVal
+    }
+}
