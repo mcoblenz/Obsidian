@@ -291,7 +291,7 @@ class CodeGen () {
     }
 
     // The "run" method is where the contents of the
-    private def generateClientRunMethod(newClass: JDefinedClass, aContract: Contract) = {
+    private def generateClientRunMethod(aContract: Contract, newClass: JDefinedClass) = {
 
     }
 

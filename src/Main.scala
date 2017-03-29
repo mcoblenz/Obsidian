@@ -291,7 +291,7 @@ object Main {
                 }
             }
         } catch {
-            case e: ParseException => println(e.message)
+            case e: Parser.ParseException => println(e.message)
         }
 
         if (shouldDelete) {
