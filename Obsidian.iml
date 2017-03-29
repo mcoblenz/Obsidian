@@ -12,5 +12,6 @@
     <orderEntry type="library" name="junit:junit:4.12" level="project" />
     <orderEntry type="library" name="org.scalatest:scalatest_2.11:3.0.1" level="project" />
     <orderEntry type="library" name="scala-sdk-2.11.8" level="project" />
+    <orderEntry type="library" name="scala-sdk-2.11.8" level="application" />
   </component>
 </module>
