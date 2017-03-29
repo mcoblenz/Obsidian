@@ -13,7 +13,5 @@
     <orderEntry type="library" name="org.scalatest:scalatest_2.11:3.0.1" level="project" />
     <orderEntry type="library" name="scala-sdk-2.11.8" level="project" />
     <orderEntry type="library" name="scala-sdk-2.11.8" level="application" />
-    <orderEntry type="library" name="key.core" level="project" />
-    <orderEntry type="library" name="key.core.example" level="project" />
   </component>
 </module>
