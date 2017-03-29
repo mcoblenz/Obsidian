@@ -31,7 +31,10 @@ case class TranslationContext(
     /* name of the state we're currently translating */
     currentState: Option[String],
     /* when translating an inner class, this gives us the fully-qualified name */
-    outerClassNames: Option[List[String]],
+    contractNameResolutionMap: Map[Contract, String], // maps from Obsidian contracts to fully-qualified Java class names
+    protobufOuterClassNames: Map[String, String], // maps from fully-qualified Java class names to protobuf outer class names
+                                 
+
     /* the states of the contract we're currently translating */
     states: Map[String, StateContext],
     /* the state enum class */
@@ -47,5 +50,59 @@ case class TranslationContext(
     /* gets the enum if it exists, fails otherwise */
     def getEnum(stName: String): JEnumConstant = {
         states.get(stName).get.enumVal
+    }
+
+    def getProtobufClassName(contract: Contract) : String = {
+        val fullyQualifiedClassName = contractNameResolutionMap(contract)
+        protobufOuterClassNames(fullyQualifiedClassName) + "." + fullyQualifiedClassName
+    }
+
+    def getContainingContract(contract: Contract) : Option[Contract] = {
+        // TODO: store a mapping instead of doing this, because this is kind of awful.
+        if (contractNameResolutionMap.contains(contract)) {
+            val fullyQualifiedName = contractNameResolutionMap(contract)
+            val lastPeriod = fullyQualifiedName.lastIndexOf(".")
+            if (lastPeriod == -1) {
+                None
+            }
+            else {
+                assert(lastPeriod > 0, "contract names should not start with '.'")
+                val containingContractFullyQualifiedName = fullyQualifiedName.substring(lastPeriod - 1)
+                // Ugh.
+                val foundPair = contractNameResolutionMap.find((pair: (Contract, String)) => pair._2.equals(containingContractFullyQualifiedName))
+                if (foundPair.isDefined) Some(foundPair.get._1) else None
+            }
+        }
+        else {
+            assert(false, "Failed to look up contract " + contract.name)
+            None
+        }
+    }
+}
+
+object TranslationContext {
+    // For constructing the translation context.
+    // TODO: invoke this from a constructor of TranslationContext.
+    def contractNameResolutionMapForProgram(program: Program): Map[Contract, String] = {
+        val map = mutable.HashMap.empty[Contract, String]
+
+        def addClassesToMap(map: mutable.HashMap[Contract, String], contract: Contract, outerClassPath: String): Unit = {
+            val name = contract.name
+
+            val newClassPath = if (outerClassPath.length == 0) name else outerClassPath + "." + name
+            map += (contract -> newClassPath)
+
+            for (c <- contract.declarations if c.isInstanceOf[Contract]) {
+                val innerContract = c.asInstanceOf[Contract]
+
+                addClassesToMap(map, innerContract, newClassPath)
+            }
+        }
+
+        for (c <- program.contracts) {
+            addClassesToMap(map, c, "")
+        }
+
+        map
     }
 }
