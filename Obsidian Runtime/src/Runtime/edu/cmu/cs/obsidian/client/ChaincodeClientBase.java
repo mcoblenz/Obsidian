@@ -1,6 +1,5 @@
 package edu.cmu.cs.obsidian.client;
 
-import com.oracle.javafx.jmx.json.JSONReader;
 import org.json.JSONTokener;
 import org.json.JSONWriter;
 
