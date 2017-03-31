@@ -1,8 +1,8 @@
-contract SimpleVerification {
+main contract SimpleVerification {
     int x;
 
-    transaction do()
-        ensures
+    transaction doStuff()
+        ensures true;
     {
         x = 0;
     }
