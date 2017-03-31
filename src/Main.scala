@@ -248,22 +248,26 @@ object Main {
             val lastSlash = filename.lastIndexOf("/")
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
-            if (options.buildClient) {
-                val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
+            val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-                val javaModel = translateClientASTToJava(ast, protobufOuterClassName);
-            }
-            else { // Build a server process.
-                // The outer class name has to depend on the filename, not the contract name, because there may be many contracts in one file.
-                val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
+            val javaModel = if (options.buildClient) translateClientASTToJava(ast, protobufOuterClassName)
+                                else translateServerASTToJava(ast, protobufOuterClassName)
+            javaModel.build(srcDir.toFile)
+
+            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(ast, sourceFilename)
+
+            // Each import results in a .proto file, which needs to be compiled.
+            for (p <- protobufs) {
+                val protobuf = p._1
+                val filename = p._2
+
+                val protobufOuterClassName = Util.protobufOuterClassNameForFilename(filename)
                 val protobufFilename = protobufOuterClassName + ".proto"
+
                 val protobufPath = outputPath.resolve(protobufFilename)
 
-                val p: Protobuf = ProtobufGen.translateProgram(ast)
-                p.build(protobufPath.toFile, protobufOuterClassName)
+                protobuf.build(protobufPath.toFile, protobufOuterClassName)
 
-                val javaModel = translateServerASTToJava(ast, protobufOuterClassName)
-                javaModel.build(srcDir.toFile)
 
                 // Invoke protoc to compile from protobuf to Java.
                 val protocInvocation: String =
@@ -277,21 +281,23 @@ object Main {
                 } catch {
                     case e: Throwable => println("Error running protoc: " + e)
                 }
+            }
 
-                // invoke javac and make a jar from the result
-                val mainName = findMainContractName(ast)
-                val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
+
+            // invoke javac and make a jar from the result
+            val mainName = findMainContractName(ast)
+            val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
+            if (options.verbose) {
+                println("javac exited with value " + javacExit)
+            }
+            if (javacExit == 0) {
+                val jarPath = outputPath.resolve(s"$mainName.jar")
+                val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
                 if (options.verbose) {
-                    println("javac exited with value " + javacExit)
-                }
-                if (javacExit == 0) {
-                    val jarPath = outputPath.resolve(s"$mainName.jar")
-                    val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
-                    if (options.verbose) {
-                        println("jar exited with value " + jarExit)
-                    }
+                    println("jar exited with value " + jarExit)
                 }
             }
+
         } catch {
             case e: Parser.ParseException => println(e.message)
         }

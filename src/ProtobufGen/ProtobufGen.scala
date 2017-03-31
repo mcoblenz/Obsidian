@@ -3,6 +3,7 @@ package edu.cmu.cs.obsidian.protobuf
 import java.io.File
 
 import edu.cmu.cs.obsidian.parser._
+import edu.cmu.cs.obsidian.util.Util
 
 class Unimplemented extends Exception {}
 
@@ -14,12 +15,26 @@ class Unimplemented extends Exception {}
 object ProtobufGen {
 
     // Programs translate to lists of messages (one per contract).
-    def translateProgram(program: Program): Protobuf = {
+    def translateProgram(program: Program, sourceFilename: String): Seq[(Protobuf, String)] = {
         val protobuf = new Protobuf(Nil)
+
+        val protobufs: Seq[(Protobuf, String)] = program.imports.map ((imp: Import) => {
+            // Each import results in a .proto file, which needs to be compiled.
+            val protobufOuterClassName = Util.protobufOuterClassNameForFilename(imp.name)
+            val protobufFilename = protobufOuterClassName + ".proto"
+
+            // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
+            val filename = imp.name;
+
+            val ast = Parser.parseFileAtPath(filename, printTokens = false)
+            val messages = ast.contracts.map(translateContract)
+            (new Protobuf(messages), filename)
+        })
 
         val messages = program.contracts.map(translateContract)
 
-        new Protobuf(messages)
+        val result = protobufs :+ ((new Protobuf(messages), sourceFilename))
+        result
     }
 
 

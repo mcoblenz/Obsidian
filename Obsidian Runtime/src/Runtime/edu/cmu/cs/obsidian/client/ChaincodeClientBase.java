@@ -38,7 +38,7 @@ public abstract class ChaincodeClientBase {
         jsonWriter.endObject(); // ctorMsg
     }
 
-    public abstract void invokeMain(JSONWriter jsonWriter, JSONTokener jsonTokener) throws java.io.IOException;
+    public abstract void invokeClientMain(JSONWriter jsonWriter, JSONTokener jsonTokener) throws java.io.IOException;
 
 
     public void delegatedMain (String args[]) {
@@ -88,8 +88,7 @@ public abstract class ChaincodeClientBase {
 
         try {
             // We need to invoke the client's main() transaction.
-
-            invokeMain(jsonWriter, jsonTokener);
+            invokeClientMain(jsonWriter, jsonTokener);
         }
 
         catch (java.io.IOException e) {

@@ -1,9 +1,9 @@
 import "resources/tests/LinkedList.obs"
 
-contract LinkedListAppendClient {
+main contract LinkedListAppendClient {
     // TODO: support arbitrary parameters to main.
     // For now, the parameters are limited to on-chain contract instances.
-    transaction main(remote LinkedList list) {
+    transaction main(remote IntList list) {
         list.append(42);
     }
 }

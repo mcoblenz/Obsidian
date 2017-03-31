@@ -398,6 +398,11 @@ class CodeGen (val target: Target) {
                                        contractNameResolutionMap: Map[Contract, String],
                                        protobufOuterClassNames: Map[String, String]) = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
+        if (target == Client() && aContract.mod.contains(IsMain)) {
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
+            generateClientMainMethod(newClass)
+            generateInvokeClientMainMethod(aContract, newClass)
+        }
 
         val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames)
         translateContract(aContract, newClass, translationContext)
@@ -407,12 +412,11 @@ class CodeGen (val target: Target) {
         if (target == Server() && aContract.mod.contains(IsMain)) {
             generateMainServerClassMethods(newClass, translationContext)
         }
-        else if (target == Client()) {
-            generateClientRunMethod(aContract, newClass)
-        }
 
         /* Generate serialization code */
-        generateSerialization(aContract, newClass, translationContext)
+        if (target == Server() || !aContract.mod.contains(IsMain)) {
+            generateSerialization(aContract, newClass, translationContext)
+        }
     }
 
     private def translateInnerContract(aContract: Contract,
@@ -577,8 +581,13 @@ class CodeGen (val target: Target) {
         invocation.arg(args)
     }
 
-    // The "run" method is where the contents of the
-    private def generateClientRunMethod(aContract: Contract, newClass: JDefinedClass) = {
+    // The "invokeClientMain" method is called from delegatedMain.
+    // invokeClientMain should establish the server connection, set stubs according to the type of the client's main(),
+    // and pass it to the client's main() method.
+    private def generateInvokeClientMainMethod(aContract: Contract, newClass: JDefinedClass) = {
+        val method = newClass.method(JMod.PUBLIC, model.VOID, "invokeClientMain")
+        val writer = method.param(model.ref("org.json.JSONWriter"), "jsonWriter")
+        val tokener = method.param(model.ref("org.json.JSONTokener"), "jsonTokener")
 
     }
 
