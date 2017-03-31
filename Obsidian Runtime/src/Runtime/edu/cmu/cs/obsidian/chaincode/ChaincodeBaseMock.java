@@ -208,19 +208,23 @@ public abstract class ChaincodeBaseMock {
             // If the file didn't exist, no problem; we'll create a new instance later.
         }
 
-        /* setup a hook that saves data to archive file on shutdown */
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("\nSaving to archive...");
-            byte[] newArchiveBytes = archiveBytes();
-            try {
-                java.nio.file.Files.write(archivePath, newArchiveBytes,
-                        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
-            } catch (IOException e) {
-                System.err.println("Error: failed to write state to output file at " + archivePathString + ": " + e);
-                System.err.println("Data may be lost.");
-                System.exit(1);
+        class ShutdownHook implements Runnable {
+            public void run() {
+                System.out.println("\nSaving to archive...");
+                byte[] newArchiveBytes = archiveBytes();
+                try {
+                    java.nio.file.Files.write(archivePath, newArchiveBytes,
+                            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+                } catch (IOException e) {
+                    System.err.println("Error: failed to write state to output file at " + archivePathString + ": " + e);
+                    System.err.println("Data may be lost.");
+                    System.exit(1);
+                }
             }
-        }));
+        }
+
+        /* setup a hook that saves data to archive file on shutdown */
+        Runtime.getRuntime().addShutdownHook(new Thread(new ShutdownHook()));
 
         /* spin up server */
         try {
