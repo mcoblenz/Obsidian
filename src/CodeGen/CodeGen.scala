@@ -110,8 +110,6 @@ class CodeGen () {
                      (name: String, declSeq: Seq[(State, Field)]): FieldInfo = {
         val fieldType = resolveType(declSeq.head._2.typ)
 
-        println("making...")
-
         /* setup get method */
         val getMeth = newClass.method(JMod.PRIVATE, fieldType, fieldGetMethodName(name))
         val getBody = getMeth.body()
@@ -331,12 +329,12 @@ class CodeGen () {
         translationContext
     }
     private def translateContract(
-                                     aContract: Contract,
-                                     newClass: JDefinedClass,
-                                     translationContext: TranslationContext) = {
+                    aContract: Contract,
+                    newClass: JDefinedClass,
+                    translationContext: TranslationContext) = {
 
         for (decl <- aContract.declarations) {
-            translateDeclaration(decl, newClass, translationContext, None, aContract.mod)
+            translateDeclaration(decl, newClass, translationContext, None, aContract)
         }
 
         translationContext
@@ -645,6 +643,36 @@ class CodeGen () {
         }
     }
 
+    private def generateStateArchiver(contract: Contract,
+                                      state: State,
+                                      stateClass: JDefinedClass,
+                                      translationContext: TranslationContext): Unit = {
+        val contractProtobufClassName = translationContext.getProtobufClassName(contract)
+        val protobufClassName = contractProtobufClassName + "." + state.name
+
+        val archiveType = model.directClass(protobufClassName)
+        val archiveMethod = stateClass.method(JMod.PUBLIC, archiveType, "archive")
+        val archiveBody = archiveMethod.body()
+
+        val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
+        val builderType = model.parseType(protobufMessageClassBuilder)
+
+        /* TODO obviously this workaround is bad; see if there's another way */
+        archiveBody.directStatement(protobufMessageClassBuilder + " builder = " +
+            protobufClassName + ".newBuilder();")
+        val builderVariable = JExpr.ref("builder")
+
+        val declarations = state.declarations
+
+        for (f <- declarations if f.isInstanceOf[Field]) {
+            val field: Field = f.asInstanceOf[Field]
+            val javaFieldVar = stateClass.fields().get(field.fieldName)
+            generateFieldArchiver(field, javaFieldVar, builderVariable, archiveBody, translationContext, contract)
+        }
+
+        val buildInvocation = JExpr.invoke(builderVariable, "build")
+        archiveBody._return(buildInvocation)
+    }
 
     // Generates a method, archive(), which outputs a protobuf object corresponding to the archive of this class.
     private def generateArchiver(
@@ -762,6 +790,46 @@ class CodeGen () {
         }
     }
 
+    private def generateStateArchiveInitializer(
+                    contract: Contract,
+                    state: State,
+                    stateClass: JDefinedClass,
+                    translationContext: TranslationContext): Unit = {
+        val contractProtobufClassName = translationContext.getProtobufClassName(contract)
+        val protobufClassName = contractProtobufClassName + "." + state.name
+
+        val archiveType = model.directClass(protobufClassName)
+
+        /* [initFromArchive] setup */
+        val fromArchiveMeth = stateClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
+        val archive = fromArchiveMeth.param(archiveType, "archive")
+        val fromArchiveBody = fromArchiveMeth.body()
+
+        /* [initFromArchiveBytes] declaration: this just parses the archive and
+         * calls [initFromArchive] */
+        val fromBytesMeth =
+            stateClass.method(JMod.PUBLIC, model.VOID, "initFromArchiveBytes")
+        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+        fromBytesMeth._throws(exceptionType.asInstanceOf[JClass])
+        val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
+
+        val fromBytesBody = fromBytesMeth.body()
+        val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
+        parseInvocation.arg(archiveBytes)
+        val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
+        fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
+
+        // Call setters.
+        val declarations = state.declarations
+
+        /* this takes care of fields that are not specific to any particular state */
+        for (f <- declarations if f.isInstanceOf[Field]) {
+            val field: Field = f.asInstanceOf[Field]
+            val javaFieldVar = stateClass.fields().get(field.fieldName)
+            generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, translationContext, contract)
+        }
+    }
+
     /* generates the method [initFromArchiveBytes] and [initFromArchive];
      * these methods load the recipient class from a protobuf message in the
      * form of raw bytes and a java message protobuf object, respectively.
@@ -849,8 +917,8 @@ class CodeGen () {
                     newClass: JDefinedClass,
                     translationContext: TranslationContext,
                     currentState: Option[String],
-                    mod: Option[ContractModifier]): Unit = {
-        (mod, declaration) match {
+                    aContract: Contract): Unit = {
+        (aContract.mod, declaration) match {
 
             /* the main contract has special generated code, so many functions are different */
             case (Some(IsMain), c@Constructor(_,_,_)) =>
@@ -863,7 +931,7 @@ class CodeGen () {
                 translateTransDecl(t, newClass, translationContext)
                 mainTransactions.add((currentState, t))
             case (Some(IsMain), s@State(_,_)) =>
-                translateStateDecl(s, newClass, translationContext, mod)
+                translateStateDecl(s, aContract, newClass, translationContext)
             case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
 
             // TODO : shared contracts
@@ -886,7 +954,7 @@ class CodeGen () {
             case (_, t@Transaction(_,_,_,_)) =>
                 translateTransDecl(t, newClass, translationContext)
             case (_, s@State(_,_)) =>
-                translateStateDecl(s, newClass, translationContext, mod)
+                translateStateDecl(s, aContract, newClass, translationContext)
             case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
 
             case _ => () // TODO : type declarations
@@ -1058,13 +1126,15 @@ class CodeGen () {
 
     private def translateStateDecl(
                     state: State,
+                    contract: Contract,
                     newClass: JDefinedClass,
-                    translationContext: TranslationContext,
-                    mod: Option[ContractModifier]): Unit = {
+                    translationContext: TranslationContext): Unit = {
         val stateClass = translationContext.states(state.name).innerClass
         for (decl <- state.declarations) {
-            translateDeclaration(decl, stateClass, translationContext, Some(state.name), mod)
+            translateDeclaration(decl, stateClass, translationContext, Some(state.name), contract)
         }
+        generateStateArchiveInitializer(contract, state, stateClass, translationContext)
+        generateStateArchiver(contract, state, stateClass, translationContext)
     }
 
     private def translateTransDecl(
