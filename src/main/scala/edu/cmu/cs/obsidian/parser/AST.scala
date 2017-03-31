@@ -72,8 +72,11 @@ case class Func(name: String,
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
                        retType: Option[Type],
+                       ensures: Seq[Ensures],
                        body: Seq[Statement]) extends Declaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration
+
+case class Ensures(expr: Expression)
 
 sealed trait ContractModifier
 case object IsUnique extends ContractModifier

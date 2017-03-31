@@ -50,6 +50,7 @@ object Lexer extends RegexParsers {
         case "this" => ThisT()
         case "import" => ImportT()
         case "remote" => RemoteT()
+        case "ensures" => EnsuresT()
         case id => IdentifierT(id)
     }
 
