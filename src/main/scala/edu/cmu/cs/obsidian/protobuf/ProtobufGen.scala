@@ -76,7 +76,7 @@ object ProtobufGen {
             case t@TypeDecl(_, _) => None // TODO
             case f@edu.cmu.cs.obsidian.parser.Field(_, _) => Some(translateFieldDecl(f))
             case f@Func(_,_,_, _) => None
-            case t@Transaction(_,_,_,_) => None
+            case t@Transaction(_,_,_,_,_) => None
             case s@State(_, _) => Some(translateStateDecl(s))
         }
     }
