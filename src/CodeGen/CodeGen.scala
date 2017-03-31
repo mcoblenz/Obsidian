@@ -139,7 +139,7 @@ class CodeGen (val target: Target) {
             case Field(_, _) => // Fields aren't translated because they shouldn't be accessed directly.
             case Constructor(name, args, body) => // Constructors aren't translated becuase stubs are only for remote instances.
             case f@Func(name, args, retType, body) => translateStubFunction(f, inClass)
-            case t@Transaction(_, _, _, _) => translateStubTransaction(t, inClass)
+            case t@Transaction(_, _, _, _, _) => translateStubTransaction(t, inClass)
             case s@State(_, _) => translateStubState(s, inClass)
             case c@Contract(mod, name, decls) => translateStubContract(c, inClass.getPackage())
         }
@@ -291,7 +291,7 @@ class CodeGen (val target: Target) {
         for (decl <- contract.declarations) {
             decl match {
                 case f@Field(_, fieldName) => fieldLookup = fieldLookup.updated(fieldName, GlobalFieldInfo(f))
-                case t@Transaction(name, _, _, _) => txLookup = txLookup.updated(name, GlobalTransactionInfo(t))
+                case t@Transaction(name, _, _, _, _) => txLookup = txLookup.updated(name, GlobalTransactionInfo(t))
                 case f@Func(name, _, _, _) => funLookup = funLookup.updated(name, GlobalFuncInfo(f))
                 case _ => ()
             }
@@ -989,7 +989,7 @@ class CodeGen (val target: Target) {
                 translateFieldDecl(f, newClass)
             case (Some(IsMain), f@Func(_,_,_,_)) =>
                 translateFuncDecl(f, newClass, translationContext)
-            case (Some(IsMain), t@Transaction(_,_,_,_)) =>
+            case (Some(IsMain), t@Transaction(_,_,_,_,_)) =>
                 translateTransDecl(t, newClass, translationContext)
                 mainTransactions.add((currentState, t))
             case (Some(IsMain), s@State(_,_)) =>
@@ -1002,7 +1002,7 @@ class CodeGen (val target: Target) {
             case (Some(IsShared), c@Constructor(_,_,_)) => ()
             case (Some(IsShared), f@Field(_,_)) => ()
             case (Some(IsShared), f@Func(_,_,_,_)) => ()
-            case (Some(IsShared), t@Transaction(_,_,_,_)) => ()
+            case (Some(IsShared), t@Transaction(_,_,_,_,_)) => ()
             case (Some(IsShared), s@State(_,_)) => ()
             case (Some(IsShared), c@Contract(_,_,_)) => ()
 
@@ -1013,7 +1013,7 @@ class CodeGen (val target: Target) {
                 translateFieldDecl(f, newClass)
             case (_, f@Func(_,_,_,_)) =>
                 translateFuncDecl(f, newClass, translationContext)
-            case (_, t@Transaction(_,_,_,_)) =>
+            case (_, t@Transaction(_,_,_,_,_)) =>
                 translateTransDecl(t, newClass, translationContext)
             case (_, s@State(_,_)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
