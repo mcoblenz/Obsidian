@@ -20,21 +20,30 @@ case class StateContext(
 
 /* a declaration is either defined globally in a contract, or in one or more
  * states of the contract */
-sealed trait DeclarationContext[T]
-/* a declaration made in the whole contract */
-case class GlobalDeclaration[T](decl: T) extends DeclarationContext[T]
-/* a declaration made in one or more states */
-case class StateSpecificDeclaration[T](declSeq: Seq[(State, T)]) extends DeclarationContext[T]
+
+sealed trait FieldInfo
+/* a field made in the whole contract */
+case class GlobalFieldInfo(decl: Field) extends FieldInfo
+/* a field made in one or more states */
+case class StateSpecificFieldInfo(declSeq: Seq[(State, Field)],
+                                     getFunc: JMethod, setFunc: JMethod) extends FieldInfo
+
+sealed trait FuncInfo
+case class GlobalFuncInfo(decl: Func) extends FuncInfo
+case class StateSpecificFuncInfo(declSeq: Seq[(State, Func)], dynamicCheckMethod: JMethod) extends FuncInfo
+
+sealed trait TransactionInfo
+case class GlobalTransactionInfo(decl: Transaction) extends TransactionInfo
+case class StateSpecificTransactionInfo(declSeq: Seq[(State, Transaction)],
+                                           dynamicCheckMethod: JMethod) extends TransactionInfo
+
+
 
 /* aggregates information about the current state in the translation */
 case class TranslationContext(
-    /* name of the state we're currently translating */
-    currentState: Option[String],
     /* when translating an inner class, this gives us the fully-qualified name */
     contractNameResolutionMap: Map[Contract, String], // maps from Obsidian contracts to fully-qualified Java class names
     protobufOuterClassNames: Map[String, String], // maps from fully-qualified Java class names to protobuf outer class names
-                                 
-
     /* the states of the contract we're currently translating */
     states: Map[String, StateContext],
     /* the state enum class */
@@ -42,14 +51,68 @@ case class TranslationContext(
     /* a field of the state enum type representing the current state */
     stateEnumField: Option[JFieldVar],
     /* aggregates information about [transaction/function/field] declarations:
-     * maps the [tx/fun/field] name to [DeclarationContext]  */
-    txLookup: Map[String, DeclarationContext[Transaction]],
-    funLookup: Map[String, DeclarationContext[Func]],
-    fieldLookup: Map[String, DeclarationContext[Field]]
+     * maps the [tx/fun/field] name to useful data  */
+    txLookup: Map[String, TransactionInfo],
+    funLookup: Map[String, FuncInfo],
+    fieldLookup: Map[String, FieldInfo]
 ) {
     /* gets the enum if it exists, fails otherwise */
     def getEnum(stName: String): JEnumConstant = {
         states.get(stName).get.enumVal
+    }
+
+    /* gets/assigns a variable (can be either a field or a local variable/argument).
+     * Because of JCodeModel's design, [assignField] appends the code onto [body]. */
+    def assignVariable(name: String, assignExpr: JExpression, body: JBlock): Unit = {
+        fieldLookup.get(name) match {
+            case None => body.assign(JExpr.ref(name), assignExpr)
+            case Some(GlobalFieldInfo(_)) => body.assign(JExpr.ref(name), assignExpr)
+            case Some(StateSpecificFieldInfo(_, _, setFunc)) => body.invoke(setFunc).arg(assignExpr)
+        }
+    }
+
+    def dereferenceVariable(f: String): JExpression = {
+        fieldLookup.get(f) match {
+            case None => JExpr.ref(f)
+            case Some(GlobalFieldInfo(_)) => JExpr.ref(f)
+            case Some(StateSpecificFieldInfo(_, getFunc, _)) => JExpr.invoke(getFunc)
+        }
+    }
+
+    /* does one of the below; checks first to see which one is possible */
+    def invokeTransactionOrFunction(name: String): JInvocation = {
+        if (txLookup.get(name).isDefined) {
+            invokeTransaction(name)
+        } else {
+            invokeFunction(name)
+        }
+    }
+
+    def invokeTransaction(name: String): JInvocation = {
+        txLookup(name) match {
+            case GlobalTransactionInfo(_) => JExpr.invoke(name)
+            case StateSpecificTransactionInfo(_, meth) => JExpr.invoke(meth)
+        }
+    }
+
+    def invokeFunction(name: String): JInvocation = {
+        funLookup(name) match {
+            case GlobalFuncInfo(_) => JExpr.invoke(name)
+            case StateSpecificFuncInfo(_, meth) => JExpr.invoke(meth)
+        }
+    }
+
+    /* the set of fields that defined in both states. Note: this does not include fields that are defined
+     * in the contract as a whole */
+    def conservedFields(stNameFrom: String, stNameTo: String) : Set[Field] = {
+        val getFields = (stName: String) =>
+            states(stName).astState.declarations.filter(_.isInstanceOf[Field]).map(_.asInstanceOf[Field])
+        val (fromFields, toFields) = (getFields(stNameFrom), getFields(stNameTo))
+
+        def conservedFilter(fieldPrime: Field): Boolean = { toFields.exists(_.fieldName == fieldPrime.fieldName) }
+
+        /* take only the fields that are conserved */
+        fromFields.filter(conservedFilter).toSet
     }
 
     def getProtobufClassName(contract: Contract) : String = {
