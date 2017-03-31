@@ -15,5 +15,7 @@
     <orderEntry type="library" name="scala-sdk-2.11.8" level="application" />
     <orderEntry type="library" name="key.core" level="project" />
     <orderEntry type="library" name="key.core.example" level="project" />
+    <orderEntry type="library" name="antlr" level="project" />
+    <orderEntry type="library" name="key.util" level="project" />
   </component>
 </module>

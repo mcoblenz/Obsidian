@@ -1,5 +1,6 @@
-import java.nio.file.{Files, Paths, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.io.File
+import java.util
 import java.util.Scanner
 
 import edu.cmu.cs.obsidian.lexer._
@@ -115,20 +116,24 @@ object Main {
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
+    def classPathForGeneratedSource (sourceDirectoryPath: Path) : Seq[String] =  {
+        List("Obsidian Runtime/src/Runtime/",
+            s"$sourceDirectoryPath",
+            "lib/protobuf-java-3.2.0.jar",
+            "lib/json-20160810.jar")
+    }
+
     /* returns the exit code of the javac process */
     def invokeJavac(
             printJavacOutput: Boolean,
-            mainName: String,
+            sourceFilePath: Path,
             sourceDir: Path,
             compileTo: Path): Int  = {
 
-        val sourcePath = sourceDir.toString
-        val classPath =
-            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.2.0.jar:lib/json-20160810.jar"
-        val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
+        val classPath = classPathForGeneratedSource(sourceDir).reduce((a: String, b: String) => a + ":" + b)
         val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
                                                        "-classpath", classPath,
-                                                        srcFile.toString)
+                                                        sourceFilePath.toString)
 
         val proc: java.lang.Process = Runtime.getRuntime().exec(compileCmd)
 
@@ -286,7 +291,9 @@ object Main {
 
             // invoke javac and make a jar from the result
             val mainName = findMainContractName(ast)
-            val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
+
+            val sourceFilePath = srcDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
+            val javacExit = invokeJavac(options.verbose, sourceFilePath, srcDir, bytecodeDir)
             if (options.verbose) {
                 println("javac exited with value " + javacExit)
             }
@@ -298,6 +305,8 @@ object Main {
                 }
             }
 
+            checkJavaFileWithKey(srcDir.toFile, classPathForGeneratedSource(srcDir))
+
         } catch {
             case e: Parser.ParseException => println(e.message)
         }
@@ -306,4 +315,94 @@ object Main {
             recDelete(tmpPath.toFile)
         }
     }
+
+    private def checkJavaFileWithKey(file: File, classpath: Seq[String]): Unit = {
+        import de.uka.ilkd.key.control.KeYEnvironment
+        import de.uka.ilkd.key.java.abstraction.KeYJavaType
+        import de.uka.ilkd.key.logic.op.IObserverFunction
+        import de.uka.ilkd.key.proof.Proof
+        import de.uka.ilkd.key.proof.init.ProofInputException
+        import de.uka.ilkd.key.proof.io.ProblemLoaderException
+        import de.uka.ilkd.key.settings.ChoiceSettings
+        import de.uka.ilkd.key.settings.ProofSettings
+        import de.uka.ilkd.key.strategy.StrategyProperties
+        import de.uka.ilkd.key.util.KeYTypeUtil
+        import de.uka.ilkd.key.util.MiscTools
+        import de.uka.ilkd.key.speclang.Contract
+        import scala.collection.JavaConverters._
+
+        // Path to the source code folder/file or to a *.proof file
+        val fileClassPath = classpath.map ((s: String) => Paths.get(s).toFile()).asJava
+        // Optionally: Additional specifications for API classes
+        val bootClassPath = null
+        // Optionally: Different default specifications for Java API
+        val includes = null // Optionally: Additional includes to consider
+        try { // Ensure that Taclets are parsed
+            if (!ProofSettings.isChoiceSettingInitialised) {
+                val env = KeYEnvironment.load(file, fileClassPath, bootClassPath, includes)
+                env.dispose()
+            }
+            // Set Taclet options
+            val choiceSettings = ProofSettings.DEFAULT_SETTINGS.getChoiceSettings
+            val oldSettings = choiceSettings.getDefaultChoices
+            val newSettings = new util.HashMap[String, String](oldSettings)
+            newSettings.putAll(MiscTools.getDefaultTacletOptions)
+            choiceSettings.setDefaultChoices(newSettings)
+            // Load source code
+            val env = KeYEnvironment.load(file, fileClassPath, bootClassPath, includes) // env.getLoadedProof() returns performed proof if a *.proof file is loaded
+            try { // List all specifications of all types in the source location (not classPaths and bootClassPath)
+                val proofContracts = new util.LinkedList[Contract]()
+                val kjts = env.getJavaInfo.getAllKeYJavaTypes
+                import scala.collection.JavaConversions._
+                for (javaType <- kjts) {
+                    if (!KeYTypeUtil.isLibraryClass(javaType)) {
+                        val targets = env.getSpecificationRepository.getContractTargets(javaType)
+                        for (target <- targets) {
+                            val contracts = env.getSpecificationRepository.getContracts(javaType, target)
+                            for (contract <- contracts) {
+                                proofContracts.add(contract)
+                            }
+                        }
+                    }
+                }
+                // Perform proofs
+                import scala.collection.JavaConversions._
+                for (contract <- proofContracts) {
+                    var proof: Proof = null
+                    try { // Create proof
+                        proof = env.createProof(contract.createProofObl(env.getInitConfig, contract))
+                        // Set proof strategy options
+                        val sp = proof.getSettings.getStrategySettings.getActiveStrategyProperties
+                        sp.setProperty(StrategyProperties.METHOD_OPTIONS_KEY, StrategyProperties.METHOD_CONTRACT)
+                        sp.setProperty(StrategyProperties.DEP_OPTIONS_KEY, StrategyProperties.DEP_ON)
+                        sp.setProperty(StrategyProperties.QUERY_OPTIONS_KEY, StrategyProperties.QUERY_ON)
+                        sp.setProperty(StrategyProperties.NON_LIN_ARITH_OPTIONS_KEY, StrategyProperties.NON_LIN_ARITH_DEF_OPS)
+                        sp.setProperty(StrategyProperties.STOPMODE_OPTIONS_KEY, StrategyProperties.STOPMODE_NONCLOSE)
+                        proof.getSettings.getStrategySettings.setActiveStrategyProperties(sp)
+                        // Make sure that the new options are used
+                        val maxSteps = 10000
+                        ProofSettings.DEFAULT_SETTINGS.getStrategySettings.setMaxSteps(maxSteps)
+                        ProofSettings.DEFAULT_SETTINGS.getStrategySettings.setActiveStrategyProperties(sp)
+                        proof.getSettings.getStrategySettings.setMaxSteps(maxSteps)
+                        proof.setActiveStrategy(proof.getServices.getProfile.getDefaultStrategyFactory.create(proof, sp))
+                        // Start auto mode
+                        env.getUi.getProofControl.startAndWaitForAutoMode(proof)
+                        // Show proof result
+                        val closed = proof.openGoals.isEmpty
+                        System.out.println("Contract '" + contract.getDisplayName + "' of " + contract.getTarget + " is " + (if (closed) "verified"
+                        else "still open") + ".")
+                    } catch {
+                        case e: ProofInputException =>
+                            System.out.println("Exception at '" + contract.getDisplayName + "' of " + contract.getTarget + ":")
+                            e.printStackTrace
+                    } finally if (proof != null) proof.dispose() // Ensure always that all instances of Proof are disposed
+                }
+            } finally env.dispose() // Ensure always that all instances of KeYEnvironment are disposed
+        } catch {
+            case e: ProblemLoaderException =>
+                System.out.println("Exception at '" + file + "':")
+                e.printStackTrace()
+        }
+    }
+
 }

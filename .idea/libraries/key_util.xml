@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="key.util">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/key-2.6.1/components/key.util.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1218,6 +1218,10 @@ class CodeGen (val target: Target) {
         /* add body */
         translateBody(meth.body(), decl.body, translationContext, localContext)
 
+        /* Add postcondition */
+        val comment = meth.javadoc()
+        comment.add("@ensures false")
+
         meth
     }
 
