@@ -93,19 +93,6 @@ class CodeGen () {
 
     }
 
-    private def declGetName(decl: Declaration): String = {
-        decl match {
-            case TypeDecl(name, _) => name
-            case Field(_, name) => name
-            case Constructor(name, _, _) => name
-            case Contract(_, name, _) => name
-            case Transaction(name, _, _, _) => name
-            case Func(name, _, _, _) => name
-            case State(name, _) => name
-        }
-    }
-
-
     def makeFieldInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
                      (name: String, declSeq: Seq[(State, Field)]): FieldInfo = {
         val fieldType = resolveType(declSeq.head._2.typ)
@@ -1036,10 +1023,10 @@ class CodeGen () {
 
         val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
 
-        val localContext = new immutable.HashMap[String, JVar]()
+        var localContext = new immutable.HashMap[String, JVar]()
         /* add args */
         for (arg <- c.args) {
-            localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         }
 
         /* add body */
@@ -1054,10 +1041,10 @@ class CodeGen () {
                     translationContext: TranslationContext) : JMethod = {
         val meth: JMethod = newClass.constructor(JMod.PUBLIC)
 
-        val localContext = new immutable.HashMap[String, JVar]()
+        var localContext = new immutable.HashMap[String, JVar]()
         /* add args */
         for (arg <- c.args) {
-            localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         }
 
         /* add body */
@@ -1147,10 +1134,10 @@ class CodeGen () {
         }
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name)
 
-        val localContext = new immutable.HashMap[String, JVar]()
+        var localContext = new immutable.HashMap[String, JVar]()
         /* add args */
         for (arg <- decl.args) {
-            localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         }
 
         /* add body */
@@ -1194,14 +1181,35 @@ class CodeGen () {
             case Return => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newState, updates) =>
-                translateBody(body, updates, translationContext, localContext)
+                /* order here is important! We must: construct the instance, then
+                 * assign the state enum, then update the fields */
+
+                /* construct a new instance of the inner contract */
+                val newStField = translationContext.states(newState).innerClassField
+                body.assign(newStField, JExpr._new(translationContext.states(newState).innerClass))
+
+                /* assign enum */
                 body.assign(JExpr.ref(stateField), translationContext.getEnum(newState))
-            case Assignment(Dereference(eDeref, field), e) => {
-                // TODO: do we ever need this if all contracts are encapsulated?
-            }
+
+                /* update fields */
+                translateBody(body, updates, translationContext, localContext)
+
+                /* TODO : take care of state-specific fields that are conserved by the transition */
+                /* TODO : assign the old state field to null */
+
             case Assignment(Variable(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
-                               body, translationContext, localContext)
+                    body, translationContext, localContext)
+            /* it's bad that this is a special case */
+            case Assignment(Dereference(This(), field), e) => {
+                /* we don't check the local context and just assume it's a field */
+                val newValue = translateExpr(e, translationContext,localContext)
+                translationContext.assignVariable(field, newValue, body)
+            }
+            case Assignment(Dereference(eDeref, field), e) => {
+                // TODO: do we ever need this in the general case if all contracts are encapsulated?
+            }
+
             case Throw() =>
                 body._throw(JExpr._new(model.ref("RuntimeException")))
 
@@ -1258,8 +1266,9 @@ class CodeGen () {
                     statements: Seq[Statement],
                     translationContext: TranslationContext,
                     localContext: Map[String, JVar]): Unit = {
+        var nextContext = localContext
         for (st <- statements) {
-            translateStatement(body, st, translationContext, localContext)
+            nextContext = translateStatement(body, st, translationContext, nextContext)
         }
     }
 
@@ -1273,10 +1282,10 @@ class CodeGen () {
         }
         val meth: JMethod = newClass.method(JMod.PRIVATE, javaRetType, decl.name)
 
-        val localContext = new immutable.HashMap[String, JVar]()
+        var localContext = new immutable.HashMap[String, JVar]()
         /* add args */
         for (arg <- decl.args) {
-            localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         }
 
         /* add body */

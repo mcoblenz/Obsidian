@@ -5,7 +5,8 @@ import com.sun.codemodel.internal._
 
 import scala.collection._
 
-/* aggregates information about a particular state */
+/* aggregates information about a particular state.
+ * INVARIANT: the  */
 case class StateContext(
     /* the AST node representing the state */
     astState: State,
@@ -64,18 +65,16 @@ case class TranslationContext(
     /* gets/assigns a variable (can be either a field or a local variable/argument).
      * Because of JCodeModel's design, [assignField] appends the code onto [body]. */
     def assignVariable(name: String, assignExpr: JExpression, body: JBlock): Unit = {
-        fieldLookup.get(name) match {
-            case None => body.assign(JExpr.ref(name), assignExpr)
-            case Some(GlobalFieldInfo(_)) => body.assign(JExpr.ref(name), assignExpr)
-            case Some(StateSpecificFieldInfo(_, _, setFunc)) => body.invoke(setFunc).arg(assignExpr)
+        fieldLookup(name) match {
+            case GlobalFieldInfo(_) => body.assign(JExpr._this().ref(name), assignExpr)
+            case StateSpecificFieldInfo(_, _, setFunc) => body.invoke(setFunc).arg(assignExpr)
         }
     }
 
     def dereferenceVariable(f: String): JExpression = {
-        fieldLookup.get(f) match {
-            case None => JExpr.ref(f)
-            case Some(GlobalFieldInfo(_)) => JExpr.ref(f)
-            case Some(StateSpecificFieldInfo(_, getFunc, _)) => JExpr.invoke(getFunc)
+        fieldLookup(f) match {
+            case GlobalFieldInfo(_) => JExpr._this().ref(f)
+            case StateSpecificFieldInfo(_, getFunc, _) => JExpr.invoke(getFunc)
         }
     }
 
