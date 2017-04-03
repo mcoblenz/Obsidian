@@ -1138,47 +1138,6 @@ class CodeGen (val target: Target) {
         }
     }
 
-    /* The java constructor in the main contract runs every transaction.
-     * The obsidian constructor only runs when the contract is deployed.
-     * Thus, the obsidian constructor must be placed in a distinct method. */
-    private def translateMainConstructor(
-                    c: Constructor,
-                    newClass: JDefinedClass,
-                    translationContext: TranslationContext) : JMethod = {
-        val name = "new_" + newClass.name()
-
-        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
-
-        var localContext = new immutable.HashMap[String, JVar]()
-        /* add args */
-        for (arg <- c.args) {
-            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
-        }
-
-        /* add body */
-        translateBody(meth.body(), c.body, translationContext, localContext)
-
-        meth
-    }
-
-    private def translateConstructor(
-                    c: Constructor,
-                    newClass: JDefinedClass,
-                    translationContext: TranslationContext) : JMethod = {
-        val meth: JMethod = newClass.constructor(JMod.PUBLIC)
-
-        var localContext = new immutable.HashMap[String, JVar]()
-        /* add args */
-        for (arg <- c.args) {
-            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
-        }
-
-        /* add body */
-        translateBody(meth.body(), c.body, translationContext, localContext)
-
-        meth
-    }
-
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
         newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
     }
@@ -1250,6 +1209,53 @@ class CodeGen (val target: Target) {
         generateStateArchiver(contract, state, stateClass, translationContext)
     }
 
+    /* the local context at the beginning of the method */
+
+    /* The java constructor in the main contract runs every transaction.
+     * The obsidian constructor only runs when the contract is deployed.
+     * Thus, the obsidian constructor must be placed in a distinct method. */
+    private def translateMainConstructor(
+                                            c: Constructor,
+                                            newClass: JDefinedClass,
+                                            translationContext: TranslationContext) : JMethod = {
+        val name = "new_" + newClass.name()
+
+        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
+
+        /* add args to method and collect them in a list */
+        val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDecl) =>
+                (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+            )
+
+        /* construct the local context from this list */
+        val localContext: immutable.Map[String, JVar] = argList.toMap
+
+        /* add body */
+        translateBody(meth.body(), c.body, translationContext, localContext)
+
+        meth
+    }
+
+    private def translateConstructor(
+                                        c: Constructor,
+                                        newClass: JDefinedClass,
+                                        translationContext: TranslationContext) : JMethod = {
+        val meth: JMethod = newClass.constructor(JMod.PUBLIC)
+
+        /* add args to method and collect them in a list */
+        val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDecl) =>
+            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+        )
+
+        /* construct the local context from this list */
+        val localContext: immutable.Map[String, JVar] = argList.toMap
+
+        /* add body */
+        translateBody(meth.body(), c.body, translationContext, localContext)
+
+        meth
+    }
+
     private def translateTransDecl(
                     decl: Transaction,
                     newClass: JDefinedClass,
@@ -1260,11 +1266,13 @@ class CodeGen (val target: Target) {
         }
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name)
 
-        var localContext = new immutable.HashMap[String, JVar]()
-        /* add args */
-        for (arg <- decl.args) {
-            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
-        }
+        /* add args to method and collect them in a list */
+        val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
+            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+        )
+
+        /* construct the local context from this list */
+        val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
         translateBody(meth.body(), decl.body, translationContext, localContext)
@@ -1416,11 +1424,13 @@ class CodeGen (val target: Target) {
         }
         val meth: JMethod = newClass.method(JMod.PRIVATE, javaRetType, decl.name)
 
-        var localContext = new immutable.HashMap[String, JVar]()
-        /* add args */
-        for (arg <- decl.args) {
-            localContext = localContext.updated(arg.varName, meth.param(resolveType(arg.typ), arg.varName))
-        }
+        /* add args to method and collect them in a list */
+        val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
+            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+        )
+
+        /* construct the local context from this list */
+        val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
         translateBody(meth.body(), decl.body, translationContext, localContext)
