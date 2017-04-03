@@ -76,7 +76,7 @@ object Parser extends Parsers {
 
         val parseUpdate = {
             val oneUpdate = parseIdString ~! EqT() ~! parseExpr ^^ {
-                case f ~ _ ~ e => Assignment(Dereference(This(), f), e)
+                case f ~ _ ~ e => (Variable(f), e)
             }
             LParenT() ~ LBraceT() ~ repsep(oneUpdate, CommaT()) ~
                 RBraceT() ~ RParenT() ^^ {

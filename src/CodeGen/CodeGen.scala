@@ -44,6 +44,12 @@ class CodeGen (val target: Target) {
     private def innerClassFieldName(stName: String): String = {
         "__state" + stName
     }
+    /* This method dynamically checks type state and copies the value of conserved fields
+     * (i.e. defined in both states) from one state to another */
+    private final val conserveFieldsName = "__conserveFields"
+    /* based on the result of [getStateMeth], this nulls out the appropriate state field
+     * so that the old state can be garbage-collected after a transition */
+    private final val deleteOldStateName = "__oldStateToNull"
 
     final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
 
@@ -166,7 +172,7 @@ class CodeGen (val target: Target) {
         val getBody = getMeth.body()
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            getBody._if(JExpr.invoke(getStateMeth).invoke("equals").arg(stateLookup(st.name).enumVal))
+            getBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                    ._then()
                    ._return(stateLookup(st.name).innerClassField.ref(f.fieldName))
         }
@@ -179,7 +185,7 @@ class CodeGen (val target: Target) {
         val newValue = setMeth.param(fieldType, "newValue")
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            setBody._if(JExpr.invoke(getStateMeth).invoke("equals").arg(stateLookup(st.name).enumVal))
+            setBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                 ._then()
                 .assign(stateLookup(st.name).innerClassField.ref(f.fieldName), newValue)
         }
@@ -205,7 +211,7 @@ class CodeGen (val target: Target) {
         for ((st, f) <- declSeq) {
             val inv = JExpr.invoke(stateLookup(st.name).innerClassField, txExample.name)
             // dynamically check the state
-            body._if(JExpr.invoke(getStateMeth).invoke("equals").arg(stateLookup(st.name).enumVal))
+            body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                     ._then()
                     ._return(inv)
         }
@@ -233,7 +239,7 @@ class CodeGen (val target: Target) {
         for ((st, f) <- declSeq) {
             val inv = JExpr.invoke(stateLookup(st.name).innerClassField, funExample.name)
             // dynamically check the state
-            body._if(JExpr.invoke(getStateMeth).invoke("equals").arg(stateLookup(st.name).enumVal))
+            body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                 ._then()
                 ._return(inv)
         }
@@ -377,8 +383,53 @@ class CodeGen (val target: Target) {
             fieldLookup = fieldLookup
         )
 
+        /* i.e. if this contract defines any type states */
+        if (translationContext.stateEnumClass.isDefined)
+            generateStateHelpers(newClass, translationContext)
+
         translationContext
     }
+
+
+    private def generateStateHelpers(newClass: JDefinedClass,
+                                     translationContext: TranslationContext): Unit = {
+        /* method to take care of conserved fields during a state transition
+         * Invariant for use: [getStateMeth] returns the current state, the new state is passed
+         * as an argument. The new state's inner class field must be non-null. */
+        val conserveMeth = newClass.method(JMod.PRIVATE, model.VOID, conserveFieldsName)
+        val nextState = conserveMeth.param(translationContext.stateEnumClass.get, "nextState")
+        val conserveBody = conserveMeth.body()
+        /* match on the current state */
+        for (stFrom <- translationContext.states.values) {
+            val thisStateBody = conserveBody._if(
+                    JExpr.invoke(getStateMeth).eq(stFrom.enumVal))
+                ._then()
+            /* match on the target state */
+            for (stTo <- translationContext.states.values if stTo != stFrom) {
+                val assignBody = thisStateBody._if(
+                        nextState.eq(stTo.enumVal))
+                    ._then()
+                val (fromName, toName) = (stFrom.astState.name, stTo.astState.name)
+                for (f <- translationContext.conservedFields(fromName, toName)) {
+                    /* assign the field to the new state from the old */
+                    assignBody.assign(stTo.innerClassField.ref(f.fieldName),
+                                        stFrom.innerClassField.ref(f.fieldName))
+                }
+            }
+        }
+
+        /* method to null out old state
+         * Invariant for use: [getStateMeth] returns the current state; this will be the state
+         * whose inner class field this method nullifies. */
+        val deleteBody = newClass.method(JMod.PRIVATE, model.VOID, deleteOldStateName).body()
+        for (st <- translationContext.states.values) {
+            deleteBody._if(
+                    JExpr.invoke(getStateMeth).eq(st.enumVal))
+                ._then()
+                .assign(st.innerClassField, JExpr._null())
+        }
+    }
+
     private def translateContract(
                     aContract: Contract,
                     newClass: JDefinedClass,
@@ -1256,21 +1307,29 @@ class CodeGen (val target: Target) {
             case Return => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newState, updates) =>
-                /* order here is important! We must: construct the instance, then
-                 * assign the state enum, then update the fields */
-
+                /* We must (in this order):
+                 *     1) construct the new state's inner class,
+                 *     2) assign the fields of the new inner class object,
+                 *     3) clean up the old state,
+                 *     4) change the state enum.
+                 */
                 /* construct a new instance of the inner contract */
                 val newStField = translationContext.states(newState).innerClassField
                 body.assign(newStField, JExpr._new(translationContext.states(newState).innerClass))
 
-                /* assign enum */
+                /* assign fields in the update construct */
+                for ((f, e) <- updates) {
+                    body.assign(newStField.ref(f.x), translateExpr(e, translationContext, localContext))
+                }
+
+                /* assign conserved fields (implicit to programmer) */
+                body.invoke(conserveFieldsName).arg(translationContext.states(newState).enumVal)
+
+                /* nullify old state inner class field */
+                body.invoke(deleteOldStateName)
+
+                /* change the enum to reflect the new state */
                 body.assign(JExpr.ref(stateField), translationContext.getEnum(newState))
-
-                /* update fields */
-                translateBody(body, updates, translationContext, localContext)
-
-                /* TODO : take care of state-specific fields that are conserved by the transition */
-                /* TODO : assign the old state field to null */
 
             case Assignment(Variable(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
