@@ -1,24 +1,76 @@
+/* Things we should test about states
+ * ------------------------------------------------
+ * Main Contract:
+ *   - transaction calls should fail if the state is not correct
+ * Transitions:
+ *   - transitions work correctly from a particular state, but also from the most general type "C"
+ *   - conserved fields are correctly assigned after a state transition
+ *   - the update clause works
+ */
 main contract States {
-    int y;
+
+    States() {
+        ->S1({x = 0, z = 0});
+    }
 
     state S1 {
         int x;
-        transaction s1_only() {
-            x = 1;
+        /* z is a conserved field */
+        int z;
+        transaction set_x(int x) {
+            this.x = x;
+        }
+
+        transaction set_z(int z) {
+            this.z = z;
+        }
+
+        transaction toS2() {
+            ->S2({y = x});
+        }
+
+        transaction getX() returns int {
+            return x;
         }
     }
 
     state S2 {
-        transaction s2_only() {
-            y = 1;
+        int y;
+        int z;
+        transaction toS1() {
+            ->S1({x = y});
+        }
+
+        transaction getY() returns int {
+            return y;
         }
     }
 
-    transaction all_states() {
-        throw;
+    transaction getZ() returns int {
+        return z;
     }
 
-    States() {
-        ->S1({x = y});
+    transaction get_X_or_Y() returns int {
+        int ret;
+        switch this {
+            case S1 {
+                ret = getX();
+            }
+            case S2 {
+                ret = getY();
+            }
+        }
+        return ret;
+    }
+
+    transaction flipStates(int x, int y) {
+        switch this {
+            case S1 {
+                ->S2({y = y});
+            }
+            case S2 {
+                ->S1({x = x});
+            }
+        }
     }
 }

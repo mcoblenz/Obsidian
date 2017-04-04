@@ -204,17 +204,23 @@ class CodeGen (val target: Target) {
         }
 
         val meth = newClass.method(JMod.PUBLIC, retType, txExample.name)
-        for (arg <- txExample.args) {
-            meth.param(resolveType(arg.typ), arg.varName)
-        }
+
+        /* add the appropriate args to the method and collect them in a list */
+        val jArgs = txExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
+
         val body = meth.body()
 
         for ((st, f) <- declSeq) {
             val inv = JExpr.invoke(stateLookup(st.name).innerClassField, txExample.name)
+
+            /* add args to the invocation */
+            jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
+
             // dynamically check the state
-            body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
-                    ._then()
-                    ._return(inv)
+            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))._then()
+
+            if (hasReturn) stBody._return(inv)
+            else stBody.add(inv)
         }
         // exhaustive return to please compiler
         if (hasReturn) body._return(JExpr._null())
@@ -232,17 +238,23 @@ class CodeGen (val target: Target) {
         }
 
         val meth = newClass.method(JMod.PUBLIC, retType, funExample.name)
-        for (arg <- funExample.args) {
-            meth.param(resolveType(arg.typ), arg.varName)
-        }
+
+        /* add the appropriate args to the method and collect them in a list */
+        val jArgs = funExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
+
         val body = meth.body()
 
         for ((st, f) <- declSeq) {
             val inv = JExpr.invoke(stateLookup(st.name).innerClassField, funExample.name)
+
+            /* add args to the invocation */
+            jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
+
             // dynamically check the state
-            body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
-                ._then()
-                ._return(inv)
+            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))._then()
+
+            if (hasReturn) stBody._return(inv)
+            else stBody.add(inv)
         }
         // exhaustive return to please compiler
         if (hasReturn) body._return(JExpr._null())
