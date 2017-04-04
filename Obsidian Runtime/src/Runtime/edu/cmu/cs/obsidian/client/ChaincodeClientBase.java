@@ -8,37 +8,9 @@ import java.net.Socket;
 /**
  * Created by mcoblenz on 2/16/17.
  */
-public abstract class ChaincodeClientBase {
+public abstract class ChaincodeClientBase extends ChaincodeClientStub {
 
-    public void doTransaction(Socket socket, String transactionName, Object[] args) throws java.io.IOException {
-        assert (socket.isConnected());
-        java.io.PrintWriter socketWriter = new java.io.PrintWriter(socket.getOutputStream());
-        JSONWriter jsonWriter = new JSONWriter(socketWriter);
-
-        jsonWriter.key("jsonrpc");
-        jsonWriter.value("2.0");
-
-        jsonWriter.key("method");
-        jsonWriter.value("invoke");
-
-        // params
-        jsonWriter.key("params");
-        jsonWriter.object();
-        jsonWriter.key("ctorMsg");
-        jsonWriter.object();
-        jsonWriter.key("function");
-        jsonWriter.value(transactionName);
-        jsonWriter.key("args");
-        jsonWriter.array();
-
-        for (int i = 0; i < args.length; i++) {
-            jsonWriter.value(args[i]);
-        }
-        jsonWriter.endArray(); // args
-        jsonWriter.endObject(); // ctorMsg
-    }
-
-    public abstract void invokeClientMain(JSONWriter jsonWriter, JSONTokener jsonTokener) throws java.io.IOException;
+    public abstract void invokeClientMain() throws java.io.IOException;
 
 
     public void delegatedMain (String args[]) {
@@ -70,16 +42,14 @@ public abstract class ChaincodeClientBase {
             System.exit(1);
         }
 
-        Socket socket = null;
-        JSONWriter jsonWriter = null;
-        JSONTokener jsonTokener = null;
         try {
-            socket = new Socket(addressString, port);
+            Socket socket = new Socket(addressString, port);
 
             assert (socket.isConnected());
             java.io.PrintWriter socketWriter = new java.io.PrintWriter(socket.getOutputStream());
-            jsonWriter = new JSONWriter(socketWriter);
-            jsonTokener = new JSONTokener(socket.getInputStream());
+            JSONWriter jsonWriter = new JSONWriter(socketWriter);
+            JSONTokener jsonTokener = new JSONTokener(socket.getInputStream());
+            connectionManager = new ChaincodeClientConnectionManager(jsonWriter, jsonTokener);
         }
         catch (java.io.IOException e) {
             System.err.println("Error: failed to connect to " + addressString + ":" + port);
@@ -88,7 +58,7 @@ public abstract class ChaincodeClientBase {
 
         try {
             // We need to invoke the client's main() transaction.
-            invokeClientMain(jsonWriter, jsonTokener);
+            invokeClientMain();
         }
 
         catch (java.io.IOException e) {

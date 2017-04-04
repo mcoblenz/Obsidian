@@ -197,7 +197,7 @@ public abstract class ChaincodeBaseMock {
 
         try {
             byte[] bytes = java.nio.file.Files.readAllBytes(archivePath);
-            initFromArchiveBytes(bytes);
+            __initFromArchiveBytes(bytes);
         }
         catch (InvalidProtocolBufferException e) {
             // Failed to read the file. Bail.
@@ -211,7 +211,7 @@ public abstract class ChaincodeBaseMock {
         /* setup a hook that saves data to archive file on shutdown */
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("\nSaving to archive...");
-            byte[] newArchiveBytes = archiveBytes();
+            byte[] newArchiveBytes = __archiveBytes();
             try {
                 java.nio.file.Files.write(archivePath, newArchiveBytes,
                         StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
@@ -236,8 +236,8 @@ public abstract class ChaincodeBaseMock {
     public abstract byte[] init(ChaincodeStubMock stub, byte[][] args);
     public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args);
 
-    public abstract void initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
-    public abstract byte[] archiveBytes();
+    public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
+    public abstract byte[] __archiveBytes();
 }
 
 
