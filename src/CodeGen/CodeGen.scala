@@ -253,7 +253,7 @@ class CodeGen (val target: Target) {
 
         // argsArray = new Object[size]
         val body = meth.body()
-        val objectArrayType = newClass.owner().ref("java.util.ArrayList<byte[]>")
+        val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("byte[]"))
         val newArrayExpr = JExpr._new(objectArrayType)
         newArrayExpr.arg(JExpr.lit(argExpressions.length))
         val argArray = body.decl(objectArrayType, "argArray", newArrayExpr)
