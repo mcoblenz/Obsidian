@@ -1,0 +1,9 @@
+main contract IntContainer {
+	int x;
+	
+	transaction setX(int newX) returns int {
+		int oldX = x;
+		x = newX;
+		return oldX;
+	}
+}

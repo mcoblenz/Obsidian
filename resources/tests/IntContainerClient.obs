@@ -1,0 +1,7 @@
+import "resources/tests/IntContainer.obs"
+
+main contract IntContainerClient {
+	transaction main(remote IntContainer container) {
+		container.setX(42);
+	}
+}
