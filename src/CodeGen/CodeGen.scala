@@ -2,10 +2,11 @@ package edu.cmu.cs.obsidian.codegen
 
 import CodeGen._
 import edu.cmu.cs.obsidian.parser._
-import com.sun.codemodel.internal.{JClass, _}
+import com.helger.jcodemodel._
 import edu.cmu.cs.obsidian.util._
 
 import scala.collection.{mutable, _}
+import collection.JavaConverters._
 
 
 trait Target
@@ -509,7 +510,7 @@ class CodeGen (val target: Target) {
 
     private def generateInitMethod(
                     newClass: JDefinedClass,
-                    stubType: JClass): Unit = {
+                    stubType: AbstractJClass): Unit = {
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
         initMeth.param(stubType, "stub")
         initMeth.param(model.BYTE.array().array(), "args")
@@ -522,7 +523,7 @@ class CodeGen (val target: Target) {
     private def generateRunMethod(
                     newClass: JDefinedClass,
                     translationContext: TranslationContext,
-                    stubType: JClass): Unit = {
+                    stubType: AbstractJClass): Unit = {
         val runMeth = newClass.method(JMod.PUBLIC, model.BYTE.array(), "run")
         runMeth.param(stubType, "stub")
         runMeth.param(model.ref("String"), "transName")
@@ -655,8 +656,8 @@ class CodeGen (val target: Target) {
 
         for (c <- contract.declarations if c.isInstanceOf[Contract]) {
             val innerContract: Contract = c.asInstanceOf[Contract]
-            val javaInnerClasses = inClass.listClasses()
-            val javaInnerClassOption = javaInnerClasses.find((c: JClass) => (c.name().equals(innerContract.name)))
+            val javaInnerClasses = inClass.classes().asScala
+            val javaInnerClassOption = javaInnerClasses.find((c: AbstractJClass) => (c.name().equals(innerContract.name)))
 
 
             if (javaInnerClassOption.isDefined) {
@@ -717,8 +718,8 @@ class CodeGen (val target: Target) {
                 val setterName: String = setterNameForField(field.fieldName)
                 val setInvocation = JExpr.invoke(builderVar, setterName)
 
-                val byteStringClass: JClass =
-                    model.parseType("com.google.protobuf.ByteString").asInstanceOf[JClass]
+                val byteStringClass: AbstractJClass =
+                    model.parseType("com.google.protobuf.ByteString").asInstanceOf[AbstractJClass]
                 val toByteArrayInvocation = JExpr.invoke(fieldVar, "toByteArray")
                 val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
                 copyFromInvocation.arg(toByteArrayInvocation)
@@ -739,7 +740,7 @@ class CodeGen (val target: Target) {
                 }
                 else {
                     val archiveVariableTypeName = translationContext.getProtobufClassName(contract.get)
-                    val archiveVariableType: JType = model.parseType(archiveVariableTypeName)
+                    val archiveVariableType: AbstractJType = model.parseType(archiveVariableTypeName)
 
                     val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
                     val archiveVariable = nonNullBody.decl(archiveVariableType,
@@ -855,7 +856,7 @@ class CodeGen (val target: Target) {
                     inContract: Contract): Unit = {
         // generate: FieldArchive fieldArchive = field.archive();
         val javaFieldName: String = field.fieldName
-        val javaFieldType: JType = resolveType(field.typ)
+        val javaFieldType: AbstractJType = resolveType(field.typ)
 
         field.typ match {
             case IntType() => {
@@ -890,7 +891,7 @@ class CodeGen (val target: Target) {
                 else {
                     val protobufClassName = translationContext.getProtobufClassName(contract.get)
 
-                    val archiveType: JType = model.parseType(protobufClassName)
+                    val archiveType: AbstractJType = model.parseType(protobufClassName)
 
                     // TODO
                     /* generate another method that takes the actual archive type
@@ -923,7 +924,7 @@ class CodeGen (val target: Target) {
         val fromBytesMeth =
             stateClass.method(JMod.PUBLIC, model.VOID, "initFromArchiveBytes")
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
-        fromBytesMeth._throws(exceptionType.asInstanceOf[JClass])
+        fromBytesMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
 
         val fromBytesBody = fromBytesMeth.body()
@@ -964,7 +965,7 @@ class CodeGen (val target: Target) {
         val fromBytesMeth =
             newClass.method(JMod.PUBLIC, model.VOID, "initFromArchiveBytes")
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
-        fromBytesMeth._throws(exceptionType.asInstanceOf[JClass])
+        fromBytesMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
 
         val fromBytesBody = fromBytesMeth.body()
@@ -1006,7 +1007,7 @@ class CodeGen (val target: Target) {
             val st = stDecl.asInstanceOf[State]
 
             val stArchiveName = protobufClassName + "." + st.name
-            val stArchiveType: JType = model.parseType(stArchiveName)
+            val stArchiveType: AbstractJType = model.parseType(stArchiveName)
 
             val innerClass = translationContext.states(st.name).innerClass
             val innerClassField = translationContext.states(st.name).innerClassField
@@ -1074,7 +1075,7 @@ class CodeGen (val target: Target) {
         }
     }
 
-    private def resolveType(typ: Type): JType = {
+    private def resolveType(typ: Type): AbstractJType = {
         typ match {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
@@ -1154,7 +1155,7 @@ class CodeGen (val target: Target) {
     /* returns an expr because exprs are built bottom-up (unlike everything else) */
     private def translateExpr(e: Expression,
                               translationContext: TranslationContext,
-                              localContext: Map[String, JVar]): JExpression = {
+                              localContext: Map[String, JVar]): IJExpression = {
         val recurse = (e: Expression) => translateExpr(e, translationContext, localContext)
 
         e match {
@@ -1284,7 +1285,7 @@ class CodeGen (val target: Target) {
 
     private def dereferenceVariable(name: String,
                                     translationContext: TranslationContext,
-                                    localContext: Map[String, JVar]): JExpression = {
+                                    localContext: Map[String, JVar]): IJExpression = {
         localContext.get(name) match {
             case Some(variable) => variable
             case None => translationContext.dereferenceVariable(name)
@@ -1292,7 +1293,7 @@ class CodeGen (val target: Target) {
     }
 
     private def assignVariable(name: String,
-                               newValue: JExpression,
+                               newValue: IJExpression,
                                body: JBlock,
                                translationContext: TranslationContext,
                                localContext: Map[String, JVar]

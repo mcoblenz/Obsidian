@@ -7,7 +7,7 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
 import edu.cmu.cs.obsidian.util._
-import com.sun.codemodel.internal.JCodeModel
+import com.helger.jcodemodel.JCodeModel
 
 import scala.sys.process._
 

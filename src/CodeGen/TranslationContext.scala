@@ -1,7 +1,7 @@
 package CodeGen
 
 import edu.cmu.cs.obsidian.parser._
-import com.sun.codemodel.internal._
+import com.helger.jcodemodel._
 
 import scala.collection._
 
@@ -64,14 +64,14 @@ case class TranslationContext(
 
     /* gets/assigns a variable (can be either a field or a local variable/argument).
      * Because of JCodeModel's design, [assignField] appends the code onto [body]. */
-    def assignVariable(name: String, assignExpr: JExpression, body: JBlock): Unit = {
+    def assignVariable(name: String, assignExpr: IJExpression, body: JBlock): Unit = {
         fieldLookup(name) match {
             case GlobalFieldInfo(_) => body.assign(JExpr._this().ref(name), assignExpr)
             case StateSpecificFieldInfo(_, _, setFunc) => body.invoke(setFunc).arg(assignExpr)
         }
     }
 
-    def dereferenceVariable(f: String): JExpression = {
+    def dereferenceVariable(f: String): IJExpression = {
         fieldLookup(f) match {
             case GlobalFieldInfo(_) => JExpr._this().ref(f)
             case StateSpecificFieldInfo(_, getFunc, _) => JExpr.invoke(getFunc)
