@@ -386,9 +386,12 @@ class CodeGen (val target: Target) {
 
         /* setup the TranslationContext */
         val translationContext = TranslationContext(
+            contract = aContract,
+            contractClass = newClass,
             contractNameResolutionMap = contractNameResolutionMap,
             protobufOuterClassNames = protobufOuterClassNames,
             states = stateLookup,
+            currentStateName = None,
             stateEnumClass = stateEnumOption,
             stateEnumField = stateEnumField,
             txLookup = txLookup,
@@ -488,7 +491,14 @@ class CodeGen (val target: Target) {
                                        translationContext: TranslationContext
                                       ): Unit = {
         val newClass: JDefinedClass = parent._class(JMod.PUBLIC, aContract.name)
-        val _ = translateContract(aContract, newClass, translationContext)
+
+        /* change the information in the translation context */
+        val newTranslationContext = translationContext.copy(
+            contract = aContract,
+            contractClass = newClass
+        )
+
+        val _ = translateContract(aContract, newClass, newTranslationContext)
     }
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
@@ -1215,8 +1225,11 @@ class CodeGen (val target: Target) {
                     newClass: JDefinedClass,
                     translationContext: TranslationContext): Unit = {
         val stateClass = translationContext.states(state.name).innerClass
+
+        /* we change one thing: the currently translated state */
+        val newTranslationContext = translationContext.copy(currentStateName = Some(state.name))
         for (decl <- state.declarations) {
-            translateDeclaration(decl, stateClass, translationContext, Some(state.name), contract)
+            translateDeclaration(decl, stateClass, newTranslationContext, Some(state.name), contract)
         }
         generateStateArchiveInitializer(contract, state, stateClass, translationContext)
         generateStateArchiver(contract, state, stateClass, translationContext)
@@ -1400,10 +1413,12 @@ class CodeGen (val target: Target) {
                     translateBody(jPrev._then(), _case.body, translationContext, localContext)
                 }
             case LocalInvocation(methName, args) =>
-                addArgs(translationContext.invokeTransaction(methName), args, translationContext, localContext)
+                addArgs(translationContext.invokeTransactionOrFunction(methName),
+                        args, translationContext, localContext)
             /* TODO : it's bad that this is a special case */
             case Invocation(This(), methName, args) =>
-                addArgs(translationContext.invokeTransaction(methName), args, translationContext, localContext)
+                addArgs(translationContext.invokeTransactionOrFunction(methName),
+                        args, translationContext, localContext)
 
             case Invocation(e, methName, args) =>
                 addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName),

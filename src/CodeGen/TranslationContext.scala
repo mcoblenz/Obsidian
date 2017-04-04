@@ -23,9 +23,10 @@ case class StateContext(
  * states of the contract */
 
 sealed trait FieldInfo
-/* a field made in the whole contract */
+/* a field made in the whole contract. */
 case class GlobalFieldInfo(decl: Field) extends FieldInfo
-/* a field made in one or more states */
+/* a field made in one or more states.
+ * This has getter and setter methods that do dynamic checks on state  */
 case class StateSpecificFieldInfo(declSeq: Seq[(State, Field)],
                                      getFunc: JMethod, setFunc: JMethod) extends FieldInfo
 
@@ -42,11 +43,17 @@ case class StateSpecificTransactionInfo(declSeq: Seq[(State, Transaction)],
 
 /* aggregates information about the current state in the translation */
 case class TranslationContext(
+    /* the contract currently being translated */
+    contract: Contract,
+    /* the class of the _contract_ that is currently being translated (i.e. doesn't include states) */
+    contractClass: JDefinedClass,
     /* when translating an inner class, this gives us the fully-qualified name */
     contractNameResolutionMap: Map[Contract, String], // maps from Obsidian contracts to fully-qualified Java class names
     protobufOuterClassNames: Map[String, String], // maps from fully-qualified Java class names to protobuf outer class names
     /* the states of the contract we're currently translating */
     states: Map[String, StateContext],
+    /* the state currently being translated, if there is such a state */
+    currentStateName: Option[String],
     /* the state enum class */
     stateEnumClass: Option[JDefinedClass],
     /* a field of the state enum type representing the current state */
@@ -62,19 +69,26 @@ case class TranslationContext(
         states.get(stName).get.enumVal
     }
 
-    /* gets/assigns a variable (can be either a field or a local variable/argument).
+    /* assigns a variable (can be either a field or a local variable/argument).
      * Because of JCodeModel's design, [assignField] appends the code onto [body]. */
     def assignVariable(name: String, assignExpr: IJExpression, body: JBlock): Unit = {
-        fieldLookup(name) match {
-            case GlobalFieldInfo(_) => body.assign(JExpr._this().ref(name), assignExpr)
-            case StateSpecificFieldInfo(_, _, setFunc) => body.invoke(setFunc).arg(assignExpr)
+        (currentStateName, fieldLookup(name)) match {
+            /* if "f" is defined in the outer class, "this.f" isn't a valid reference of the field
+             * from inside the inner class. Note that it's not sufficient to just use "f", because
+             * this makes shadowing of this variable impossible */
+            case (None, GlobalFieldInfo(_)) => body.assign(JExpr._this().ref(name), assignExpr)
+            case (Some(_), GlobalFieldInfo(_)) => body.assign(contractClass.staticRef("this").ref(name), assignExpr)
+            case (_, StateSpecificFieldInfo(_, _, setFunc)) => body.invoke(setFunc).arg(assignExpr)
         }
     }
 
+    /* just like [assignVariable], but this dereferences a variable */
     def dereferenceVariable(f: String): IJExpression = {
-        fieldLookup(f) match {
-            case GlobalFieldInfo(_) => JExpr._this().ref(f)
-            case StateSpecificFieldInfo(_, getFunc, _) => JExpr.invoke(getFunc)
+        (currentStateName, fieldLookup(f)) match {
+            /* same note in [assignVariable] above applies here as well */
+            case (None, GlobalFieldInfo(_)) => JExpr._this().ref(f)
+            case (Some(_), GlobalFieldInfo(_)) => contractClass.staticRef("this").ref(f)
+            case (_, StateSpecificFieldInfo(_, getFunc, _)) => JExpr.invoke(getFunc)
         }
     }
 
