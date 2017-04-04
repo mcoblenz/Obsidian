@@ -13,6 +13,14 @@
     <orderEntry type="library" name="org.scalatest:scalatest_2.11:3.0.1" level="project" />
     <orderEntry type="library" name="scala-sdk-2.11.8" level="project" />
     <orderEntry type="library" name="scala-sdk-2.11.8" level="application" />
-    <orderEntry type="library" name="com.helger:jcodemodel:2.8.6" level="project" />
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/jcodemodel-3.0.0-SNAPSHOT.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
   </component>
 </module>
