@@ -155,7 +155,7 @@ object Main {
             outputJar: Path,
             bytecode: Path): Int  = {
 
-        val manifest = s"Obsidian Runtime/protobuf_manifest.mf"
+        val manifest = s"Obsidian Runtime/manifest.mf"
         val entryClass = s"edu.cmu.cs.obsidian.generated_code.$mainName"
         val jarCmd: Array[String] =
             Array("jar", "-cmfe", manifest, outputJar.toString, entryClass, "-C",
