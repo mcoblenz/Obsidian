@@ -58,7 +58,7 @@ class ChaincodeBaseServer {
             throws IOException, ClassCastException {
         Socket clientSk = serverSk.accept();
 
-        if (printDebug) System.out.println("Accepting transaction...");
+        if (printDebug) System.out.println("Accepted connection...");
 
         BufferedReader in =
                 new BufferedReader(new InputStreamReader(clientSk.getInputStream()));

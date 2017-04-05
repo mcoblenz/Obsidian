@@ -10,7 +10,8 @@ import collection.JavaConverters._
 
 
 trait Target
-case class Client() extends Target
+// We have to keep track of which contract is the main client contract because some of the imported contracts may be main contracts for server processes.
+case class Client(mainContract: Contract) extends Target
 case class Server() extends Target
 
 class CodeGen (val target: Target) {
@@ -118,7 +119,7 @@ class CodeGen (val target: Target) {
         val ast = Parser.parseFileAtPath(filename, printTokens = false)
 
         target match {
-            case Client() =>
+            case Client(_) =>
                 val program = translateProgramInPackage(ast, Util.protobufOuterClassNameForFilename(filename), programPackage)
                 val stub = translateStubProgram(ast, programPackage, contractNameResolutionMap, protobufOuterClassNames)
 
@@ -264,8 +265,7 @@ class CodeGen (val target: Target) {
             val unmarshalledArg = argExpressions(i)
 
             val marshalledArg = marshallExpr(unmarshalledArg, transaction.args(i).typ)
-            val setInvocation = body.invoke(argArray, "set")
-            setInvocation.arg(JExpr.lit(i))
+            val setInvocation = body.invoke(argArray, "add")
             setInvocation.arg(marshalledArg)
         }
 
@@ -635,24 +635,29 @@ class CodeGen (val target: Target) {
                                        contractNameResolutionMap: Map[Contract, String],
                                        protobufOuterClassNames: Map[String, String]) = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
-        if (target == Client() && aContract.mod.contains(IsMain)) {
-            newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
-            generateClientMainMethod(newClass)
-            generateInvokeClientMainMethod(aContract, newClass)
-        }
 
         val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
         translateContract(aContract, newClass, translationContext)
 
-        /* We need to generate special methods for the main contract to align
-         * with the Hyperledger chaincode format */
-        if (target == Server() && aContract.mod.contains(IsMain)) {
-            generateMainServerClassMethods(newClass, translationContext)
-        }
 
-        /* Generate serialization code */
-        if (target == Server() || !aContract.mod.contains(IsMain)) {
-            generateSerialization(aContract, newClass, translationContext)
+        target match {
+            case Client(mainContract) =>
+                if (aContract == mainContract) {
+                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
+                    generateClientMainMethod(newClass)
+                    generateInvokeClientMainMethod(aContract, newClass)
+                }
+                else {
+                    generateSerialization(aContract, newClass, translationContext)
+                }
+            case Server() =>
+                if (aContract.mod.contains(IsMain)) {
+                    /* We need to generate special methods for the main contract to align */
+                    /* with the Hyperledger chaincode format */
+                    generateMainServerClassMethods(newClass, translationContext)
+
+                }
+                generateSerialization(aContract, newClass, translationContext)
         }
     }
 
@@ -836,15 +841,33 @@ class CodeGen (val target: Target) {
         invocation.arg(args)
     }
 
-    // The "invokeClientMain" method is called from delegatedMain.
-    // invokeClientMain should establish the server connection, construct a stub according to the type of the client's main(),
-    // and pass it to the client's main() method.
+    /* The "invokeClientMain" method is called from delegatedMain.
+     * invokeClientMain can assume the server is already connected.
+     * It should construct a stub according to the type of the client's main(),
+     * and pass it to the client's main() method.
+    */
     private def generateInvokeClientMainMethod(aContract: Contract, newClass: JDefinedClass) = {
         val method = newClass.method(JMod.PUBLIC, model.VOID, "invokeClientMain")
-        //val writer = method.param(model.ref("org.json.JSONWriter"), "jsonWriter")
-        //val tokener = method.param(model.ref("org.json.JSONTokener"), "jsonTokener")
+        method._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
 
+        val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
+                                                                  .asInstanceOf[Option[Transaction]]
 
+        if (mainTransactionOption.isEmpty) {
+            println("Error: can't find main transaction in main contract " + aContract.name)
+        }
+        else {
+            val mainTransaction: Transaction = mainTransactionOption.get
+
+            // The main transaction expects to be passed a stub of a particular type. Construct it.
+            val stubType: Type= mainTransaction.args(0).typ
+            val stubJavaType = resolveType(stubType)
+            val newStubExpr = JExpr._new(stubJavaType)
+            newStubExpr.arg(JExpr.ref("connectionManager"))
+            val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
+            val clientMainInvocation = method.body.invoke("main")
+            clientMainInvocation.arg(stubVariable)
+        }
 
     }
 
@@ -1367,8 +1390,29 @@ class CodeGen (val target: Target) {
         }
     }
 
+    private def fieldInitializerForType(typ: Type): Option[IJExpression] = {
+        typ match {
+            case IntType() =>
+                val newInt =
+                    model.ref("java.math.BigInteger").staticInvoke("valueOf")
+                val _ = newInt.arg(0)
+                Some(newInt)
+            case BoolType() =>
+                Some(JExpr.lit(false))
+            case StringType() =>
+                Some(JExpr.lit(""))
+            case NonPrimitiveType(mod, name) => None
+        }
+    }
+
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
-        newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
+        val initializer = fieldInitializerForType(decl.typ)
+        if (initializer.isDefined) {
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName, initializer.get)
+        }
+        else {
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
+        }
     }
 
     private def addArgs(inv: JInvocation,
@@ -1497,9 +1541,14 @@ class CodeGen (val target: Target) {
             case None => model.VOID
         }
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name)
-        if (target == Client() && decl.name.equals("main")) {
-            meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+        target match {
+            case Client(mainContract) =>
+                if ((translationContext.contract == mainContract) && decl.name.equals("main")) {
+                    meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+            }
+            case _ =>
         }
+
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
