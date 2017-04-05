@@ -97,12 +97,11 @@ object Main {
     }
 
     def findMainContractName(prog: Program): String = {
-        for (aContract <- prog.contracts) {
-            if (aContract.mod.contains(IsMain)) {
-                return aContract.name
-            }
+        val mainContractOption = findMainContract(prog)
+        if (mainContractOption.isEmpty) {
+            throw new RuntimeException("No main contract found")
         }
-        throw new RuntimeException("No main contract found")
+        return mainContractOption.get.name
     }
 
     def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
@@ -110,8 +109,17 @@ object Main {
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
+    def findMainContract(ast: Program): Option[Contract] = {
+        ast.contracts.find((c: Contract) => c.mod.contains(IsMain))
+    }
+
     def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
-        val codeGen = new CodeGen(Client())
+        // Client programs must have a main contract.
+        val mainContractOption = findMainContract(ast)
+        if (mainContractOption.isEmpty) {
+            throw new RuntimeException("No main contract found")
+        }
+        val codeGen = new CodeGen(Client(mainContractOption.get))
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 

@@ -10,7 +10,7 @@ import java.net.Socket;
  */
 public abstract class ChaincodeClientBase extends ChaincodeClientStub {
 
-    public abstract void invokeClientMain() throws java.io.IOException;
+    public abstract void invokeClientMain() throws java.io.IOException, ChaincodeClientAbortTransactionException;
 
 
     public void delegatedMain (String args[]) {
@@ -50,7 +50,7 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
             java.io.PrintWriter socketWriter = new java.io.PrintWriter(socket.getOutputStream());
             JSONWriter jsonWriter = new JSONWriter(socketWriter);
             JSONTokener jsonTokener = new JSONTokener(socket.getInputStream());
-            connectionManager = new ChaincodeClientConnectionManager(jsonWriter, jsonTokener);
+            connectionManager = new ChaincodeClientConnectionManager(socketWriter, jsonWriter, jsonTokener);
         }
         catch (java.io.IOException e) {
             System.err.println("Error: failed to connect to " + addressString + ":" + port);
@@ -64,10 +64,12 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
                 socket.close();
             }
         }
-
         catch (java.io.IOException e) {
             System.err.println("Error: failed to write data to server: " + e);
             System.exit(1);
+        }
+        catch (ChaincodeClientAbortTransactionException e) {
+            System.err.println("Transaction aborted: " + e);
         }
     }
 }
