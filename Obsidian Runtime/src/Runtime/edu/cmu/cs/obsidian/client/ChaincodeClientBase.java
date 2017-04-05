@@ -42,8 +42,9 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
             System.exit(1);
         }
 
+        Socket socket = null;
         try {
-            Socket socket = new Socket(addressString, port);
+            socket = new Socket(addressString, port);
 
             assert (socket.isConnected());
             java.io.PrintWriter socketWriter = new java.io.PrintWriter(socket.getOutputStream());
@@ -59,6 +60,9 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
         try {
             // We need to invoke the client's main() transaction.
             invokeClientMain();
+            if (socket != null) {
+                socket.close();
+            }
         }
 
         catch (java.io.IOException e) {
