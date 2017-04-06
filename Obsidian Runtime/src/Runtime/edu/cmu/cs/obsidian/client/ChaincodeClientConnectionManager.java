@@ -6,17 +6,18 @@ import org.json.JSONWriter;
 
 import java.util.ArrayList;
 import java.util.Base64;
+import java.io.*;
 
 /**
  * Created by mcoblenz on 4/3/17.
  */
 public class ChaincodeClientConnectionManager {
-    protected JSONWriter jsonWriter;
-    protected JSONTokener jsonTokener;
+    protected Writer underlyingWriter;
+    protected Reader underlyingReader;
 
-    public ChaincodeClientConnectionManager(JSONWriter jsonWriter, JSONTokener jsonTokener) {
-        this.jsonWriter = jsonWriter;
-        this.jsonTokener = jsonTokener;
+    public ChaincodeClientConnectionManager(Writer w, Reader r) {
+        this.underlyingWriter = w;
+        this.underlyingReader = r;
     }
 
     public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, boolean returnsNonvoid)
@@ -24,6 +25,9 @@ public class ChaincodeClientConnectionManager {
                 ChaincodeClientTransactionFailedException,
                 ChaincodeClientTransactionBugException
     {
+        JSONWriter jsonWriter = new JSONWriter(underlyingWriter);
+        System.out.println("doTransaction: " + transactionName);
+        jsonWriter.object(); // outer object for whole message
         jsonWriter.key("jsonrpc");
         jsonWriter.value("2.0");
 
@@ -33,27 +37,48 @@ public class ChaincodeClientConnectionManager {
         // params
         jsonWriter.key("params");
         jsonWriter.object();
-        jsonWriter.key("ctorMsg");
-        jsonWriter.object();
-        jsonWriter.key("function");
-        jsonWriter.value(transactionName);
-        jsonWriter.key("args");
-        jsonWriter.array();
+            jsonWriter.key("ctorMsg");
+            jsonWriter.object();
+                jsonWriter.key("function");
+                jsonWriter.value(transactionName);
+                jsonWriter.key("args");
+                jsonWriter.array();
 
-        for (int i = 0; i < args.size(); i++) {
-            jsonWriter.value(args.get(i));
-        }
-        jsonWriter.endArray(); // args
-        jsonWriter.endObject(); // ctorMsg
+                    for (int i = 0; i < args.size(); i++) {
+                        byte[] bytes = args.get(i);
+                        String byteString = Base64.getEncoder().encodeToString(bytes);
+                        jsonWriter.value(byteString);
+                    }
+                jsonWriter.endArray(); // args
+            jsonWriter.endObject(); // ctorMsg
+        jsonWriter.endObject(); // params
 
+        jsonWriter.endObject(); // outer object
+        underlyingWriter.write(jsonWriter.toString());
+        underlyingWriter.flush();
+
+        JSONTokener jsonTokener = new JSONTokener(underlyingReader);
         Object reply = jsonTokener.nextValue();
         System.out.println("Received from server: " + reply);
+
         if (reply instanceof JSONObject) {
             JSONObject jsonReply = (JSONObject)reply;
-            Object statusReply = jsonReply.get("status");
-            if (statusReply instanceof String) {
-                if (!((String)statusReply).equals("OK")) {
+            Object resultReply = jsonReply.get("result");
+            if (resultReply instanceof JSONObject) {
+                JSONObject resultJSONObject = (JSONObject)resultReply;
+                String statusReply = resultJSONObject.getString("status");
+                if (!statusReply.equals("OK")) {
                     throw new ChaincodeClientTransactionFailedException();
+                }
+
+                if (returnsNonvoid) {
+                    Object messageReply = resultJSONObject.get("message");
+                    if (messageReply instanceof String) {
+                        return Base64.getDecoder().decode((String)messageReply);
+                    } else {
+                        // bad status type
+                        throw new ChaincodeClientTransactionBugException();
+                    }
                 }
             }
             else {
@@ -61,15 +86,7 @@ public class ChaincodeClientConnectionManager {
                 throw new ChaincodeClientTransactionBugException();
             }
 
-            if (returnsNonvoid) {
-                Object messageReply = jsonReply.get("message");
-                if (messageReply instanceof String) {
-                    return Base64.getDecoder().decode((String)messageReply);
-                } else {
-                    // bad status type
-                    throw new ChaincodeClientTransactionBugException();
-                }
-            }
+
         } else {
             // bad status type
             throw new ChaincodeClientTransactionBugException();

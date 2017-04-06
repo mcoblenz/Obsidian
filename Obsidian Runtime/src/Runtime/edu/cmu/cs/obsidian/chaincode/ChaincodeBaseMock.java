@@ -61,24 +61,58 @@ class ChaincodeBaseServer {
      */
 
     /* Waits for a request and then runs a transaction based on the request.
-     * Throws [IOException] when there's a networking error.
      * Throws [ClassCastException] when the request in incorrectly formatted,
      * i.e. json parsing doesn't work as expected */
     private void handleRequest(ServerSocket serverSk)
-            throws IOException, ClassCastException {
-        Socket clientSk = serverSk.accept();
+            throws ClassCastException {
+        Socket clientSk = null;
+        try {
+            clientSk = serverSk.accept();
+        }
+        catch (IOException e) {
+            // If the client failed to establish a connection, drop this request.
+            return;
+        }
 
-        if (printDebug) System.out.println("Accepting transaction...");
+        if (printDebug) System.out.println("Accepted connection...");
+
+        boolean anotherTransaction = true;
+        while (!clientSk.isClosed() && anotherTransaction) {
+            try {
+                anotherTransaction = processTransaction(clientSk);
+            }
+            catch (IOException e) {
+                // Bail.
+                try {
+                    clientSk.close();
+                    return;
+                }
+                catch (IOException e2) {
+                    // Nothing to do.
+                }
+                return;
+            }
+        }
+    }
+
+    // returns true iff we should process another transaction from this client.
+    private boolean processTransaction(Socket clientSk)
+            throws IOException, ClassCastException
+    {
 
         BufferedReader in =
                 new BufferedReader(new InputStreamReader(clientSk.getInputStream()));
         OutputStreamWriter out = new OutputStreamWriter(clientSk.getOutputStream());
 
         JSONTokener tokener = new JSONTokener(in);
+        if (!tokener.more()) {
+            // The client has sent an EOF, so we're done.
+            return false;
+        }
+
         JSONObject root = new JSONObject(tokener);
 
-        if (printDebug) System.out.println("Received JSON:\n" + root.toString());
-
+        if (printDebug) System.out.println("Received transaction request. JSON:\n" + root.toString());
         String method = root.getString("method");
         JSONArray txArgsJson = root.getJSONObject("params")
                 .getJSONObject("ctorMsg")
@@ -141,7 +175,7 @@ class ChaincodeBaseServer {
         }
 
         if (printDebug) System.out.println("Transaction completed");
-        clientSk.close();
+        return true;
     }
 
     /* this ought to never return under normal conditions: it accepts connections
@@ -227,7 +261,7 @@ public abstract class ChaincodeBaseMock {
             new ChaincodeBaseServer(port, this, printDebug).start();
         }
         catch (IOException e) {
-            System.out.println("Error: IOException raised when running server");
+            System.out.println("Error: IOException raised when running server: " + e);
             System.exit(1);
         }
     }

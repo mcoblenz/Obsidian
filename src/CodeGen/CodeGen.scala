@@ -10,7 +10,8 @@ import collection.JavaConverters._
 
 
 trait Target
-case class Client() extends Target
+// We have to keep track of which contract is the main client contract because some of the imported contracts may be main contracts for server processes.
+case class Client(mainContract: Contract) extends Target
 case class Server() extends Target
 
 class CodeGen (val target: Target) {
@@ -86,7 +87,7 @@ class CodeGen (val target: Target) {
 
 
         for (imp <- program.imports) {
-            translateImport(programPackage, imp, contractNameResolutionMap, protobufOuterClassNames)
+            translateImport(programPackage, imp)
         }
 
         for (c <- program.contracts) {
@@ -108,83 +109,48 @@ class CodeGen (val target: Target) {
     }
 
 
-    private def translateImport(programPackage: JPackage,
-                                imp: Import,
-                                contractNameResolutionMap: Map[Contract, String],
-                                protobufOuterClassNames: Map[String, String]): Unit = {
+    private def translateImport(programPackage: JPackage, imp: Import): Unit = {
         // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
         val filename = imp.name;
 
         val ast = Parser.parseFileAtPath(filename, printTokens = false)
 
         target match {
-            case Client() =>
+            case Client(_) =>
                 val program = translateProgramInPackage(ast, Util.protobufOuterClassNameForFilename(filename), programPackage)
-                val stub = translateStubProgram(ast, programPackage, contractNameResolutionMap, protobufOuterClassNames)
+                val stub = translateStubProgram(ast, programPackage)
 
             case Server() => assert(false, "imports not yet supported in servers") // TODO
         }
     }
 
-    private def translateStubProgram(program: Program,
-                                     programPackage: JPackage,
-                                     contractNameResolutionMap: Map[Contract, String],
-                                     protobufOuterClassNames: Map[String, String]): Unit = {
+    private def translateStubProgram(program: Program, programPackage: JPackage): Unit = {
         // TODO: support imports in programs to be translated as stubs
         assert(program.imports.isEmpty, "imports in imported contracts are not yet supported");
 
         for (contract <- program.contracts) {
-            translateStubContract(contract, programPackage, contractNameResolutionMap, protobufOuterClassNames)
+            translateStubContract(contract, programPackage)
         }
     }
 
-    private def classNameForStub(contractName: String) = {
-        contractName + "__Stub__"
-    }
-
-    private def translateStubContract(contract: Contract,
-                                      programPackage: JPackage,
-                                      contractNameResolutionMap: Map[Contract, String],
-                                      protobufOuterClassNames: Map[String, String]): Unit = {
-        var contractClass = programPackage._class(JMod.PUBLIC, classNameForStub(contract.name))
-        contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
-
-        val constructor = contractClass.constructor(JMod.PUBLIC)
-        val param = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
-        val superConstructorInvocation = constructor.body().invoke("super")
-        superConstructorInvocation.arg(param)
-
-        val stubTranslationContext = makeTranslationContext(contract, contractClass, contractNameResolutionMap, protobufOuterClassNames, true)
-
+    private def translateStubContract(contract: Contract, programPackage: JPackage): Unit = {
+        var contractClass = programPackage._class(JMod.PUBLIC, contract.name + "__Stub__")
 
         for (decl <- contract.declarations) {
-            translateStubDeclaration(decl, contractClass, stubTranslationContext)
+            translateStubDeclaration(decl, contractClass)
         }
     }
 
-    private def translateStubDeclaration(decl: Declaration, inClass: JDefinedClass, translationContext: TranslationContext) : Unit = {
+    private def translateStubDeclaration(decl: Declaration, inClass: JDefinedClass) : Unit = {
         decl match {
             case TypeDecl(_, _) => assert(false, "unsupported"); // TODO
-            case f@Field(_, _) => translateStubField(f, inClass, translationContext)
+            case Field(_, _) => // Fields aren't translated because they shouldn't be accessed directly.
             case Constructor(name, args, body) => // Constructors aren't translated becuase stubs are only for remote instances.
             case f@Func(name, args, retType, body) => translateStubFunction(f, inClass)
-            case t@Transaction(_, _, _, _) => translateStubTransaction(t, inClass, translationContext)
+            case t@Transaction(_, _, _, _) => translateStubTransaction(t, inClass)
             case s@State(_, _) => translateStubState(s, inClass)
-            case c@Contract(mod, name, decls) => translateStubContract(c,
-                inClass.getPackage(),
-                translationContext.contractNameResolutionMap,
-                translationContext.protobufOuterClassNames)
+            case c@Contract(mod, name, decls) => translateStubContract(c, inClass.getPackage())
         }
-    }
-
-    private def translateStubField(decl: Field, newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
-        // In a stub, every non-primitive field is also a stub, so we need to make the field of appropriate type for that.
-        // Primitive fields will not map to anything; instead, their accesses will translate to remote calls.
-        val remoteFieldType = decl.typ match {
-            case n@NonPrimitiveType(modifiers, name) => if (!modifiers.contains(IsRemote)) NonPrimitiveType((modifiers :+ IsRemote), name) else n
-            case o@_ => o
-        }
-        newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.fieldName)
     }
 
     private def translateStubFunction(f: Func, inClass: JDefinedClass) : Unit = {
@@ -264,8 +230,7 @@ class CodeGen (val target: Target) {
             val unmarshalledArg = argExpressions(i)
 
             val marshalledArg = marshallExpr(unmarshalledArg, transaction.args(i).typ)
-            val setInvocation = body.invoke(argArray, "set")
-            setInvocation.arg(JExpr.lit(i))
+            val setInvocation = body.invoke(argArray, "add")
             setInvocation.arg(marshalledArg)
         }
 
@@ -417,18 +382,20 @@ class CodeGen (val target: Target) {
     private def makeDeclarationLookupTables(
                     contract: Contract,
                     stateLookup: Map[String, StateContext],
-                    newClass: JDefinedClass,
-                    generateStub: Boolean):
+                    newClass: JDefinedClass):
                         (Map[String, FieldInfo], Map[String, TransactionInfo], Map[String, FuncInfo]) = {
 
-        /* collect all declarations of any type that are particular to a state: each declaration
-         * is paired with the state it is defined in */
+        /* this collects all declarations (fields, transactions, etc.) that are made
+         * _in a particular state's scope_ (rather than the contract's scope as a whole).
+         * Each declaration is paired with the [State] object it is defined in. */
         val declarations = contract.declarations
+                // look in all the states of the contract 
                 .filter(_.isInstanceOf[State])
                 .map(_.asInstanceOf[State])
+                // make a big, flat list that has all the pairs (s: State, d: Declaration)
                 .flatMap((s: State) => s.declarations.zip(List.fill(s.declarations.size)(s)))
 
-        /* collect all declarations by specific type */
+        /* sorts declarations by type (fields only, functions only, etc.) */
         val fields = declarations.filter(_._1.isInstanceOf[Field])
                                  .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Field]))
         val txs = declarations.filter(_._1.isInstanceOf[Transaction])
@@ -436,7 +403,7 @@ class CodeGen (val target: Target) {
         val funs = declarations.filter(_._1.isInstanceOf[Func])
                                .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Func]))
 
-        /* splits items in [ts] into groups based on equality of the result of applying [f] */
+        /* this splits items in the input list into groups based on equality of the result of applying [f] */
         def generalizedPartition[T, S](ts: List[T], f: Function[T, S]): immutable.HashMap[S, Seq[T]] = {
             ts match {
                 case h :: rest =>
@@ -446,34 +413,29 @@ class CodeGen (val target: Target) {
             }
         }
 
-        /* group declarations by name: this requires declarations with the same name to have the same type */
-        if (generateStub) {
-            (Map.empty, Map.empty, Map.empty)
-        }
-        else {
-            val fieldInfoFunc = makeFieldInfo(newClass, stateLookup) _
-            val transactionInfoFunc = makeTransactionInfo(newClass, stateLookup) _
-            val functionInfoFunc = makeFuncInfo(newClass, stateLookup) _
+        /* uses the above function to group fields/txs/functions by name.
+         * e.g. If two fields have the same name but are defined in different states, we group them
+         * together in the lookup table, because conceptually they are the same declaration.
+         * For each grouped declaration, we call the makeInfo functions (see above) to setup the
+         * the lookup tables in the desired format */
+        var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.fieldName)
+                                .transform(makeFieldInfo(newClass, stateLookup))
+        var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name)
+                                .transform(makeTransactionInfo(newClass, stateLookup))
+        var funLookup = generalizedPartition[(State, Func), String](funs.toList, _._2.name)
+                                .transform(makeFuncInfo(newClass, stateLookup))
 
-            var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.fieldName)
-                .transform(fieldInfoFunc)
-            var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name)
-                .transform(transactionInfoFunc)
-            var funLookup = generalizedPartition[(State, Func), String](funs.toList, _._2.name)
-                .transform(functionInfoFunc)
-
-            /* add on any whole-contract declarations */
-            for (decl <- contract.declarations) {
-                decl match {
-                    case f@Field(_, fieldName) => fieldLookup = fieldLookup.updated(fieldName, GlobalFieldInfo(f))
-                    case t@Transaction(name, _, _, _) => txLookup = txLookup.updated(name, GlobalTransactionInfo(t))
-                    case f@Func(name, _, _, _) => funLookup = funLookup.updated(name, GlobalFuncInfo(f))
-                    case _ => ()
-                }
+        /* add on any whole-contract declarations */
+        for (decl <- contract.declarations) {
+            decl match {
+                case f@Field(_, fieldName) => fieldLookup = fieldLookup.updated(fieldName, GlobalFieldInfo(f))
+                case t@Transaction(name, _, _, _) => txLookup = txLookup.updated(name, GlobalTransactionInfo(t))
+                case f@Func(name, _, _, _) => funLookup = funLookup.updated(name, GlobalFuncInfo(f))
+                case _ => ()
             }
-
-            (fieldLookup, txLookup, funLookup)
         }
+
+        (fieldLookup, txLookup, funLookup)
     }
 
     /* factors out shared functionality for translate[Outer|Inner]Contract.
@@ -482,8 +444,7 @@ class CodeGen (val target: Target) {
                                           aContract: Contract,
                                           newClass: JDefinedClass,
                                           contractNameResolutionMap: Map[Contract, String],
-                                          protobufOuterClassNames: Map[String, String],
-                                          generateStub: Boolean
+                                          protobufOuterClassNames: Map[String, String]
                                       ): TranslationContext = {
 
         /* if we're not in the main contract, we need to ensure there's an empty constructor.
@@ -540,7 +501,7 @@ class CodeGen (val target: Target) {
         }
 
         /* setup tx/fun/field lookup tables */
-        val (fieldLookup, txLookup, funLookup) = makeDeclarationLookupTables(aContract, stateLookup, newClass, generateStub)
+        val (fieldLookup, txLookup, funLookup) = makeDeclarationLookupTables(aContract, stateLookup, newClass)
 
         /* setup the TranslationContext */
         val translationContext = TranslationContext(
@@ -623,24 +584,29 @@ class CodeGen (val target: Target) {
                                        contractNameResolutionMap: Map[Contract, String],
                                        protobufOuterClassNames: Map[String, String]) = {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
-        if (target == Client() && aContract.mod.contains(IsMain)) {
-            newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
-            generateClientMainMethod(newClass)
-            generateInvokeClientMainMethod(aContract, newClass)
-        }
 
-        val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
+        val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames)
         translateContract(aContract, newClass, translationContext)
 
-        /* We need to generate special methods for the main contract to align
-         * with the Hyperledger chaincode format */
-        if (target == Server() && aContract.mod.contains(IsMain)) {
-            generateMainServerClassMethods(newClass, translationContext)
-        }
 
-        /* Generate serialization code */
-        if (target == Server() || !aContract.mod.contains(IsMain)) {
-            generateSerialization(aContract, newClass, translationContext)
+        target match {
+            case Client(mainContract) =>
+                if (aContract == mainContract) {
+                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
+                    generateClientMainMethod(newClass)
+                    generateInvokeClientMainMethod(aContract, newClass)
+                }
+                else {
+                    generateSerialization(aContract, newClass, translationContext)
+                }
+            case Server() =>
+                if (aContract.mod.contains(IsMain)) {
+                    /* We need to generate special methods for the main contract to align */
+                    /* with the Hyperledger chaincode format */
+                    generateMainServerClassMethods(newClass, translationContext)
+
+                }
+                generateSerialization(aContract, newClass, translationContext)
         }
     }
 
@@ -754,7 +720,7 @@ class CodeGen (val target: Target) {
                         resolveType(txArg.typ),
                         txArg.varName,
                         JExpr._new(resolveType(txArg.typ)))
-                    stateCondBody.invoke(newTxArg, "__initFromArchiveBytes")
+                    stateCondBody.invoke(newTxArg, "initFromArchiveBytes")
                         .arg(runArgs.component(JExpr.lit(runArgNumber)))
                 }
                 txArgsList = newTxArg :: txArgsList
@@ -813,17 +779,33 @@ class CodeGen (val target: Target) {
         invocation.arg(args)
     }
 
-    // The "invokeClientMain" method is called from delegatedMain.
-    // invokeClientMain should establish the server connection, construct a stub according to the type of the client's main(),
-    // and pass it to the client's main() method.
+    /* The "invokeClientMain" method is called from delegatedMain.
+     * invokeClientMain can assume the server is already connected.
+     * It should construct a stub according to the type of the client's main(),
+     * and pass it to the client's main() method.
+    */
     private def generateInvokeClientMainMethod(aContract: Contract, newClass: JDefinedClass) = {
         val method = newClass.method(JMod.PUBLIC, model.VOID, "invokeClientMain")
-        //val writer = method.param(model.ref("org.json.JSONWriter"), "jsonWriter")
-        //val tokener = method.param(model.ref("org.json.JSONTokener"), "jsonTokener")
+        method._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
 
+        val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
+                                                                  .asInstanceOf[Option[Transaction]]
 
+        if (mainTransactionOption.isEmpty) {
+            println("Error: can't find main transaction in main contract " + aContract.name)
+        }
+        else {
+            val mainTransaction: Transaction = mainTransactionOption.get
 
-    }
+            // The main transaction expects to be passed a stub of a particular type. Construct it.
+            val stubType: Type= mainTransaction.args(0).typ
+            val stubJavaType = resolveType(stubType)
+            val newStubExpr = JExpr._new(stubJavaType)
+            newStubExpr.arg(JExpr.ref("connectionManager"))
+            val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
+            val clientMainInvocation = method.body.invoke("main")
+            clientMainInvocation.arg(stubVariable)
+        }
 
     private def generateSerialization(
                     contract: Contract,
@@ -1018,9 +1000,9 @@ class CodeGen (val target: Target) {
     }
 
 
-    // Generates a method, __archiveBytes(), which outputs a string in protobuf format.
+    // Generates a method, archiveBytes(), which outputs a string in protobuf format.
     private def generateSerializer(contract: Contract, inClass: JDefinedClass): Unit = {
-        val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__archiveBytes")
+        val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "archiveBytes")
 
         val archiveBody = archiveMethod.body()
 
@@ -1101,11 +1083,10 @@ class CodeGen (val target: Target) {
         val archive = fromArchiveMeth.param(archiveType, "archive")
         val fromArchiveBody = fromArchiveMeth.body()
 
-        /* [__initFromArchiveBytes] declaration: this just parses the archive and
+        /* [initFromArchiveBytes] declaration: this just parses the archive and
          * calls [initFromArchive] */
         val fromBytesMeth =
-            stateClass.method(JMod.PUBLIC, stateClass, "__initFromArchiveBytes")
-
+            stateClass.method(JMod.PUBLIC, model.VOID, "initFromArchiveBytes")
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         fromBytesMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
@@ -1125,14 +1106,12 @@ class CodeGen (val target: Target) {
             val javaFieldVar = stateClass.fields().get(field.fieldName)
             generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, translationContext, contract)
         }
-
-        fromBytesBody._return(JExpr._this())
     }
 
-    /* generates the method [__initFromArchiveBytes] and [initFromArchive];
+    /* generates the method [initFromArchiveBytes] and [initFromArchive];
      * these methods load the recipient class from a protobuf message in the
      * form of raw bytes and a java message protobuf object, respectively.
-     * Overrides __initFromArchiveBytes() in superclass if this is the main contract */
+     * Overrides initFromArchiveBytes() in superclass if this is the main contract */
     private def generateArchiveInitializer(
                     contract: Contract,
                     newClass: JDefinedClass,
@@ -1145,10 +1124,10 @@ class CodeGen (val target: Target) {
         val archive = fromArchiveMeth.param(archiveType, "archive")
         val fromArchiveBody = fromArchiveMeth.body()
 
-        /* [__initFromArchiveBytes] declaration: this just parses the archive and
+        /* [initFromArchiveBytes] declaration: this just parses the archive and
          * calls [initFromArchive] */
         val fromBytesMeth =
-            newClass.method(JMod.PUBLIC, newClass, "__initFromArchiveBytes")
+            newClass.method(JMod.PUBLIC, model.VOID, "initFromArchiveBytes")
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         fromBytesMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
@@ -1158,7 +1137,7 @@ class CodeGen (val target: Target) {
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
         fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
-        fromBytesBody._return(JExpr._this())
+
 
         /* [initFromArchive] does most of the grunt work of mapping the protobuf message to
          * fields of the class: the following code does this */
@@ -1266,7 +1245,7 @@ class CodeGen (val target: Target) {
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
             case NonPrimitiveType(_, "address") => model.directClass("java.math.BigInteger")
-            case NonPrimitiveType(modifiers, name) => if (modifiers.contains(IsRemote)) model.ref(classNameForStub(name)) else model.ref(name)
+            case NonPrimitiveType(_, name) => model.ref(name)
         }
     }
 
@@ -1324,8 +1303,29 @@ class CodeGen (val target: Target) {
         }
     }
 
+    private def fieldInitializerForType(typ: Type): Option[IJExpression] = {
+        typ match {
+            case IntType() =>
+                val newInt =
+                    model.ref("java.math.BigInteger").staticInvoke("valueOf")
+                val _ = newInt.arg(0)
+                Some(newInt)
+            case BoolType() =>
+                Some(JExpr.lit(false))
+            case StringType() =>
+                Some(JExpr.lit(""))
+            case NonPrimitiveType(mod, name) => None
+        }
+    }
+
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
-        newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
+        val initializer = fieldInitializerForType(decl.typ)
+        if (initializer.isDefined) {
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName, initializer.get)
+        }
+        else {
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
+        }
     }
 
     private def addArgs(inv: JInvocation,
@@ -1454,8 +1454,13 @@ class CodeGen (val target: Target) {
             case None => model.VOID
         }
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name)
-        if (target == Client() && decl.name.equals("main")) {
-            meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+
+      target match {
+            case Client(mainContract) =>
+                if ((translationContext.contract == mainContract) && decl.name.equals("main")) {
+                    meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+            }
+            case _ =>
         }
 
         /* add args to method and collect them in a list */
