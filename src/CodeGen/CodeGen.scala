@@ -311,6 +311,10 @@ class CodeGen (val target: Target) {
         // TODO
     }
 
+
+    /* the make_X_Info functions setup necessary helper methods for a state-specific declaration
+     * (i.e. defined in some states but not in the entire contract) of type X */
+
     def makeFieldInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
                      (name: String, declSeq: Seq[(State, Field)]): FieldInfo = {
         val fieldType = resolveType(declSeq.head._2.typ)
@@ -421,14 +425,17 @@ class CodeGen (val target: Target) {
                     generateStub: Boolean):
                         (Map[String, FieldInfo], Map[String, TransactionInfo], Map[String, FuncInfo]) = {
 
-        /* collect all declarations of any type that are particular to a state: each declaration
-         * is paired with the state it is defined in */
+        /* collect all declarations (fields, functions, transactions) that are particular
+         * to a state.
+         * Each declaration is also paired with the state it is defined in */
         val declarations = contract.declarations
+                // look in all the states of the contract
                 .filter(_.isInstanceOf[State])
                 .map(_.asInstanceOf[State])
+                // make a big, flat list of pains (d: Declaration, s: State)
                 .flatMap((s: State) => s.declarations.zip(List.fill(s.declarations.size)(s)))
 
-        /* collect all declarations by specific type */
+        /* separate declarations by their type */
         val fields = declarations.filter(_._1.isInstanceOf[Field])
                                  .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Field]))
         val txs = declarations.filter(_._1.isInstanceOf[Transaction])
@@ -446,15 +453,20 @@ class CodeGen (val target: Target) {
             }
         }
 
-        /* group declarations by name: this requires declarations with the same name to have the same type */
         if (generateStub) {
             (Map.empty, Map.empty, Map.empty)
         }
         else {
+
             val fieldInfoFunc = makeFieldInfo(newClass, stateLookup) _
             val transactionInfoFunc = makeTransactionInfo(newClass, stateLookup) _
             val functionInfoFunc = makeFuncInfo(newClass, stateLookup) _
 
+            /* this uses the above helper function to group declarations by name. Conceptually, if we
+            * define field "f" in states "S1" and "S2", it is one declaration that specifies multiple
+            * states, rather than two distinct declarations.
+            * For each grouped declaration, the corresponding makeInfo function is called to setup
+            * the necessary information for the table */
             var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.fieldName)
                 .transform(fieldInfoFunc)
             var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name)
@@ -462,7 +474,7 @@ class CodeGen (val target: Target) {
             var funLookup = generalizedPartition[(State, Func), String](funs.toList, _._2.name)
                 .transform(functionInfoFunc)
 
-            /* add on any whole-contract declarations */
+            /* add on any whole-contract declarations to the lookup table: these are fairly simple */
             for (decl <- contract.declarations) {
                 decl match {
                     case f@Field(_, fieldName) => fieldLookup = fieldLookup.updated(fieldName, GlobalFieldInfo(f))
