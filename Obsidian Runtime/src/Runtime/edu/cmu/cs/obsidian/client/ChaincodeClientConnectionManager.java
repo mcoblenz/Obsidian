@@ -13,13 +13,11 @@ import java.io.*;
  */
 public class ChaincodeClientConnectionManager {
     protected Writer underlyingWriter;
-    protected JSONWriter jsonWriter;
-    protected JSONTokener jsonTokener;
+    protected Reader underlyingReader;
 
-    public ChaincodeClientConnectionManager(Writer w, JSONWriter jsonWriter, JSONTokener jsonTokener) {
+    public ChaincodeClientConnectionManager(Writer w, Reader r) {
         this.underlyingWriter = w;
-        this.jsonWriter = jsonWriter;
-        this.jsonTokener = jsonTokener;
+        this.underlyingReader = r;
     }
 
     public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, boolean returnsNonvoid)
@@ -27,6 +25,7 @@ public class ChaincodeClientConnectionManager {
                 ChaincodeClientTransactionFailedException,
                 ChaincodeClientTransactionBugException
     {
+        JSONWriter jsonWriter = new JSONWriter(underlyingWriter);
         System.out.println("doTransaction: " + transactionName);
         jsonWriter.object(); // outer object for whole message
         jsonWriter.key("jsonrpc");
@@ -55,8 +54,10 @@ public class ChaincodeClientConnectionManager {
         jsonWriter.endObject(); // params
 
         jsonWriter.endObject(); // outer object
+        underlyingWriter.write(jsonWriter.toString());
         underlyingWriter.flush();
 
+        JSONTokener jsonTokener = new JSONTokener(underlyingReader);
         Object reply = jsonTokener.nextValue();
         System.out.println("Received from server: " + reply);
 
