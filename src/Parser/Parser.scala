@@ -93,7 +93,7 @@ object Parser extends Parsers {
         val parseVarDeclAssn =
             parseType ~ parseIdString ~ EqT() ~! parseExpr ~! SemicolonT() ^^ {
                 case typ ~ name ~ _ ~ e ~ _ =>
-                    Seq(VariableDecl(typ, name), Assignment(Variable(name), e))
+                    VariableDeclWithInit(typ, name, e)
         }
 
         val parseVarDecl =
@@ -142,7 +142,7 @@ object Parser extends Parsers {
         val seqify = (p: Parser[Statement]) => p ^^ { case a => Seq(a) }
 
         seqify(parseReturn) | seqify(parseTransition) | seqify(parseThrow) |
-        parseVarDeclAssn | seqify(parseVarDecl) | seqify(parseIf) | seqify(parseSwitch) |
+        seqify(parseVarDeclAssn) | seqify(parseVarDecl) | seqify(parseIf) | seqify(parseSwitch) |
         seqify(parseTryCatch) | seqify(parseExprFirst)
     }
 

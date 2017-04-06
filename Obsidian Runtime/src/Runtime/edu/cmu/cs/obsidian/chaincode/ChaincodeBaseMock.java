@@ -22,16 +22,6 @@ class ChaincodeBaseServer {
     private final ChaincodeBaseMock base;
     private final boolean printDebug;
 
-    /* Encoding and decoding bytes in a JSON-friendly format is necessary
-     * to send them back to the client */
-    private static String bytesToString(byte[] bytes) {
-        return Base64.getEncoder().encodeToString(bytes);
-    }
-
-    private static byte[] stringToBytes(String base64Str) {
-        return Base64.getDecoder().decode(base64Str);
-    }
-
     public ChaincodeBaseServer(int port, ChaincodeBaseMock base, boolean printDebug) {
         this.port = port;
         this.base = base;
@@ -86,10 +76,11 @@ class ChaincodeBaseServer {
 
         byte[][] txArgs = new byte[txArgsJson.length()][];
         for (int i = 0; i < txArgsJson.length(); i++) {
-            txArgs[i] = stringToBytes(txArgsJson.getString(i));
+            txArgs[i] = ChaincodeUtils.stringToBytes(txArgsJson.getString(i));
         }
 
         byte[] retBytes = new byte[0];
+        boolean abortTransaction = false;
 
         if (method.equals("deploy")) {
             if (printDebug) System.out.println("Calling constructor...");
@@ -102,7 +93,12 @@ class ChaincodeBaseServer {
                     .getString("function");
 
             if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
-            retBytes = base.run(base.stub, txName, txArgs);
+            try {
+                retBytes = base.run(base.stub, txName, txArgs);
+            }
+            catch (BadTransactionException e) {
+                abortTransaction = true;
+            }
         }
         else if (method.equals("query")) {
             /* TODO : do we support queries? */
@@ -123,8 +119,13 @@ class ChaincodeBaseServer {
 
         JSONObject retObject = new JSONObject();
         JSONObject result = new JSONObject();
-        result.put("status", "OK");
-        result.put("message", bytesToString(retBytes));
+        if (abortTransaction) {
+            result.put("status", "Failure");
+        }
+        else {
+            result.put("status", "OK");
+            result.put("message", ChaincodeUtils.bytesToString(retBytes));
+        }
         retObject.put("result", result);
 
         if (printDebug) {
@@ -234,7 +235,7 @@ public abstract class ChaincodeBaseMock {
 
     // Must be overridden in generated class.
     public abstract byte[] init(ChaincodeStubMock stub, byte[][] args);
-    public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args);
+    public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args) throws BadTransactionException;
 
     public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
