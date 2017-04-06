@@ -1,4 +1,4 @@
-name := "Obsidian_test"
+name := "Obsidian"
 
 version := "1.0"
 
