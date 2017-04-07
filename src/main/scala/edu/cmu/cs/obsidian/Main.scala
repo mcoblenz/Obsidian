@@ -1,3 +1,5 @@
+package edu.cmu.cs.obsidian
+
 import java.nio.file.{Files, Paths, Path}
 import java.io.File
 import java.util.Scanner
@@ -10,8 +12,6 @@ import edu.cmu.cs.obsidian.util._
 import com.helger.jcodemodel.JCodeModel
 
 import scala.sys.process._
-
-
 
 case class CompilerOptions (outputPath: Option[String],
                             debugPath: Option[String],
@@ -68,7 +68,7 @@ object Main {
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
                         println("Unknown option " + option)
-                        sys.exit(1)
+                        sys.exit(0)
                     }
                     else if (option.endsWith(".obs")) {
                         // This is an input file.
@@ -77,7 +77,7 @@ object Main {
                     }
                     else {
                         println("Unknown argument " + option)
-                        sys.exit(1)
+                        sys.exit(0)
                     }
             }
         }
@@ -86,7 +86,7 @@ object Main {
 
         if (inputFiles.isEmpty) {
             println("Must pass at least one file")
-            sys.exit(1)
+            sys.exit(0)
         }
 
         if (inputFiles.length > 1) {
@@ -206,7 +206,7 @@ object Main {
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
             println(usage)
-            sys.exit(1)
+            sys.exit(0)
         }
 
         val options = parseOptions(args.toList)

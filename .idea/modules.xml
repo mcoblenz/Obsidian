@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Obsidian.iml" filepath="$PROJECT_DIR$/Obsidian.iml" />
-      <module fileurl="file://$PROJECT_DIR$/Obsidian Runtime/Obsidian Runtime.iml" filepath="$PROJECT_DIR$/Obsidian Runtime/Obsidian Runtime.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/obsidian.iml" filepath="$PROJECT_DIR$/.idea/modules/obsidian.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/obsidian-build.iml" filepath="$PROJECT_DIR$/.idea/modules/obsidian-build.iml" />
     </modules>
   </component>
 </project>
