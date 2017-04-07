@@ -1,3 +1,9 @@
 language: scala
 scala:
     - 2.11.9
+
+# This may be necessary depending on the tests we eventually run. For example,
+# the chaincode base server uses "java.util.Base64", which is only supported
+# as of java version 8
+jdk:
+  - oraclejdk8
