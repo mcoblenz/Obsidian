@@ -22,16 +22,6 @@ class ChaincodeBaseServer {
     private final ChaincodeBaseMock base;
     private final boolean printDebug;
 
-    /* Encoding and decoding bytes in a JSON-friendly format is necessary
-     * to send them back to the client */
-    private static String bytesToString(byte[] bytes) {
-        return Base64.getEncoder().encodeToString(bytes);
-    }
-
-    private static byte[] stringToBytes(String base64Str) {
-        return Base64.getDecoder().decode(base64Str);
-    }
-
     public ChaincodeBaseServer(int port, ChaincodeBaseMock base, boolean printDebug) {
         this.port = port;
         this.base = base;
@@ -94,7 +84,6 @@ class ChaincodeBaseServer {
             }
         }
     }
-
     // returns true iff we should process another transaction from this client.
     private boolean processTransaction(Socket clientSk)
             throws IOException, ClassCastException
@@ -120,10 +109,11 @@ class ChaincodeBaseServer {
 
         byte[][] txArgs = new byte[txArgsJson.length()][];
         for (int i = 0; i < txArgsJson.length(); i++) {
-            txArgs[i] = stringToBytes(txArgsJson.getString(i));
+            txArgs[i] = ChaincodeUtils.JSONStringToBytes(txArgsJson.getString(i));
         }
 
         byte[] retBytes = new byte[0];
+        boolean abortTransaction = false;
 
         if (method.equals("deploy")) {
             if (printDebug) System.out.println("Calling constructor...");
@@ -152,13 +142,23 @@ class ChaincodeBaseServer {
 
         if (printDebug) {
             System.out.println("Raw return bytes:");
-            System.out.println(Arrays.toString(retBytes));
+            if (retBytes == null) {
+                System.out.println("(null)");
+            }
+            else {
+                System.out.println(Arrays.toString(retBytes));
+            }
         }
 
         JSONObject retObject = new JSONObject();
         JSONObject result = new JSONObject();
-        result.put("status", "OK");
-        result.put("message", bytesToString(retBytes));
+        if (retBytes == null) {
+            result.put("status", "Failure");
+        }
+        else {
+            result.put("status", "OK");
+            result.put("message", ChaincodeUtils.bytesToJSONString(retBytes));
+        }
         retObject.put("result", result);
 
         if (printDebug) {

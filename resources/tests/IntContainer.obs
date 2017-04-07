@@ -1,5 +1,7 @@
 main contract IntContainer {
 	int x;
+	string s;
+	bool b;
 	
 	transaction setX(int newX) returns int {
 		int oldX = x;
