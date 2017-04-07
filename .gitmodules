@@ -1,0 +1,3 @@
+[submodule "jcodemodel"]
+	path = jcodemodel
+	url = https://github.com/phax/jcodemodel.git
