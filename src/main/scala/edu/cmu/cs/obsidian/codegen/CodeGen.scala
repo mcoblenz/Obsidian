@@ -1551,7 +1551,10 @@ class CodeGen (val target: Target) {
             case _ =>
         }
 
-        // TODO: translate the ensures clauses into JML.
+        for (e <- decl.ensures) {
+            val javaExpr: IJExpression = translateExpr(e.expr, translationContext, Map.empty)
+            // TODO: emit a JML-formatted comment using javaExpr. Maybe invoke javaExpr.generate().
+        }
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
