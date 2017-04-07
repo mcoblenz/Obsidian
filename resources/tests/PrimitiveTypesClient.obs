@@ -1,0 +1,13 @@
+import "resources/tests/PrimitiveTypes.obs"
+
+main contract PrimitiveTypesClient {
+	transaction main(remote PrimitiveTypes container) {
+		int oldX = container.setInt(42);
+		container.setInt(oldX);
+		container.setInt(42);
+
+		container.setBool(true);
+
+		container.setString("Hello, world!");
+	}
+}

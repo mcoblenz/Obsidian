@@ -25,11 +25,11 @@ public class ChaincodeUtils {
 
     /* Encoding and decoding bytes in a JSON-friendly format is necessary
      * to send them back to the client */
-    public static String bytesToString(byte[] bytes) {
+    public static String bytesToJSONString(byte[] bytes) {
         return Base64.getEncoder().encodeToString(bytes);
     }
 
-    public static byte[] stringToBytes(String base64Str) {
+    public static byte[] JSONStringToBytes(String base64Str) {
         return Base64.getDecoder().decode(base64Str);
     }
 }

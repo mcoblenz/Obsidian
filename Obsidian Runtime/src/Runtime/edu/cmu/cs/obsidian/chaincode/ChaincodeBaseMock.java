@@ -110,7 +110,7 @@ class ChaincodeBaseServer {
 
         byte[][] txArgs = new byte[txArgsJson.length()][];
         for (int i = 0; i < txArgsJson.length(); i++) {
-            txArgs[i] = ChaincodeUtils.stringToBytes(txArgsJson.getString(i));
+            txArgs[i] = ChaincodeUtils.JSONStringToBytes(txArgsJson.getString(i));
         }
 
         byte[] retBytes = new byte[0];
@@ -127,12 +127,7 @@ class ChaincodeBaseServer {
                     .getString("function");
 
             if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
-            try {
-                retBytes = base.run(base.stub, txName, txArgs);
-            }
-            catch (BadTransactionException e) {
-                abortTransaction = true;
-            }
+            retBytes = base.run(base.stub, txName, txArgs);
         }
         else if (method.equals("query")) {
             /* TODO : do we support queries? */
@@ -148,17 +143,22 @@ class ChaincodeBaseServer {
 
         if (printDebug) {
             System.out.println("Raw return bytes:");
-            System.out.println(Arrays.toString(retBytes));
+            if (retBytes == null) {
+                System.out.println("(null)");
+            }
+            else {
+                System.out.println(Arrays.toString(retBytes));
+            }
         }
 
         JSONObject retObject = new JSONObject();
         JSONObject result = new JSONObject();
-        if (abortTransaction) {
+        if (retBytes == null) {
             result.put("status", "Failure");
         }
         else {
             result.put("status", "OK");
-            result.put("message", ChaincodeUtils.bytesToString(retBytes));
+            result.put("message", ChaincodeUtils.bytesToJSONString(retBytes));
         }
         retObject.put("result", result);
 
@@ -269,7 +269,7 @@ public abstract class ChaincodeBaseMock {
 
     // Must be overridden in generated class.
     public abstract byte[] init(ChaincodeStubMock stub, byte[][] args);
-    public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args) throws BadTransactionException;
+    public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args);
 
     public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();

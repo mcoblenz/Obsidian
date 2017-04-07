@@ -4,5 +4,6 @@ main contract IntContainerClient {
 	transaction main(remote IntContainer container) {
 		int oldX = container.setX(42);
 		container.setX(oldX);
+		container.setX(42);
 	}
 }

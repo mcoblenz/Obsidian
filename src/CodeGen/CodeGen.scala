@@ -197,10 +197,10 @@ class CodeGen (val target: Target) {
         {
             case IntType() => unmarshalledExpr.invoke("toByteArray");
             case BoolType() => JExpr.cond(unmarshalledExpr, JExpr.ref("TRUE_ARRAY"), JExpr.ref("FALSE_ARRAY"))
-            case StringType() => val byteStringClass: AbstractJClass =
-                model.parseType("com.google.protobuf.ByteString").asInstanceOf[AbstractJClass]
-                val toByteArrayInvocation = JExpr.invoke(unmarshalledExpr, "toByteArray")
-                toByteArrayInvocation
+            case StringType() =>
+                val toByteArrayInvocation: JInvocation = JExpr.invoke(unmarshalledExpr, "getBytes")
+                val charset = JExpr._this().ref("DEFAULT_CHARSET")
+                toByteArrayInvocation.arg(charset)
             case NonPrimitiveType(modifiers, name) => unmarshalledExpr.invoke("__archiveBytes")
         }
 
@@ -216,16 +216,14 @@ class CodeGen (val target: Target) {
                 newInt.arg(marshalledExpr)
                 newInt
             case BoolType() =>
-                val _ = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
+                val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
+                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException")))
                 marshalledExpr.component(JExpr.lit(0)).eq0()
             case StringType() =>
-                val byteStringClass: AbstractJClass =
-                    model.parseType("com.google.protobuf.ByteString").asInstanceOf[AbstractJClass]
+                val stringClass = model.ref("java.lang.String")
+                val charset = JExpr._this().ref("DEFAULT_CHARSET")
 
-                val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
-                val _ = copyFromInvocation.arg(marshalledExpr)
-
-                copyFromInvocation.invoke("toString")
+                JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
             case NonPrimitiveType(modifiers, name) =>
                 val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
@@ -724,7 +722,6 @@ class CodeGen (val target: Target) {
         val runMeth = newClass.method(JMod.PUBLIC, model.BYTE.array(), "run")
         runMeth.param(stubType, "stub")
         runMeth.param(model.ref("String"), "transName")
-        runMeth._throws(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
 
         val returnBytes = runMeth.body().decl(
@@ -771,10 +768,15 @@ class CodeGen (val target: Target) {
                         lengthCheckCall.arg(runArg)
 
                         val lengthCheck = stateCondBody._if(lengthCheckCall.not())
-                        val _ = lengthCheck._then()._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+                        val _ = lengthCheck._then()._return(JExpr._null())
 
                         JExpr.cond(runArg.component(JExpr.lit(0)).eq0(), JExpr.lit(false),JExpr.lit(true))
-                    case StringType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("bytesToString").arg(runArg)
+                    case StringType() =>
+                        val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                        val newString = JExpr._new(model.ref("java.lang.String"))
+                        newString.arg(runArg)
+                        newString.arg(charset)
+                        newString
                     case _ => JExpr._new(javaArgType).invoke("__initFromArchiveBytes").arg(runArg)
                 }
 
@@ -796,7 +798,7 @@ class CodeGen (val target: Target) {
                     tx.retType.get match {
                         case IntType() => txInvoke.invoke("toByteArray")
                         case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("booleanToBytes").arg(txInvoke)
-                        case StringType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("stringToBytes").arg(txInvoke)
+                        case StringType() => txInvoke.invoke("getBytes")
                         case _ => txInvoke.invoke("archiveBytes")
                     }
                 )
