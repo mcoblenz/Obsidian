@@ -1551,6 +1551,7 @@ class CodeGen (val target: Target) {
             case _ =>
         }
 
+        // TODO: translate the ensures clauses into JML.
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
