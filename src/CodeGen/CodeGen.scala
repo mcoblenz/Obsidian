@@ -197,10 +197,10 @@ class CodeGen (val target: Target) {
         {
             case IntType() => unmarshalledExpr.invoke("toByteArray");
             case BoolType() => JExpr.cond(unmarshalledExpr, JExpr.ref("TRUE_ARRAY"), JExpr.ref("FALSE_ARRAY"))
-            case StringType() => val byteStringClass: AbstractJClass =
-                model.parseType("com.google.protobuf.ByteString").asInstanceOf[AbstractJClass]
-                val toByteArrayInvocation = JExpr.invoke(unmarshalledExpr, "toByteArray")
-                toByteArrayInvocation
+            case StringType() =>
+                val toByteArrayInvocation: JInvocation = JExpr.invoke(unmarshalledExpr, "getBytes")
+                val charset = JExpr._this().ref("DEFAULT_CHARSET")
+                toByteArrayInvocation.arg(charset)
             case NonPrimitiveType(modifiers, name) => unmarshalledExpr.invoke("__archiveBytes")
         }
 
@@ -216,16 +216,14 @@ class CodeGen (val target: Target) {
                 newInt.arg(marshalledExpr)
                 newInt
             case BoolType() =>
-                val _ = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
+                val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
+                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException")))
                 marshalledExpr.component(JExpr.lit(0)).eq0()
             case StringType() =>
-                val byteStringClass: AbstractJClass =
-                    model.parseType("com.google.protobuf.ByteString").asInstanceOf[AbstractJClass]
+                val stringClass = model.ref("java.lang.String")
+                val charset = JExpr._this().ref("DEFAULT_CHARSET")
 
-                val copyFromInvocation = byteStringClass.staticInvoke("copyFrom")
-                val _ = copyFromInvocation.arg(marshalledExpr)
-
-                copyFromInvocation.invoke("toString")
+                JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
             case NonPrimitiveType(modifiers, name) =>
                 val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
@@ -757,23 +755,37 @@ class CodeGen (val target: Target) {
             var txArgsList: List[JVar] = List.empty
             var runArgNumber = 0
             for (txArg <- tx.args) {
+                val runArg = runArgs.component(JExpr.lit(runArgNumber))
+                val javaArgType = resolveType(txArg.typ)
 
-                var newTxArg: JVar = null
-                if (txArg.typ.isInstanceOf[IntType]) {
-                    newTxArg = stateCondBody.decl(
-                        resolveType(txArg.typ),
-                        txArg.varName,
-                        JExpr._new(resolveType(txArg.typ)).arg(
-                            runArgs.component(JExpr.lit(runArgNumber))
-                        ))
-                } else {
-                    newTxArg = stateCondBody.decl(
-                        resolveType(txArg.typ),
-                        txArg.varName,
-                        JExpr._new(resolveType(txArg.typ)))
-                    stateCondBody.invoke(newTxArg, "__initFromArchiveBytes")
-                        .arg(runArgs.component(JExpr.lit(runArgNumber)))
+                val transactionArgExpr: IJExpression = txArg.typ match {
+                    case IntType() =>
+                        JExpr._new(javaArgType).arg(runArg)
+                    case BoolType() =>
+                        // Arg has to be a 1-element-long array containing
+                        // either 0 or 1.
+                        val lengthCheckCall = model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("bytesRepresentBoolean")
+                        lengthCheckCall.arg(runArg)
+
+                        val lengthCheck = stateCondBody._if(lengthCheckCall.not())
+                        val _ = lengthCheck._then()._return(JExpr._null())
+
+                        JExpr.cond(runArg.component(JExpr.lit(0)).eq0(), JExpr.lit(false),JExpr.lit(true))
+                    case StringType() =>
+                        val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                        val newString = JExpr._new(model.ref("java.lang.String"))
+                        newString.arg(runArg)
+                        newString.arg(charset)
+                        newString
+                    case _ => JExpr._new(javaArgType).invoke("__initFromArchiveBytes").arg(runArg)
                 }
+
+                val newTxArg: JVar = stateCondBody.decl(
+                    javaArgType,
+                    txArg.varName,
+                    transactionArgExpr
+                )
+
                 txArgsList = newTxArg :: txArgsList
                 runArgNumber += 1
             }
@@ -782,11 +794,14 @@ class CodeGen (val target: Target) {
 
             if (tx.retType.isDefined) {
                 txInvoke = JExpr.invoke(tx.name)
-                if (tx.retType.get.isInstanceOf[IntType]) {
-                    stateCondBody.assign(returnBytes, txInvoke.invoke("toByteArray"))
-                } else {
-                    stateCondBody.assign(returnBytes, txInvoke.invoke("archiveBytes"))
-                }
+                stateCondBody.assign (returnBytes,
+                    tx.retType.get match {
+                        case IntType() => txInvoke.invoke("toByteArray")
+                        case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("booleanToBytes").arg(txInvoke)
+                        case StringType() => txInvoke.invoke("getBytes")
+                        case _ => txInvoke.invoke("archiveBytes")
+                    }
+                )
             } else {
                 txInvoke = stateCondBody.invoke(tx.name)
             }
@@ -794,8 +809,6 @@ class CodeGen (val target: Target) {
             for (txArg <- txArgsList.reverse) {
                 txInvoke.arg(txArg)
             }
-
-
         }
 
         runMeth.body()._return(returnBytes)
@@ -924,11 +937,12 @@ class CodeGen (val target: Target) {
                     body: JBlock,
                     translationContext: TranslationContext,
                     inContract: Contract): Unit = {
-        val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
-        val nonNullBody = ifNonNull._then()
         val javaFieldType = resolveType(field.typ)
         field.typ match {
             case IntType() => {
+                val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
+                val nonNullBody = ifNonNull._then()
+
                 // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
                 // The protobuf type for this is just bytes.
                 // builder.setField(ByteString.CopyFrom(field.toByteArray()))
@@ -945,12 +959,22 @@ class CodeGen (val target: Target) {
                 nonNullBody.add(setInvocation)
             }
             case BoolType() => {
-                // TODO
+                val setterName: String = setterNameForField(field.fieldName)
+                val setInvocation = body.invoke(builderVar, setterName)
+                setInvocation.arg(fieldVar)
             }
             case StringType() => {
-                // TODO
+                val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
+                val nonNullBody = ifNonNull._then()
+
+                val setterName: String = setterNameForField(field.fieldName)
+                val setInvocation = nonNullBody.invoke(builderVar, setterName)
+                setInvocation.arg(fieldVar)
             }
             case n@NonPrimitiveType(_, name) => {
+                val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
+                val nonNullBody = ifNonNull._then()
+
                 val contract = resolveNonPrimitiveTypeToContract(n, translationContext, inContract)
                 if (contract.isEmpty) {
                     println("Compilation error: unable to resolve type " + name)
@@ -1093,10 +1117,19 @@ class CodeGen (val target: Target) {
                 ifNonempty._then().assign(fieldVar, newInteger)
             }
             case BoolType() => {
-                // TODO
+                val getterName = getterNameForField(javaFieldName)
+                // foo = archive.getFoo();
+                val getCall = archive.invoke(getterName)
+                body.assign(fieldVar, getCall)
             }
             case StringType() => {
-                // TODO
+                val getterName = getterNameForField(javaFieldName)
+
+                val ifNonempty = body._if(archive.invoke(getterName).invoke("isEmpty").not())
+
+                // foo = archive.getFoo();
+                val getCall = archive.invoke(getterName)
+                ifNonempty._then().assign(fieldVar, getCall)
             }
             case n@NonPrimitiveType(_, name) => {
                 // foo = new Foo(); foo.initFromArchive(archive.getFoo());
@@ -1564,7 +1597,13 @@ class CodeGen (val target: Target) {
         var nextContext = localContext
         statement match {
             case VariableDecl(typ, name) =>
-                nextContext = localContext.updated(name, body.decl(resolveType(typ), name, JExpr._null()))
+                val initializer = typ match {
+                    case BoolType() => JExpr.lit(false)
+                    case _ => JExpr._null()
+                }
+                nextContext = localContext.updated(name, body.decl(resolveType(typ), name, initializer))
+            case VariableDeclWithInit(typ, name, e) =>
+                nextContext = localContext.updated(name, body.decl(resolveType(typ), name, translateExpr(e, translationContext, localContext)))
             case Return => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newState, updates) =>

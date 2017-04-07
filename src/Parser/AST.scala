@@ -36,6 +36,7 @@ case class Construction(name: String, args: Seq[Expression]) extends Expression
 
 /* statements and control flow constructs */
 case class VariableDecl(typ: Type, varName: String) extends Statement
+case class VariableDeclWithInit(typ: Type, varName: String, e: Expression) extends Statement
 case object Return extends Statement
 case class ReturnExpr(e: Expression) extends Statement
 case class Transition(newStateName: String, updates: Seq[(Variable, Expression)]) extends Statement
