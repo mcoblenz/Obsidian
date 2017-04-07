@@ -62,13 +62,11 @@ object Parser extends Parsers {
 
     private def parseBody: Parser[Seq[Statement]] =
         parseAtomicStatement ~ opt(parseBody) ^^ {
-            case s ~ None => s
-            case s1 ~ Some(s2) => s1 ++ s2
+            case s ~ None => Seq(s)
+            case s1 ~ Some(s2) => s1 +: s2
         }
 
-    /* this parser is for Seq[AST] instead of AST to handle declaration
-     *  and assignment of a variable in a single statement */
-    private def parseAtomicStatement: Parser[Seq[Statement]] = {
+    private def parseAtomicStatement: Parser[Statement] = {
         val parseReturn = ReturnT() ~ opt(parseExpr) ~! SemicolonT() ^^ {
             case _ ~ Some(e) ~ _ => ReturnExpr(e)
             case _ ~ None ~ _ => Return
@@ -139,11 +137,9 @@ object Parser extends Parsers {
             }
         }
 
-        val seqify = (p: Parser[Statement]) => p ^^ { case a => Seq(a) }
-
-        seqify(parseReturn) | seqify(parseTransition) | seqify(parseThrow) |
-        seqify(parseVarDeclAssn) | seqify(parseVarDecl) | seqify(parseIf) | seqify(parseSwitch) |
-        seqify(parseTryCatch) | seqify(parseExprFirst)
+        parseReturn | parseTransition | parseThrow |
+        parseVarDeclAssn | parseVarDecl | parseIf | parseSwitch |
+        parseTryCatch | parseExprFirst
     }
 
 
