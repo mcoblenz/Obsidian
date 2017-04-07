@@ -84,7 +84,6 @@ class ChaincodeBaseServer {
             }
         }
     }
-
     // returns true iff we should process another transaction from this client.
     private boolean processTransaction(Socket clientSk)
             throws IOException, ClassCastException
