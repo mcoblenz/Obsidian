@@ -364,7 +364,7 @@ object Parser extends Parsers {
         }
 
         val ast: Program = parseProgram(tokens) match {
-            case Left(msg) => println(msg); throw new ParseException(msg)
+            case Left(msg) => throw new ParseException(msg + " in " + srcPath)
             case Right(tree) => tree
         }
 
