@@ -1551,7 +1551,6 @@ class CodeGen (val target: Target) {
             case _ =>
         }
 
-
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
             (arg.varName, meth.param(resolveType(arg.typ), arg.varName))

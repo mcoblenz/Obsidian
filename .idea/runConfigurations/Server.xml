@@ -1,9 +1,11 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Server" type="SbtRunConfiguration" factoryName="SBT Task">
-    <setting name="tasks" value="&quot;run --verbose --dump-debug obs_output --output-path obs_output resources/tests/IntContainer.obs&quot;" />
+    <setting name="tasks" value="&quot;run --verbose --dump-debug obs_output --output-path obs_output resources/tests/simpleVerification.obs&quot;" />
     <setting name="vmparams" value="-Xms512M -Xmx1024M -Xss1M -XX:+CMSClassUnloadingEnabled" />
     <setting name="workingDir" value="$PROJECT_DIR$" />
-    <envs />
+    <envs>
+      <env name="DAFNY_PATH" value="/Users/mcoblenz/dafny/dafny" />
+    </envs>
     <method />
   </configuration>
 </component>

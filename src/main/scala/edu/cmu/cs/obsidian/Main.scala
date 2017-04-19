@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian
 
-import java.nio.file.{Files, Paths, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.io.File
 import java.util.Scanner
 
@@ -9,7 +9,8 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
 import edu.cmu.cs.obsidian.util._
-import com.helger.jcodemodel.JCodeModel
+import com.helger.jcodemodel.{JCodeModel, JPackage, JDefinedClass}
+import collection.JavaConverters._
 
 import scala.sys.process._
 
@@ -201,6 +202,51 @@ object Main {
         className.substring(0, 1).toUpperCase(java.util.Locale.US) + className.substring(1) + "OuterClass"
     }
 
+    def runVerifier(p: Program): Boolean = {
+        val dafnyGen = new DafnyGen()
+        val dafnyFile: File = File.createTempFile("dafny-spec", ".dfy")
+        dafnyGen.translateProgram(p, dafnyFile)
+
+        // DEBUG: dump Dafny to stdout
+        import java.io.BufferedReader
+        import java.io.FileReader
+        try {
+            val br = new BufferedReader(new FileReader(dafnyFile))
+            try {
+                var line = br.readLine()
+                while (line != null) {
+                    line = br.readLine()
+                    println(line)
+                }
+            }
+            finally {
+                if (br != null) { br.close(); }
+            }
+        }
+        catch {
+            case e: Exception => println("Failed to read dafny file")
+        }
+
+        val dafnyPath = System.getenv("DAFNY_PATH")
+        val verifyCommand = Array(dafnyPath, dafnyFile.getAbsolutePath())
+        val proc: java.lang.Process = Runtime.getRuntime().exec(verifyCommand)
+
+        // This API is confusingly named; the "input stream" is connected to the output of the process.
+        val compilerOutput = proc.getInputStream()
+        val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
+        val result = if (untilEOF.hasNext()) {
+            untilEOF.next()
+        } else {
+            ""
+        }
+
+        print(result)
+
+        proc.waitFor()
+        println("dafny result: " + proc.exitValue())
+        return (proc.exitValue() == 0)
+    }
+
     // For input foo.obs, we generate foo.proto, from which we generate FooOuterClass.java.
     //    We also generate a jar at the specified directory, containing the generated classes.
     def main(args: Array[String]): Unit = {
@@ -305,6 +351,9 @@ object Main {
                     println("jar exited with value " + jarExit)
                 }
             }
+
+            // Run the OpenJML verifier on all the generated files.
+            runVerifier(ast)
 
         } catch {
             case e: Parser.ParseException => println(e.message)
