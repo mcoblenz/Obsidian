@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian
 
-import java.nio.file.{Files, Paths, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.io.File
 import java.util.Scanner
 
@@ -9,7 +9,8 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
 import edu.cmu.cs.obsidian.util._
-import com.helger.jcodemodel.JCodeModel
+import com.helger.jcodemodel.{JCodeModel, JPackage, JDefinedClass}
+import collection.JavaConverters._
 
 import scala.sys.process._
 
@@ -201,6 +202,37 @@ object Main {
         className.substring(0, 1).toUpperCase(java.util.Locale.US) + className.substring(1) + "OuterClass"
     }
 
+    def runVerifier(directory: File, model: JCodeModel): Boolean = {
+        val javaFiles = directory.listFiles()
+        var allSucceeded = true
+
+        for (p: JPackage <- model.packages.asScala) {
+            for (c: JDefinedClass <- p.classes().asScala) {
+                val filename = c.fullName() + ".java"
+                // invoke java -jar OpenJML/openjml.jar <f>
+                println("Running OpenJML verifier on " + filename)
+                val verifyCommand: Array[String] = Array("java", "-jar", "OpenJML/openjml.jar", filename)
+
+                val proc: java.lang.Process = Runtime.getRuntime().exec(verifyCommand)
+
+                val compilerOutput = proc.getErrorStream()
+                val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
+                val result = if (untilEOF.hasNext()) {
+                    untilEOF.next()
+                } else {
+                    ""
+                }
+
+                print(result)
+
+                proc.waitFor()
+                allSucceeded = allSucceeded && (proc.exitValue() == 0)
+            }
+
+        }
+        allSucceeded
+    }
+
     // For input foo.obs, we generate foo.proto, from which we generate FooOuterClass.java.
     //    We also generate a jar at the specified directory, containing the generated classes.
     def main(args: Array[String]): Unit = {
@@ -261,6 +293,9 @@ object Main {
             val javaModel = if (options.buildClient) translateClientASTToJava(ast, protobufOuterClassName)
                                 else translateServerASTToJava(ast, protobufOuterClassName)
             javaModel.build(srcDir.toFile)
+
+            // Run the OpenJML verifier on all the generated files.
+            runVerifier(srcDir.toFile, javaModel)
 
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(ast, sourceFilename)
 
