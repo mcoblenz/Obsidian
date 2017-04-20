@@ -2,7 +2,7 @@ main contract SimpleVerification {
     int x;
 
     transaction doStuff()
-        ensures true;
+        ensures false;
     {
         x = 0;
     }

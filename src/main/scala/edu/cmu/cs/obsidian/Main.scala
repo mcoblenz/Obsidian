@@ -202,20 +202,25 @@ object Main {
         className.substring(0, 1).toUpperCase(java.util.Locale.US) + className.substring(1) + "OuterClass"
     }
 
-    def runVerifier(directory: File, model: JCodeModel): Boolean = {
+    def runVerifier(directory: File, model: JCodeModel, sourcePath: Path): Boolean = {
         val javaFiles = directory.listFiles()
         var allSucceeded = true
+        val classPath =
+            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.2.0.jar:lib/json-20160810.jar"
+
 
         for (p: JPackage <- model.packages.asScala) {
             for (c: JDefinedClass <- p.classes().asScala) {
-                val filename = c.fullName() + ".java"
+                val innerFilePath = c.fullName().replace(".", "/")
+                val filename = directory + "/" + (innerFilePath + ".java")
                 // invoke java -jar OpenJML/openjml.jar <f>
                 println("Running OpenJML verifier on " + filename)
-                val verifyCommand: Array[String] = Array("java", "-jar", "OpenJML/openjml.jar", filename)
+                val verifyCommand: Array[String] = Array("java", "-jar", "OpenJML/openjml.jar", "-exec", "z3", "-cp", classPath, filename)
 
                 val proc: java.lang.Process = Runtime.getRuntime().exec(verifyCommand)
 
-                val compilerOutput = proc.getErrorStream()
+                // This API is confusingly named; the "input stream" is connected to the output of the process.
+                val compilerOutput = proc.getInputStream()
                 val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
                 val result = if (untilEOF.hasNext()) {
                     untilEOF.next()
@@ -226,6 +231,7 @@ object Main {
                 print(result)
 
                 proc.waitFor()
+                println("OpenJML result: " + proc.exitValue())
                 allSucceeded = allSucceeded && (proc.exitValue() == 0)
             }
 
@@ -295,7 +301,7 @@ object Main {
             javaModel.build(srcDir.toFile)
 
             // Run the OpenJML verifier on all the generated files.
-            runVerifier(srcDir.toFile, javaModel)
+            runVerifier(srcDir.toFile, javaModel, srcDir)
 
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(ast, sourceFilename)
 

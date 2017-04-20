@@ -1553,7 +1553,8 @@ class CodeGen (val target: Target) {
 
         for (e <- decl.ensures) {
             val javaExpr: IJExpression = translateExpr(e.expr, translationContext, Map.empty)
-            // TODO: emit a JML-formatted comment using javaExpr. Maybe invoke javaExpr.generate().
+            val jmlAnnotation = meth.jml()
+            jmlAnnotation.addEnsures(javaExpr)
         }
 
         /* add args to method and collect them in a list */
