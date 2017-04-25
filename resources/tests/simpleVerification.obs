@@ -1,9 +1,9 @@
 main contract SimpleVerification {
-    int x;
+    bool x;
 
     transaction doStuff()
-        ensures false;
+        ensures true;
     {
-        x = 0;
+        x = false;
     }
 }

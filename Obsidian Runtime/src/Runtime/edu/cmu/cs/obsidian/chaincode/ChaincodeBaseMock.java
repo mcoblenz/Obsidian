@@ -200,7 +200,7 @@ class ChaincodeBaseServer {
 }
 
 public abstract class ChaincodeBaseMock {
-    public final ChaincodeStubMock stub = new ChaincodeStubMock();
+    public final /*@ non_null @*/ ChaincodeStubMock stub = new ChaincodeStubMock();
 
     public void delegatedMain(String args[]) {
         if (args.length != 2) {
@@ -271,6 +271,8 @@ public abstract class ChaincodeBaseMock {
     public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args);
 
     public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
+
+    //@ ensures \result != null;
     public abstract byte[] __archiveBytes();
 }
 

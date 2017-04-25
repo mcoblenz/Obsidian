@@ -215,7 +215,7 @@ object Main {
                 val filename = directory + "/" + (innerFilePath + ".java")
                 // invoke java -jar OpenJML/openjml.jar <f>
                 println("Running OpenJML verifier on " + filename)
-                val verifyCommand: Array[String] = Array("java", "-jar", "OpenJML/openjml.jar", "-exec", "z3", "-cp", classPath, filename)
+                val verifyCommand: Array[String] = Array("java", "-Xss128m", "-jar", "OpenJML/openjml.jar", "-subexpressions", "-ce", "-esc", "-prover", "z3_4_3", "-exec", "/Users/mcoblenz/Downloads/z3-4.3.0-x86/bin/z3", "-cp", classPath, filename)
 
                 val proc: java.lang.Process = Runtime.getRuntime().exec(verifyCommand)
 

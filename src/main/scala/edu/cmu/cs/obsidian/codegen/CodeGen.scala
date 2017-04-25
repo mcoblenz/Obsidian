@@ -1038,6 +1038,9 @@ class CodeGen (val target: Target) {
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
+        val nonNullResultEnsuresExpr = new JMLExpressionOpBinary(new JMLExpressionResult(), "!=", JMLExpressionSimple.NULL)
+        archiveMethod.jml().addEnsures(nonNullResultEnsuresExpr)
+
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
@@ -1047,6 +1050,11 @@ class CodeGen (val target: Target) {
         archiveBody.directStatement(protobufMessageClassBuilder + " builder = " +
                                     protobufClassName + ".newBuilder();")
         val builderVariable = JExpr.ref("builder")
+
+        val assumption = new JMLAnnotation()
+        assumption.addAssume(new JMLExpressionOpBinary(new JMLExpressionSimple(builderVariable), "!=", JMLExpressionSimple.NULL))
+        archiveBody.addJMLAnnotation(assumption)
+
         // val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
@@ -1073,19 +1081,43 @@ class CodeGen (val target: Target) {
         }
 
         val buildInvocation = JExpr.invoke(builderVariable, "build")
-        archiveBody._return(buildInvocation)
+
+        val nullable = new JMLAnnotation()
+        nullable.addNullable()
+        archiveBody.addJMLAnnotation(nullable)
+        val result = archiveBody.decl(archiveType, "result", buildInvocation)
+
+        val assumesBuildReturnsNonNull = new JMLAnnotation()
+        assumesBuildReturnsNonNull.addAssume(new JMLExpressionOpBinary(new JMLExpressionSimple(result), "!=", JMLExpressionSimple.NULL))
+        archiveBody.addJMLAnnotation(assumesBuildReturnsNonNull)
+
+        archiveBody._return(result)
     }
 
 
     // Generates a method, __archiveBytes(), which outputs a string in protobuf format.
     private def generateSerializer(contract: Contract, inClass: JDefinedClass): Unit = {
         val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__archiveBytes")
+        val nonNullResultEnsuresExpr = new JMLExpressionOpBinary(new JMLExpressionResult(), "!=", JMLExpressionSimple.NULL)
+        archiveMethod.jml().addEnsures(nonNullResultEnsuresExpr)
 
         val archiveBody = archiveMethod.body()
 
         val archive = JExpr.invoke(JExpr._this(), "archive")
         val archiveBytes = archive.invoke("toByteArray")
-        archiveBody._return(archiveBytes);
+
+        val nullable = new JMLAnnotation()
+        nullable.addNullable()
+        archiveBody.addJMLAnnotation(nullable)
+        val result = archiveBody.decl(model.parseType("byte[]"), "result", archiveBytes)
+
+
+        val assumesByteArrayNonNull = new JMLExpressionOpBinary(new JMLExpressionSimple(result), "!=", JMLExpressionSimple.NULL)
+        val assumesAnnotation = new JMLAnnotation()
+        assumesAnnotation.addAssume(assumesByteArrayNonNull)
+        archiveBody.addJMLAnnotation(assumesAnnotation)
+
+        archiveBody._return(result);
     }
 
     private def generateFieldInitializer(
@@ -1554,7 +1586,7 @@ class CodeGen (val target: Target) {
         for (e <- decl.ensures) {
             val javaExpr: IJExpression = translateExpr(e.expr, translationContext, Map.empty)
             val jmlAnnotation = meth.jml()
-            jmlAnnotation.addEnsures(javaExpr)
+            jmlAnnotation.addEnsures(new JMLExpressionSimple(javaExpr))
         }
 
         /* add args to method and collect them in a list */
