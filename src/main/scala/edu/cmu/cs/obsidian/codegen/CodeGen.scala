@@ -1144,7 +1144,17 @@ class CodeGen (val target: Target) {
                 val newInteger = JExpr._new(model.parseType("java.math.BigInteger"))
 
                 val getCall = archive.invoke(getterName)
-                newInteger.arg(JExpr.invoke(getCall, "toByteArray"))
+
+                val nullable = new JMLAnnotation()
+                nullable.addNullable()
+                ifNonempty._then().addJMLAnnotation(nullable)
+                val integerBytes = ifNonempty._then().decl(model.parseType("byte[]"), "bytes", JExpr.invoke(getCall, "toByteArray"))
+                newInteger.arg(integerBytes)
+
+                val assumesByteArrayNonNull = new JMLExpressionOpBinary(new JMLExpressionSimple(integerBytes), "!=", JMLExpressionSimple.NULL)
+                val assumesAnnotation = new JMLAnnotation()
+                assumesAnnotation.addAssume(assumesByteArrayNonNull)
+                ifNonempty._then().addJMLAnnotation(assumesAnnotation)
 
                 ifNonempty._then().assign(fieldVar, newInteger)
             }
