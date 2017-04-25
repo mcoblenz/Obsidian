@@ -215,7 +215,7 @@ object Main {
                 val filename = directory + "/" + (innerFilePath + ".java")
                 // invoke java -jar OpenJML/openjml.jar <f>
                 println("Running OpenJML verifier on " + filename)
-                val verifyCommand: Array[String] = Array("java", "-Xss128m", "-jar", "OpenJML/openjml.jar", "-subexpressions", "-ce", "-esc", "-prover", "z3_4_3", "-exec", "/Users/mcoblenz/Downloads/z3-4.3.0-x86/bin/z3", "-cp", classPath, filename)
+                val verifyCommand: Array[String] = Array("java", "-Xss128m", "-jar", "OpenJML/openjml.jar", "-specspath", "resources/specs", "-subexpressions", /*"-ce",*/ "-esc", "-prover", "z3_4_3", "-exec", "/Users/mcoblenz/Downloads/z3-4.3.0-x86/bin/z3", "-cp", classPath, filename)
 
                 val proc: java.lang.Process = Runtime.getRuntime().exec(verifyCommand)
 
@@ -300,9 +300,6 @@ object Main {
                                 else translateServerASTToJava(ast, protobufOuterClassName)
             javaModel.build(srcDir.toFile)
 
-            // Run the OpenJML verifier on all the generated files.
-            runVerifier(srcDir.toFile, javaModel, srcDir)
-
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(ast, sourceFilename)
 
             // Each import results in a .proto file, which needs to be compiled.
@@ -346,6 +343,9 @@ object Main {
                     println("jar exited with value " + jarExit)
                 }
             }
+
+            // Run the OpenJML verifier on all the generated files.
+            runVerifier(srcDir.toFile, javaModel, srcDir)
 
         } catch {
             case e: Parser.ParseException => println(e.message)
