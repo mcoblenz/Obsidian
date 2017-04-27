@@ -56,14 +56,19 @@ class DafnyGen {
         }
     }
 
-    def translateField(f: Field): String = {
-        val typeDecl = f.typ match {
+    def translateType(t: Type): String = {
+        val typeDecl = t match {
             case IntType() => "int"
             case BoolType() => "bool"
             case StringType() => "string"
             case NonPrimitiveType(m, name) => name
         }
 
+        typeDecl
+    }
+
+    def translateField(f: Field): String = {
+        val typeDecl = translateType(f.typ)
         "var " + f.fieldName + ": " + typeDecl
     }
 
@@ -72,7 +77,11 @@ class DafnyGen {
     }
 
     def translateArgs(args: Seq[VariableDecl]): String = {
-        ""
+        def translateArg(arg: VariableDecl): String = {
+            arg.varName + ": " + translateType(arg.typ)
+        }
+
+        String.join(", ", args.map(translateArg).toIterable.asJava)
     }
 
     def translateBody(statements: Seq[Statement]): String = {
