@@ -1,0 +1,33 @@
+main contract Simple2 {
+    int x;
+    int y;
+
+    state S1 {
+		int a = 1;
+		int b = 2;
+        transaction t1() 
+		ensures y == 1;
+		{
+            y = 1;
+            ->S2;
+        }
+    }
+
+    state S2 {
+		int c = 0;
+		
+        function foo() 
+		{
+            y = y + y;
+        }
+
+        transaction t2() returns int
+		ensures y >= 0;
+		ensures S1();
+		{
+            foo();
+            ->S1;
+			return y;
+        }
+    }
+}
