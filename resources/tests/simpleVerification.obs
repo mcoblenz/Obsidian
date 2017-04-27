@@ -1,5 +1,6 @@
 main contract SimpleVerification {
     int x;
+    int y;
 
     transaction doStuff()
         ensures false;

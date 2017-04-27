@@ -207,26 +207,6 @@ object Main {
         val dafnyFile: File = File.createTempFile("dafny-spec", ".dfy")
         dafnyGen.translateProgram(p, dafnyFile)
 
-        // DEBUG: dump Dafny to stdout
-        import java.io.BufferedReader
-        import java.io.FileReader
-        try {
-            val br = new BufferedReader(new FileReader(dafnyFile))
-            try {
-                var line = br.readLine()
-                while (line != null) {
-                    line = br.readLine()
-                    println(line)
-                }
-            }
-            finally {
-                if (br != null) { br.close(); }
-            }
-        }
-        catch {
-            case e: Exception => println("Failed to read dafny file")
-        }
-
         val dafnyPath = System.getenv("DAFNY_PATH")
         val verifyCommand = Array(dafnyPath, dafnyFile.getAbsolutePath())
         val proc: java.lang.Process = Runtime.getRuntime().exec(verifyCommand)
