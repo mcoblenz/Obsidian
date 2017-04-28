@@ -6,5 +6,11 @@ main contract SimpleVerification {
         ensures false;
     {
         x = 0;
+        other();
+    }
+
+    transaction other()
+    {
+
     }
 }

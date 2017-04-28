@@ -61,9 +61,8 @@ object Parser extends Parsers {
     }
 
     private def parseBody: Parser[Seq[Statement]] =
-        parseAtomicStatement ~ opt(parseBody) ^^ {
-            case s ~ None => Seq(s)
-            case s1 ~ Some(s2) => s1 +: s2
+        rep(parseAtomicStatement) ^^ {
+            case s => s
         }
 
     private def parseAtomicStatement: Parser[Statement] = {

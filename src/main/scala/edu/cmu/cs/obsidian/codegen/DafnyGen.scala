@@ -191,15 +191,15 @@ class DafnyGen {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
             case Throw() => "" // TODO; not supported yet
             case If(e, s) =>
-                "if (" + translateExpression(e) + ") {\n" +
+                "if " + translateExpression(e) + " {\n" +
                     indent(translateBody(s), 1) +
                     "\n}"
-                /*
-            case IfThenElse(e, s1, s2) =>
-                val jIf = body._if(translateExpr(e, translationContext, localContext))
-                translateBody(jIf._then(), s1, translationContext, localContext)
-                translateBody(jIf._else(), s2, translationContext, localContext)
 
+            case IfThenElse(e, s1, s2) =>
+                "if " + translateExpression(e) + " {\n" +
+                    indent(translateBody(s1), 1) +
+                    "\n}\nelse {\n" + indent(translateBody(s2), 1) + "\n}"
+/*
             case TryCatch(s1, s2) =>
                 val jTry = body._try()
                 val jCatch = jTry._catch(model.ref("RuntimeException"))
@@ -223,14 +223,13 @@ class DafnyGen {
                     jPrev = jPrev._elseif(eqState(_case.stateName))
                     translateBody(jPrev._then(), _case.body, translationContext, localContext)
                 }
+            */
             case LocalInvocation(methName, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(methName),
-                    args, translationContext, localContext)
+                invokeTransactionOrFunction(methName, args)
             /* TODO : it's bad that this is a special case */
             case Invocation(This(), methName, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(methName),
-                    args, translationContext, localContext)
-
+                invokeTransactionOrFunction(methName, args)
+            /*
             case Invocation(e, methName, args) =>
                 addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName),
                     args, translationContext, localContext)
@@ -239,6 +238,11 @@ class DafnyGen {
             case _ => ()
             */
         }
+    }
+
+    def invokeTransactionOrFunction(name: String, args: Seq[Expression]): String = {
+        val argsString = String.join(",", args.map(translateExpression).asJava)
+        name + "(" + argsString + ")"
     }
 
     def translateBody(statements: Seq[Statement]): String = {
