@@ -88,8 +88,53 @@ class DafnyGen {
 
     def translateExpression(e: Expression): String = {
         e match {
-            case Variable(x) => x
-            case _ => "" // TODO: the rest of the cases
+            case Variable(x) =>
+                x.toString
+            case NumLiteral(value) =>
+                value.toString
+            case StringLiteral(value) =>
+                value.toString
+            case TrueLiteral() =>
+                "true"
+            case FalseLiteral() =>
+                "false"
+            case This() =>
+                "this"
+            case Conjunction(e1, e2) =>
+                translateExpression(e1) + " && " + translateExpression(e2)
+            case Disjunction(e1, e2) =>
+                translateExpression(e1) + " || " + translateExpression(e2)
+            case LogicalNegation(e) =>
+                "!" + translateExpression(e)
+            case Add(e1, e2) =>
+                translateExpression(e1) + " + " + translateExpression(e2)
+            case Subtract(e1, e2) =>
+                translateExpression(e1) + " - " + translateExpression(e2)
+            case Divide(e1, e2) =>
+                translateExpression(e1) + " / " + translateExpression(e2)
+            case Multiply(e1, e2) =>
+                translateExpression(e1) + " * " + translateExpression(e2)
+            case Equals(e1, e2) =>
+                translateExpression(e1) + " == " + translateExpression(e2)
+            case GreaterThan(e1, e2) =>
+                translateExpression(e1) + " > " + translateExpression(e2)
+            case GreaterThanOrEquals(e1, e2) =>
+                translateExpression(e1) + " >= " + translateExpression(e2)
+            case LessThan(e1, e2) =>
+                translateExpression(e1) + " < " + translateExpression(e2)
+            case LessThanOrEquals(e1, e2) =>
+                translateExpression(e1) + " <= " + translateExpression(e2)
+            case NotEquals(e1, e2) =>
+                translateExpression(e1) + " != " + translateExpression(e2)
+            case Dereference(e, f) =>
+                assert(false).toString // Not implemented.
+            case LocalInvocation(name, args) =>
+                name.toString + "(" + args.mkString(", ") + ")"
+            case Invocation(recipient, name, args) =>
+                recipient.toString + "." + name.toString + "(" + args.mkString(", ") + ")"
+            case Construction(name, args) =>
+                "new " + name.toString + "(" + args.mkString(", ") + ")"
+            case _ => ""
         }
     }
 
