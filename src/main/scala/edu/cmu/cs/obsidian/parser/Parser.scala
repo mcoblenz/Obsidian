@@ -86,6 +86,11 @@ object Parser extends Parsers {
             case _ ~ name ~ None ~ _ => Transition(name, List.empty)
             case _ ~ name ~ Some(updates) ~ _ => Transition(name, updates)
         }
+/*
+        val parseTransition = RightArrowT() ~ parseIdString ~ LParenT() ~ parseArgList ~ RParenT() ~! SemicolonT() ^^ {
+            case _ ~ name ~ _ ~ args ~ _ ~ _ => TransitionInvocation(name, args)
+        }
+*/
 
         val parseVarDeclAssn =
             parseType ~ parseIdString ~ EqT() ~! parseExpr ~! SemicolonT() ^^ {

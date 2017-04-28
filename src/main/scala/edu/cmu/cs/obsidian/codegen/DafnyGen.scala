@@ -11,6 +11,9 @@ import collection.JavaConverters._
 /**
   * Created by mcoblenz on 4/27/17.
   */
+
+class StateDeclaration (val contents: String);
+
 class DafnyGen {
     def translateProgram(p: Program, outputFile: java.io.File): Unit = {
         val fileWriter = new java.io.FileWriter(outputFile)
@@ -40,21 +43,42 @@ class DafnyGen {
     }
 
     def translateContract(c: Contract): String = {
-        val translatedDeclarations = c.declarations.map(translateDeclaration)
-        val classContents = String.join("\n", translatedDeclarations.toIterable.asJava)
+
+        val allStatesAsDecls = c.declarations.filter((d: Declaration) => d.isInstanceOf[State])
+        val allStates = allStatesAsDecls.map((d: Declaration) => d.asInstanceOf[State])
+        val translatedDeclarationsAndStates = c.declarations.map(translateDeclaration(allStates)(c.name))
+        val (translatedDeclarations, translatedStates) = translatedDeclarationsAndStates.unzip
+
+        // translatedStates is a list of all the different states in the contract. Translate those all into one datatype declaration.
+        val flattenedStates = translatedStates.flatten :+ new StateDeclaration("defaultState")
+
+        val stateContents = String.join(" | ", flattenedStates.map((s: StateDeclaration) => s.contents).toIterable.asJava)
+        val stateTypeName = c.name + "_states"
+        val stateDeclaration = "datatype " + stateTypeName + " = " + indent(stateContents, 1)
 
 
 
-        val classDecl = "class " + c.name + " {\n" + indent(classContents, 1) + "\n}"
+        val stateField = "var state__: " + stateTypeName + "\n\n"
 
-        classDecl
+        val classConstructor = "constructor()\n" + "modifies this;\n" + "{\n" +
+        indent("this.state__ := defaultState;", 1) + "\n}\n\n"
+
+        val classContents = stateField + classConstructor + String.join("\n", translatedDeclarations.toIterable.asJava)
+
+
+
+        val classDecl = "class " + c.name + " {\n"  +
+            indent(classContents, 1) + "\n}"
+
+        stateDeclaration + "\n\n" + classDecl
     }
 
-    def translateDeclaration(d: Declaration): String = {
+    def translateDeclaration(allStates: Seq[State])(containingContractName: String)(d: Declaration) : (String, Seq[StateDeclaration]) = {
         d match {
-            case f@Field(typ, fieldName) => translateField(f)
-            case t@Transaction(_, _, _, _, _) => translateTransaction(t)
-            case _ => "" // TODO
+            case f@Field(typ, fieldName) => (translateField(f), Nil)
+            case t@Transaction(_, _, _, _, _) => (translateTransaction(allStates)(t), Nil)
+            case s@State(_, _) => ("", List(translateState(s, containingContractName)))
+            case _ => ("", Nil) // TODO
         }
     }
 
@@ -74,8 +98,10 @@ class DafnyGen {
         "var " + f.fieldName + ": " + typeDecl
     }
 
-    def translateTransaction(t: Transaction): String = {
-        "method " + t.name + " (" + translateArgs(t.args) + ")" + "\n{" + indent(translateBody(t.body), 1) + "\n}"
+    def translateTransaction(allStates: Seq[State])(t: Transaction): String = {
+        "method " + t.name + " (" + translateArgs(t.args) + ")" +
+            "\nmodifies this;" +
+            "\n{" + indent(translateBody(allStates: Seq[State])(t.body), 1) + "\n}\n"
     }
 
     def translateArgs(args: Seq[VariableDecl]): String = {
@@ -138,7 +164,7 @@ class DafnyGen {
         }
     }
 
-    def translateStatement(s: Statement): String = {
+    def translateStatement(allStates: Seq[State])(s: Statement): String = {
         s match {
             case VariableDecl(typ, name) =>
                 val initializer = typ match {
@@ -153,33 +179,30 @@ class DafnyGen {
 
             case ReturnExpr(e) => "return" + translateExpression(e)
 
-            case Transition(newState, updates) => ""
-                /* We must (in this order):
-                 * 1) define local variables that match the signature for the state constructor
-                 * 2) execute the state constructor.
-                 */
-                /* construct a new instance of the inner contract */
-                /*val decls =
+            case Transition(newState, updates: Seq[(Variable, Expression)]) =>
+                // There's no state constructor supported yet. Instead, we need to set up the state using the updates.
+                // They better be complete…
+                // ->S1({s1 = 3}) maps to…
+                // state__ := S1(3)
 
-                   // OLD CODE BELOW HERE
-                val newStField = translationContext.states(newState).innerClassField
-                body.assign(newStField, JExpr._new(translationContext.states(newState).innerClass))
+                val destState = allStates.find((s: State) => s.name.equals(newState))
 
-                /* assign fields in the update construct */
-                for ((f, e) <- updates) {
-                    body.assign(newStField.ref(f.x), translateExpr(e, translationContext, localContext))
+                // Typechecker should have rejected this program otherwise.
+                assert(destState.isDefined)
+                val stateFieldDecls = destState.get.declarations.filter((d: Declaration) => d.isInstanceOf[Field])
+                val stateFields = stateFieldDecls.map((d: Declaration) => d.asInstanceOf[Field])
+                // The order of the fields matters. We have to reorder the input expressions according to the order in which
+                // the fields were declared.
+
+                def mapField (f: Field): String = {
+                    // For each field in the state, find the binding in the update list.
+                    val foundPair = updates.find((u : (Variable, Expression)) => u._1.x.equals(f.fieldName))
+                    assert(foundPair.isDefined)
+                    translateExpression(foundPair.get._2)
                 }
 
-                /* assign conserved fields (implicit to programmer) */
-                body.invoke(conserveFieldsName).arg(translationContext.states(newState).enumVal)
-
-                /* nullify old state inner class field */
-                body.invoke(deleteOldStateName)
-
-                /* change the enum to reflect the new state */
-                body.assign(JExpr.ref(stateField), translationContext.getEnum(newState))
-                */
-
+                val initializers = stateFields.map(mapField)
+                "state__ := " + newState + "(" + String.join(", ", initializers.toIterable.asJava) + ");"
             case Assignment(Variable(x), e) =>
                 x + " := " + translateExpression(e)
             /* it's bad that this is a special case */
@@ -192,13 +215,13 @@ class DafnyGen {
             case Throw() => "" // TODO; not supported yet
             case If(e, s) =>
                 "if " + translateExpression(e) + " {\n" +
-                    indent(translateBody(s), 1) +
+                    indent(translateBody(allStates)(s), 1) +
                     "\n}"
 
             case IfThenElse(e, s1, s2) =>
                 "if " + translateExpression(e) + " {\n" +
-                    indent(translateBody(s1), 1) +
-                    "\n}\nelse {\n" + indent(translateBody(s2), 1) + "\n}"
+                    indent(translateBody(allStates)(s1), 1) +
+                    "\n}\nelse {\n" + indent(translateBody(allStates)(s2), 1) + "\n}"
 /*
             case TryCatch(s1, s2) =>
                 val jTry = body._try()
@@ -245,9 +268,28 @@ class DafnyGen {
         name + "(" + argsString + ")"
     }
 
-    def translateBody(statements: Seq[Statement]): String = {
-        val translatedStatements = statements.map(translateStatement)
+    def translateBody(allStates: Seq[State])(statements: Seq[Statement]): String = {
+        val translatedStatements = statements.map(translateStatement(allStates))
         String.join(";\n", translatedStatements.toIterable.asJava)
 
+    }
+
+    def translateState(state: State, containingContractName: String): StateDeclaration = {
+        // The fields in the declarations have to be unwrapped into cases in an algebraic datatype.
+
+        def extractFieldFromDeclaration(d: Declaration) = {
+            d match {
+                case Field(typ, fieldName) => fieldName + ": " + translateType(typ)
+                case _ => ""
+            }
+        }
+
+        val fieldsForState = state.declarations.map(extractFieldFromDeclaration)
+
+        val stateContents = state.name + "(" + String.join(",", fieldsForState.toIterable.asJava) + ")"
+
+
+
+        new StateDeclaration(stateContents)
     }
 }

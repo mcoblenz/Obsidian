@@ -2,11 +2,25 @@ main contract SimpleVerification {
     int x;
     int y;
 
+    SimpleVerification() {
+        x = 0;
+        y = 1;
+    }
+
+    state S1 {
+        int s1;
+    }
+
+    state S2 {
+        int s2;
+    }
+
     transaction doStuff(int a, bool b)
         ensures false;
     {
         x = 0;
         other();
+        ->S1({s1 = a});
     }
 
     transaction other()
