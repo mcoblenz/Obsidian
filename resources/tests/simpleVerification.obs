@@ -16,7 +16,7 @@ main contract SimpleVerification {
     }
 
     transaction doStuff(int a, bool b)
-        ensures false;
+        ensures true;
     {
         x = 0;
         other();

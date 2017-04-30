@@ -99,9 +99,14 @@ class DafnyGen {
     }
 
     def translateTransaction(allStates: Seq[State])(t: Transaction): String = {
-        "method " + t.name + " (" + translateArgs(t.args) + ")" +
-            "\nmodifies this;" +
-            "\n{" + indent(translateBody(allStates: Seq[State])(t.body), 1) + "\n}\n"
+        val ensuresExprs = t.ensures
+        val ensuresStrings = ensuresExprs.map((e: Ensures) => "ensures " + (translateExpression(e.expr)) + ";\n")
+        val ensuresClause = String.join("", ensuresStrings.toIterable.asJava)
+
+        "method " + t.name + " (" + translateArgs(t.args) + ")\n" +
+            "modifies this\n" +
+            ensuresClause +
+            "{" + indent(translateBody(allStates: Seq[State])(t.body), 1) + "\n}\n"
     }
 
     def translateArgs(args: Seq[VariableDecl]): String = {
