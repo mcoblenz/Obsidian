@@ -170,7 +170,7 @@ class CodeGen (val target: Target) {
             case Constructor(name, args, body) => // Constructors aren't translated becuase stubs are only for remote instances.
             case f@Func(name, args, retType, body) => translateStubFunction(f, inClass)
             case t@Transaction(_, _, _, _, _) => translateStubTransaction(t, inClass, translationContext)
-            case s@State(_, _) => translateStubState(s, inClass)
+            case s@State(_, _,  _) => translateStubState(s, inClass)
             case c@Contract(mod, name, decls) => translateStubContract(c,
                 inClass.getPackage(),
                 translationContext.contractNameResolutionMap,
@@ -507,7 +507,7 @@ class CodeGen (val target: Target) {
         /* setup the state enum */
         val stateDeclarations: Seq[State] =
             aContract.declarations.filter((d: Declaration) => d match {
-                case State(_, _) => true
+                case State(_, _, _) => true
                 case _ => false
             }).map({ s => s.asInstanceOf[State] })
 
@@ -518,7 +518,7 @@ class CodeGen (val target: Target) {
             stateEnumOption = Some(stateEnum)
 
             /* Declare the states in the enum */
-            for (State(name, _) <- stateDeclarations) {
+            for (State(name, _, _) <- stateDeclarations) {
                 stateEnum.enumConstant(name)
             }
 
@@ -1297,7 +1297,7 @@ class CodeGen (val target: Target) {
             case (Some(IsMain), t@Transaction(_,_,_,_,_)) =>
                 translateTransDecl(t, newClass, translationContext)
                 mainTransactions.add((currentState, t))
-            case (Some(IsMain), s@State(_,_)) =>
+            case (Some(IsMain), s@State(_, _,_)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
             case (Some(IsMain), c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
 
@@ -1308,7 +1308,7 @@ class CodeGen (val target: Target) {
             case (Some(IsShared), f@Field(_,_)) => ()
             case (Some(IsShared), f@Func(_,_,_,_)) => ()
             case (Some(IsShared), t@Transaction(_,_,_,_,_)) => ()
-            case (Some(IsShared), s@State(_,_)) => ()
+            case (Some(IsShared), s@State(_, _,_)) => ()
             case (Some(IsShared), c@Contract(_,_,_)) => ()
 
             /* Unique contracts and nested contracts are translated the same way */
@@ -1320,7 +1320,7 @@ class CodeGen (val target: Target) {
                 translateFuncDecl(f, newClass, translationContext)
             case (_, t@Transaction(_,_,_,_,_)) =>
                 translateTransDecl(t, newClass, translationContext)
-            case (_, s@State(_,_)) =>
+            case (_, s@State(_, _,_)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
             case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
 

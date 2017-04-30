@@ -307,8 +307,8 @@ object Parser extends Parsers {
     }
 
     private def parseStateDecl = {
-        StateT() ~! parseIdString ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ defs ~ _ => State(name, defs)
+        StateT() ~! parseIdString ~! rep(parseRequires) ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
+            case _ ~ name ~ requires ~ _ ~ defs ~ _ => State(name, requires, defs)
         }
     }
 

@@ -76,7 +76,7 @@ class DafnyGen {
         d match {
             case f@Field(typ, fieldName) => (translateField(f), Nil)
             case t@Transaction(_, _, _, _, _) => (translateTransaction(allStates)(t), Nil)
-            case s@State(_, _) => ("", List(translateState(s, containingContractName)))
+            case s@State(_, _, _) => ("", List(translateState(s, containingContractName)))
             case _ => ("", Nil) // TODO
         }
     }
@@ -213,8 +213,14 @@ class DafnyGen {
                     translateExpression(foundPair.get._2)
                 }
 
+
+                def mapStateRequires(r: Requires): String = {
+                    "assert " + translateExpression(r.expr) + ";\n"
+                }
+                val assertions = destState.get.requires.map(mapStateRequires)
+                val assertionsClause = String.join("", assertions.toIterable.asJava)
                 val initializers = stateFields.map(mapField)
-                "state__ := " + newState + "(" + String.join(", ", initializers.toIterable.asJava) + ");"
+                assertionsClause + "state__ := " + newState + "(" + String.join(", ", initializers.toIterable.asJava) + ");"
             case Assignment(Variable(x), e) =>
                 x + " := " + translateExpression(e)
             /* it's bad that this is a special case */

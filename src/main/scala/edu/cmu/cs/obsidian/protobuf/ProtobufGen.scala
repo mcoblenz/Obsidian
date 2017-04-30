@@ -45,7 +45,7 @@ object ProtobufGen {
 
         val stateNames: List[String] = aContract.declarations.foldRight(Nil: List[String])((decl, states) => decl match
             {
-                case State(name, _) => name::states
+                case State(name, _, _) => name::states
                 case _ => states
             }
         )
@@ -77,7 +77,7 @@ object ProtobufGen {
             case f@edu.cmu.cs.obsidian.parser.Field(_, _) => Some(translateFieldDecl(f))
             case f@Func(_,_,_, _) => None
             case t@Transaction(_,_,_,_,_) => None
-            case s@State(_, _) => Some(translateStateDecl(s))
+            case s@State(_, _, _) => Some(translateStateDecl(s))
         }
     }
 

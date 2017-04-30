@@ -7,7 +7,9 @@ main contract SimpleVerification {
         y = 1;
     }
 
-    state S1 {
+    state S1
+    requires x > 0;
+    {
         int s1;
     }
 
@@ -16,14 +18,17 @@ main contract SimpleVerification {
     }
 
     transaction doStuff(int a, bool b)
+        requires true;
         ensures true;
     {
-        x = 0;
+        x = 1;
         other();
         ->S1({s1 = a});
     }
 
     transaction other()
+        requires x > 0;
+        ensures x > 0;
     {
 
     }

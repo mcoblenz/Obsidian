@@ -74,7 +74,7 @@ case class Transaction(name: String,
                        retType: Option[Type],
                        specifications: Seq[Specification],
                        body: Seq[Statement]) extends Declaration
-case class State(name: String, declarations: Seq[Declaration]) extends Declaration
+case class State(name: String, requires: Seq[Requires], declarations: Seq[Declaration]) extends Declaration
 
 sealed trait Specification
 
