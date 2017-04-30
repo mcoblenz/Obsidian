@@ -4,7 +4,6 @@ import java.io.BufferedWriter
 
 import com.helger.jcodemodel.JExpr
 import edu.cmu.cs.obsidian.parser._
-
 import collection.JavaConverters._
 
 
@@ -99,13 +98,21 @@ class DafnyGen {
     }
 
     def translateTransaction(allStates: Seq[State])(t: Transaction): String = {
-        val ensuresExprs = t.ensures
-        val ensuresStrings = ensuresExprs.map((e: Ensures) => "ensures " + (translateExpression(e.expr)) + ";\n")
-        val ensuresClause = String.join("", ensuresStrings.toIterable.asJava)
+        val specifications = t.specifications
+
+        def translateSpecification(s: Specification): String = {
+            s match {
+                case Ensures(expr) => "ensures " + translateExpression(expr) + ";\n"
+                case Requires(expr) => "requires " + translateExpression(expr) + ";\n"
+            }
+        }
+
+        val specificationStrings = specifications.map(translateSpecification)
+        val specificationsClause = String.join("", specificationStrings.toIterable.asJava)
 
         "method " + t.name + " (" + translateArgs(t.args) + ")\n" +
             "modifies this\n" +
-            ensuresClause +
+            specificationsClause +
             "{" + indent(translateBody(allStates: Seq[State])(t.body), 1) + "\n}\n"
     }
 

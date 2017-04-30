@@ -282,18 +282,27 @@ object Parser extends Parsers {
         }
     }
 
+    private def parseRequires = {
+        RequiresT() ~! parseExpr ~! SemicolonT() ^^ {
+            case _ ~ expr ~ _ => Requires(expr)
+        }
+    }
 
-
+    private def parseSpecifications = {
+        rep(parseEnsures | parseRequires) ^^ {
+            case list => list
+        }
+    }
 
     private def parseTransDecl = {
         TransactionT() ~! (parseIdString | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        opt(parseReturns) ~! rep(parseEnsures) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case _ ~ name ~ _ ~ args ~ _ ~ ret ~ ensures ~ _ ~ body ~ _ =>
+        opt(parseReturns) ~! parseSpecifications ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case _ ~ name ~ _ ~ args ~ _ ~ ret ~ specs ~ _ ~ body ~ _ =>
                 val nameString = name match {
                     case s: String => s
                     case MainT() => "main"
                 }
-                Transaction(nameString, args, ret, ensures, body)
+                Transaction(nameString, args, ret, specs, body)
         }
     }
 
