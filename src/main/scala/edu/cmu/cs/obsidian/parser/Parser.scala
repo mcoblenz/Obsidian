@@ -278,13 +278,17 @@ object Parser extends Parsers {
 
     private def parseEnsures = {
         EnsuresT() ~! parseExpr ~! SemicolonT() ^^ {
-            case _ ~ expr ~ _ => Ensures(expr)
+            case ensuresTok ~ expr ~ _ => val e = Ensures(expr)
+                e.setPos(ensuresTok.pos)
+                e
         }
     }
 
     private def parseRequires = {
         RequiresT() ~! parseExpr ~! SemicolonT() ^^ {
-            case _ ~ expr ~ _ => Requires(expr)
+            case requiresTok ~ expr ~ _ => val r = Requires(expr)
+                r.setPos(requiresTok.pos)
+                r
         }
     }
 

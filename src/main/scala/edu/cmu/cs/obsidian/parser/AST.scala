@@ -1,5 +1,7 @@
 package edu.cmu.cs.obsidian.parser
 
+import scala.util.parsing.input.Positional
+
 sealed trait AST
 sealed trait Statement extends AST
 
@@ -78,8 +80,8 @@ case class State(name: String, requires: Seq[Requires], declarations: Seq[Declar
 
 sealed trait Specification
 
-case class Ensures(expr: Expression) extends Specification
-case class Requires(expr: Expression) extends Specification
+case class Ensures(expr: Expression) extends Specification with Positional
+case class Requires(expr: Expression) extends Specification with Positional
 
 sealed trait ContractModifier
 case object IsUnique extends ContractModifier
