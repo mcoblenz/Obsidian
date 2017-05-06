@@ -62,7 +62,7 @@ class DafnyGen {
         val classConstructor = "constructor()\n" + "modifies this;\n" + "{\n" +
         indent("this.state__ := defaultState;", 1) + "\n}\n\n"
 
-        val classContents = stateField + classConstructor + String.join("\n", translatedDeclarations.toIterable.asJava)
+        val classContents = stateField + classConstructor + String.join("\n", translatedDeclarations.toIterable.asJava) + "\n"
 
 
 
@@ -76,8 +76,8 @@ class DafnyGen {
         d match {
             case f@Field(typ, fieldName) => (translateField(f), Nil)
             case t@Transaction(_, _, _, _, _) => (translateTransaction(allStates)(t), Nil)
-            case s@State(_, _, _) => ("", List(translateState(s, containingContractName)))
-            case _ => ("", Nil) // TODO
+            case s@State(_, _, _) => translateState(allStates)(s, containingContractName)
+            case _ => ("", Nil) // TOD
         }
     }
 
@@ -110,10 +110,19 @@ class DafnyGen {
         val specificationStrings = specifications.map(translateSpecification)
         val specificationsClause = String.join("", specificationStrings.toIterable.asJava)
 
-        "method " + t.name + " (" + translateArgs(t.args) + ")\n" +
-            "modifies this\n" +
+        val returnsClause =
+            if (t.retType.isDefined) {
+                // Make up a dummy name for the returned variable.
+                "returns (ret___: " + translateType(t.retType.get) + ") "
+            }
+            else {
+                ""
+            }
+
+        "method " + t.name + " (" + translateArgs(t.args) + ") " + returnsClause + "\n" +
+            "modifies this;\n" +
             specificationsClause +
-            "{" + indent(translateBody(allStates: Seq[State])(t.body), 1) + "\n}\n"
+            "{\n" + indent(translateBody(allStates: Seq[State])(t.body), 1) + "\n}\n"
     }
 
     def translateArgs(args: Seq[VariableDecl]): String = {
@@ -189,7 +198,7 @@ class DafnyGen {
 
             case Return => "return"
 
-            case ReturnExpr(e) => "return" + translateExpression(e)
+            case ReturnExpr(e) => "return " + translateExpression(e)
 
             case Transition(newState, updates: Seq[(Variable, Expression)]) =>
                 // There's no state constructor supported yet. Instead, we need to set up the state using the updates.
@@ -220,7 +229,7 @@ class DafnyGen {
                 val assertions = destState.get.requires.map(mapStateRequires)
                 val assertionsClause = String.join("", assertions.toIterable.asJava)
                 val initializers = stateFields.map(mapField)
-                assertionsClause + "state__ := " + newState + "(" + String.join(", ", initializers.toIterable.asJava) + ");"
+                assertionsClause + "state__ := " + newState + "(" + String.join(", ", initializers.toIterable.asJava) + ")"
             case Assignment(Variable(x), e) =>
                 x + " := " + translateExpression(e)
             /* it's bad that this is a special case */
@@ -288,11 +297,12 @@ class DafnyGen {
 
     def translateBody(allStates: Seq[State])(statements: Seq[Statement]): String = {
         val translatedStatements = statements.map(translateStatement(allStates))
-        String.join(";\n", translatedStatements.toIterable.asJava)
-
+        val body = String.join(";\n", translatedStatements.toIterable.asJava)
+        if (body.length > 0) return body + ";"
+        else return body
     }
 
-    def translateState(state: State, containingContractName: String): StateDeclaration = {
+    def translateState(allStates: Seq[State])(state: State, containingContractName: String): (String, Seq[StateDeclaration]) = {
         // The fields in the declarations have to be unwrapped into cases in an algebraic datatype.
 
         def extractFieldFromDeclaration(d: Declaration) = {
@@ -302,12 +312,15 @@ class DafnyGen {
             }
         }
 
-        val fieldsForState = state.declarations.map(extractFieldFromDeclaration)
+        val fieldsForState = state.declarations.map(extractFieldFromDeclaration).filter((s: String) => s.length() > 0)
 
         val stateContents = state.name + "(" + String.join(",", fieldsForState.toIterable.asJava) + ")"
 
 
+        val translatedStateDecls = state.declarations.map(translateDeclaration(allStates)(containingContractName)).unzip
+        // We won't find any nested states because Obsidian doesn't support those.
 
-        new StateDeclaration(stateContents)
+
+        (String.join("\n", translatedStateDecls._1.toIterable.asJava), List(new StateDeclaration(stateContents)))
     }
 }
