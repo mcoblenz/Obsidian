@@ -208,7 +208,7 @@ object Main {
         dafnyGen.translateProgram(p, dafnyFile)
 
         val dafnyPath = System.getenv("DAFNY_PATH")
-        val verifyCommand = Array(dafnyPath, dafnyFile.getAbsolutePath())
+        val verifyCommand = Array(dafnyPath, "/compile:0", dafnyFile.getAbsolutePath())
         val proc: java.lang.Process = Runtime.getRuntime().exec(verifyCommand)
 
         // This API is confusingly named; the "input stream" is connected to the output of the process.
