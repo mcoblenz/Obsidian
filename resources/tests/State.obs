@@ -1,0 +1,33 @@
+main contract StateTest {
+    int x;
+    string s;
+    bool b;
+
+    StateTest() {
+        x = 2;
+        s = "abc";
+        b = true;
+    }
+
+    transaction setX(int newX) returns int {
+        int oldX = x;
+        x = newX;
+        -> S1;
+        return oldX;
+    }
+
+    state S1{
+        transaction setX(int newX) returns int {
+            x = newX;
+            return 5;
+        }
+    }
+
+    state S2 {
+        transaction f(string newS) returns string {
+            s = "b";
+            return s;
+        }
+    }
+
+}
