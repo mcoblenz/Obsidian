@@ -35,18 +35,22 @@ object Parser extends Parsers {
     }
 
     private def parseTypeModifier = {
-        val linearP = LinearT() ^^ (_ => IsLinear)
+        val linearP = ReadOnlyT() ^^ (_ => IsReadOnly)
+        val borrowsP = BorrowsT() ^^ (_ => IsBorrowed)
         val remoteP = RemoteT() ^^ (_ => IsRemote)
         linearP | remoteP
     }
 
     private def parseType = {
-        val nonPrim = rep(parseTypeModifier) ~ parseIdString ^^ {
-            case mod ~ id => NonPrimitiveType(mod, id)
+        val nonPrim = rep(parseTypeModifier) ~ parseIdString ~ opt(DotT() ~ parseIdString) ^^ {
+            case mod ~ nameC ~ Some(_ ~ nameS) => AstStateType(mod, nameC, nameS)
+            case mod ~ nameC ~ None => AstContractType(mod, nameC)
         }
-        val intPrim = IntT() ^^ { _ => IntType() }
-        val boolPrim = BoolT() ^^ { _ => BoolType() }
-        val stringPrim = StringT() ^^ { _ => StringType() }
+
+
+        val intPrim = IntT() ^^ { _ => AstIntType() }
+        val boolPrim = BoolT() ^^ { _ => AstBoolType() }
+        val stringPrim = StringT() ^^ { _ => AstStringType() }
 
         nonPrim | intPrim | boolPrim | stringPrim
     }
@@ -315,7 +319,7 @@ object Parser extends Parsers {
 
     private def parseContractModifier = {
         val mainP = MainT() ^^ (_ => IsMain)
-        val uniqueP = UniqueT() ^^ (_ => IsUnique)
+        val uniqueP = UniqueT() ^^ (_ => IsOwned)
         val sharedP = SharedT() ^^ (_ => IsShared)
         opt(mainP | uniqueP | sharedP)
     }

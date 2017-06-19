@@ -7,7 +7,7 @@ sealed trait Statement extends AST
  * that don't have effects to a later analysis */
 sealed trait Expression extends Statement
 sealed trait Declaration extends AST
-sealed trait Type extends AST
+sealed trait AstType extends AST
 
 /* Expressions */
 case class Variable(x: String) extends Expression
@@ -35,8 +35,8 @@ case class Invocation(recipient: Expression, name: String, args: Seq[Expression]
 case class Construction(name: String, args: Seq[Expression]) extends Expression
 
 /* statements and control flow constructs */
-case class VariableDecl(typ: Type, varName: String) extends Statement
-case class VariableDeclWithInit(typ: Type, varName: String, e: Expression) extends Statement
+case class VariableDecl(typ: AstType, varName: String) extends Statement
+case class VariableDeclWithInit(typ: AstType, varName: String, e: Expression) extends Statement
 case object Return extends Statement
 case class ReturnExpr(e: Expression) extends Statement
 case class Transition(newStateName: String, updates: Seq[(Variable, Expression)]) extends Statement
@@ -49,29 +49,33 @@ case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
 
 sealed trait TypeModifier
-case object IsLinear extends TypeModifier
+case object IsReadOnly extends TypeModifier
+case object IsBorrowed extends TypeModifier
 case object IsRemote extends TypeModifier
 
-case class IntType() extends Type
-case class BoolType() extends Type
-case class StringType() extends Type
-case class NonPrimitiveType(modifiers: Seq[TypeModifier], name: String) extends Type
+case class AstIntType() extends AstType
+case class AstBoolType() extends AstType
+case class AstStringType() extends AstType
+case class AstContractType(modifiers: Seq[TypeModifier], name: String) extends AstType
+case class AstStateType(modifiers: Seq[TypeModifier],
+                        contractName: String,
+                        stateName: String) extends AstType
 
 /* Declarations */
-case class TypeDecl(name: String, typ: Type) extends Declaration
+case class TypeDecl(name: String, typ: AstType) extends Declaration
 
-case class Field(typ: Type, fieldName: String) extends Declaration
+case class Field(typ: AstType, fieldName: String) extends Declaration
 
 case class Constructor(name: String,
                        args: Seq[VariableDecl],
                        body: Seq[Statement]) extends Declaration
 case class Func(name: String,
                 args: Seq[VariableDecl],
-                retType: Option[Type],
+                retType: Option[AstType],
                 body: Seq[Statement]) extends Declaration
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
-                       retType: Option[Type],
+                       retType: Option[AstType],
                        ensures: Seq[Ensures],
                        body: Seq[Statement]) extends Declaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration
@@ -79,7 +83,7 @@ case class State(name: String, declarations: Seq[Declaration]) extends Declarati
 case class Ensures(expr: Expression)
 
 sealed trait ContractModifier
-case object IsUnique extends ContractModifier
+case object IsOwned extends ContractModifier
 case object IsShared extends ContractModifier
 case object IsMain extends ContractModifier
 
