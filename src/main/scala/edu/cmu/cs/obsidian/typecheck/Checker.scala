@@ -154,6 +154,10 @@ class Checker {
             case IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) => None // todo
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) => None // todo
             case Switch(e: Expression, cases: Seq[SwitchCase]) => None // todo
+            case LocalInvocation(name: String, args: Seq[Expression]) => None // todo
+            case Invocation(recipient: Expression, name: String, args: Seq[Expression]) => None // todo
+            case Construction(name: String, args: Seq[Expression]) => None // todo
+            case expr => Some(s"Statement $expr has no side effects")
         }
     }
 

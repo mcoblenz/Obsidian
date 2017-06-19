@@ -121,11 +121,11 @@ class ParserTests extends JUnitSuite {
               |     state S1 {
               |         function f() { return x; }
               |         function f(T x) { return x; }
-              |         function f(T1 x, linear T2 y, T3 z) { return x; }
+              |         function f(T1 x, T2 y, T3 z) { return x; }
               |
               |         transaction t() { return x; }
               |         transaction t(T x) { return x; }
-              |         transaction t(T1 x, linear T2 y, T3 z) {
+              |         transaction t(T1 x, T2 y, T3 z) {
               |             f(x, y, z);
               |             f();
               |             x.f(x, y, z);

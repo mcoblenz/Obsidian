@@ -39,12 +39,12 @@ class LexerTests extends JUnitSuite {
         shouldEqual(
             """
               | contract Contract if else transaction trans function function1 type state try
-              | catch throw not and or return linear new newa
+              | catch throw not and or return new newa
             """.stripMargin,
             List(
                 ContractT(), IdentifierT("Contract"), IfT(), ElseT(), TransactionT(), IdentifierT("trans"),
                 FunctionT(), IdentifierT("function1"), TypeT(), StateT(), TryT(), CatchT(), ThrowT(), NotT(),
-                AndT(), OrT(), ReturnT(), LinearT(), NewT(), IdentifierT("newa")
+                AndT(), OrT(), ReturnT(), NewT(), IdentifierT("newa")
             )
         )
     }

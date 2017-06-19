@@ -83,10 +83,12 @@ object ProtobufGen {
 
     private def translateFieldDecl(f: edu.cmu.cs.obsidian.parser.Field): ProtobufDeclaration = {
         f.typ match {
-            case i@edu.cmu.cs.obsidian.parser.IntType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.fieldName)
-            case b@edu.cmu.cs.obsidian.parser.BoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.fieldName)
-            case s@edu.cmu.cs.obsidian.parser.StringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.fieldName)
-            case n@edu.cmu.cs.obsidian.parser.NonPrimitiveType(modifiers, typeName) =>
+            case i@edu.cmu.cs.obsidian.parser.AstIntType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.fieldName)
+            case b@edu.cmu.cs.obsidian.parser.AstBoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.fieldName)
+            case s@edu.cmu.cs.obsidian.parser.AstStringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.fieldName)
+            case n@edu.cmu.cs.obsidian.parser.AstContractType(_, typeName) =>
+                ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName), f.fieldName)
+            case n@edu.cmu.cs.obsidian.parser.AstStateType(_, typeName, _) =>
                 ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName), f.fieldName)
         }
     }
