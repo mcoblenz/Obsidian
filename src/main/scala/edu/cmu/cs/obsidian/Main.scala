@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian
 
-import java.nio.file.{Files, Paths, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.io.File
 import java.util.Scanner
 
@@ -10,6 +10,7 @@ import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
 import edu.cmu.cs.obsidian.util._
 import com.helger.jcodemodel.JCodeModel
+import edu.cmu.cs.obsidian.typecheck.Checker
 
 import scala.sys.process._
 
@@ -252,6 +253,11 @@ object Main {
                 println()
             }
 
+            val checker = new Checker()
+            checker.checkProgram(ast) match {
+                case Some(err) => println(s"Typechecking failed with error:\n$err")
+                case None => println("Typechecking was completed successfully.")
+            }
 
             val lastSlash = filename.lastIndexOf("/")
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)

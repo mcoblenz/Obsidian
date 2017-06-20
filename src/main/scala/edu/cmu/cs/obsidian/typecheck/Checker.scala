@@ -9,7 +9,7 @@ case class ContractType(contractName: String) extends SimpleType
 case class StateType(contractName: String, stateName: String) extends SimpleType
 
 /* This is necessarily different from the representation of types in the AST; it's
- * unclear in the AST if a reference is "shared" or "owned" when it has no modifier */
+* unclear in the AST if a reference is "shared" or "owned" when it has no modifier */
 sealed trait Type
 case class ReadOnlyRef(t: SimpleType) extends Type
 case class SharedRef(t: SimpleType) extends Type
@@ -26,6 +26,8 @@ class IndexedState(
                       funLookup: Map[String, Func]
                   ) {
     def getAst = state
+
+    def getContractAst = insideOf.getAst
 
     def getField(name: String): Option[Field] = {
         fieldLookup.get(name) match {
@@ -72,7 +74,32 @@ class Checker {
 
     var progInfo: IndexedProgram = null
 
-    def translateType(t: AstType): Type = {
+    /* true iff [t1 <: t2] */
+    private def simpleSubTypeOf(t1: SimpleType, t2: SimpleType): Boolean = {
+        (t1, t2) match {
+            /* Reflexivity rules */
+            case (ContractType(c1), ContractType(c2)) => c1 == c2
+            case (StateType(c1, s1), StateType(c2, s2)) => c1 == c2 && s1 == s2
+            /* */
+            case (StateType(c1, s1), ContractType(c2)) => c1 == c2
+            case _ => false
+        }
+    }
+
+    /* true iff [t1 <: t2] */
+    private def subTypeOf(t1: Type, t2: Type): Boolean = {
+        (t1, t2) match {
+            case (IntType(), IntType()) => true
+            case (BoolType(), BoolType()) => true
+            case (StringType(), StringType()) => true
+            case (OwnedRef(s_t1), OwnedRef(s_t2)) => simpleSubTypeOf(s_t1, s_t2)
+            case (ReadOnlyRef(s_t1), ReadOnlyRef(s_t2)) => simpleSubTypeOf(s_t1, s_t2)
+            case (SharedRef(s_t1), SharedRef(s_t2)) => simpleSubTypeOf(s_t1, s_t2)
+            case _ => false
+        }
+    }
+
+    private def translateType(t: AstType): Type = {
 
         val getModifier = (t: SimpleType, mods: Seq[TypeModifier], contractName: String) => {
             val contract = progInfo.getContract(contractName).get.getAst
@@ -105,9 +132,18 @@ class Checker {
         }
     }
 
-    def checkExpr(insideOf: (Statement, Transaction with Func, State with Contract),
+    private def checkExpr(insideOf: (Statement, Either[Transaction, Func], Either[IndexedState, IndexedContract]),
                   context: Map[String, Type],
                   e: Expression): Either[String, Type] = {
+
+        /* returns [t] if [e : t], otherwise gives an error message */
+        def assertTypeEquality(e: Expression, t: Type): Either[String, Type] = {
+            checkExpr(insideOf, context, e) match {
+                case err@Left(_) => err
+                case Right(tPrime) => if (t == tPrime) Right(t) else Left(s"Expression $e must have type $t")
+            }
+        }
+
          e match {
              case Variable(x: String) =>
                  context get x match {
@@ -118,10 +154,23 @@ class Checker {
              case StringLiteral(value: String) => Right(new StringType())
              case TrueLiteral() => Right(new BoolType())
              case FalseLiteral() => Right(new BoolType())
-             case This() => Left("Not Implemented.") // todo
-             case Conjunction(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case Disjunction(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case LogicalNegation(e: Expression) => Left("Not Implemented.") // todo
+             case This() =>
+                 val baseType = insideOf._3 match {
+                     case Left(s) => StateType(s.getContractAst.name, s.getAst.name)
+                     case Right(c) => ContractType(c.getAst.name)
+                 }
+                 insideOf._2 match {
+                     // if we're in a transaction, we can consider [this] to be [owned]
+                     case Left(tx) => Right(OwnedRef(baseType))
+                     // if we're in a function, [this] must be deemed [readonly]
+                     case Right(fun) => Right(ReadOnlyRef(baseType))
+                 }
+             case Conjunction(e1: Expression, e2: Expression) =>
+                 assertTypeEquality(e1, BoolType()).right.flatMap(_ => assertTypeEquality(e2, BoolType()))
+             case Disjunction(e1: Expression, e2: Expression) =>
+                 assertTypeEquality(e1, BoolType()).right.flatMap(_ => assertTypeEquality(e2, BoolType()))
+             case LogicalNegation(e: Expression) =>
+                 assertTypeEquality(e, BoolType())
              case Add(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
              case Subtract(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
              case Divide(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
@@ -139,29 +188,31 @@ class Checker {
         }
     }
 
-    def checkStatement(insideOf: (Transaction with Func, State with Contract),
+    private def checkStatement(insideOf: (Transaction with Func, State with Contract),
                        context: Map[String, Type],
-                       s: Statement): Option[String] = {
+                       s: Statement): Either[String, Map[String, Type]] = {
         s match {
-            case VariableDecl(typ: AstType, varName: String) => None // todo
-            case VariableDeclWithInit(typ: AstType, varName: String, e: Expression) => None // todo
-            case Return => None // todo
-            case ReturnExpr(e: Expression) => None // todo
-            case Transition(newStateName: String, updates: Seq[(Variable, Expression)]) => None // todo
-            case Assignment(assignTo: Expression, e: Expression) => None // todo
-            case Throw() => None // todo
-            case If(eCond: Expression, s: Seq[Statement]) => None // todo
-            case IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) => None // todo
-            case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) => None // todo
-            case Switch(e: Expression, cases: Seq[SwitchCase]) => None // todo
-            case LocalInvocation(name: String, args: Seq[Expression]) => None // todo
-            case Invocation(recipient: Expression, name: String, args: Seq[Expression]) => None // todo
-            case Construction(name: String, args: Seq[Expression]) => None // todo
-            case expr => Some(s"Statement $expr has no side effects")
+            case VariableDecl(typ: AstType, varName: String) =>
+                // todo : do we want to analyze initialization status as well?
+                Right(context.updated(varName, translateType(typ)))
+            case VariableDeclWithInit(typ: AstType, varName: String, e: Expression) => Left("") // todo
+            case Return => Left("") // todo
+            case ReturnExpr(e: Expression) => Left("") // todo
+            case Transition(newStateName: String, updates: Seq[(Variable, Expression)]) => Left("") // todo
+            case Assignment(assignTo: Expression, e: Expression) => Left("") // todo
+            case Throw() => Left("") // todo
+            case If(eCond: Expression, s: Seq[Statement]) => Left("") // todo
+            case IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) => Left("") // todo
+            case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) => Left("") // todo
+            case Switch(e: Expression, cases: Seq[SwitchCase]) => Left("") // todo
+            case LocalInvocation(name: String, args: Seq[Expression]) => Left("") // todo
+            case Invocation(recipient: Expression, name: String, args: Seq[Expression]) => Left("") // todo
+            case Construction(name: String, args: Seq[Expression]) => Left("") // todo
+            case expr => Left(s"Statement $expr has no side effects")
         }
     }
 
-    def checkSimpleType(st: SimpleType): Option[String] = {
+    private def checkSimpleType(st: SimpleType): Option[String] = {
         st match {
             case ContractType(name) =>
                 val lookup = progInfo.getContract(name)
@@ -176,7 +227,7 @@ class Checker {
         }
     }
 
-    def checkField(field: Field): Option[String] = {
+    private def checkField(field: Field): Option[String] = {
         translateType(field.typ) match {
             case OwnedRef(simple) => checkSimpleType(simple)
 
@@ -190,19 +241,19 @@ class Checker {
         }
     }
 
-    def checkTransaction(tx: Transaction, insideOf: Contract): Option[String] = {
+    private def checkTransaction(tx: Transaction, insideOf: Contract): Option[String] = {
         None // todo
     }
 
-    def checkFunc(func: Func, insideOf: Contract): Option[String] = {
+    private def checkFunc(func: Func, insideOf: Contract): Option[String] = {
         None // todo
     }
 
-    def checkContract(contract: Contract): Option[String] = {
+    private def checkContract(contract: Contract): Option[String] = {
         None // todo
     }
 
-    def indexDecl(decls: Seq[Declaration]): (Map[String, Field], Map[String, Transaction], Map[String, Func]) = {
+    private def indexDecl(decls: Seq[Declaration]): (Map[String, Field], Map[String, Transaction], Map[String, Func]) = {
         var fieldLookup = new TreeMap[String, Field]()
         var txLookup = new TreeMap[String, Transaction]()
         var funLookup = new TreeMap[String, Func]()
@@ -219,13 +270,13 @@ class Checker {
         (fieldLookup, txLookup, funLookup)
     }
 
-    def indexState(state: State, insideOf: IndexedContract): IndexedState = {
+    private def indexState(state: State, insideOf: IndexedContract): IndexedState = {
         val (fieldLookup, txLookup, funLookup) = indexDecl(state.declarations)
 
         new IndexedState(state, insideOf, fieldLookup, txLookup, funLookup)
     }
 
-    def indexContract(contract: Contract): IndexedContract = {
+    private def indexContract(contract: Contract): IndexedContract = {
         val (fieldLookup, txLookup, funLookup) = indexDecl(contract.declarations)
 
         /* this is mutable essentially in order to easily allow the construction of a circular reference between
@@ -248,7 +299,7 @@ class Checker {
 
     /* this doesn't actually check anything, but indexes data by name so that searching for a
      * contract/field/tx/function is easy/fast */
-    def indexProgram(program: Program): Unit = {
+    private def indexProgram(program: Program): Unit = {
         var contractLookup = new TreeMap[String, IndexedContract]
         for (contract <- program.contracts) {
             contractLookup = contractLookup.updated(contract.name, indexContract(contract))
