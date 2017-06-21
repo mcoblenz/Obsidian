@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.typecheck
 import edu.cmu.cs.obsidian.parser._
 
 import scala.collection.immutable.TreeMap
-import scala.collection.Map
+import scala.collection.{Map, mutable}
 import scala.collection.mutable.ArrayBuffer
 
 sealed trait SimpleType
@@ -145,13 +145,145 @@ class Checker {
         }
     }
 
+
     private def checkExpr(
                              insideOfMethod: Either[Transaction, Func],
                              insideOfContract: Either[IndexedState, IndexedContract],
                              context: Context,
                              e: Expression
                          ): (Type, Context) = {
-        (BottomType(), context)
+
+        /* returns [t] if [e : t], otherwise returns BottomType */
+        def assertTypeEquality(e: Expression, t: Type, c: Context): (Type, Context) = {
+            val (tPrime, cPrime) = checkExpr(insideOfMethod, insideOfContract, c, e)
+            if (t == tPrime) (t, cPrime) else {
+                logError(f"$e must have type $t")
+                (BottomType(), cPrime)
+            }
+        }
+
+        def assertOperationType(e1: Expression, e2: Expression, t: Type): (Type, Context) = {
+            val (t1, c1) = assertTypeEquality(e1, t, context)
+            val (t2, c2) = assertTypeEquality(e2, t, c1)
+            if (t1 == BottomType() || t2 == BottomType()) (BottomType(), c2) else (t, c2)
+        }
+
+        def assertComparisonType(e1: Expression, e2: Expression): (Type, Context) = {
+            val (t1, c1) = assertTypeEquality(e1, IntType(), context)
+            val (t2, c2) = assertTypeEquality(e2, IntType(), c1)
+            if (t1 == BottomType() || t2 == BottomType()){
+                logError(f"$e1 and $e2 must have type int")
+                (BottomType(), c2)
+            }  else (BoolType(), c2)
+        }
+
+        def checkArgsTx(tx: Transaction, args: Seq[Expression], context: Context): Context = {
+           context
+        }
+
+        def checkArgsFun(fun: Func, args: Seq[Expression], context: Context): Context = {
+            context
+        }
+
+         e match {
+             case Variable(x: String) =>
+                 context get x match {
+                     case Some(t) => t match {
+                         case OwnedRef(simp) => (OwnedRef(simp), context.updated(x, ReadOnlyRef(simp)))
+                         case _ => (t, context)
+                     }
+                     case None =>
+                         logError(s"Variable $x undefined")
+                         (BottomType(), context)
+                 }
+             case NumLiteral(value: Int) => (IntType(), context)
+             case StringLiteral(value: String) => (StringType(), context)
+             case TrueLiteral() => (BoolType(), context)
+             case FalseLiteral() => (BoolType(), context)
+             case This() =>
+                 val baseType = insideOfContract match {
+                     case Left(s) => StateType(s.getContractAst.name, s.getAst.name)
+                     case Right(c) => ContractType(c.getAst.name)
+                 }
+                 insideOfMethod match {
+                     // if we're in a transaction, we can consider [this] to be [owned]
+                     case Left(tx) => (OwnedRef(baseType), context)
+                     // if we're in a function, [this] must be deemed [readonly]
+                     case Right(fun) => (ReadOnlyRef(baseType), context)
+                 }
+             case Conjunction(e1: Expression, e2: Expression) =>
+                 assertOperationType(e1, e2, BoolType())
+             case Disjunction(e1: Expression, e2: Expression) =>
+                 assertOperationType(e1, e2, BoolType())
+             case LogicalNegation(e: Expression) =>
+                 assertTypeEquality(e, BoolType(), context)
+             case Add(e1: Expression, e2: Expression) =>
+                 assertOperationType(e1, e2, IntType())
+             case Subtract(e1: Expression, e2: Expression) =>
+                 assertOperationType(e1, e2, IntType())
+             case Divide(e1: Expression, e2: Expression) =>
+                 assertOperationType(e1, e2, IntType())
+             case Multiply(e1: Expression, e2: Expression) =>
+                 assertOperationType(e1, e2, IntType())
+             case Equals(e1: Expression, e2: Expression) =>
+                 val (t1, c1) = checkExpr(insideOfMethod, insideOfContract, context, e1)
+                 val (t2, c2) = checkExpr(insideOfMethod, insideOfContract, c1, e2)
+                 if (t1 == t2) (t1, c2) else (BottomType(), c2)
+             case GreaterThan(e1: Expression, e2: Expression) =>
+                 assertComparisonType(e1, e2)
+             case GreaterThanOrEquals(e1: Expression, e2: Expression) =>
+                 assertComparisonType(e1, e2)
+             case LessThan(e1: Expression, e2: Expression) =>
+                 assertComparisonType(e1, e2)
+             case LessThanOrEquals(e1: Expression, e2: Expression) =>
+                 assertComparisonType(e1, e2)
+             case NotEquals(e1: Expression, e2: Expression) =>
+                 val (t1, c1) = checkExpr(insideOfMethod, insideOfContract, context, e1)
+                 val (t2, c2) = checkExpr(insideOfMethod, insideOfContract, c1, e2)
+                 if (t1 == t2) (t1, c2) else (BottomType(), c2)
+             case Dereference(e: Expression, f: String) => (BottomType(), context) // todo
+             case LocalInvocation(name: String, args: Seq[Expression]) =>
+                 insideOfContract match {
+                     case Left(state) => state.getTransaction(name) match {
+                         case Some(tx) =>
+                             val cPrime = checkArgsTx(tx, args, context)
+                             tx.retType match{
+                                 case Some(rType) => (translateType(rType), cPrime)
+                                 case None => (BottomType(), cPrime)
+                             }
+                         case None => state.getFunction(name) match {
+                             case Some(fun) =>
+                                 val cPrime = checkArgsFun(fun, args, context)
+                                 fun.retType match{
+                                     case Some(rType) => (translateType(rType), cPrime)
+                                     case None => (BottomType(), cPrime)
+                                 }
+                             case None => (BottomType(), context)
+
+                         }
+                     }
+                     case Right(contract) => contract.getTransaction(name) match {
+                         case Some(tx) =>
+                             val cPrime = checkArgsTx(tx, args, context)
+                             tx.retType match{
+                                 case Some(rType) => (translateType(rType), cPrime)
+                                 case None => (BottomType(), cPrime)
+                             }
+                         case None => contract.getFunction(name) match {
+                             case Some(fun) =>
+                                 val cPrime = checkArgsFun(fun, args, context)
+                                 fun.retType match{
+                                     case Some(rType) => (translateType(rType), cPrime)
+                                     case None => (BottomType(), cPrime)
+                                 }
+                             case None => (BottomType(), context)
+
+                         }
+                     }
+                 }
+             case Invocation(recipient: Expression, name: String, args: Seq[Expression]) => (BottomType(), context) // todo
+             case Construction(name: String, args: Seq[Expression]) => (BottomType(), context) // todo
+         }
     }
 
     private def checkStatement(
