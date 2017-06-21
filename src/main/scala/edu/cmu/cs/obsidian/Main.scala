@@ -254,9 +254,10 @@ object Main {
             }
 
             val checker = new Checker()
-            checker.checkProgram(ast) match {
-                case Some(err) => println(s"Typechecking failed with error:\n$err")
-                case None => println("Typechecking was completed successfully.")
+            if (checker.checkProgram(ast)) {
+                println("Typechecking was completed successfully.")
+            } else {
+                println("Typechecking failed.\n")
             }
 
             val lastSlash = filename.lastIndexOf("/")

@@ -67,12 +67,13 @@ class IndexedContract(
     def getFunction = funLookup.get(_)
     def getState = stateLookup.get(_)
 
-    def getConstructors(): Set[Constructor] = {
-        var constructors = new TreeSet[Constructor]()
-        for (rawDecl <- contract.declarations;
-             rawDecl.isInstanceOf[Constructor];
-             decl: Constructor <- rawDecl.asInstanceOf[Constructor]) {
-            constructors = constructors + decl
+    def getConstructors(): Seq[Constructor] = {
+        var constructors: List[Constructor] = Nil
+        for (rawDecl <- contract.declarations) {
+            if (rawDecl.isInstanceOf[Constructor]) {
+                constructors = rawDecl.asInstanceOf[Constructor]::constructors
+            }
+
         }
         constructors
     }
@@ -160,9 +161,9 @@ class Checker {
                 } else {
                     None
                 }
-            case (StateType(c1, s1), c@ContractType(c2)) =>
+            case (StateType(c1, _), c@ContractType(c2)) =>
                 if (c1 == c2) Some(c) else None
-            case (c@ContractType(c1), State(c2, s2)) =>
+            case (c@ContractType(c1), StateType(c2, _)) =>
                 if (c1 == c2) Some(c) else None
             case _ => None
         }
@@ -256,8 +257,8 @@ class Checker {
     private def mergeContext(context1: Context, context2: Context): Context = {
         var mergedContext = new TreeMap[String, Type]()
 
-        val onlyIn1 = context1.keys.toSet - context2.keys.toSet
-        val onlyIn2 = context2.keys.toSet - context1.keys.toSet
+        val onlyIn1: Set[String] = context1.keys.toSet.diff(context2.keys.toSet)
+        val onlyIn2: Set[String] = context2.keys.toSet.diff(context1.keys.toSet)
         val inBoth = context1.keys.toSet.intersect(context2.keys.toSet)
 
         for (x <- inBoth) {
@@ -600,19 +601,69 @@ class Checker {
         }
     }
 
-    private def checkTransaction(tx: Transaction, insideOf: Contract): Option[String] = {
+    private def checkTransaction(
+                                    tx: Transaction,
+                                    insideOfContract: Either[IndexedState, IndexedContract]
+                                ): Unit = {
+        var initContext = new TreeMap[String, Type]()
+
+        for (arg <- tx.args) {
+            initContext = initContext.updated(arg.varName, translateType(arg.typ))
+        }
+
+        val thisType = insideOfContract match {
+            case Left(indexed) =>
+                OwnedRef(StateType(indexed.getContract.getAst.name, indexed.getAst.name))
+            case Right(indexed) =>
+                OwnedRef(ContractType(indexed.getAst.name))
+        }
+        val cName = insideOfContract.fold(_.getContract.getAst.name, _.getAst.name)
+
+        initContext = initContext.updated("this", thisType)
+
+        val outputContext =
+            checkStatementSequence(Left(tx), insideOfContract, initContext, tx.body)
+
+        assertSubType(outputContext("this"), OwnedRef(ContractType(cName)))
+
+        for ((x, t) <- outputContext) {
+            if (t.isInstanceOf[OwnedRef]) {
+                logError(s"Variable $x holds ownership, but is unused at the end of the transaction")
+            }
+        }
+
+        // todo: analyze that there is a return in every branch
+    }
+
+    private def checkFunc(func: Func, insideOf: Contract): Unit = {
         None // todo
     }
 
-    private def checkFunc(func: Func, insideOf: Contract): Option[String] = {
-        None // todo
+    private def checkState(insideOf: IndexedContract, state: State): Unit = {
+        val indexed = insideOf.getState(state.name).get
+        for (decl <- state.declarations) {
+            decl match {
+                case t@Transaction(_,_,_,_,_) => checkTransaction(t, Left(indexed))
+                case f@Field(_,_) => checkField(f)
+                case _ => () // TODO
+            }
+        }
     }
 
-    private def checkContract(contract: Contract): Option[String] = {
-        None // todo
+    private def checkContract(contract: Contract): Unit = {
+        val indexed = progInfo.getContract(contract.name).get
+        for (decl <- contract.declarations) {
+            decl match {
+                case t@Transaction(_,_,_,_,_) => checkTransaction(t, Right(indexed))
+                case s@State(_,_) => checkState(indexed, s)
+                case f@Field(_,_) => checkField(f)
+                case _ => () // TODO
+            }
+        }
     }
 
-    private def indexDecl(decls: Seq[Declaration]): (Map[String, Field], Map[String, Transaction], Map[String, Func]) = {
+    private def indexDecl(decls: Seq[Declaration]
+                         ): (Map[String, Field], Map[String, Transaction], Map[String, Func]) = {
         var fieldLookup = new TreeMap[String, Field]()
         var txLookup = new TreeMap[String, Transaction]()
         var funLookup = new TreeMap[String, Func]()
@@ -667,15 +718,18 @@ class Checker {
         progInfo = new IndexedProgram(program, contractLookup)
     }
 
-    def checkProgram(program: Program): Option[String] = {
+    /* [true] if no type errors, [false] otherwise */
+    def checkProgram(program: Program): Boolean = {
         indexProgram(program)
         for (contract <- program.contracts) {
-            checkContract(contract) match {
-                case err@Some(_) => return err
-                case _ => ()
-            }
+            checkContract(contract)
         }
 
-        None
+        for (err <- errors) {
+            println(s"Typechecking failure:\n$err")
+            println()
+        }
+
+        errors.isEmpty
     }
 }
