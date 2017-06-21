@@ -98,7 +98,7 @@ class Checker {
     var progInfo: IndexedProgram = null
 
     private def logError(msg: String): Unit = {
-        errors + msg
+        errors.push(msg)
     }
 
     private def extractSimpleType(t: Type): Option[SimpleType] = {
@@ -762,7 +762,7 @@ class Checker {
         assertSubType(outputContext("this"), OwnedRef(ContractType(cName)))
 
         for ((x, t) <- outputContext) {
-            if (t.isInstanceOf[OwnedRef]) {
+            if (t.isInstanceOf[OwnedRef] && x != "this") {
                 logError(s"Variable $x holds ownership, but is unused at the end of the transaction")
             }
         }
@@ -860,10 +860,7 @@ class Checker {
             checkContract(contract)
         }
 
-        for (err <- errors) {
-            println(s"Typechecking failure:\n$err")
-            println()
-        }
+        for (err <- errors) println(err)
 
         errors.isEmpty
     }

@@ -258,6 +258,7 @@ object Main {
                 println("Typechecking was completed successfully.")
             } else {
                 println("Typechecking failed.\n")
+                return
             }
 
             val lastSlash = filename.lastIndexOf("/")
