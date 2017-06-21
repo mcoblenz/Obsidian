@@ -1,8 +1,10 @@
 package edu.cmu.cs.obsidian.typecheck
 
 import edu.cmu.cs.obsidian.parser._
+
 import scala.collection.immutable.TreeMap
 import scala.collection.Map
+import scala.collection.mutable.ArrayBuffer
 
 sealed trait SimpleType
 case class ContractType(contractName: String) extends SimpleType
@@ -17,6 +19,8 @@ case class OwnedRef(t: SimpleType) extends Type
 case class IntType() extends Type
 case class BoolType() extends Type
 case class StringType() extends Type
+/* Used to indicate an error in expressions */
+case class BottomType() extends Type
 
 class IndexedState(
                       state: State,
@@ -72,7 +76,15 @@ class IndexedProgram(
 
 class Checker {
 
+    type Context = Map[String, Type]
+    type Error = String
+
+    val errors = new collection.mutable.ArrayStack[Error]()
     var progInfo: IndexedProgram = null
+
+    private def logError(msg: String): Unit = {
+        errors + msg
+    }
 
     /* true iff [t1 <: t2] */
     private def simpleSubTypeOf(t1: SimpleType, t2: SimpleType): Boolean = {
@@ -89,6 +101,7 @@ class Checker {
     /* true iff [t1 <: t2] */
     private def subTypeOf(t1: Type, t2: Type): Boolean = {
         (t1, t2) match {
+            case (BottomType(), _) => true
             case (IntType(), IntType()) => true
             case (BoolType(), BoolType()) => true
             case (StringType(), StringType()) => true
@@ -132,84 +145,22 @@ class Checker {
         }
     }
 
-    private def checkExpr(insideOf: (Statement, Either[Transaction, Func], Either[IndexedState, IndexedContract]),
-                  context: Map[String, Type],
-                  e: Expression): Either[String, Type] = {
-
-        /* returns [t] if [e : t], otherwise gives an error message */
-        def assertTypeEquality(e: Expression, t: Type): Either[String, Type] = {
-            checkExpr(insideOf, context, e) match {
-                case err@Left(_) => err
-                case Right(tPrime) => if (t == tPrime) Right(t) else Left(s"Expression $e must have type $t")
-            }
-        }
-
-         e match {
-             case Variable(x: String) =>
-                 context get x match {
-                     case Some(t) => Right(t)
-                     case None => Left(f"variable '$x' not ")
-                 }
-             case NumLiteral(value: Int) => Right(new IntType())
-             case StringLiteral(value: String) => Right(new StringType())
-             case TrueLiteral() => Right(new BoolType())
-             case FalseLiteral() => Right(new BoolType())
-             case This() =>
-                 val baseType = insideOf._3 match {
-                     case Left(s) => StateType(s.getContractAst.name, s.getAst.name)
-                     case Right(c) => ContractType(c.getAst.name)
-                 }
-                 insideOf._2 match {
-                     // if we're in a transaction, we can consider [this] to be [owned]
-                     case Left(tx) => Right(OwnedRef(baseType))
-                     // if we're in a function, [this] must be deemed [readonly]
-                     case Right(fun) => Right(ReadOnlyRef(baseType))
-                 }
-             case Conjunction(e1: Expression, e2: Expression) =>
-                 assertTypeEquality(e1, BoolType()).right.flatMap(_ => assertTypeEquality(e2, BoolType()))
-             case Disjunction(e1: Expression, e2: Expression) =>
-                 assertTypeEquality(e1, BoolType()).right.flatMap(_ => assertTypeEquality(e2, BoolType()))
-             case LogicalNegation(e: Expression) =>
-                 assertTypeEquality(e, BoolType())
-             case Add(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case Subtract(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case Divide(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case Multiply(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case Equals(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case GreaterThan(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case GreaterThanOrEquals(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case LessThan(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case LessThanOrEquals(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case NotEquals(e1: Expression, e2: Expression) => Left("Not Implemented.") // todo
-             case Dereference(e: Expression, f: String) => Left("Not Implemented.") // todo
-             case LocalInvocation(name: String, args: Seq[Expression]) => Left("Not Implemented.") // todo
-             case Invocation(recipient: Expression, name: String, args: Seq[Expression]) => Left("Not Implemented.") // todo
-             case Construction(name: String, args: Seq[Expression]) => Left("Not Implemented.") // todo
-        }
+    private def checkExpr(
+                             insideOfMethod: Either[Transaction, Func],
+                             insideOfContract: Either[IndexedState, IndexedContract],
+                             context: Context,
+                             e: Expression
+                         ): (Type, Context) = {
+        (BottomType(), context)
     }
 
-    private def checkStatement(insideOf: (Transaction with Func, State with Contract),
-                       context: Map[String, Type],
-                       s: Statement): Either[String, Map[String, Type]] = {
-        s match {
-            case VariableDecl(typ: AstType, varName: String) =>
-                // todo : do we want to analyze initialization status as well?
-                Right(context.updated(varName, translateType(typ)))
-            case VariableDeclWithInit(typ: AstType, varName: String, e: Expression) => Left("") // todo
-            case Return => Left("") // todo
-            case ReturnExpr(e: Expression) => Left("") // todo
-            case Transition(newStateName: String, updates: Seq[(Variable, Expression)]) => Left("") // todo
-            case Assignment(assignTo: Expression, e: Expression) => Left("") // todo
-            case Throw() => Left("") // todo
-            case If(eCond: Expression, s: Seq[Statement]) => Left("") // todo
-            case IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) => Left("") // todo
-            case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) => Left("") // todo
-            case Switch(e: Expression, cases: Seq[SwitchCase]) => Left("") // todo
-            case LocalInvocation(name: String, args: Seq[Expression]) => Left("") // todo
-            case Invocation(recipient: Expression, name: String, args: Seq[Expression]) => Left("") // todo
-            case Construction(name: String, args: Seq[Expression]) => Left("") // todo
-            case expr => Left(s"Statement $expr has no side effects")
-        }
+    private def checkStatement(
+                                  insideOfMethod: Either[Transaction, Func],
+                                  insideOfContract: Either[State, Contract],
+                                  context: Context,
+                                  s: Statement
+                              ): Context = {
+        context
     }
 
     private def checkSimpleType(st: SimpleType): Option[String] = {
