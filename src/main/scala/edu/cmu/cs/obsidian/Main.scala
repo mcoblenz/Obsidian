@@ -102,7 +102,7 @@ object Main {
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        return mainContractOption.get.name
+        return mainContractOption.get.name.name
     }
 
     def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {

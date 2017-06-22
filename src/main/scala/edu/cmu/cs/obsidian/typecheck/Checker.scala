@@ -30,6 +30,8 @@ class IndexedState(
                       txLookup: Map[String, Transaction],
                       funLookup: Map[String, Func]
                   ) {
+
+    def name: String = state.name.name
     def getAst: State = state
 
     def getContract: IndexedContract = insideOf
@@ -61,6 +63,7 @@ class IndexedContract(
                          txLookup: Map[String, Transaction],
                          funLookup: Map[String, Func]
                      ) {
+    def name: String = contract.name.name
     def getAst: Contract = contract
     def getField: Function[String, Option[Field]] = fieldLookup.get
     def getTransaction: Function[String, Option[Transaction]] = txLookup.get
@@ -73,6 +76,7 @@ class IndexedContract(
             rawDecl match {
                 case c: Constructor =>
                     constructors = c::constructors
+                case _ => ()
             }
 
         }
@@ -90,13 +94,13 @@ class IndexedProgram(
 class Checker {
 
     type Context = Map[String, Type]
-    type Error = String
+    type Error = (AST, String)
 
     val errors = new collection.mutable.ArrayStack[Error]()
     var progInfo: IndexedProgram = _
 
-    private def logError(msg: String): Unit = {
-        errors.push(msg)
+    private def logError(ast: AST, msg: String): Unit = {
+        errors.push((ast, msg))
     }
 
     private def extractSimpleType(t: Type): Option[SimpleType] = {
@@ -145,9 +149,9 @@ class Checker {
         }
     }
 
-    private def assertSubType(t1: Type, t2: Type): Unit = {
+    private def assertSubType(ast: AST, t1: Type, t2: Type): Unit = {
         if (!subTypeOf(t1, t2)) {
-            logError(s"Type $t1 cannot be used as $t2")
+            logError(ast, s"Type $t1 cannot be used as $t2")
         }
     }
 
@@ -211,9 +215,9 @@ class Checker {
             case AstIntType() => IntType()
             case AstBoolType() => BoolType()
             case AstStringType() => StringType()
-            case AstContractType(mods, name) =>
+            case AstContractType(mods, Identifier(name)) =>
                 getModifier(ContractType(name), mods, name)
-            case AstStateType(mods, nameC, nameS) =>
+            case AstStateType(mods, Identifier(nameC), Identifier(nameS)) =>
                 getModifier(StateType(nameC, nameS), mods, nameC)
         }
     }
@@ -230,7 +234,7 @@ class Checker {
         def assertTypeEquality(e: Expression, t: Type, c: Context): (Type, Context) = {
             val (tPrime, contextPrime) = checkExpr(insideOfMethod, insideOfContract, c, e)
             if (t == tPrime) (t, contextPrime) else {
-                logError(f"$e must have type $t")
+                logError(e, f"$e must have type $t")
                 (BottomType(), contextPrime)
             }
         }
@@ -241,24 +245,24 @@ class Checker {
             if (t1 == BottomType() || t2 == BottomType()) (BottomType(), c2) else (t, c2)
         }
 
-        def assertComparisonType(e1: Expression, e2: Expression): (Type, Context) = {
+        def assertComparisonType(ast: AST, e1: Expression, e2: Expression): (Type, Context) = {
             val (t1, c1) = assertTypeEquality(e1, IntType(), context)
             val (t2, c2) = assertTypeEquality(e2, IntType(), c1)
             if (t1 == BottomType() || t2 == BottomType()){
-                logError(f"$e1 and $e2 must have type int")
+                logError(ast, f"$e1 and $e2 must have type int")
                 (BottomType(), c2)
             }  else (BoolType(), c2)
         }
 
          e match {
-             case Variable(x: String) =>
+             case Variable(Identifier(x)) =>
                  context get x match {
                      case Some(t) => t match {
                          case OwnedRef(simp) => (OwnedRef(simp), context.updated(x, ReadOnlyRef(simp)))
                          case _ => (t, context)
                      }
                      case None =>
-                         logError(s"Variable $x undefined")
+                         logError(e, s"Variable $x undefined")
                          (BottomType(), context)
                  }
              case NumLiteral(value: Int) => (IntType(), context)
@@ -267,8 +271,8 @@ class Checker {
              case FalseLiteral() => (BoolType(), context)
              case This() =>
                  val baseType = insideOfContract match {
-                     case Left(s) => StateType(s.getContract.getAst.name, s.getAst.name)
-                     case Right(c) => ContractType(c.getAst.name)
+                     case Left(s) => StateType(s.name, s.name)
+                     case Right(c) => ContractType(c.name)
                  }
                  insideOfMethod match {
                      // if we're in a transaction, we can consider [this] to be [owned]
@@ -294,47 +298,47 @@ class Checker {
                  val (t1, c1) = checkExpr(insideOfMethod, insideOfContract, context, e1)
                  val (t2, c2) = checkExpr(insideOfMethod, insideOfContract, c1, e2)
                  if (t1 == t2) (t1, c2) else {
-                     logError(f"Expressions '$e1' and '$e2' do not have same type")
+                     logError(e, f"Expressions '$e1' and '$e2' do not have same type")
                      (BottomType(), c2)
                  }
              case GreaterThan(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 assertComparisonType(e, e1, e2)
              case GreaterThanOrEquals(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 assertComparisonType(e, e1, e2)
              case LessThan(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 assertComparisonType(e, e1, e2)
              case LessThanOrEquals(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 assertComparisonType(e, e1, e2)
              case NotEquals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = checkExpr(insideOfMethod, insideOfContract, context, e1)
                  val (t2, c2) = checkExpr(insideOfMethod, insideOfContract, c1, e2)
                  if (t1 == t2) (t1, c2) else {
-                     logError(f"Expressions '$e1' and '$e2' do not have same type")
+                     logError(e, f"Expressions '$e1' and '$e2' do not have same type")
                      (BottomType(), c2)
                  }
-             case Dereference(e: Expression, name: String) =>
+             case Dereference(e: Expression, Identifier(name)) =>
                  val (t, contextPrime) = checkExpr(insideOfMethod, insideOfContract, context, e)
                  extractSimpleType(t) match {
                      case Some(ContractType(contractName)) => val contract = progInfo.getContract(contractName).get
                          contract.getField(name) match {
                              case Some(f) => (translateType(f.typ), contextPrime)
                              case None =>
-                                 logError(s"$contractName has no field named '$name'")
+                                 logError(e, s"$contractName has no field named '$name'")
                                  (BottomType(), context)
                          }
                      case Some(StateType(stateName, contractName)) => val contract = progInfo.getContract(contractName).get
                          contract.getState(stateName).get.getField(name) match {
                              case Some(f) => (translateType(f.typ), contextPrime)
                              case None =>
-                                 logError(s"$contractName has no field named '$name'")
+                                 logError(e, s"$contractName has no field named '$name'")
                                  (BottomType(), context)
                          }
                      case _ =>
-                         logError(s"Cannot dereference on type $t")
+                         logError(e, s"Cannot dereference on type $t")
                          return (BottomType(), contextPrime)
                  }
 
-             case LocalInvocation(name: String, args: Seq[Expression]) =>
+             case LocalInvocation(Identifier(name), args: Seq[Expression]) =>
                  val contract = insideOfContract match {
                  case Left(s) => s.getContract
                  case Right(c) => c
@@ -348,7 +352,7 @@ class Checker {
 
                  val (spec, ret) = (txLookup, funLookup) match {
                      case (None, None) =>
-                         logError(s"No function or transaction named $name found")
+                         logError(e, s"No function or transaction named $name found")
                          return (BottomType(), context)
                      case (_, Some(Transaction(_, txArgs, txRet, _, _))) => (txArgs, txRet)
                      case (Some(Func(_, funArgs, funRet, _)), _) => (funArgs, funRet)
@@ -356,14 +360,14 @@ class Checker {
 
 
                  val (argTypes, contextPrime) = checkExprs(insideOfMethod, insideOfContract, context, args)
-                 assertArgsCorrect(spec::Nil, argTypes)
+                 assertArgsCorrect(e, spec::Nil, argTypes)
 
                  ret match {
                      case Some(rType) => (translateType(rType), contextPrime)
                      case None => (BottomType(), contextPrime)
                  }
 
-             case Invocation(recipient: Expression, name: String, args: Seq[Expression]) =>
+             case Invocation(recipient: Expression, Identifier(name), args: Seq[Expression]) =>
                  val (recipType, contextPrime) = checkExpr(insideOfMethod, insideOfContract, context, recipient)
                  val (tx, fun) = extractSimpleType(recipType) match {
                      case Some(ContractType(contractName)) =>
@@ -374,40 +378,40 @@ class Checker {
                          (contract.getState(stateName).get.getTransaction(name),
                           contract.getState(stateName).get.getFunction(name))
                      case _ =>
-                         logError(s"Cannot invoke functions or transactions on type $recipType")
+                         logError(e, s"Cannot invoke functions or transactions on type $recipType")
                          return (BottomType(), contextPrime)
                  }
 
                  val (spec, ret) = (tx, fun) match {
                      case (None, None) =>
-                         logError(s"No function or transaction named $name found")
+                         logError(e, s"No function or transaction named $name found")
                          return (BottomType(), context)
                      case (Some(Transaction(_, txArgs, txRet, _, _)), _) => (txArgs, txRet)
                      case (_, Some(Func(_, funArgs, funRet, _))) => (funArgs, funRet)
                  }
 
                  val (argTypes, contextPrime2) = checkExprs(insideOfMethod, insideOfContract, context, args)
-                 assertArgsCorrect(spec::Nil, argTypes)
+                 assertArgsCorrect(e, spec::Nil, argTypes)
 
                  ret match {
                      case Some(rType) => (translateType(rType), contextPrime2)
                      case None => (BottomType(), contextPrime2)
                  }
 
-             case Construction(name: String, args: Seq[Expression]) =>
+             case Construction(Identifier(name), args: Seq[Expression]) =>
                  progInfo.getContract(name) match {
                      case Some(c) =>
                          val (argTypes, contextPrime) = checkExprs(insideOfMethod, insideOfContract, context, args)
                          val constrSpecs = c.getConstructors.map(constr => constr.args)
-                         assertArgsCorrect(constrSpecs, argTypes)
+                         assertArgsCorrect(e, constrSpecs, argTypes)
                          c.getAst.mod match {
-                             case Some(IsOwned) => (OwnedRef(ContractType(name)), context)
-                             case Some(IsShared) => (SharedRef(ContractType(name)), context)
-                             case Some(IsMain) => (SharedRef(ContractType(name)), context)// is main contract shared?
+                             case Some(IsOwned()) => (OwnedRef(ContractType(name)), context)
+                             case Some(IsShared()) => (SharedRef(ContractType(name)), context)
+                             case Some(IsMain()) => (SharedRef(ContractType(name)), context)// is main contract shared?
                              case None => (SharedRef(ContractType(name)), context)// what goes here?
                          }
                      case None =>
-                         logError(s"Contract '$name' does not exist")
+                         logError(e, s"Contract '$name' does not exist")
                          (BottomType(), context)
                  }
          }
@@ -419,14 +423,14 @@ class Checker {
                                     insideOfContract: Either[IndexedState, IndexedContract],
                                     context: Context,
                                     es: Seq[Expression]
-                                ): (Seq[Type], Context) = {
-        val types = new ListBuffer[Type]()
+                                ): (Seq[(Type, Expression)], Context) = {
+        val types = new ListBuffer[(Type, Expression)]()
         var contextPrime = context
         for (e <- es) {
             val (t, contextPrime2) =
                 checkExpr(insideOfMethod, insideOfContract, contextPrime, e)
             contextPrime = contextPrime2
-            types.append(t)
+            types.append((t, e))
         }
         (types, contextPrime)
     }
@@ -440,7 +444,7 @@ class Checker {
                 checkStatement(insideOfMethod, prevContext, s))
     }
 
-    private def mergeContext(context1: Context, context2: Context): Context = {
+    private def mergeContext(ast: AST, context1: Context, context2: Context): Context = {
         var mergedContext = new TreeMap[String, Type]()
 
         val onlyIn1: Set[String] = context1.keys.toSet.diff(context2.keys.toSet)
@@ -453,14 +457,14 @@ class Checker {
             upperBound(t1, t2) match {
                 case Some(u) => mergedContext = mergedContext.updated(x, u)
                 case None =>
-                    logError(s"Variable $x is incompatibly typed as both $t1 and $t2 after branch")
+                    logError(ast, s"Variable $x is incompatibly typed as both $t1 and $t2 after branch")
             }
         }
 
         for (x <- onlyIn1) {
             context1(x) match {
                 case OwnedRef(_) =>
-                    logError(s"Variable $x is owned in at least one branch, but is dropped in others")
+                    logError(ast, s"Variable $x is owned in at least one branch, but is dropped in others")
                 case _ => ()
             }
         }
@@ -468,7 +472,7 @@ class Checker {
         for (x <- onlyIn2) {
             context2(x) match {
                 case OwnedRef(_) =>
-                    logError(s"Variable $x is owned in at least one branch, but is dropped in others")
+                    logError(ast, s"Variable $x is owned in at least one branch, but is dropped in others")
                 case _ => ()
             }
         }
@@ -476,35 +480,35 @@ class Checker {
         mergedContext
     }
 
-    // returns [Some(err)] if [spec] and [args] don't match, [None] if they do
-    private def checkArgs(spec: Seq[VariableDecl], args: Seq[Type]): Option[Seq[Error]] = {
+    // returns [Some(err)] if [spec] and [args] match, [None] if they do
+    private def checkArgs(ast: AST, spec: Seq[VariableDecl], args: Seq[(Type, AST)]): Option[Seq[Error]] = {
         val (specL, argsL) = (spec.length, args.length)
         if (specL > argsL) {
-            Some(s"Too few arguments: expected $specL but only found $argsL"::Nil)
+            Some((ast, s"Too few arguments: expected $specL but only found $argsL")::Nil)
         } else if (specL < argsL) {
-            Some(s"Too many arguments: expected $specL but found $argsL"::Nil)
+            Some((ast, s"Too many arguments: expected $specL but found $argsL")::Nil)
         } else {
             val specList = spec.toIterator
             var errList: List[Error] = Nil
-            for (argType <- args) {
+            for ((argType, ast) <- args) {
                 val expectedType = translateType(specList.next().typ)
                 if (!subTypeOf(argType, expectedType)) {
-                    errList = s"Type $argType cannot be used as $expectedType"::errList
+                    errList = (ast, s"Type $argType cannot be used as $expectedType")::errList
                 }
             }
             Some(errList)
         }
     }
 
-    private def assertArgsCorrect(specs: Seq[Seq[VariableDecl]], args: Seq[Type]): Unit = {
+    private def assertArgsCorrect(ast: AST, specs: Seq[Seq[VariableDecl]], args: Seq[(Type, AST)]): Unit = {
         var errs: List[Error] = Nil
         for (spec <- specs) {
-            checkArgs(spec, args) match {
+            checkArgs(ast, spec, args) match {
                 case None => return
                 case Some(newErrs) => errs = newErrs.toList ++ errs
             }
         }
-        errs.foreach(logError)
+        errs.foreach((err: (AST, String)) => logError(err._1, err._2))
     }
 
     private def getThisIndexed(context: Context): Either[IndexedState, IndexedContract] = {
@@ -531,21 +535,21 @@ class Checker {
             this.checkExprs(insideOfMethod, getThisIndexed(context), context, es)
 
         s match {
-            case VariableDecl(typ: AstType, varName: String) =>
-                context.updated(varName, translateType(typ))
+            case VariableDecl(typ: AstType, Identifier(name)) =>
+                context.updated(name, translateType(typ))
 
-            case VariableDeclWithInit(typ: AstType, varName: String, e: Expression) =>
+            case VariableDeclWithInit(typ: AstType, Identifier(name), e: Expression) =>
                 val (t, contextPrime) = checkExpr(context, e)
                 val tDecl = translateType(typ)
-                assertSubType(t, tDecl)
-                contextPrime.updated(varName, tDecl)
+                assertSubType(s, t, tDecl)
+                contextPrime.updated(name, tDecl)
 
-            case Return =>
+            case Return() =>
                 insideOfMethod match {
                     /* the tx/function must have no return type */
                     case Left(Transaction(_,_, None ,_,_)) | Right(Func(_,_, None ,_)) => context
                     case _ =>
-                        logError("Must return a value of the specified return type")
+                        logError(s, "Must return a value of the specified return type")
                         context
 
                 }
@@ -559,17 +563,17 @@ class Checker {
                     case Right(Func(_, _, Some(astType), _)) =>
                         translateType(astType)
                     case _ =>
-                        logError("Cannot return a value for a method with no return type")
+                        logError(s, "Cannot return a value for a method with no return type")
                         return contextPrime
                 }
-                assertSubType(t, tRet)
+                assertSubType(s, t, tRet)
                 contextPrime
 
-            case Transition(newStateName: String, updates: Seq[(Variable, Expression)]) =>
+            case Transition(Identifier(newStateName), updates: Seq[(Variable, Expression)]) =>
                 val (cName, sName) = extractSimpleType(context("this")) match {
                     case Some(StateType(ct, st)) => (ct, st)
                     case _ =>
-                        logError("'this' must be typed to a particular state to transition")
+                        logError(s, "'this' must be typed to a particular state to transition")
                         return context
                 }
 
@@ -577,7 +581,7 @@ class Checker {
                 val indexedOldState = indexedContract.getState(sName).get
 
                 if (indexedContract.getState(newStateName).isEmpty) {
-                    logError(s"State $newStateName not found in contract $cName")
+                    logError(s, s"State $newStateName not found in contract $cName")
                     return context
                 }
 
@@ -593,19 +597,19 @@ class Checker {
                 val toInitialize = newFields.toSet - oldFields.toSet
 
                 if (updates.map(_._1.x).toSet != toInitialize) {
-                    logError(s"Transition from $sName to $newStateName must update exactly the following set of" +
-                             s" fields: $toInitialize")
+                    logError(s, s"Transition from $sName to $newStateName must update exactly the following set of" +
+                                s" fields: $toInitialize")
                 }
 
                 var types = new ListBuffer[Type]()
                 types = BottomType() +: types
 
                 var contextPrime = context
-                for ((Variable(f), e) <- updates) {
+                for ((Variable(Identifier(f)), e) <- updates) {
                     val (t, contextPrime2) = checkExpr(contextPrime, e)
                     contextPrime = contextPrime2
                     val fieldType = translateType(indexedNewState.getField(f).get.typ)
-                    assertSubType(t, fieldType)
+                    assertSubType(s, t, fieldType)
                 }
 
                 val newType = updateSimpleType(context("this"), StateType(cName, newStateName))
@@ -618,12 +622,12 @@ class Checker {
                     // assigment is of the form "x = e"
                     case Variable(x) =>
                         val contextType = context.get(s"$x")
-                        if (contextType.isEmpty) logError(s"Variable $x not found in context")
-                        else assertSubType(t, contextType.get)
+                        if (contextType.isEmpty) logError(s, s"Variable $x not found in context")
+                        else assertSubType(s, t, contextType.get)
                         contextPrime
 
                     // assignment is of the form "e1.f = e2"
-                    case Dereference(e, f) =>
+                    case Dereference(e, Identifier(f)) =>
                         val (derefType, contextPrime2) = checkExpr(contextPrime, e)
                         val fieldType = extractSimpleType(derefType) match {
                             // [e] is of contract type
@@ -633,7 +637,7 @@ class Checker {
                                     .flatMap(_.getField(f))
 
                                 if (lookup.isEmpty) {
-                                    logError(s"Field $f not found in contract $cName")
+                                    logError(s, s"Field $f not found in contract $cName")
                                     return contextPrime2
                                 }
                                 translateType(lookup.get.typ)
@@ -646,48 +650,48 @@ class Checker {
                                     .flatMap(_.getField(f))
 
                                 if (lookup.isEmpty) {
-                                    logError(s"Field $f not found in state $cName.$sName")
+                                    logError(s, s"Field $f not found in state $cName.$sName")
                                     return contextPrime2
                                 }
                                 translateType(lookup.get.typ)
 
                             // [e] is a primitive type
                             case None =>
-                                logError(s"Cannot dereference expression $e of type $derefType")
+                                logError(s, s"Cannot dereference expression $e of type $derefType")
                                 return contextPrime2
                         }
 
-                        assertSubType(t, fieldType)
+                        assertSubType(s, t, fieldType)
                         contextPrime2
 
                     // assignment target is neither a variable nor a field
                     case _ =>
-                        logError("Assignment target must be a local variable or a field")
+                        logError(s, "Assignment target must be a local variable or a field")
                         contextPrime
                 }
 
             case Throw() => context
 
-            case If(eCond: Expression, s: Seq[Statement]) =>
+            case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime) = checkExpr(context, eCond)
-                assertSubType(t, BoolType())
-                checkStatementSequence(insideOfMethod, contextPrime, s)
+                assertSubType(s, t, BoolType())
+                checkStatementSequence(insideOfMethod, contextPrime, body)
 
-            case IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) =>
+            case IfThenElse(eCond: Expression, body1: Seq[Statement], body2: Seq[Statement]) =>
                 val (t, contextPrime) = checkExpr(context, eCond)
-                assertSubType(t, BoolType())
+                assertSubType(s, t, BoolType())
                 val contextIfTrue =
-                    checkStatementSequence(insideOfMethod, contextPrime, s1)
+                    checkStatementSequence(insideOfMethod, contextPrime, body1)
                 val contextIfFalse =
-                    checkStatementSequence(insideOfMethod, contextPrime, s2)
-                mergeContext(contextIfFalse, contextIfTrue)
+                    checkStatementSequence(insideOfMethod, contextPrime, body2)
+                mergeContext(s, contextIfFalse, contextIfTrue)
 
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val contextIfTry =
                     checkStatementSequence(insideOfMethod, context, s1)
                 val contextIfCatch =
                     checkStatementSequence(insideOfMethod, context, s2)
-                mergeContext(contextIfTry, contextIfCatch)
+                mergeContext(s, contextIfTry, contextIfCatch)
 
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
                 val (t, contextPrime) = checkExpr(context, e)
@@ -696,32 +700,32 @@ class Checker {
                 getThisIndexed(context).fold(
                     st => {
                             val sName = st.getAst.name
-                            logError(s"Expression $e is known to be in state " +
-                                     s"$sName: a dynamic check is not needed")
+                            logError(s, s"Expression $e is known to be in state " +
+                                        s"$sName: a dynamic check is not needed")
                         },
                     _ => ()
                 )
 
                 var mergedContext = contextPrime
-                for (SwitchCase(sName, body) <- cases) {
+                for (SwitchCase(Identifier(sName), body) <- cases) {
                     val newThisTypeSimple = indexedContract.getState(sName) match {
                         case Some(indexedState) =>
-                            StateType(indexedContract.getAst.name, indexedState.getAst.name)
+                            StateType(indexedContract.name, indexedState.name)
                         case None =>
-                            logError(s"State $sName not found")
-                            ContractType(indexedContract.getAst.name)
+                            logError(s, s"State $sName not found")
+                            ContractType(indexedContract.name)
                     }
 
                     val newThisType = updateSimpleType(context("this"), newThisTypeSimple)
 
                     val startContext = contextPrime.updated("this", newThisType)
                     val endContext = checkStatementSequence(insideOfMethod, startContext, body)
-                    mergedContext = mergeContext(mergedContext, endContext)
+                    mergedContext = mergeContext(s, mergedContext, endContext)
                 }
 
                 mergedContext
 
-            case LocalInvocation(name: String, args: Seq[Expression]) =>
+            case LocalInvocation(Identifier(name), args: Seq[Expression]) =>
                 val contract = getThisIndexedContract(context)
                 val (txLookup, funLookup) = extractSimpleType(context("this")) match {
                     case Some(StateType(_, sName)) =>
@@ -732,22 +736,22 @@ class Checker {
 
                 val (spec, ret) = (txLookup, funLookup) match {
                     case (None, None) =>
-                        logError(s"No function or transaction named $name found")
+                        logError(s, s"No function or transaction named $name found")
                         return context
                     case (_, Some(Transaction(_, txArgs, txRet, _, _))) => (txArgs, txRet)
                     case (Some(Func(_, funArgs, funRet, _)), _) => (funArgs, funRet)
                 }
 
                 val (types, contextPrime) = checkExprs(context, args)
-                assertArgsCorrect(spec::Nil, types)
+                assertArgsCorrect(s, spec::Nil, types)
 
                 if (ret.isDefined && translateType(ret.get).isInstanceOf[OwnedRef]) {
-                    logError(s"Call to $name leaks ownership of the return value")
+                    logError(s, s"Call to $name leaks ownership of the return value")
                 }
 
                 contextPrime
 
-            case Invocation(recipient: Expression, name: String, args: Seq[Expression]) =>
+            case Invocation(recipient: Expression, Identifier(name), args: Seq[Expression]) =>
 
                 val (tRecipient, contextPrime) = checkExpr(context, recipient)
                 val (txLookup, funLookup) = extractSimpleType(tRecipient) match {
@@ -760,43 +764,43 @@ class Checker {
                         val contract = progInfo.getContract(cName).get
                         (contract.getFunction(name), contract.getTransaction(name))
                     case _ =>
-                        logError(s"Cannot invoke functions or transactions on type $tRecipient")
+                        logError(s, s"Cannot invoke functions or transactions on type $tRecipient")
                         return contextPrime
                 }
 
                 val (spec, ret) = (txLookup, funLookup) match {
                     case (None, None) =>
-                        logError(s"No function or transaction named $name found")
+                        logError(s, s"No function or transaction named $name found")
                         return context
                     case (Some(Transaction(_, sp, rt, _, _)), _) => (sp, rt)
                     case (_, Some(Func(_, sp, rt, _))) => (sp, rt)
                 }
 
                 val (types, contextPrime2) = checkExprs(context, args)
-                assertArgsCorrect(spec::Nil, types)
+                assertArgsCorrect(s, spec::Nil, types)
 
                 if (ret.isDefined && translateType(ret.get).isInstanceOf[OwnedRef]) {
-                    logError(s"Call to $name leaks ownership of the return value")
+                    logError(s, s"Call to $name leaks ownership of the return value")
                 }
 
                 contextPrime2
 
-            case Construction(name: String, args: Seq[Expression]) =>
+            case Construction(Identifier(name), args: Seq[Expression]) =>
                 val constructors = progInfo.getContract(name) match {
                     case None =>
-                        logError(s"Cannot find contract with name $name")
+                        logError(s, s"Cannot find contract with name $name")
                         return context
                     case Some(contract) =>
                         contract.getConstructors
                 }
 
                 val (argTypes, contextPrime) = checkExprs(context, args)
-                assertArgsCorrect(constructors.map(_.args), argTypes)
+                assertArgsCorrect(s, constructors.map(_.args), argTypes)
 
                 contextPrime
 
             case expr =>
-                logError(s"Statement $expr has no side effects")
+                logError(s, s"Statement $expr has no side effects")
                 context
         }
     }
@@ -821,11 +825,11 @@ class Checker {
             case OwnedRef(simple) => checkSimpleType(simple)
 
             case SharedRef(StateType(_, _)) =>
-                logError(s"State-specific types are not safe for 'shared' references")
+                logError(field, s"State-specific types are not safe for 'shared' references")
             case SharedRef(simple) => checkSimpleType(simple)
 
             case ReadOnlyRef(StateType(_, _)) =>
-                logError(s"State-specific types are not safe for 'readonly' references")
+                logError(field, s"State-specific types are not safe for 'readonly' references")
             case ReadOnlyRef(simple) => checkSimpleType(simple)
 
             case _ => None
@@ -839,27 +843,27 @@ class Checker {
         var initContext = new TreeMap[String, Type]()
 
         for (arg <- tx.args) {
-            initContext = initContext.updated(arg.varName, translateType(arg.typ))
+            initContext = initContext.updated(arg.varName.name, translateType(arg.typ))
         }
 
         val thisType = insideOfContract match {
             case Left(indexed) =>
-                OwnedRef(StateType(indexed.getContract.getAst.name, indexed.getAst.name))
+                OwnedRef(StateType(indexed.name, indexed.name))
             case Right(indexed) =>
-                OwnedRef(ContractType(indexed.getAst.name))
+                OwnedRef(ContractType(indexed.name))
         }
-        val cName = insideOfContract.fold(_.getContract.getAst.name, _.getAst.name)
+        val cName = insideOfContract.fold(_.name, _.name)
 
         initContext = initContext.updated("this", thisType)
 
         val outputContext =
             checkStatementSequence(Left(tx), initContext, tx.body)
 
-        assertSubType(outputContext("this"), OwnedRef(ContractType(cName)))
+        assertSubType(tx, outputContext("this"), OwnedRef(ContractType(cName)))
 
         for ((x, t) <- outputContext) {
             if (t.isInstanceOf[OwnedRef] && x != "this") {
-                logError(s"Variable $x holds ownership, but is unused at the end of the transaction")
+                logError(tx, s"Variable $x holds ownership, but is unused at the end of the transaction")
             }
         }
 
@@ -871,7 +875,7 @@ class Checker {
     }
 
     private def checkState(insideOf: IndexedContract, state: State): Unit = {
-        val indexed = insideOf.getState(state.name).get
+        val indexed = insideOf.getState(state.name.name).get
         for (decl <- state.declarations) {
             decl match {
                 case t@Transaction(_,_,_,_,_) => checkTransaction(t, Left(indexed))
@@ -882,7 +886,7 @@ class Checker {
     }
 
     private def checkContract(contract: Contract): Unit = {
-        val indexed = progInfo.getContract(contract.name).get
+        val indexed = progInfo.getContract(contract.name.name).get
         for (decl <- contract.declarations) {
             decl match {
                 case t@Transaction(_,_,_,_,_) => checkTransaction(t, Right(indexed))
@@ -901,9 +905,9 @@ class Checker {
 
         for (decl <- decls) {
             decl match {
-                case f@Field(_, name) => fieldLookup = fieldLookup.updated(name, f)
-                case t@Transaction(name, _, _, _, _) => txLookup = txLookup.updated(name, t)
-                case f@Func(name, _, _, _) => funLookup = funLookup.updated(name, f)
+                case f@Field(_, Identifier(name)) => fieldLookup = fieldLookup.updated(name, f)
+                case t@Transaction(Identifier(name), _, _, _, _) => txLookup = txLookup.updated(name, t)
+                case f@Func(Identifier(name), _, _, _) => funLookup = funLookup.updated(name, f)
                 case _ => ()
             }
         }
@@ -930,7 +934,7 @@ class Checker {
 
         for (decl <- contract.declarations) {
             decl match {
-                case s@State(name, _) => stateLookup.put(name, indexState(s, indexed))
+                case s@State(Identifier(name), _) => stateLookup.put(name, indexState(s, indexed))
                 case _ => ()
             }
         }
@@ -943,7 +947,7 @@ class Checker {
     private def indexProgram(program: Program): Unit = {
         var contractLookup = new TreeMap[String, IndexedContract]
         for (contract <- program.contracts) {
-            contractLookup = contractLookup.updated(contract.name, indexContract(contract))
+            contractLookup = contractLookup.updated(contract.name.name, indexContract(contract))
         }
 
         progInfo = new IndexedProgram(program, contractLookup)
@@ -956,7 +960,10 @@ class Checker {
             checkContract(contract)
         }
 
-        for (err <- errors.reverse) println(err)
+        for ((ast, msg) <- errors.reverse) {
+            val location = ast.loc
+            println(s"At $location: $msg")
+        }
 
         errors.isEmpty
     }

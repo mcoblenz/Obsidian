@@ -165,7 +165,7 @@ object TranslationContext {
         def addClassesToMap(map: mutable.HashMap[Contract, String], contract: Contract, outerClassPath: String): Unit = {
             val name = contract.name
 
-            val newClassPath = if (outerClassPath.length == 0) name else outerClassPath + "." + name
+            val newClassPath = if (outerClassPath.length == 0) name.name else outerClassPath + "." + name.name
             map += (contract -> newClassPath)
 
             for (c <- contract.declarations if c.isInstanceOf[Contract]) {

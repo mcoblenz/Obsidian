@@ -45,7 +45,7 @@ object ProtobufGen {
 
         val stateNames: List[String] = aContract.declarations.foldRight(Nil: List[String])((decl, states) => decl match
             {
-                case State(name, _) => name::states
+                case State(name, _) => (name.name)::states
                 case _ => states
             }
         )
@@ -62,10 +62,10 @@ object ProtobufGen {
                 (ObjectType(stateName), "state" + stateName))
             val stateDecl = ProtobufOneOf("state", oneOfOptions)
 
-            new ProtobufMessage(stateDecl::decls, aContract.name)
+            new ProtobufMessage(stateDecl::decls, aContract.name.name)
         }
         else {
-            new ProtobufMessage(decls, aContract.name)
+            new ProtobufMessage(decls, aContract.name.name)
         }
     }
 
@@ -83,13 +83,13 @@ object ProtobufGen {
 
     private def translateFieldDecl(f: edu.cmu.cs.obsidian.parser.Field): ProtobufDeclaration = {
         f.typ match {
-            case i@edu.cmu.cs.obsidian.parser.AstIntType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.fieldName)
-            case b@edu.cmu.cs.obsidian.parser.AstBoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.fieldName)
-            case s@edu.cmu.cs.obsidian.parser.AstStringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.fieldName)
+            case i@edu.cmu.cs.obsidian.parser.AstIntType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.fieldName.name)
+            case b@edu.cmu.cs.obsidian.parser.AstBoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.fieldName.name)
+            case s@edu.cmu.cs.obsidian.parser.AstStringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.fieldName.name)
             case n@edu.cmu.cs.obsidian.parser.AstContractType(_, typeName) =>
-                ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName), f.fieldName)
+                ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName.name), f.fieldName.name)
             case n@edu.cmu.cs.obsidian.parser.AstStateType(_, typeName, _) =>
-                ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName), f.fieldName)
+                ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName.name), f.fieldName.name)
         }
     }
 
@@ -104,6 +104,6 @@ object ProtobufGen {
             }
         )
 
-        new ProtobufMessage(fields, s.name)
+        new ProtobufMessage(fields, s.name.name)
     }
 }
