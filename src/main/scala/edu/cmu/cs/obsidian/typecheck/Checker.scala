@@ -33,6 +33,8 @@ class IndexedState(
 
     def getContractAst = insideOf.getAst
 
+    def getContract = insideOf
+
     def getField(name: String): Option[Field] = {
         fieldLookup.get(name) match {
             case x@Some(_) => x
@@ -177,14 +179,6 @@ class Checker {
             }  else (BoolType(), c2)
         }
 
-        def checkArgsTx(tx: Transaction, args: Seq[Expression], context: Context): Context = {
-           context
-        }
-
-        def checkArgsFun(fun: Func, args: Seq[Expression], context: Context): Context = {
-            context
-        }
-
          e match {
              case Variable(x: String) =>
                  context get x match {
@@ -228,7 +222,10 @@ class Checker {
              case Equals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = checkExpr(insideOfMethod, insideOfContract, context, e1)
                  val (t2, c2) = checkExpr(insideOfMethod, insideOfContract, c1, e2)
-                 if (t1 == t2) (t1, c2) else (BottomType(), c2)
+                 if (t1 == t2) (t1, c2) else {
+                     logError(f"Expressions '$e1' and '$e2' do not have same type")
+                     (BottomType(), c2)
+                 }
              case GreaterThan(e1: Expression, e2: Expression) =>
                  assertComparisonType(e1, e2)
              case GreaterThanOrEquals(e1: Expression, e2: Expression) =>
@@ -240,49 +237,101 @@ class Checker {
              case NotEquals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = checkExpr(insideOfMethod, insideOfContract, context, e1)
                  val (t2, c2) = checkExpr(insideOfMethod, insideOfContract, c1, e2)
-                 if (t1 == t2) (t1, c2) else (BottomType(), c2)
-             case Dereference(e: Expression, f: String) => (BottomType(), context) // todo
-             case LocalInvocation(name: String, args: Seq[Expression]) =>
-                 insideOfContract match {
-                     case Left(state) => state.getTransaction(name) match {
-                         case Some(tx) =>
-                             val cPrime = checkArgsTx(tx, args, context)
-                             tx.retType match{
-                                 case Some(rType) => (translateType(rType), cPrime)
-                                 case None => (BottomType(), cPrime)
-                             }
-                         case None => state.getFunction(name) match {
-                             case Some(fun) =>
-                                 val cPrime = checkArgsFun(fun, args, context)
-                                 fun.retType match{
-                                     case Some(rType) => (translateType(rType), cPrime)
-                                     case None => (BottomType(), cPrime)
-                                 }
-                             case None => (BottomType(), context)
-
-                         }
-                     }
-                     case Right(contract) => contract.getTransaction(name) match {
-                         case Some(tx) =>
-                             val cPrime = checkArgsTx(tx, args, context)
-                             tx.retType match{
-                                 case Some(rType) => (translateType(rType), cPrime)
-                                 case None => (BottomType(), cPrime)
-                             }
-                         case None => contract.getFunction(name) match {
-                             case Some(fun) =>
-                                 val cPrime = checkArgsFun(fun, args, context)
-                                 fun.retType match{
-                                     case Some(rType) => (translateType(rType), cPrime)
-                                     case None => (BottomType(), cPrime)
-                                 }
-                             case None => (BottomType(), context)
-
-                         }
-                     }
+                 if (t1 == t2) (t1, c2) else {
+                     logError(f"Expressions '$e1' and '$e2' do not have same type")
+                     (BottomType(), c2)
                  }
-             case Invocation(recipient: Expression, name: String, args: Seq[Expression]) => (BottomType(), context) // todo
-             case Construction(name: String, args: Seq[Expression]) => (BottomType(), context) // todo
+             case Dereference(e: Expression, name: String) =>
+                 val (t, cPrime) = checkExpr(insideOfMethod, insideOfContract, context, e)
+                 t match {
+                     case ContractType(contractName) => val contract = progInfo.getContract(contractName).get
+                         contract.getField(name) match {
+                             case Some(f) => (translateType(f.typ), cPrime)
+                             case None =>
+                                 logError(s"$contractName has no field named '$name'")
+                                 (BottomType(), context)
+                         }
+                     case StateType(stateName, contractName) => val contract = progInfo.getContract(contractName).get
+                         contract.getState(stateName).get.getField(name) match {
+                             case Some(f) => (translateType(f.typ), cPrime)
+                             case None =>
+                                 logError(s"$contractName has no field named '$name'")
+                                 (BottomType(), context)
+                         }
+                 }
+
+             case LocalInvocation(name: String, args: Seq[Expression]) =>
+                 val contract = insideOfContract match {
+                 case Left(s) => s.getContract
+                 case Right(c) => c
+             }
+                 val (txLookup, funLookup) = context("this") match {
+                     case StateType(_, sName) =>
+                         (contract.getState(sName).get.getFunction(name),
+                           contract.getState(sName).get.getTransaction(name))
+                     case _ => (contract.getFunction(name), contract.getTransaction(name))
+                 }
+
+                 val (spec, ret) = (txLookup, funLookup) match {
+                     case (None, None) =>
+                         logError(s"No function or transaction named $name found")
+                         return (BottomType(), context)
+                     case (_, Some(Transaction(_, txArgs, txRet, _, _))) => (txArgs, txRet)
+                     case (Some(Func(_, funArgs, funRet, _)), _) => (funArgs, funRet)
+                 }
+
+
+                 //checkArgs
+
+                 ret match {
+                     case Some(rType) => (translateType(rType), context)
+                     case None => (BottomType(), context)
+                 }
+
+             case Invocation(recipient: Expression, name: String, args: Seq[Expression]) =>
+                 val (recipType, cPrime) = checkExpr(insideOfMethod, insideOfContract, context, recipient)
+                 val (tx, fun) = recipType match {
+                     case ContractType(contractName) =>
+                         val contract = progInfo.getContract(contractName).get
+                         (contract.getTransaction(name), contract.getFunction(name))
+                     case StateType(stateName, contractName) =>
+                         val contract = progInfo.getContract(contractName).get
+                         (contract.getState(stateName).get.getTransaction(name),
+                          contract.getState(stateName).get.getFunction(name))
+                 }
+
+                 val (spec, ret) = (tx, fun) match {
+                     case (None, None) =>
+                         logError(s"No function or transaction named $name found")
+                         return (BottomType(), context)
+                     case (_, Some(Transaction(_, txArgs, txRet, _, _))) => (txArgs, txRet)
+                     case (Some(Func(_, funArgs, funRet, _)), _) => (funArgs, funRet)
+                 }
+
+                 //checkArgs
+
+                 ret match {
+                     case Some(rType) => (translateType(rType), context)
+                     case None => (BottomType(), context)
+                 }
+
+             case Construction(name: String, args: Seq[Expression]) =>
+                 progInfo.getContract(name) match {
+                     case Some(c) =>
+                         //checkArgs
+                         c.getAst.mod match {
+                             case Some(IsOwned) => (OwnedRef(ContractType(name)), context)
+                             case Some(IsShared) => (SharedRef(ContractType(name)), context)
+                             case Some(IsMain) => (SharedRef(ContractType(name)), context)// TODO: is main contract shared?
+                             case None => (SharedRef(ContractType(name)), context)// TODO: what goes here?
+                         }
+                     case None =>
+                         logError(s"Contract '$name' does not exist")
+                         (BottomType(), context)
+                 }
+
+
+             // todo
          }
     }
 
