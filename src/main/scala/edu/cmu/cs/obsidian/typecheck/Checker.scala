@@ -2,12 +2,9 @@ package edu.cmu.cs.obsidian.typecheck
 
 import edu.cmu.cs.obsidian.parser._
 
-import scala.collection.immutable.{TreeMap, TreeSet}
-import scala.collection.Map
 import scala.collection.mutable.ListBuffer
 import scala.collection.immutable.TreeMap
-import scala.collection.{Map, mutable}
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.Map
 
 sealed trait SimpleType
 case class ContractType(contractName: String) extends SimpleType
@@ -33,9 +30,9 @@ class IndexedState(
                       txLookup: Map[String, Transaction],
                       funLookup: Map[String, Func]
                   ) {
-    def getAst = state
+    def getAst: State = state
 
-    def getContract = insideOf
+    def getContract: IndexedContract = insideOf
 
     def getField(name: String): Option[Field] = {
         fieldLookup.get(name) match {
@@ -64,17 +61,18 @@ class IndexedContract(
                          txLookup: Map[String, Transaction],
                          funLookup: Map[String, Func]
                      ) {
-    def getAst = contract
-    def getField = fieldLookup.get(_)
-    def getTransaction = txLookup.get(_)
-    def getFunction = funLookup.get(_)
-    def getState = stateLookup.get(_)
+    def getAst: Contract = contract
+    def getField: Function[String, Option[Field]] = fieldLookup.get
+    def getTransaction: Function[String, Option[Transaction]] = txLookup.get
+    def getFunction: Function[String, Option[Func]] = funLookup.get
+    def getState: Function[String, Option[IndexedState]] = stateLookup.get
 
-    def getConstructors(): Seq[Constructor] = {
+    def getConstructors: Seq[Constructor] = {
         var constructors: List[Constructor] = Nil
         for (rawDecl <- contract.declarations) {
-            if (rawDecl.isInstanceOf[Constructor]) {
-                constructors = rawDecl.asInstanceOf[Constructor]::constructors
+            rawDecl match {
+                case c: Constructor =>
+                    constructors = c::constructors
             }
 
         }
@@ -85,8 +83,8 @@ class IndexedContract(
 class IndexedProgram(
                         program: Program,
                         contractLookup: Map[String, IndexedContract]) {
-    def getAst = program
-    def getContract = contractLookup.get(_)
+    def getAst: Program = program
+    def getContract: Function[String, Option[IndexedContract]] = contractLookup.get
 }
 
 class Checker {
@@ -95,7 +93,7 @@ class Checker {
     type Error = String
 
     val errors = new collection.mutable.ArrayStack[Error]()
-    var progInfo: IndexedProgram = null
+    var progInfo: IndexedProgram = _
 
     private def logError(msg: String): Unit = {
         errors.push(msg)
@@ -200,23 +198,23 @@ class Checker {
             /* if a reference is 'readonly', it is labeled as such; otherwise, it is 'owned'/'shared', based on the
              * declaration of the contract itself */
             if (mods.contains(IsReadOnly)) {
-                new ReadOnlyRef(t)
+                ReadOnlyRef(t)
             } else if (mod == IsOwned) {
-                new OwnedRef(t)
+                OwnedRef(t)
             } else {
                 // TODO: are main contracts always deemed shared by the type system?
-                new SharedRef(t)
+                SharedRef(t)
             }
         }
 
         t match {
-            case AstIntType() => new IntType()
-            case AstBoolType() => new BoolType()
-            case AstStringType() => new StringType()
+            case AstIntType() => IntType()
+            case AstBoolType() => BoolType()
+            case AstStringType() => StringType()
             case AstContractType(mods, name) =>
-                getModifier(new ContractType(name), mods, name)
+                getModifier(ContractType(name), mods, name)
             case AstStateType(mods, nameC, nameS) =>
-                getModifier(new StateType(nameC, nameS), mods, nameC)
+                getModifier(StateType(nameC, nameS), mods, nameC)
         }
     }
 
@@ -253,7 +251,7 @@ class Checker {
         }
 
         def checkArgsTx(tx: Transaction, args: Seq[Expression], context: Context): Context = {
-           context
+            context
         }
 
         def checkArgsFun(fun: Func, args: Seq[Expression], context: Context): Context = {
@@ -381,12 +379,11 @@ class Checker {
 
     private def checkStatementSequence(
                                           insideOfMethod: Either[Transaction, Func],
-                                          insideOfContract: Either[IndexedState, IndexedContract],
                                           context: Context,
                                           s: Seq[Statement]
                                       ): Context = {
         s.foldLeft(context)((prevContext: Context, s: Statement) =>
-                checkStatement(insideOfMethod, insideOfContract, prevContext, s))
+                checkStatement(insideOfMethod, prevContext, s))
     }
 
     private def mergeContext(context1: Context, context2: Context): Context = {
@@ -456,17 +453,28 @@ class Checker {
         errs.foreach(logError)
     }
 
+    private def getThisIndexed(context: Context): Either[IndexedState, IndexedContract] = {
+        extractSimpleType(context("this")) match {
+            case Some(ContractType(c)) => Right(progInfo.getContract(c).get)
+            case Some(StateType(c, s)) => Left(progInfo.getContract(c).get.getState(s).get)
+            case _ => throw new Exception() // shouldn't happen
+        }
+    }
+
+    private def getThisIndexedContract(context: Context): IndexedContract = {
+        getThisIndexed(context).fold(_.getContract, identity)
+    }
+
     private def checkStatement(
                                   insideOfMethod: Either[Transaction, Func],
-                                  insideOfContract: Either[IndexedState, IndexedContract],
                                   context: Context,
                                   s: Statement
                               ): Context = {
 
         val checkExpr = (context: Context, e: Expression) =>
-            this.checkExpr(insideOfMethod, insideOfContract, context, e)
+            this.checkExpr(insideOfMethod, getThisIndexed(context), context, e)
         val checkExprs = (context: Context, es: Seq[Expression]) =>
-            this.checkExprs(insideOfMethod, insideOfContract, context, es)
+            this.checkExprs(insideOfMethod, getThisIndexed(context), context, es)
 
         s match {
             case VariableDecl(typ: AstType, varName: String) =>
@@ -492,8 +500,10 @@ class Checker {
                 val (t, contextPrime) = checkExpr(context, e)
                 val tRet = insideOfMethod match {
                     /* must be no return type */
-                    case Left(Transaction(_, _, Some(t), _, _)) => translateType(t)
-                    case Right(Func(_, _, Some(t), _)) => translateType(t)
+                    case Left(Transaction(_, _, Some(astType), _, _)) =>
+                        translateType(astType)
+                    case Right(Func(_, _, Some(astType), _)) =>
+                        translateType(astType)
                     case _ =>
                         logError("Cannot return a value for a method with no return type")
                         return contextPrime
@@ -503,13 +513,13 @@ class Checker {
 
             case Transition(newStateName: String, updates: Seq[(Variable, Expression)]) =>
                 val (cName, sName) = extractSimpleType(context("this")) match {
-                    case Some(StateType(c, s)) => (c, s)
+                    case Some(StateType(ct, st)) => (ct, st)
                     case _ =>
                         logError("'this' must be typed to a particular state to transition")
                         return context
                 }
 
-                val indexedContract = insideOfContract.fold(_.getContract, identity)
+                val indexedContract = getThisIndexedContract(context)
                 val indexedOldState = indexedContract.getState(sName).get
 
                 if (indexedContract.getState(newStateName).isEmpty) {
@@ -594,12 +604,12 @@ class Checker {
                         }
 
                         assertSubType(t, fieldType)
-                        return contextPrime2
+                        contextPrime2
 
                     // assignment target is neither a variable nor a field
                     case _ =>
                         logError("Assignment target must be a local variable or a field")
-                        return contextPrime
+                        contextPrime
                 }
 
             case Throw() => context
@@ -607,28 +617,58 @@ class Checker {
             case If(eCond: Expression, s: Seq[Statement]) =>
                 val (t, contextPrime) = checkExpr(context, eCond)
                 assertSubType(t, BoolType())
-                checkStatementSequence(insideOfMethod, insideOfContract, contextPrime, s)
+                checkStatementSequence(insideOfMethod, contextPrime, s)
 
             case IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) =>
                 val (t, contextPrime) = checkExpr(context, eCond)
                 assertSubType(t, BoolType())
                 val contextIfTrue =
-                    checkStatementSequence(insideOfMethod, insideOfContract, contextPrime, s1)
+                    checkStatementSequence(insideOfMethod, contextPrime, s1)
                 val contextIfFalse =
-                    checkStatementSequence(insideOfMethod, insideOfContract, contextPrime, s2)
+                    checkStatementSequence(insideOfMethod, contextPrime, s2)
                 mergeContext(contextIfFalse, contextIfTrue)
 
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val contextIfTry =
-                    checkStatementSequence(insideOfMethod, insideOfContract, context, s1)
+                    checkStatementSequence(insideOfMethod, context, s1)
                 val contextIfCatch =
-                    checkStatementSequence(insideOfMethod, insideOfContract, context, s2)
+                    checkStatementSequence(insideOfMethod, context, s2)
                 mergeContext(contextIfTry, contextIfCatch)
 
-            case Switch(e: Expression, cases: Seq[SwitchCase]) => context
+            case Switch(e: Expression, cases: Seq[SwitchCase]) =>
+                val (t, contextPrime) = checkExpr(context, e)
+                val indexedContract = getThisIndexedContract(contextPrime)
+
+                getThisIndexed(context).fold(
+                    st => {
+                            val sName = st.getAst.name
+                            logError(s"Expression $e is known to be in state " +
+                                     s"$sName: a dynamic check is not needed")
+                        },
+                    _ => ()
+                )
+
+                var mergedContext = contextPrime
+                for (SwitchCase(sName, body) <- cases) {
+                    val newThisTypeSimple = indexedContract.getState(sName) match {
+                        case Some(indexedState) =>
+                            StateType(indexedContract.getAst.name, indexedState.getAst.name)
+                        case None =>
+                            logError(s"State $sName not found")
+                            ContractType(indexedContract.getAst.name)
+                    }
+
+                    val newThisType = updateSimpleType(context("this"), newThisTypeSimple)
+
+                    val startContext = contextPrime.updated("this", newThisType)
+                    val endContext = checkStatementSequence(insideOfMethod, startContext, body)
+                    mergedContext = mergeContext(mergedContext, endContext)
+                }
+
+                mergedContext
 
             case LocalInvocation(name: String, args: Seq[Expression]) =>
-                val contract = insideOfContract.fold(_.getContract, identity)
+                val contract = getThisIndexedContract(context)
                 val (txLookup, funLookup) = extractSimpleType(context("this")) match {
                     case Some(StateType(_, sName)) =>
                         (contract.getState(sName).get.getFunction(name),
@@ -674,8 +714,8 @@ class Checker {
                     case (None, None) =>
                         logError(s"No function or transaction named $name found")
                         return context
-                    case (Some(Transaction(_, args, ret, _, _)), _) => (args, ret)
-                    case (_, Some(Func(_, args, ret, _))) => (args, ret)
+                    case (Some(Transaction(_, sp, rt, _, _)), _) => (sp, rt)
+                    case (_, Some(Func(_, sp, rt, _))) => (sp, rt)
                 }
 
                 val (types, contextPrime2) = checkExprs(context, args)
@@ -693,11 +733,11 @@ class Checker {
                         logError(s"Cannot find contract with name $name")
                         return context
                     case Some(contract) =>
-                        contract.getConstructors()
+                        contract.getConstructors
                 }
 
                 val (argTypes, contextPrime) = checkExprs(context, args)
-                assertArgsCorrect(constructors.map(_.args).toSeq, argTypes)
+                assertArgsCorrect(constructors.map(_.args), argTypes)
 
                 contextPrime
 
@@ -722,14 +762,16 @@ class Checker {
         }
     }
 
-    private def checkField(field: Field): Option[String] = {
+    private def checkField(field: Field): Unit = {
         translateType(field.typ) match {
             case OwnedRef(simple) => checkSimpleType(simple)
 
-            case SharedRef(StateType(_, _)) => Some(s"State-specific types are not safe for 'shared' references")
+            case SharedRef(StateType(_, _)) =>
+                logError(s"State-specific types are not safe for 'shared' references")
             case SharedRef(simple) => checkSimpleType(simple)
 
-            case ReadOnlyRef(StateType(_, _)) => Some(s"State-specific types are not safe for 'readonly' references")
+            case ReadOnlyRef(StateType(_, _)) =>
+                logError(s"State-specific types are not safe for 'readonly' references")
             case ReadOnlyRef(simple) => checkSimpleType(simple)
 
             case _ => None
@@ -757,7 +799,7 @@ class Checker {
         initContext = initContext.updated("this", thisType)
 
         val outputContext =
-            checkStatementSequence(Left(tx), insideOfContract, initContext, tx.body)
+            checkStatementSequence(Left(tx), initContext, tx.body)
 
         assertSubType(outputContext("this"), OwnedRef(ContractType(cName)))
 
@@ -860,7 +902,7 @@ class Checker {
             checkContract(contract)
         }
 
-        for (err <- errors) println(err)
+        for (err <- errors.reverse) println(err)
 
         errors.isEmpty
     }

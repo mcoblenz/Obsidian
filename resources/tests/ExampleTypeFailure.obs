@@ -1,11 +1,28 @@
-main contract IntContainer {
-	int x;
-	string s;
-	bool b;
+unique contract C {
+    C(string s) {
+        ->HasString({s = s});
+    }
 
-	transaction setX(int newX) returns int {
-		int oldX = x;
-		x = newX + true;
-		return oldX;
-	}
+    state HasString {
+        string s;
+    }
+}
+
+main contract IntContainer {
+    int x;
+    string s;
+    bool b;
+
+    transaction setX(int newX) returns int {
+        int oldX = this.x;
+        this.x = newX + true;
+        createC();
+        createC(newX);
+        createC(this.s, this.s);
+        return this.b;
+    }
+
+    transaction createC(string s) returns C {
+        return new C(s);
+    }
 }
