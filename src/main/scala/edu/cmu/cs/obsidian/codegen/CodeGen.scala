@@ -147,7 +147,7 @@ class CodeGen (val target: Target) {
                                       programPackage: JPackage,
                                       contractNameResolutionMap: Map[Contract, String],
                                       protobufOuterClassNames: Map[String, String]): Unit = {
-        var contractClass = programPackage._class(JMod.PUBLIC, classNameForStub(contract.name.name))
+        var contractClass = programPackage._class(JMod.PUBLIC, classNameForStub(contract.name))
         contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
 
         val constructor = contractClass.constructor(JMod.PUBLIC)
@@ -192,7 +192,7 @@ class CodeGen (val target: Target) {
                 else ctSt
             case o@_ => o
         }
-        newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.fieldName.name)
+        newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.fieldName)
     }
 
     private def translateStubFunction(f: Func, inClass: JDefinedClass) : Unit = {
@@ -247,14 +247,14 @@ class CodeGen (val target: Target) {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
         }
-        val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, transaction.name.name)
+        val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, transaction.name)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
 
 
         var argExpressions: List[IJExpression] = Nil
         /* add args */
         for (arg <- transaction.args) {
-            argExpressions = argExpressions :+ meth.param(resolveType(arg.typ), arg.varName.name)
+            argExpressions = argExpressions :+ meth.param(resolveType(arg.typ), arg.varName)
         }
 
         /* add body */
@@ -280,7 +280,7 @@ class CodeGen (val target: Target) {
         val tryBlock = body._try()
 
         val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
-        doTransactionInvocation.arg(transaction.name.name)
+        doTransactionInvocation.arg(transaction.name)
         doTransactionInvocation.arg(argArray)
         doTransactionInvocation.arg(transaction.retType.isDefined)
 
@@ -331,9 +331,9 @@ class CodeGen (val target: Target) {
         val getBody = getMeth.body()
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            getBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name.name).enumVal))
+            getBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                    ._then()
-                   ._return(stateLookup(st.name.name).innerClassField.ref(f.fieldName.name))
+                   ._return(stateLookup(st.name).innerClassField.ref(f.fieldName))
         }
         // exhaustive return to keep the compiler happy
         getBody._return(JExpr._null())
@@ -344,9 +344,9 @@ class CodeGen (val target: Target) {
         val newValue = setMeth.param(fieldType, "newValue")
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            setBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name.name).enumVal))
+            setBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                 ._then()
-                .assign(stateLookup(st.name.name).innerClassField.ref(f.fieldName.name), newValue)
+                .assign(stateLookup(st.name).innerClassField.ref(f.fieldName), newValue)
         }
 
         StateSpecificFieldInfo(declSeq, getMeth, setMeth)
@@ -361,21 +361,21 @@ class CodeGen (val target: Target) {
             case None => (false, model.VOID)
         }
 
-        val meth = newClass.method(JMod.PUBLIC, retType, txExample.name.name)
+        val meth = newClass.method(JMod.PUBLIC, retType, txExample.name)
 
         /* add the appropriate args to the method and collect them in a list */
-        val jArgs = txExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName.name) )
+        val jArgs = txExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
 
         val body = meth.body()
 
         for ((st, f) <- declSeq) {
-            val inv = JExpr.invoke(stateLookup(st.name.name).innerClassField, txExample.name.name)
+            val inv = JExpr.invoke(stateLookup(st.name).innerClassField, txExample.name)
 
             /* add args to the invocation */
             jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
 
             // dynamically check the state
-            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name.name).enumVal))._then()
+            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))._then()
 
             if (hasReturn) stBody._return(inv)
             else stBody.add(inv)
@@ -395,21 +395,21 @@ class CodeGen (val target: Target) {
             case None => (false, model.VOID)
         }
 
-        val meth = newClass.method(JMod.PUBLIC, retType, funExample.name.name)
+        val meth = newClass.method(JMod.PUBLIC, retType, funExample.name)
 
         /* add the appropriate args to the method and collect them in a list */
-        val jArgs = funExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName.name) )
+        val jArgs = funExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
 
         val body = meth.body()
 
         for ((st, f) <- declSeq) {
-            val inv = JExpr.invoke(stateLookup(st.name.name).innerClassField, funExample.name.name)
+            val inv = JExpr.invoke(stateLookup(st.name).innerClassField, funExample.name)
 
             /* add args to the invocation */
             jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
 
             // dynamically check the state
-            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name.name).enumVal))._then()
+            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))._then()
 
             if (hasReturn) stBody._return(inv)
             else stBody.add(inv)
@@ -474,22 +474,19 @@ class CodeGen (val target: Target) {
             * states, rather than two distinct declarations.
             * For each grouped declaration, the corresponding makeInfo function is called to setup
             * the necessary information for the table */
-            var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.fieldName.name)
+            var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.fieldName)
                 .transform(fieldInfoFunc)
-            var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name.name)
+            var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name)
                 .transform(transactionInfoFunc)
-            var funLookup = generalizedPartition[(State, Func), String](funs.toList, _._2.name.name)
+            var funLookup = generalizedPartition[(State, Func), String](funs.toList, _._2.name)
                 .transform(functionInfoFunc)
 
             /* add on any whole-contract declarations to the lookup table: these are fairly simple */
             for (decl <- contract.declarations) {
                 decl match {
-                    case f@Field(_, fieldName) =>
-                        fieldLookup = fieldLookup.updated(fieldName.name, GlobalFieldInfo(f))
-                    case t@Transaction(name, _, _, _, _) =>
-                        txLookup = txLookup.updated(name.name, GlobalTransactionInfo(t))
-                    case f@Func(name, _, _, _) =>
-                        funLookup = funLookup.updated(name.name, GlobalFuncInfo(f))
+                    case f@Field(_, fieldName) => fieldLookup = fieldLookup.updated(fieldName, GlobalFieldInfo(f))
+                    case t@Transaction(name, _, _, _, _) => txLookup = txLookup.updated(name, GlobalTransactionInfo(t))
+                    case f@Func(name, _, _, _) => funLookup = funLookup.updated(name, GlobalFuncInfo(f))
                     case _ => ()
                 }
             }
@@ -526,12 +523,12 @@ class CodeGen (val target: Target) {
         var stateEnumOption: Option[JDefinedClass] = None
         var stateEnumField: Option[JFieldVar] = None
         if (stateDeclarations.nonEmpty) {
-            val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumNameForClassName(aContract.name.name))
+            val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumNameForClassName(aContract.name))
             stateEnumOption = Some(stateEnum)
 
             /* Declare the states in the enum */
             for (State(name, _) <- stateDeclarations) {
-                stateEnum.enumConstant(name.name)
+                stateEnum.enumConstant(name)
             }
 
             /* setup the state field and the [getState] method */
@@ -545,20 +542,20 @@ class CodeGen (val target: Target) {
         for (s <- stateDeclarations) {
 
             /* declare the inner class */
-            val innerClass = newClass._class(innerClassName(s.name.name))
+            val innerClass = newClass._class(innerClassName(s.name))
 
             /* declare the inner class field */
-            val innerClassField = newClass.field(JMod.PRIVATE, innerClass, innerClassFieldName(s.name.name))
+            val innerClassField = newClass.field(JMod.PRIVATE, innerClass, innerClassFieldName(s.name))
 
             val context =
                 StateContext(
                     astState = s,
-                    enumVal = stateEnumOption.get.enumConstant(s.name.name),
+                    enumVal = stateEnumOption.get.enumConstant(s.name),
                     innerClass = innerClass,
                     innerClassField = innerClassField
                 )
 
-            stateLookup = stateLookup.insert(s.name.name, context)
+            stateLookup = stateLookup.insert(s.name, context)
         }
 
         /* setup tx/fun/field lookup tables */
@@ -606,10 +603,10 @@ class CodeGen (val target: Target) {
                         nextState.eq(stTo.enumVal))
                     ._then()
                 val (fromName, toName) = (stFrom.astState.name, stTo.astState.name)
-                for (f <- translationContext.conservedFields(fromName.name, toName.name)) {
+                for (f <- translationContext.conservedFields(fromName, toName)) {
                     /* assign the field to the new state from the old */
-                    assignBody.assign(stTo.innerClassField.ref(f.fieldName.name),
-                                        stFrom.innerClassField.ref(f.fieldName.name))
+                    assignBody.assign(stTo.innerClassField.ref(f.fieldName),
+                                        stFrom.innerClassField.ref(f.fieldName))
                 }
             }
         }
@@ -644,7 +641,7 @@ class CodeGen (val target: Target) {
                                        protobufOuterClassName: String,
                                        contractNameResolutionMap: Map[Contract, String],
                                        protobufOuterClassNames: Map[String, String]) = {
-        val newClass: JDefinedClass = programPackage._class(aContract.name.name)
+        val newClass: JDefinedClass = programPackage._class(aContract.name)
 
         val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
         translateContract(aContract, newClass, translationContext)
@@ -675,7 +672,7 @@ class CodeGen (val target: Target) {
                                        parent: JDefinedClass,
                                        translationContext: TranslationContext
                                       ): Unit = {
-        val newClass: JDefinedClass = parent._class(JMod.PUBLIC, aContract.name.name)
+        val newClass: JDefinedClass = parent._class(JMod.PUBLIC, aContract.name)
 
         /* change the information in the translation context */
         val newTranslationContext = translationContext.copy(
@@ -751,12 +748,12 @@ class CodeGen (val target: Target) {
                             .band(
                                 JExpr.ref("transName")
                                     .invoke("equals").arg(
-                                        JExpr.lit(tx.name.name))
+                                        JExpr.lit(tx.name))
                             )
                     case None =>
                         JExpr.ref("transName")
                             .invoke("equals").arg(
-                                JExpr.lit(tx.name.name))
+                                JExpr.lit(tx.name))
                 }
             }
 
@@ -794,7 +791,7 @@ class CodeGen (val target: Target) {
 
                 val newTxArg: JVar = stateCondBody.decl(
                     javaArgType,
-                    txArg.varName.name,
+                    txArg.varName,
                     transactionArgExpr
                 )
 
@@ -805,7 +802,7 @@ class CodeGen (val target: Target) {
             var txInvoke: JInvocation = null
 
             if (tx.retType.isDefined) {
-                txInvoke = JExpr.invoke(tx.name.name)
+                txInvoke = JExpr.invoke(tx.name)
                 stateCondBody.assign (returnBytes,
                     tx.retType.get match {
                         case AstIntType() => txInvoke.invoke("toByteArray")
@@ -815,7 +812,7 @@ class CodeGen (val target: Target) {
                     }
                 )
             } else {
-                txInvoke = stateCondBody.invoke(tx.name.name)
+                txInvoke = stateCondBody.invoke(tx.name)
             }
 
             for (txArg <- txArgsList.reverse) {
@@ -969,7 +966,7 @@ class CodeGen (val target: Target) {
                     archiveVariableInvocation)
 
                 // generate: builder.setField(field);
-                val setterName: String = setterNameForField(field.fieldName.name)
+                val setterName: String = setterNameForField(field.fieldName)
 
                 val invocation: JInvocation = nonNullBody.invoke(builderVar, setterName)
                 invocation.arg(archiveVariable)
@@ -984,7 +981,7 @@ class CodeGen (val target: Target) {
                 // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
                 // The protobuf type for this is just bytes.
                 // builder.setField(ByteString.CopyFrom(field.toByteArray()))
-                val setterName: String = setterNameForField(field.fieldName.name)
+                val setterName: String = setterNameForField(field.fieldName)
                 val setInvocation = JExpr.invoke(builderVar, setterName)
 
                 val byteStringClass: AbstractJClass =
@@ -997,7 +994,7 @@ class CodeGen (val target: Target) {
                 nonNullBody.add(setInvocation)
             }
             case AstBoolType() => {
-                val setterName: String = setterNameForField(field.fieldName.name)
+                val setterName: String = setterNameForField(field.fieldName)
                 val setInvocation = body.invoke(builderVar, setterName)
                 setInvocation.arg(fieldVar)
             }
@@ -1005,12 +1002,12 @@ class CodeGen (val target: Target) {
                 val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
                 val nonNullBody = ifNonNull._then()
 
-                val setterName: String = setterNameForField(field.fieldName.name)
+                val setterName: String = setterNameForField(field.fieldName)
                 val setInvocation = nonNullBody.invoke(builderVar, setterName)
                 setInvocation.arg(fieldVar)
             }
-            case n@AstContractType(_, name) => handleNonPrimitive(name.name, n)
-            case n@AstStateType(_, name, _) => handleNonPrimitive(name.name, n)
+            case n@AstContractType(_, name) => handleNonPrimitive(name, n)
+            case n@AstStateType(_, name, _) => handleNonPrimitive(name, n)
         }
     }
 
@@ -1019,7 +1016,7 @@ class CodeGen (val target: Target) {
                                       stateClass: JDefinedClass,
                                       translationContext: TranslationContext): Unit = {
         val contractProtobufClassName = translationContext.getProtobufClassName(contract)
-        val protobufClassName = contractProtobufClassName + "." + state.name.name
+        val protobufClassName = contractProtobufClassName + "." + state.name
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = stateClass.method(JMod.PUBLIC, archiveType, "archive")
@@ -1070,7 +1067,7 @@ class CodeGen (val target: Target) {
 
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
-            val javaFieldVar = inClass.fields().get(field.fieldName.name)
+            val javaFieldVar = inClass.fields().get(field.fieldName)
             generateFieldArchiver(field, javaFieldVar, builderVariable, archiveBody, translationContext, contract)
         }
 
@@ -1078,12 +1075,12 @@ class CodeGen (val target: Target) {
         if (translationContext.states.nonEmpty) {
             for (stDecl <- declarations.filter(d => d.isInstanceOf[State])) {
                 val st = stDecl.asInstanceOf[State]
-                val cond = translationContext.getEnum(st.name.name).eq(JExpr.invoke(getStateMeth))
+                val cond = translationContext.getEnum(st.name).eq(JExpr.invoke(getStateMeth))
                 val thisStateBody = archiveBody._if(cond)._then()
 
-                val stateField = translationContext.states(st.name.name).innerClassField
+                val stateField = translationContext.states(st.name).innerClassField
                 val builtState = thisStateBody.invoke(stateField, "archive")
-                thisStateBody.invoke(builderVariable, "setState" + st.name.name)
+                thisStateBody.invoke(builderVariable, "setState" + st.name)
                              .arg(builtState)
             }
         }
@@ -1112,7 +1109,7 @@ class CodeGen (val target: Target) {
                     translationContext: TranslationContext,
                     inContract: Contract): Unit = {
         // generate: FieldArchive fieldArchive = field.archive();
-        val javaFieldName: String = field.fieldName.name
+        val javaFieldName: String = field.fieldName
         val javaFieldType: AbstractJType = resolveType(field.typ)
 
         def handleNonPrimitive(name: String, n: AstType): Unit = {
@@ -1168,8 +1165,8 @@ class CodeGen (val target: Target) {
                 val getCall = archive.invoke(getterName)
                 ifNonempty._then().assign(fieldVar, getCall)
             }
-            case n@AstContractType(_, name) => handleNonPrimitive(name.name, n)
-            case n@AstStateType(_, name, _) => handleNonPrimitive(name.name, n)
+            case n@AstContractType(_, name) => handleNonPrimitive(name, n)
+            case n@AstStateType(_, name, _) => handleNonPrimitive(name, n)
         }
     }
 
@@ -1179,7 +1176,7 @@ class CodeGen (val target: Target) {
                     stateClass: JDefinedClass,
                     translationContext: TranslationContext): Unit = {
         val contractProtobufClassName = translationContext.getProtobufClassName(contract)
-        val protobufClassName = contractProtobufClassName + "." + state.name.name
+        val protobufClassName = contractProtobufClassName + "." + state.name
 
         val archiveType = model.directClass(protobufClassName)
 
@@ -1269,27 +1266,27 @@ class CodeGen (val target: Target) {
             val st = stDecl.asInstanceOf[State]
             val thisStateBody = fromArchiveBody._if(
                 archive.invoke(enumGetter).invoke("equals").arg(
-                    JExpr.direct(enumName(st.name.name)))
+                    JExpr.direct(enumName(st.name)))
             )._then()
-            thisStateBody.assign(JExpr.ref(stateField), translationContext.getEnum(st.name.name))
+            thisStateBody.assign(JExpr.ref(stateField), translationContext.getEnum(st.name))
         }
 
         /* this takes care of state-specific fields */
         for (stDecl <- declarations if stDecl.isInstanceOf[State]) {
             val st = stDecl.asInstanceOf[State]
 
-            val stArchiveName = protobufClassName + "." + st.name.name
+            val stArchiveName = protobufClassName + "." + st.name
             val stArchiveType: AbstractJType = model.parseType(stArchiveName)
 
-            val innerClass = translationContext.states(st.name.name).innerClass
-            val innerClassField = translationContext.states(st.name.name).innerClassField
+            val innerClass = translationContext.states(st.name).innerClass
+            val innerClassField = translationContext.states(st.name).innerClassField
 
             val thisStateBody = fromArchiveBody._if(
                     archive.invoke(enumGetter).invoke("equals").arg(
-                    JExpr.direct(enumName(st.name.name)))
+                    JExpr.direct(enumName(st.name)))
                 )._then()
 
-            val stArchiveGetter = "getState" + st.name.name
+            val stArchiveGetter = "getState" + st.name
             val stArchive =
                 thisStateBody.decl(stArchiveType, "stateArchive", archive.invoke(stArchiveGetter))
 
@@ -1352,15 +1349,9 @@ class CodeGen (val target: Target) {
             case AstIntType() => model.directClass("java.math.BigInteger")
             case AstBoolType() => model.BOOLEAN
             case AstStringType() => model.ref("String")
-            case AstContractType(_, Identifier("address")) => model.directClass("java.math.BigInteger")
-            case AstContractType(modifiers, name) =>
-                if (modifiers.contains(IsRemote))
-                    model.ref(classNameForStub(name.name))
-                else model.ref(name.name)
-            case AstStateType(modifiers, cName, _) =>
-                if (modifiers.contains(IsRemote))
-                    model.ref(classNameForStub(cName.name))
-                else model.ref(cName.name)
+            case AstContractType(_, "address") => model.directClass("java.math.BigInteger")
+            case AstContractType(modifiers, name) => if (modifiers.contains(IsRemote)) model.ref(classNameForStub(name)) else model.ref(name)
+            case AstStateType(modifiers, cName, _) => if (modifiers.contains(IsRemote)) model.ref(classNameForStub(cName)) else model.ref(cName)
         }
     }
 
@@ -1374,9 +1365,9 @@ class CodeGen (val target: Target) {
             case AstStateType(_, n, _) => n
             case _ => return None
         }
-        var typeComponents = name.name.split(".")
+        var typeComponents = name.split(".")
         if (typeComponents.isEmpty) {
-            typeComponents = Array(name.name)
+            typeComponents = Array(name)
         }
         //val fullyQualifiedContainingContractName = translationContext.contractNameResolutionMap(containingContract)
         //val containingContractComponents = fullyQualifiedContainingContractName.split(".")
@@ -1442,10 +1433,10 @@ class CodeGen (val target: Target) {
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
         val initializer = fieldInitializerForType(decl.typ)
         if (initializer.isDefined) {
-            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName.name, initializer.get)
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName, initializer.get)
         }
         else {
-            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName.name)
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
         }
     }
 
@@ -1465,7 +1456,7 @@ class CodeGen (val target: Target) {
         val recurse = (e: Expression) => translateExpr(e, translationContext, localContext)
 
         e match {
-            case Variable(x) => dereferenceVariable(x.name, translationContext, localContext)
+            case Variable(x) => dereferenceVariable(x, translationContext, localContext)
             case NumLiteral(n) => model.directClass("java.math.BigInteger").
                                     staticInvoke("valueOf").arg(JExpr.lit(n))
             case StringLiteral(s) => JExpr.lit(s)
@@ -1490,16 +1481,16 @@ class CodeGen (val target: Target) {
                 recurse(e1).invoke("compareTo").arg(recurse(e2)).ne(JExpr.lit(1))
             case NotEquals(e1, e2) =>
                 recurse(e1).invoke("equals").arg(recurse(e2)).not()
-            case Dereference(e1, f) => recurse(e1).ref(f.name) /* TODO : do we ever need this? */
+            case Dereference(e1, f) => recurse(e1).ref(f) /* TODO : do we ever need this? */
             case LocalInvocation(name, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(name.name), args, translationContext, localContext)
+                addArgs(translationContext.invokeTransactionOrFunction(name), args, translationContext, localContext)
             /* TODO : this shouldn't be an extra case */
             case Invocation(This(), name, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(name.name), args, translationContext, localContext)
+                addArgs(translationContext.invokeTransactionOrFunction(name), args, translationContext, localContext)
             case Invocation(recipient, name, args) =>
-                addArgs(JExpr.invoke(recurse(recipient), name.name), args, translationContext, localContext)
+                addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext)
             case Construction(name, args) =>
-                addArgs(JExpr._new(model.ref(name.name)), args, translationContext, localContext)
+                addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
         }
     }
 
@@ -1508,12 +1499,12 @@ class CodeGen (val target: Target) {
                     contract: Contract,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext): Unit = {
-        val stateClass = translationContext.states(state.name.name).innerClass
+        val stateClass = translationContext.states(state.name).innerClass
 
         /* we change one thing: the currently translated state */
-        val newTranslationContext = translationContext.copy(currentStateName = Some(state.name.name))
+        val newTranslationContext = translationContext.copy(currentStateName = Some(state.name))
         for (decl <- state.declarations) {
-            translateDeclaration(decl, stateClass, newTranslationContext, Some(state.name.name), contract)
+            translateDeclaration(decl, stateClass, newTranslationContext, Some(state.name), contract)
         }
         generateStateArchiveInitializer(contract, state, stateClass, translationContext)
         generateStateArchiver(contract, state, stateClass, translationContext)
@@ -1534,7 +1525,7 @@ class CodeGen (val target: Target) {
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDecl) =>
-                (arg.varName.name, meth.param(resolveType(arg.typ), arg.varName.name))
+                (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
             )
 
         /* construct the local context from this list */
@@ -1554,7 +1545,7 @@ class CodeGen (val target: Target) {
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDecl) =>
-            (arg.varName.name, meth.param(resolveType(arg.typ), arg.varName.name))
+            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         )
 
         /* construct the local context from this list */
@@ -1574,7 +1565,7 @@ class CodeGen (val target: Target) {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
         }
-        val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name.name)
+        val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name)
         target match {
             case Client(mainContract) =>
                 if ((translationContext.contract == mainContract) && decl.name.equals("main")) {
@@ -1586,7 +1577,7 @@ class CodeGen (val target: Target) {
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
-            (arg.varName.name, meth.param(resolveType(arg.typ), arg.varName.name))
+            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         )
 
         /* construct the local context from this list */
@@ -1633,9 +1624,9 @@ class CodeGen (val target: Target) {
                     case AstBoolType() => JExpr.lit(false)
                     case _ => JExpr._null()
                 }
-                nextContext = localContext.updated(name.name, body.decl(resolveType(typ), name.name, initializer))
+                nextContext = localContext.updated(name, body.decl(resolveType(typ), name, initializer))
             case VariableDeclWithInit(typ, name, e) =>
-                nextContext = localContext.updated(name.name, body.decl(resolveType(typ), name.name, translateExpr(e, translationContext, localContext)))
+                nextContext = localContext.updated(name, body.decl(resolveType(typ), name, translateExpr(e, translationContext, localContext)))
             case Return() => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newState, updates) =>
@@ -1646,31 +1637,31 @@ class CodeGen (val target: Target) {
                  *     4) change the state enum.
                  */
                 /* construct a new instance of the inner contract */
-                val newStField = translationContext.states(newState.name).innerClassField
-                body.assign(newStField, JExpr._new(translationContext.states(newState.name).innerClass))
+                val newStField = translationContext.states(newState).innerClassField
+                body.assign(newStField, JExpr._new(translationContext.states(newState).innerClass))
 
                 /* assign fields in the update construct */
                 for ((f, e) <- updates) {
-                    body.assign(newStField.ref(f.x.name), translateExpr(e, translationContext, localContext))
+                    body.assign(newStField.ref(f.x), translateExpr(e, translationContext, localContext))
                 }
 
                 /* assign conserved fields (implicit to programmer) */
-                body.invoke(conserveFieldsName).arg(translationContext.states(newState.name).enumVal)
+                body.invoke(conserveFieldsName).arg(translationContext.states(newState).enumVal)
 
                 /* nullify old state inner class field */
                 body.invoke(deleteOldStateName)
 
                 /* change the enum to reflect the new state */
-                body.assign(JExpr.ref(stateField), translationContext.getEnum(newState.name))
+                body.assign(JExpr.ref(stateField), translationContext.getEnum(newState))
 
             case Assignment(Variable(x), e) =>
-                assignVariable(x.name, translateExpr(e, translationContext,localContext),
+                assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext)
             /* it's bad that this is a special case */
             case Assignment(Dereference(This(), field), e) => {
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
-                translationContext.assignVariable(field.name, newValue, body)
+                translationContext.assignVariable(field, newValue, body)
             }
             case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
@@ -1702,24 +1693,24 @@ class CodeGen (val target: Target) {
                      * type of the expression jEx: in general, this requires an analysis
                      * to link references to declarations */
                     JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
-                val jIf = body._if(eqState(h.stateName.name))
+                val jIf = body._if(eqState(h.stateName))
                 translateBody(jIf._then(), h.body, translationContext, localContext)
 
                 var jPrev = jIf
                 for (_case <- remainingCases) {
-                    jPrev = jPrev._elseif(eqState(_case.stateName.name))
+                    jPrev = jPrev._elseif(eqState(_case.stateName))
                     translateBody(jPrev._then(), _case.body, translationContext, localContext)
                 }
             case LocalInvocation(methName, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(methName.name),
+                addArgs(translationContext.invokeTransactionOrFunction(methName),
                         args, translationContext, localContext)
             /* TODO : it's bad that this is a special case */
             case Invocation(This(), methName, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(methName.name),
+                addArgs(translationContext.invokeTransactionOrFunction(methName),
                         args, translationContext, localContext)
 
             case Invocation(e, methName, args) =>
-                addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName.name),
+                addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName),
                         args, translationContext, localContext)
 
             /* all expressions can be statements but no other expressions have a reasonable meaning */
@@ -1748,11 +1739,11 @@ class CodeGen (val target: Target) {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
         }
-        val meth: JMethod = newClass.method(JMod.PRIVATE, javaRetType, decl.name.name)
+        val meth: JMethod = newClass.method(JMod.PRIVATE, javaRetType, decl.name)
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
-            (arg.varName.name, meth.param(resolveType(arg.typ), arg.varName.name))
+            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         )
 
         /* construct the local context from this list */

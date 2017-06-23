@@ -31,7 +31,7 @@ class IndexedState(
                       funLookup: Map[String, Func]
                   ) {
 
-    def name: String = state.name.name
+    def name: String = state.name
     def ast: State = state
 
     def contract: IndexedContract = insideOf
@@ -63,7 +63,7 @@ class IndexedContract(
                          txLookup: Map[String, Transaction],
                          funLookup: Map[String, Func]
                      ) {
-    def name: String = contract.name.name
+    def name: String = contract.name
     def ast: Contract = contract
     def field: Function[String, Option[Field]] = fieldLookup.get
     def transaction: Function[String, Option[Transaction]] = txLookup.get
@@ -308,9 +308,9 @@ class Checker {
             case AstIntType() => IntType()
             case AstBoolType() => BoolType()
             case AstStringType() => StringType()
-            case AstContractType(mods, Identifier(name)) =>
+            case AstContractType(mods, name) =>
                 modifier(ContractType(name), mods, name)
-            case AstStateType(mods, Identifier(nameC), Identifier(nameS)) =>
+            case AstStateType(mods, nameC, nameS) =>
                 modifier(StateType(nameC, nameS), mods, nameC)
         }
     }
@@ -342,7 +342,7 @@ class Checker {
         }
 
          e match {
-             case Variable(Identifier(x)) =>
+             case Variable(x) =>
                  context get x match {
                      case Some(t) => t match {
                          case OwnedRef(simp) => (OwnedRef(simp), context.updated(x, ReadOnlyRef(simp)))
@@ -403,7 +403,7 @@ class Checker {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
                      (BottomType(), c2)
                  }
-             case Dereference(e: Expression, Identifier(name)) =>
+             case Dereference(e: Expression, name) =>
                  val (t, contextPrime) = checkExpr(insideOfMethod, insideOfContract, context, e)
                  val simple = extractSimpleType(t)
                  simple match {
@@ -426,7 +426,7 @@ class Checker {
                          (BottomType(), contextPrime)
                  }
 
-             case LocalInvocation(Identifier(name), args: Seq[Expression]) =>
+             case LocalInvocation(name, args: Seq[Expression]) =>
                  val contract = insideOfContract match {
                  case Left(s) => s.contract
                  case Right(c) => c
@@ -456,7 +456,7 @@ class Checker {
                      case None => (BottomType(), contextPrime)
                  }
 
-             case Invocation(recipient: Expression, Identifier(name), args: Seq[Expression]) =>
+             case Invocation(recipient: Expression, name, args: Seq[Expression]) =>
                  val (recipType, contextPrime) = checkExpr(insideOfMethod, insideOfContract, context, recipient)
                  val (tx, fun) = extractSimpleType(recipType) match {
                      case Some(ContractType(contractName)) =>
@@ -489,7 +489,7 @@ class Checker {
                      case None => (BottomType(), contextPrime2)
                  }
 
-             case Construction(Identifier(name), args: Seq[Expression]) =>
+             case Construction(name, args: Seq[Expression]) =>
                  progInfo.contract(name) match {
                      case Some(c) =>
                          val (argTypes, contextPrime) = checkExprs(insideOfMethod, insideOfContract, context, args)
@@ -661,10 +661,10 @@ class Checker {
             this.checkExprs(insideOfMethod, indexedOfThis(context), context, es)
 
         s match {
-            case VariableDecl(typ: AstType, Identifier(name)) =>
+            case VariableDecl(typ: AstType, name) =>
                 context.updated(name, translateType(typ))
 
-            case VariableDeclWithInit(typ: AstType, Identifier(name), e: Expression) =>
+            case VariableDeclWithInit(typ: AstType, name, e: Expression) =>
                 val (t, contextPrime) = checkExpr(context, e)
                 val tDecl = translateType(typ)
                 assertSubType(s, t, tDecl)
@@ -675,7 +675,7 @@ class Checker {
                     /* the tx/function must have no return type */
                     case Left(Transaction(_,_, None ,_,_)) | Right(Func(_,_, None ,_)) => context
                     case _ =>
-                        logError(s, MustReturnError(insideOfMethod.fold(_.name.name, _.name.name)))
+                        logError(s, MustReturnError(insideOfMethod.fold(_.name, _.name)))
                         context
 
                 }
@@ -689,13 +689,13 @@ class Checker {
                     case Right(Func(_, _, Some(astType), _)) =>
                         translateType(astType)
                     case _ =>
-                        logError(s, CannotReturnError(insideOfMethod.fold(_.name.name, _.name.name)))
+                        logError(s, CannotReturnError(insideOfMethod.fold(_.name, _.name)))
                         return contextPrime
                 }
                 assertSubType(s, t, tRet)
                 contextPrime
 
-            case Transition(Identifier(newStateName), updates: Seq[(Variable, Expression)]) =>
+            case Transition(newStateName, updates: Seq[(Variable, Expression)]) =>
                 val (cName, sName) = extractSimpleType(context("this")) match {
                     case Some(StateType(ct, st)) => (ct, st)
                     case _ =>
@@ -715,21 +715,21 @@ class Checker {
 
                 val oldFields = indexedOldState.ast.declarations
                     .filter(_.isInstanceOf[Field])
-                    .map(_.asInstanceOf[Field].fieldName.name)
+                    .map(_.asInstanceOf[Field].fieldName)
                 val newFields = indexedNewState.ast.declarations
                     .filter(_.isInstanceOf[Field])
-                    .map(_.asInstanceOf[Field].fieldName.name)
+                    .map(_.asInstanceOf[Field].fieldName)
 
                 val toInitialize = newFields.toSet.diff(oldFields.toSet)
 
-                val updated = updates.map(_._1.x.name).toSet
+                val updated = updates.map(_._1.x).toSet
                 val uninitialized = toInitialize.diff(updated)
                 val badInitializations = updated.diff(newFields.toSet)
                 if (uninitialized.nonEmpty) logError(s, TransitionUpdateError(uninitialized))
                 if (badInitializations.nonEmpty) {
                     for (s <- badInitializations) {
                         val err = FieldUndefinedError(extractSimpleType(context("this")).get, s)
-                        logError(updates.find(_._1.x.name == s).get._1, err)
+                        logError(updates.find(_._1.x == s).get._1, err)
                     }
                 }
 
@@ -737,7 +737,7 @@ class Checker {
                 types = BottomType() +: types
 
                 var contextPrime = context
-                for ((Variable(Identifier(f)), e) <- updates) {
+                for ((Variable(f), e) <- updates) {
                     val (t, contextPrime2) = checkExpr(contextPrime, e)
                     contextPrime = contextPrime2
                     val fieldType = translateType(indexedNewState.field(f).get.typ)
@@ -754,16 +754,16 @@ class Checker {
                 /* if the variable is not in the context, see if it's a field */
                 if (contextType.isEmpty) {
                     val indexedThis = indexedOfThis(contextPrime)
-                    val fieldLookup = indexedThis.fold(_.field(x.name), _.field(x.name))
+                    val fieldLookup = indexedThis.fold(_.field(x), _.field(x))
 
                     /* if it's not a field either, log an error */
-                    if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x.name))
+                    if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x))
                     else assertSubType(e, t, translateType(fieldLookup.get.typ))
                 }
                 else assertSubType(s, t, contextType.get)
                 contextPrime
 
-            case Assignment(Dereference(eDeref, Identifier(f)), e: Expression) =>
+            case Assignment(Dereference(eDeref, f), e: Expression) =>
                 val (t, contextPrime) = checkExpr(context, e)
                 val (derefType, contextPrime2) = checkExpr(contextPrime, eDeref)
                 val fieldType = extractSimpleType(derefType) match {
@@ -844,7 +844,7 @@ class Checker {
                 val indexedContract = indexedContractOf(t)
 
                 var mergedContext = contextPrime
-                for (SwitchCase(Identifier(sName), body) <- cases) {
+                for (SwitchCase(sName, body) <- cases) {
                     val newType =
                         if (indexedContract.isEmpty) BottomType() else
                         indexedContract.get.state(sName) match {
@@ -859,7 +859,7 @@ class Checker {
 
                     /* special case to allow types to change in the context if we match on a variable */
                     val startContext = e match {
-                        case Variable(Identifier(x)) => contextPrime.updated(x, newType)
+                        case Variable(x) => contextPrime.updated(x, newType)
                         case _ => contextPrime
                     }
 
@@ -869,7 +869,7 @@ class Checker {
 
                 mergedContext
 
-            case LocalInvocation(Identifier(name), args: Seq[Expression]) =>
+            case LocalInvocation(name, args: Seq[Expression]) =>
                 val contract = indexedContractOfThis(context)
                 val (txLookup, funLookup) = extractSimpleType(context("this")) match {
                     case Some(StateType(_, sName)) =>
@@ -895,7 +895,7 @@ class Checker {
 
                 contextPrime
 
-            case Invocation(recipient: Expression, Identifier(name), args: Seq[Expression]) =>
+            case Invocation(recipient: Expression, name, args: Seq[Expression]) =>
 
                 val (tRecipient, contextPrime) = checkExpr(context, recipient)
                 val (txLookup, funLookup) = extractSimpleType(tRecipient) match {
@@ -929,7 +929,7 @@ class Checker {
 
                 contextPrime2
 
-            case Construction(Identifier(name), args: Seq[Expression]) =>
+            case Construction(name, args: Seq[Expression]) =>
                 val constructors = progInfo.contract(name) match {
                     case None =>
                         logError(s, ContractUndefinedError(name))
@@ -988,7 +988,7 @@ class Checker {
         var initContext = new TreeMap[String, Type]()
 
         for (arg <- tx.args) {
-            initContext = initContext.updated(arg.varName.name, translateType(arg.typ))
+            initContext = initContext.updated(arg.varName, translateType(arg.typ))
         }
 
         val thisType = insideOfContract match {
@@ -1020,7 +1020,7 @@ class Checker {
     }
 
     private def checkState(insideOf: IndexedContract, state: State): Unit = {
-        val indexed = insideOf.state(state.name.name).get
+        val indexed = insideOf.state(state.name).get
         for (decl <- state.declarations) {
             decl match {
                 case t@Transaction(_,_,_,_,_) => checkTransaction(t, Left(indexed))
@@ -1031,7 +1031,7 @@ class Checker {
     }
 
     private def checkContract(contract: Contract): Unit = {
-        val indexed = progInfo.contract(contract.name.name).get
+        val indexed = progInfo.contract(contract.name).get
         for (decl <- contract.declarations) {
             decl match {
                 case t@Transaction(_,_,_,_,_) => checkTransaction(t, Right(indexed))
@@ -1050,9 +1050,12 @@ class Checker {
 
         for (decl <- decls) {
             decl match {
-                case f@Field(_, Identifier(name)) => fieldLookup = fieldLookup.updated(name, f)
-                case t@Transaction(Identifier(name), _, _, _, _) => txLookup = txLookup.updated(name, t)
-                case f@Func(Identifier(name), _, _, _) => funLookup = funLookup.updated(name, f)
+                case f@Field(_, name) =>
+                    fieldLookup = fieldLookup.updated(name, f)
+                case t@Transaction(name, _, _, _, _) =>
+                    txLookup = txLookup.updated(name, t)
+                case f@Func(name, _, _, _) =>
+                    funLookup = funLookup.updated(name, f)
                 case _ => ()
             }
         }
@@ -1079,7 +1082,7 @@ class Checker {
 
         for (decl <- contract.declarations) {
             decl match {
-                case s@State(Identifier(name), _) => stateLookup.put(name, indexState(s, indexed))
+                case s@State(name, _) => stateLookup.put(name, indexState(s, indexed))
                 case _ => ()
             }
         }
@@ -1092,7 +1095,7 @@ class Checker {
     private def indexProgram(program: Program): Unit = {
         var contractLookup = new TreeMap[String, IndexedContract]
         for (contract <- program.contracts) {
-            contractLookup = contractLookup.updated(contract.name.name, indexContract(contract))
+            contractLookup = contractLookup.updated(contract.name, indexContract(contract))
         }
 
         progInfo = new IndexedProgram(program, contractLookup)

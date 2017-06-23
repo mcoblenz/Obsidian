@@ -4,6 +4,7 @@ import edu.cmu.cs.obsidian.lexer._
 
 import scala.collection._
 import scala.util.parsing.combinator._
+import scala.util.parsing.input.Position
 
 /*
 
@@ -30,8 +31,12 @@ object Parser extends Parsers {
 
     override type Elem = Token
 
+    type Identifier = (String, Position)
+
+    /* other parsers need to know the position of the identifier, but adding identifiers
+     * to the AST itself is clunky and adds unnecessary indirection */
     private def parseId: Parser[Identifier] = {
-        accept("identifier", { case t@IdentifierT(name) => Identifier(name).setLoc(t) })
+        accept("identifier", { case t@IdentifierT(name) => (name, t.pos) })
     }
 
     private def parseTypeModifier = {
@@ -43,8 +48,8 @@ object Parser extends Parsers {
 
     private def parseType = {
         val nonPrim = rep(parseTypeModifier) ~ parseId ~ opt(DotT() ~ parseId) ^^ {
-            case mod ~ nameC ~ Some(_ ~ nameS) => AstStateType(mod, nameC, nameS).setLoc(nameC)
-            case mod ~ nameC ~ None => AstContractType(mod, nameC).setLoc(nameC)
+            case mod ~ nameC ~ Some(_ ~ nameS) => AstStateType(mod, nameC._1, nameS._1).setLoc(nameC)
+            case mod ~ nameC ~ None => AstContractType(mod, nameC._1).setLoc(nameC)
         }
 
         val intPrim = IntT() ^^ { t => AstIntType().setLoc(t) }
@@ -58,7 +63,7 @@ object Parser extends Parsers {
 
     private def parseArgDefList: Parser[Seq[VariableDecl]] = {
         val oneDecl = parseType ~ parseId ^^ {
-            case typ ~ name => VariableDecl(typ, name).setLoc(typ)
+            case typ ~ name => VariableDecl(typ, name._1).setLoc(typ)
         }
         repsep(oneDecl, CommaT())
     }
@@ -77,7 +82,7 @@ object Parser extends Parsers {
 
         val parseUpdate = {
             val oneUpdate = parseId ~! EqT() ~! parseExpr ^^ {
-                case f ~ _ ~ e => (Variable(f).setLoc(f), e)
+                case f ~ _ ~ e => (Variable(f._1).setLoc(f), e)
             }
             LParenT() ~ LBraceT() ~ repsep(oneUpdate, CommaT()) ~
                 RBraceT() ~ RParenT() ^^ {
@@ -87,19 +92,19 @@ object Parser extends Parsers {
 
         val parseTransition = RightArrowT() ~ parseId ~
                               opt(parseUpdate) ~! SemicolonT() ^^ {
-            case arrow ~ name ~ None ~ _ => Transition(name, List.empty).setLoc(arrow)
-            case arrow ~ name ~ Some(updates) ~ _ => Transition(name, updates).setLoc(arrow)
+            case arrow ~ name ~ None ~ _ => Transition(name._1, List.empty).setLoc(arrow)
+            case arrow ~ name ~ Some(updates) ~ _ => Transition(name._1, updates).setLoc(arrow)
         }
 
         val parseVarDeclAssn =
             parseType ~ parseId ~ EqT() ~! parseExpr ~! SemicolonT() ^^ {
                 case typ ~ name ~ _ ~ e ~ _ =>
-                    VariableDeclWithInit(typ, name, e).setLoc(typ)
+                    VariableDeclWithInit(typ, name._1, e).setLoc(typ)
         }
 
         val parseVarDecl =
             parseType ~ parseId ~! SemicolonT() ^^ {
-                case typ ~ name ~ _ => VariableDecl(typ, name).setLoc(typ)
+                case typ ~ name ~ _ => VariableDecl(typ, name._1).setLoc(typ)
             }
 
         val assign = EqT() ~! parseExpr ^^ {
@@ -122,7 +127,7 @@ object Parser extends Parsers {
         }
 
         val parseCase = CaseT() ~! parseId ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case _case ~ name ~ _ ~ body ~ _ => SwitchCase(name, body).setLoc(_case)
+            case _case ~ name ~ _ ~ body ~ _ => SwitchCase(name._1, body).setLoc(_case)
         }
 
         val parseSwitch =
@@ -194,7 +199,7 @@ object Parser extends Parsers {
 
     private def parseLocalInv = {
         parseId ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
-            case name ~ _ ~ args ~ _ => LocalInvocation(name, args).setLoc(name)
+            case name ~ _ ~ args ~ _ => LocalInvocation(name._1, args).setLoc(name)
         }
     }
 
@@ -205,8 +210,8 @@ object Parser extends Parsers {
     private def foldDotExpr(e: Expression, dots: Seq[DotExpr]): Expression = {
         dots.foldLeft(e)(
             (e: Expression, inv: DotExpr) => inv match {
-                case Left(fieldName) => Dereference(e, fieldName).setLoc(fieldName)
-                case Right((funcName, args)) => Invocation(e, funcName, args).setLoc(funcName)
+                case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
+                case Right((funcName, args)) => Invocation(e, funcName._1, args).setLoc(funcName)
             }
         )
     }
@@ -231,7 +236,7 @@ object Parser extends Parsers {
             case _ ~ e ~ _ => e
         }
 
-        val parseVar = parseId ^^ { (id: Identifier) => Variable(id).setLoc(id) }
+        val parseVar = parseId ^^ { (id: Identifier) => Variable(id._1).setLoc(id) }
 
         val parseNumLiteral = {
             accept("numeric literal", { case t@NumLiteralT(n) => NumLiteral(n).setLoc(t) })
@@ -240,7 +245,7 @@ object Parser extends Parsers {
 
         val parseNew = {
             NewT() ~! parseId ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
-                case _new ~ name ~ _ ~ args ~ _ => Construction(name, args).setLoc(_new)
+                case _new ~ name ~ _ ~ args ~ _ => Construction(name._1, args).setLoc(_new)
             }
         }
 
@@ -260,7 +265,7 @@ object Parser extends Parsers {
 
     private def parseFieldDecl = {
         parseType ~ parseId ~! SemicolonT() ^^ {
-            case typ ~ name ~ semi => Field(typ, name).setLoc(semi)
+            case typ ~ name ~ semi => Field(typ, name._1).setLoc(semi)
         }
     }
 
@@ -272,7 +277,7 @@ object Parser extends Parsers {
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             opt(parseReturns) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case f ~ name ~ _ ~ args ~ _ ~ ret ~ _ ~ body ~ _ =>
-                Func(name, args, ret, body).setLoc(f)
+                Func(name._1, args, ret, body).setLoc(f)
         }
     }
 
@@ -289,17 +294,17 @@ object Parser extends Parsers {
         TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
         opt(parseReturns) ~! rep(parseEnsures) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case t ~ name ~ _ ~ args ~ _ ~ ret ~ ensures ~ _ ~ body ~ _ =>
-                val nameId: Identifier = name match {
-                    case t@MainT() => Identifier("main").setLoc(t)
-                    case id@Identifier(_) => id
+                val nameString: String = name match {
+                    case MainT() => "main"
+                    case (id: Identifier) => id._1
                 }
-                Transaction(nameId, args, ret, ensures, body).setLoc(t)
+                Transaction(nameString, args, ret, ensures, body).setLoc(t)
         }
     }
 
     private def parseStateDecl = {
         StateT() ~! parseId ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
-            case st ~ name ~ _ ~ defs ~ _ => State(name, defs).setLoc(st)
+            case st ~ name ~ _ ~ defs ~ _ => State(name._1, defs).setLoc(st)
         }
     }
 
@@ -308,7 +313,7 @@ object Parser extends Parsers {
     private def parseConstructor = {
         parseId ~ LParenT() ~! parseArgDefList ~! RParenT() ~! LBraceT() ~!
         parseBody ~! RBraceT() ^^ {
-            case name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => Constructor(name, args, body).setLoc(name)
+            case name ~ _ ~ args ~ _ ~ _ ~ body ~ _ => Constructor(name._1, args, body).setLoc(name)
         }
     }
 
@@ -327,7 +332,7 @@ object Parser extends Parsers {
     private def parseContractDecl = {
         parseContractModifier ~ ContractT() ~! parseId ~!
             LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
-            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod, name, defs).setLoc(ct)
+            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod, name._1, defs).setLoc(ct)
         }
     }
 
