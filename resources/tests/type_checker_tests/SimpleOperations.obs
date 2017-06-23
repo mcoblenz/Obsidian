@@ -1,0 +1,11 @@
+main contract Operations {
+
+    transaction doOperations() {
+        int a = 3 + 5;
+        a = 3 + true;
+        int b = "hi" * 1;
+        int c = true/10;
+        bool d = true and "false";
+        bool e = 5 or 6;
+    }
+}

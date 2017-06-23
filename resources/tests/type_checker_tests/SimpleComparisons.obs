@@ -1,0 +1,12 @@
+main contract Comparisons {
+
+    transaction doComparisons() {
+        bool a = 3 < 4;
+        a = 2 < true;
+        bool b = true > 6;
+        bool c = "hi" <= 7;
+        bool d = 8 >= "aaaa";
+        bool e = true > false;
+    }
+
+}
