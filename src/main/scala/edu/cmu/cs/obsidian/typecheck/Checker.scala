@@ -747,60 +747,65 @@ class Checker {
                 val newType = updateSimpleType(context("this"), StateType(cName, newStateName))
                 contextPrime.updated("this", newType)
 
-            case Assignment(assignTo: Expression, e: Expression) =>
+            case Assignment(Variable(x), e: Expression) =>
                 val (t, contextPrime) = checkExpr(context, e)
-                assignTo match {
+                val contextType = context.get(s"$x")
 
-                    // assigment is of the form "x = e"
-                    case Variable(x) =>
-                        val contextType = context.get(s"$x")
-                        if (contextType.isEmpty) logError(s, VariableUndefinedError(x.name))
-                        else assertSubType(s, t, contextType.get)
-                        contextPrime
+                /* if the variable is not in the context, see if it's a field */
+                if (contextType.isEmpty) {
+                    val indexedThis = indexedOfThis(contextPrime)
+                    val fieldLookup = indexedThis.fold(_.field(x.name), _.field(x.name))
 
-                    // assignment is of the form "e1.f = e2"
-                    case Dereference(eDeref, Identifier(f)) =>
-                        val (derefType, contextPrime2) = checkExpr(contextPrime, eDeref)
-                        val fieldType = extractSimpleType(derefType) match {
-                            // [e] is of contract type
-                            case Some(simple@ContractType(cName)) =>
-
-                                val lookup = progInfo.contract(cName)
-                                    .flatMap(_.field(f))
-
-                                if (lookup.isEmpty) {
-                                    logError(s, FieldUndefinedError(simple, f))
-                                    return contextPrime2
-                                }
-                                translateType(lookup.get.typ)
-
-                            // [e] is of state type
-                            case Some(simple@StateType(cName, sName)) =>
-
-                                val lookup = progInfo.contract(cName)
-                                    .flatMap(_.state(sName))
-                                    .flatMap(_.field(f))
-
-                                if (lookup.isEmpty) {
-                                    logError(s, FieldUndefinedError(simple, f))
-                                    return contextPrime2
-                                }
-                                translateType(lookup.get.typ)
-
-                            // [e] is a primitive type
-                            case None =>
-                                logError(s, DereferenceError(derefType))
-                                return contextPrime2
-                        }
-
-                        assertSubType(s, t, fieldType)
-                        contextPrime2
-
-                    // assignment target is neither a variable nor a field
-                    case _ =>
-                        logError(s, AssignmentError())
-                        contextPrime
+                    /* if it's not a field either, log an error */
+                    if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x.name))
+                    else assertSubType(e, t, translateType(fieldLookup.get.typ))
                 }
+                else assertSubType(s, t, contextType.get)
+                contextPrime
+
+            case Assignment(Dereference(eDeref, Identifier(f)), e: Expression) =>
+                val (t, contextPrime) = checkExpr(context, e)
+                val (derefType, contextPrime2) = checkExpr(contextPrime, eDeref)
+                val fieldType = extractSimpleType(derefType) match {
+                    // [e] is of contract type
+                    case Some(simple@ContractType(cName)) =>
+
+                        val lookup = progInfo.contract(cName)
+                            .flatMap(_.field(f))
+
+                        if (lookup.isEmpty) {
+                            logError(s, FieldUndefinedError(simple, f))
+                            return contextPrime2
+                        }
+                        translateType(lookup.get.typ)
+
+                    // [e] is of state type
+                    case Some(simple@StateType(cName, sName)) =>
+
+                        val lookup = progInfo.contract(cName)
+                            .flatMap(_.state(sName))
+                            .flatMap(_.field(f))
+
+                        if (lookup.isEmpty) {
+                            logError(s, FieldUndefinedError(simple, f))
+                            return contextPrime2
+                        }
+                        translateType(lookup.get.typ)
+
+                    // [e] is a primitive type
+                    case None =>
+                        logError(s, DereferenceError(derefType))
+                        return contextPrime2
+                }
+
+                assertSubType(s, t, fieldType)
+                contextPrime2
+
+            // assignment target is neither a variable nor a field
+            case Assignment(_, e: Expression) =>
+                val (_, contextPrime) = checkExpr(context, e)
+                logError(s, AssignmentError())
+                contextPrime
 
             case Throw() => context
 

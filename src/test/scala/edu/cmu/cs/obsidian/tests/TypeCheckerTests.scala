@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.tests
 
 
-import org.junit.Assert.assertTrue
+import org.junit.Assert.{assertTrue, fail}
 import org.junit.Test
 import org.scalatest.junit.JUnitSuite
 import edu.cmu.cs.obsidian.typecheck._
@@ -10,7 +10,16 @@ import edu.cmu.cs.obsidian.parser._
 class TypeCheckerTests extends JUnitSuite {
     type LineNumber = Int
     private def runTest(file: String, expectedErrors: Seq[(Error, LineNumber)]): Unit = {
-        val prog = Parser.parseFileAtPath(file, printTokens = false)
+        var prog: Program = null
+        try {
+            prog = Parser.parseFileAtPath(file, printTokens = false)
+        }
+        catch {
+            case p: Parser.ParseException =>
+                val errMsg = p.message
+                fail(s"Failed with parser message $errMsg")
+        }
+
         val checker = new Checker()
         val errs = checker.checkProgram(prog)
         var remaining = expectedErrors
@@ -18,7 +27,8 @@ class TypeCheckerTests extends JUnitSuite {
             val pred = (expected: (Error, LineNumber)) => {
                 expected._1 == err && expected._2 == err.loc.line
             }
-            assertTrue(s"Nothing matches $err", remaining.exists(pred))
+            val line = err.loc.line
+            assertTrue(s"Nothing matches $err at line $line", remaining.exists(pred))
             remaining = remaining.filterNot(pred)
         }
         val msg = s"The following errors weren't found when checking: $remaining"
@@ -26,11 +36,20 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def basicTest(): Unit = {
-        runTest("resources/tests/ExampleTypeFailure.obs",
+        runTest("resources/tests/type_checker_tests/ExampleTypeFailure.obs",
             (SubTypingError(BoolType(), IntType()), 18)
                 ::(WrongArityError(1, 0, "createC"), 19)
                 ::(LeakReturnValueError("createC"), 19)
                 ::(SubTypingError(BoolType(), IntType()), 20)
+                ::Nil
+        )
+    }
+
+    @Test def fieldsTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/CheckFields.obs",
+            (StateSpecificSharedError(), 10)
+                ::(StateSpecificReadOnlyError(), 11)
+                ::(StateSpecificReadOnlyError(), 13)
                 ::Nil
         )
     }

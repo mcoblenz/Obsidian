@@ -1070,7 +1070,7 @@ class CodeGen (val target: Target) {
 
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
-            val javaFieldVar = inClass.fields().get(field.fieldName)
+            val javaFieldVar = inClass.fields().get(field.fieldName.name)
             generateFieldArchiver(field, javaFieldVar, builderVariable, archiveBody, translationContext, contract)
         }
 

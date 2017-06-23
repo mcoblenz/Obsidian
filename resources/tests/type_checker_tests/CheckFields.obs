@@ -1,0 +1,21 @@
+shared contract C1 {
+  state S {}
+}
+
+unique contract C2 {
+  state S {}
+}
+
+main contract C {
+    C1.S f1;
+    readonly C1.S f2;
+    C2.S f3;
+    readonly C2.S f4;
+    C1 f5;
+    readonly C1 f6;
+    C2 f7;
+    readonly C2 f8;
+    int f9;
+    string f10;
+    bool f11;
+}
