@@ -4,10 +4,13 @@ package edu.cmu.cs.obsidian.tests
 import org.junit.Assert.{assertTrue, fail}
 import org.junit.Test
 import org.scalatest.junit.JUnitSuite
+
+import collection.mutable.ArrayBuffer._
 import edu.cmu.cs.obsidian.typecheck._
 import edu.cmu.cs.obsidian.parser._
 
 import scala.collection.immutable
+import scala.collection.mutable.ArrayBuffer
 
 class TypeCheckerTests extends JUnitSuite {
     type LineNumber = Int
@@ -24,14 +27,15 @@ class TypeCheckerTests extends JUnitSuite {
 
         val checker = new Checker()
         val errs = checker.checkProgram(prog)
-        var remaining = expectedErrors
+        var remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
         for (err <- errs) {
             val pred = (expected: (Error, LineNumber)) => {
                 expected._1 == err && expected._2 == err.loc.line
             }
             val line = err.loc.line
             assertTrue(s"Nothing matches $err at line $line", remaining.exists(pred))
-            remaining = remaining.filterNot(pred)
+            val indexToRemove = remaining.indexOf((err, err.loc.line))
+            remaining.remove(indexToRemove)
         }
         val msg = s"The following errors weren't found when checking: $remaining"
         assertTrue(msg, remaining.isEmpty)
@@ -65,7 +69,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::(SubTypingError(StringType(), IntType()), 7)
                 ::(SubTypingError(StringType(), IntType()), 8)
                 ::(SubTypingError(BoolType(), IntType()), 9)
-                ::(SubTypingError(BoolType(), IntType()), 5)
+                ::(SubTypingError(BoolType(), IntType()), 9)
                 ::Nil
         )
     }
