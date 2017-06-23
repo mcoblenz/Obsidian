@@ -10,9 +10,11 @@ import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
 import edu.cmu.cs.obsidian.util._
 import com.helger.jcodemodel.JCodeModel
-import edu.cmu.cs.obsidian.typecheck.Checker
+import edu.cmu.cs.obsidian.typecheck.{Checker, VariableUndefinedError}
 
 import scala.sys.process._
+import scala.util.parsing.input.NoPosition
+import scala.util.parsing.input.OffsetPosition
 
 case class CompilerOptions (outputPath: Option[String],
                             debugPath: Option[String],
@@ -254,7 +256,7 @@ object Main {
             }
 
             val checker = new Checker()
-            if (checker.checkProgram(ast)) {
+            if (checker.checkProgramAndPrintErrors(ast)) {
                 println("Typechecking was completed successfully.")
             } else {
                 println("Typechecking failed.\n")

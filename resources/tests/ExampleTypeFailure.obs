@@ -17,8 +17,6 @@ main contract IntContainer {
         int oldX = this.x;
         this.x = newX + true;
         createC();
-        createC(newX);
-        createC(this.s, this.s);
         return this.b;
     }
 
