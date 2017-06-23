@@ -87,18 +87,43 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
             (SubTypingError(BoolType(), IntType()), 17)
-                ::(SubTypingError(
-                    OwnedRef(ContractType("C_Unique")),
-                    SharedRef(ContractType("C_Shared"))),
-                    19)
-                ::(FieldUndefinedError(ContractType("C_Shared"), "f2"), 21)
-                ::(FieldUndefinedError(ContractType("C_Shared"), "f3"), 22)
-                ::(SubTypingError(
-                    SharedRef(ContractType("C_Shared")),
-                    SharedRef(StateType("C_Shared", "S"))),
-                    23)
-                ::(VariableUndefinedError("j"), 27)
-                ::Nil
+                ::
+                (SubTypingError(
+                OwnedRef(ContractType("C_Unique")),
+                SharedRef(ContractType("C_Shared"))),
+                19)
+                ::
+                (FieldUndefinedError(ContractType("C_Shared"), "f2"), 21)
+                ::
+                (FieldUndefinedError(ContractType("C_Shared"), "f3"), 22)
+                ::
+                (SubTypingError(
+                SharedRef(ContractType("C_Shared")),
+                SharedRef(StateType("C_Shared", "S"))),
+                23)
+                ::
+                (VariableUndefinedError("j"), 27)
+                ::
+                Nil
+        )
+    }
+    @Test def returnTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Return.obs",
+                (CannotReturnError("t_no_ret"), 7)
+                ::
+                (MustReturnError("t_has_ret"), 13)
+                ::
+                (SubTypingError(
+                OwnedRef(ContractType("C_Unique")),
+                OwnedRef(StateType("C_Unique", "S"))),
+                18)
+                ::
+                (MustReturnError("t_ret_nonprimitive"), 19)
+                ::
+                (SubTypingError(IntType(),
+                OwnedRef(ContractType("C_Unique"))), 20)
+                ::
+                Nil
         )
     }
 }

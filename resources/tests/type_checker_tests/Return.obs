@@ -1,0 +1,23 @@
+unique contract C_Unique {
+  state S {}
+}
+
+contract C {
+    transaction t_no_ret() {
+        return 3;
+        return;
+    }
+
+    transaction t_has_ret() returns int {
+        return 2;
+        return;
+    }
+
+    transaction t_ret_nonprimitive() returns C_Unique {
+        return new C_Unique();
+        C_Unique.S cs = new C_Unique();
+        return;
+        return 5;
+        return cs;
+    }
+}
