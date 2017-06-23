@@ -335,7 +335,7 @@ class Checker {
             (t, c2)
         }
 
-        def assertComparisonType(ast: AST, e1: Expression, e2: Expression): (Type, Context) = {
+        def assertComparisonType(e1: Expression, e2: Expression): (Type, Context) = {
             val (_, c1) = assertTypeEquality(e1, IntType(), context)
             val (_, c2) = assertTypeEquality(e2, IntType(), c1)
             (BoolType(), c2)
@@ -389,13 +389,13 @@ class Checker {
                      (BottomType(), c2)
                  }
              case GreaterThan(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e, e1, e2)
+                 assertComparisonType(e1, e2)
              case GreaterThanOrEquals(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e, e1, e2)
+                 assertComparisonType(e1, e2)
              case LessThan(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e, e1, e2)
+                 assertComparisonType(e1, e2)
              case LessThanOrEquals(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e, e1, e2)
+                 assertComparisonType(e1, e2)
              case NotEquals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = checkExpr(insideOfMethod, insideOfContract, context, e1)
                  val (t2, c2) = checkExpr(insideOfMethod, insideOfContract, c1, e2)
