@@ -1,0 +1,29 @@
+unique contract C_Unique {
+    int f1;
+}
+
+shared contract C_Shared {
+    int f1;
+    state S { int f2; }
+}
+
+contract C {
+    int i;
+
+    transaction t(int a) {
+        a = 3;
+        int b = 2;
+        b = 1;
+        b = true;
+        C_Shared c = new C_Shared();
+        c = new C_Unique();
+        c.f1 = 3;
+        c.f2 = 2;
+        c.f3 = 1;
+        C_Shared.S cs = new C_Shared();
+        cs.f2 = 2;
+        i = 3;
+        this.i = 3;
+        j = 2;
+    }
+}

@@ -5,11 +5,9 @@ import org.junit.Assert.{assertTrue, fail}
 import org.junit.Test
 import org.scalatest.junit.JUnitSuite
 
-import collection.mutable.ArrayBuffer._
 import edu.cmu.cs.obsidian.typecheck._
 import edu.cmu.cs.obsidian.parser._
 
-import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 
 class TypeCheckerTests extends JUnitSuite {
@@ -74,11 +72,7 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
     @Test def variableTest(): Unit = {
-        runTest("resources/tests/type_checker_tests/UndefinedVariable.obs",
-            (VariableUndefinedError("x"), 4)
-              :: (VariableUndefinedError("z"), 5)
-              :: Nil
-        )
+
     }
 
     @Test def fieldsTest(): Unit = {
@@ -86,6 +80,24 @@ class TypeCheckerTests extends JUnitSuite {
             (StateSpecificSharedError(), 10)
                 ::(StateSpecificReadOnlyError(), 11)
                 ::(StateSpecificReadOnlyError(), 13)
+                ::Nil
+        )
+    }
+
+    @Test def assignmentTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Assignment.obs",
+            (SubTypingError(BoolType(), IntType()), 17)
+                ::(SubTypingError(
+                    OwnedRef(ContractType("C_Unique")),
+                    SharedRef(ContractType("C_Shared"))),
+                    19)
+                ::(FieldUndefinedError(ContractType("C_Shared"), "f2"), 21)
+                ::(FieldUndefinedError(ContractType("C_Shared"), "f3"), 22)
+                ::(SubTypingError(
+                    SharedRef(ContractType("C_Shared")),
+                    SharedRef(StateType("C_Shared", "S"))),
+                    23)
+                ::(VariableUndefinedError("j"), 27)
                 ::Nil
         )
     }
