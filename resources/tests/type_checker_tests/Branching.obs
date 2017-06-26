@@ -1,0 +1,44 @@
+shared contract Sh/*ared*/ {
+}
+
+unique contract Ow/*ned*/ {
+
+}
+
+contract C {
+    transaction t() {
+        Ow o1 = new Ow();
+        Sh s1 = new Sh();
+        if (true) {
+            Ow o2 = o1;
+            Sh s2 = s1;
+        } else {
+            int x = 5;
+        }
+    }
+
+    transaction t2() {
+        Ow o1 = new Ow();
+        if (true) {
+            Ow o2 = o1;
+        } else {
+            throw;
+        }
+    }
+
+    transaction t3() {
+        Ow o1 = new Ow();
+        if (true) {
+            Ow o2 = o1;
+        }
+    }
+
+    transaction t4() {
+        if (true) {
+            int x = 5;
+        } else {
+            int x = 2;
+        }
+        x = 3;
+    }
+}

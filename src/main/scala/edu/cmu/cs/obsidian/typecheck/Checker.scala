@@ -5,7 +5,7 @@ import edu.cmu.cs.obsidian.parser._
 import scala.collection.mutable.ListBuffer
 import scala.collection.immutable.TreeMap
 import scala.collection.Map
-import scala.util.parsing.input.{NoPosition, Position}
+import scala.util.parsing.input.Position
 
 sealed trait SimpleType
 case class ContractType(contractName: String) extends SimpleType
@@ -157,9 +157,6 @@ case class WrongArityError(expected: Int, have: Int, methName: String) extends E
 case class MergeIncompatibleError(name: String, t1: Type, t2: Type) extends Error {
     val msg: String = s"Variable $name is incompatibly typed as both $t1 and $t2 after branch"
 }
-case class MergeLeakError(name: String) extends Error {
-    val msg: String = s"Variable $name is owned in one branch but not in any others"
-}
 case class MustReturnError(methName: String) extends Error {
     val msg: String = s"$methName specifies a return type, but no return value is given"
 }
@@ -191,13 +188,20 @@ case class StateSpecificReadOnlyError() extends Error {
     val msg: String = s"State-specific types are not safe for 'readonly' references"
 }
 case class UnusedOwnershipError(name: String) extends Error {
-    val msg: String = s"Variable $name holds ownership, but is unused at the end of the body"
+    val msg: String = s"Variable $name holds ownership, but is unused at the end of its scope"
 }
 
+/* We define a custom type to store a special flag for if a context in after a "throw".
+ * In the formalism, we allow throw to result in any type: in the implementation, we don't know
+ * which immediately which type this needs to be in order for type checking to work */
+case class Context(underlying: Map[String, Type], isThrown: Boolean)  {
+    def keys: Iterable[String] = underlying.keys
+    def updated(s: String, t: Type): Context = Context(underlying.updated(s, t), isThrown)
+    def get(s: String): Option[Type] = underlying.get(s)
+    def apply(s: String): Type = underlying(s)
+}
 
 class Checker {
-
-    type Context = Map[String, Type]
 
     val errors = new collection.mutable.ArrayStack[Error]()
     var progInfo: IndexedProgram = _
@@ -544,40 +548,50 @@ class Checker {
                 checkStatement(insideOfMethod, prevContext, s))
     }
 
-    private def mergeContext(ast: AST, context1: Context, context2: Context): Context = {
-        var mergedContext = new TreeMap[String, Type]()
+    /* returns a context that is the same as [branchContext], except only with
+     * those variables bound which [oldContext] actually assign a value to */
+    private def pruneContext(ast: AST, branchContext: Context, oldContext: Context): Context = {
+        var newContext = oldContext
 
-        val onlyIn1: Set[String] = context1.keys.toSet.diff(context2.keys.toSet)
-        val onlyIn2: Set[String] = context2.keys.toSet.diff(context1.keys.toSet)
+        for (x <- oldContext.keys) {
+            val t = branchContext.get(x) match {
+                case Some(tBranch) => tBranch
+                case None => oldContext(x)
+            }
+            newContext = newContext.updated(x, t)
+        }
+
+        for (x <- branchContext.keys.toSet.diff(oldContext.keys.toSet)) {
+            branchContext(x) match {
+                case OwnedRef(_) => logError(ast, UnusedOwnershipError(x))
+                case _ => ()
+            }
+        }
+
+        Context(newContext.underlying, isThrown = branchContext.isThrown)
+    }
+
+    private def mergeContext(ast: AST, context1: Context, context2: Context): Context = {
+        /* If we're merging with a context from a "throw", just take the other context
+        * emit no errors */
+        if (context1.isThrown && !context2.isThrown) return context2
+        if (!context1.isThrown && context2.isThrown) return context1
+
+        var mergedMap = new TreeMap[String, Type]()
+
         val inBoth = context1.keys.toSet.intersect(context2.keys.toSet)
 
         for (x <- inBoth) {
             val t1 = context1(x)
             val t2 = context2(x)
             upperBound(t1, t2) match {
-                case Some(u) => mergedContext = mergedContext.updated(x, u)
+                case Some(u) => mergedMap = mergedMap.updated(x, u)
                 case None =>
-                    logError(ast, MergeLeakError(x))
+                    logError(ast, MergeIncompatibleError(x, t1, t2))
             }
         }
 
-        for (x <- onlyIn1) {
-            context2(x) match {
-                case OwnedRef(_) =>
-                    logError(ast, MergeLeakError(x))
-                case _ => ()
-            }
-        }
-
-        for (x <- onlyIn2) {
-            context2(x) match {
-                case OwnedRef(_) =>
-                    logError(ast, MergeLeakError(x))
-                case _ => ()
-            }
-        }
-
-        mergedContext
+        Context(mergedMap, context1.isThrown && context2.isThrown)
     }
 
     // returns [Some(err)] if [spec] and [args] match, [None] if they do
@@ -798,27 +812,34 @@ class Checker {
                 logError(s, AssignmentError())
                 contextPrime
 
-            case Throw() => context
+            case Throw() => Context(context.underlying, isThrown = true)
 
             case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime) = checkExpr(context, eCond)
                 assertSubType(s, t, BoolType())
-                checkStatementSequence(insideOfMethod, contextPrime, body)
+                val contextIfTrue = pruneContext(s,
+                    checkStatementSequence(insideOfMethod, contextPrime, body),
+                    contextPrime)
+                mergeContext(s, contextPrime, contextIfTrue)
 
             case IfThenElse(eCond: Expression, body1: Seq[Statement], body2: Seq[Statement]) =>
                 val (t, contextPrime) = checkExpr(context, eCond)
                 assertSubType(s, t, BoolType())
-                val contextIfTrue =
-                    checkStatementSequence(insideOfMethod, contextPrime, body1)
-                val contextIfFalse =
-                    checkStatementSequence(insideOfMethod, contextPrime, body2)
+                val contextIfTrue = pruneContext(s,
+                    checkStatementSequence(insideOfMethod, contextPrime, body1),
+                    contextPrime)
+                val contextIfFalse = pruneContext(s,
+                    checkStatementSequence(insideOfMethod, contextPrime, body2),
+                    contextPrime)
                 mergeContext(s, contextIfFalse, contextIfTrue)
 
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
-                val contextIfTry =
-                    checkStatementSequence(insideOfMethod, context, s1)
-                val contextIfCatch =
-                    checkStatementSequence(insideOfMethod, context, s2)
+                val contextIfTry = pruneContext(s,
+                    checkStatementSequence(insideOfMethod, context, s1),
+                    context)
+                val contextIfCatch = pruneContext(s,
+                    checkStatementSequence(insideOfMethod, context, s2),
+                    context)
                 mergeContext(s, contextIfTry, contextIfCatch)
 
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
@@ -851,7 +872,9 @@ class Checker {
                         case _ => contextPrime
                     }
 
-                    val endContext = checkStatementSequence(insideOfMethod, startContext, body)
+                    val endContext = pruneContext(s,
+                        checkStatementSequence(insideOfMethod, startContext, body),
+                        startContext)
                     mergedContext = mergeContext(s, mergedContext, endContext)
                 }
 
@@ -973,7 +996,7 @@ class Checker {
                                     tx: Transaction,
                                     insideOfContract: Either[IndexedState, IndexedContract]
                                 ): Unit = {
-        var initContext = new TreeMap[String, Type]()
+        var initContext = Context(new TreeMap[String, Type](), isThrown = false)
 
         for (arg <- tx.args) {
             initContext = initContext.updated(arg.varName, translateType(arg.typ))
@@ -994,7 +1017,7 @@ class Checker {
 
         assertSubType(tx, outputContext("this"), OwnedRef(ContractType(cName)))
 
-        for ((x, t) <- outputContext) {
+        for ((x, t) <- outputContext.underlying) {
             if (t.isInstanceOf[OwnedRef] && x != "this") {
                 logError(tx, UnusedOwnershipError(x))
             }

@@ -126,4 +126,24 @@ class TypeCheckerTests extends JUnitSuite {
                 Nil
         )
     }
+    @Test def branchingTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Branching.obs",
+            (MergeIncompatibleError("o1",
+                OwnedRef(ContractType("Ow")),
+                ReadOnlyRef(ContractType("Ow"))), 12)
+            ::
+            (UnusedOwnershipError("o2"), 12)
+            ::
+            (UnusedOwnershipError("o2"), 22)
+            ::
+            (MergeIncompatibleError("o1",
+                OwnedRef(ContractType("Ow")),
+                ReadOnlyRef(ContractType("Ow"))), 31)
+            ::
+            (UnusedOwnershipError("o2"), 31)
+            ::
+            (VariableUndefinedError("x"), 42)
+            ::
+            Nil)
+    }
 }
