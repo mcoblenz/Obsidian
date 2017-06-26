@@ -249,9 +249,13 @@ class TypeCheckerTests extends JUnitSuite {
               (SubTypingError(
                   IntType(),
                   StringType()), 30)
-              :: Nil
+              ::
+              (ContractUndefinedError("Stuff"), 31)
+              ::
+              Nil
         )
     }
+
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             (MergeIncompatibleError("o1",
@@ -272,5 +276,22 @@ class TypeCheckerTests extends JUnitSuite {
             ::
             Nil)
     }
+
+  @Test def sideEffectTest(): Unit = {
+      runTest("resources/tests/type_checker_tests/NoSideEffects.obs",
+          (NoEffectsError(Variable("x")), 5)
+            ::
+            (NoEffectsError(
+                Add(NumLiteral(1),NumLiteral(3))), 6)
+            ::
+            (NoEffectsError(
+                LessThan(NumLiteral(1),Variable("x"))), 7)
+            ::
+            (NoEffectsError(
+                Disjunction(TrueLiteral(),FalseLiteral())), 8)
+            ::
+            Nil
+      )
+  }
 }
 

@@ -516,9 +516,7 @@ class Checker {
                              case None =>
                                  (SharedRef(ContractType(name)), contextPrime) // todo : what goes here?
                          }
-                     case None =>
-                         logError(e, ContractUndefinedError(name))
-                         (BottomType(), context)
+                     case None => (BottomType(), context)
                  }
          }
     }
@@ -676,7 +674,21 @@ class Checker {
 
             case VariableDeclWithInit(typ: AstType, name, e: Expression) =>
                 val (t, contextPrime) = checkExpr(context, e)
-                val tDecl = translateType(typ)
+                val tDecl = typ match {
+                    case AstContractType(mods, name) => progInfo.contract(name) match {
+                        case None =>
+                            logError(s, ContractUndefinedError(name))
+                            BottomType()
+                        case Some(_) => translateType(typ)
+                    }
+                    case AstStateType(mods, cName, sName) => progInfo.contract(cName) match {
+                        case None =>
+                            logError(s, ContractUndefinedError(cName))
+                            BottomType()
+                        case Some(_) => translateType(typ)
+                    }
+                    case _ => translateType(typ)
+                }
                 assertSubType(s, t, tDecl)
                 contextPrime.updated(name, tDecl)
 
@@ -687,7 +699,6 @@ class Checker {
                     case _ =>
                         logError(s, MustReturnError(insideOfMethod.fold(_.name, _.name)))
                         context
-
                 }
 
             case ReturnExpr(e: Expression) =>
