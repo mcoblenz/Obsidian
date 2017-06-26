@@ -646,8 +646,6 @@ class Checker {
                                   context: Context,
                                   s: Statement
                               ): Context = {
-        println(s"Checking statement $s. Current context:\n $context")
-
         val checkExpr = (context: Context, e: Expression) =>
             this.checkExpr(insideOfMethod, context, e)
         val checkExprs = (context: Context, es: Seq[Expression]) =>
@@ -848,6 +846,7 @@ class Checker {
 
                     /* special case to allow types to change in the context if we match on a variable */
                     val startContext = e match {
+                        case This() => contextPrime.updated("this", newType)
                         case Variable(x) => contextPrime.updated(x, newType)
                         case _ => contextPrime
                     }
