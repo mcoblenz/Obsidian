@@ -1,0 +1,29 @@
+shared contract OtherContract {
+
+    transaction otherMethod(int x) returns int {
+        return x + 3;
+    }
+}
+
+main contract Invocation {
+
+    transaction a(int x) returns int {
+        return x + 2;
+    }
+
+    transaction makeInvocations() {
+        int x = a(2);
+        int b = a();
+        int c = a(2, 4);
+        int d = a("hi");
+        int e = otherMethod(5);
+        int f = 5.otherMethod(1);
+
+        OtherContract other = new OtherContract();
+
+        int g = other.otherMethod(3);
+        int h = other.anotherMethod();
+        int i = other.otherMethod("a");
+    }
+
+}

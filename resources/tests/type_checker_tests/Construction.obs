@@ -1,0 +1,34 @@
+shared contract Thing {
+    int x;
+    string y;
+    bool z;
+
+    Thing() {
+        this.x = 1;
+        this.y = 2;
+        this.z = 3;
+    }
+
+    Thing(int x) {
+        this.x = x;
+        this.y = 2;
+        this.z = 3;
+    }
+
+    Thing(int x, string y, bool x) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+}
+
+main contract Construct {
+
+    transaction constructThings() {
+        Thing thing1 = new Thing();
+        Thing thing2 = new Thing("hi");
+        Thing thing3 = new Thing(1, 2, 3);
+        Stuff stuff = new Stuff();
+    }
+
+}

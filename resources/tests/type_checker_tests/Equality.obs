@@ -1,0 +1,12 @@
+main contract Equality {
+
+    transaction checkEqual() {
+        int a = 7;
+        string b = "hi";
+
+        bool c = (a == b);
+        bool d = (true != 5);
+        bool e = (1 == false);
+    }
+
+}

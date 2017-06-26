@@ -1,0 +1,26 @@
+shared contract Thing {
+    int x;
+    string y;
+    bool z;
+
+    Thing(int x) {
+        this.x = x;
+        this.y = "a";
+        this.z = true;
+    }
+
+}
+
+main contract Construct {
+
+    transaction derefThings() {
+      Thing thing1 = new Thing(5);
+
+      int a = thing1.x;
+      int b = thing1.w;
+
+      string c = "hi".y;
+
+    }
+
+}

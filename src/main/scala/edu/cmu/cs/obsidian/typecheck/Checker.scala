@@ -127,7 +127,7 @@ case class FieldUndefinedError(insideOf: SimpleType, fName: String) extends Erro
     }
 }
 case class DereferenceError(typ: Type) extends Error {
-    val msg: String = s"Type $typ is not cannot be dereferenced"
+    val msg: String = s"Type $typ cannot be dereferenced"
 }
 case class MethodUndefinedError(insideOf: SimpleType, name: String) extends Error {
     val msg: String = insideOf match {
@@ -303,6 +303,7 @@ class Checker {
     private def translateType(t: AstType): Type = {
 
         val modifier = (t: SimpleType, mods: Seq[TypeModifier], contractName: String) => {
+            // TODO: None.get error if there is no contract with contractName
             val contract = progInfo.contract(contractName).get.ast
             // TODO: what is the behavior of a contract that is not labeled?
             val mod = contract.mod match {
@@ -452,7 +453,7 @@ class Checker {
 
                  val (spec, ret) = (txLookup, funLookup) match {
                      case (None, None) =>
-                         MethodUndefinedError(extractSimpleType(context("this")).get, contract.name)
+                         logError(e, MethodUndefinedError(extractSimpleType(context("this")).get, name))
                          return (BottomType(), context)
                      case (_, Some(Transaction(_, txArgs, txRet, _, _))) => (txArgs, txRet)
                      case (Some(Func(_, funArgs, funRet, _)), _) => (funArgs, funRet)
@@ -594,7 +595,7 @@ class Checker {
         Context(mergedMap, context1.isThrown && context2.isThrown)
     }
 
-    // returns [Some(err)] if [spec] and [args] match, [None] if they do
+    // returns [Some(err)] if [spec] and [args] don't match, [None] if they do
     private def checkArgs(ast: AST,
                           methName: String,
                           spec: Seq[VariableDecl],
@@ -614,7 +615,11 @@ class Checker {
                     errList = (ast, err)::errList
                 }
             }
-            Some(errList)
+            if (errList.length == 0){
+                return None
+            } else{
+                return Some(errList)
+            }
         }
     }
 

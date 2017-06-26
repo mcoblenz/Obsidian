@@ -1,0 +1,11 @@
+main contract Variable {
+
+    transaction accessVariable() {
+        x = 7;
+        int y = z + 5;
+
+        int z = 5;
+        z = 5 + 3;
+    }
+
+}

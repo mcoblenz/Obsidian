@@ -12,6 +12,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class TypeCheckerTests extends JUnitSuite {
     type LineNumber = Int
+
     private def runTest(file: String, expectedErrors: Seq[(Error, LineNumber)]): Unit = {
         var prog: Program = null
         try {
@@ -42,88 +43,213 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def basicTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ExampleTypeFailure.obs",
             (SubTypingError(BoolType(), IntType()), 18)
-                ::(WrongArityError(1, 0, "createC"), 19)
-                ::(LeakReturnValueError("createC"), 19)
-                ::(SubTypingError(BoolType(), IntType()), 20)
-                ::Nil
+              ::
+              (WrongArityError(1, 0, "createC"), 19)
+              ::
+              (LeakReturnValueError("createC"), 19)
+              ::
+              (SubTypingError(BoolType(), IntType()), 20)
+              ::
+              Nil
         )
     }
 
     @Test def operationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleOperations.obs",
             (SubTypingError(BoolType(), IntType()), 5)
-                ::(SubTypingError(StringType(), IntType()), 6)
-                ::(SubTypingError(BoolType(), IntType()), 7)
-                ::(SubTypingError(StringType(), BoolType()), 8)
-                ::(SubTypingError(IntType(), BoolType()), 9)
-                ::(SubTypingError(IntType(), BoolType()), 9)
-                ::Nil
+              ::
+              (SubTypingError(
+                  StringType(),
+                  IntType()), 6)
+              ::
+              (SubTypingError(
+                  BoolType(),
+                  IntType()), 7)
+              ::
+              (SubTypingError(
+                  StringType(),
+                  BoolType()), 8)
+              ::
+              (SubTypingError(
+                  IntType(),
+                  BoolType()), 9)
+              ::
+              (SubTypingError(
+                  IntType(),
+                  BoolType()), 9)
+              ::
+              Nil
         )
     }
+
     @Test def comparisonTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleComparisons.obs",
             (SubTypingError(BoolType(), IntType()), 5)
-                ::(SubTypingError(BoolType(), IntType()), 6)
-                ::(SubTypingError(StringType(), IntType()), 7)
-                ::(SubTypingError(StringType(), IntType()), 8)
-                ::(SubTypingError(BoolType(), IntType()), 9)
-                ::(SubTypingError(BoolType(), IntType()), 9)
-                ::Nil
+              ::
+              (SubTypingError(
+                  BoolType(),
+                  IntType()), 6)
+              ::
+              (SubTypingError(
+                  StringType(),
+                  IntType()), 7)
+              ::
+              (SubTypingError(
+                  StringType(),
+                  IntType()), 8)
+              ::
+              (SubTypingError(
+                  BoolType(),
+                  IntType()), 9)
+              ::
+              (SubTypingError(
+                  BoolType(),
+                  IntType()), 9)
+              :: Nil
         )
     }
-    @Test def variableTest(): Unit = {
 
+    @Test def variableTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/UndefinedVariable.obs",
+            (VariableUndefinedError("x"), 4)
+              :: (VariableUndefinedError("z"), 5)
+              :: Nil
+        )
     }
 
     @Test def fieldsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/CheckFields.obs",
             (StateSpecificSharedError(), 10)
-                ::(StateSpecificReadOnlyError(), 11)
-                ::(StateSpecificReadOnlyError(), 13)
-                ::Nil
+              :: (StateSpecificReadOnlyError(), 11)
+              :: (StateSpecificReadOnlyError(), 13)
+              :: Nil
         )
     }
 
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
             (SubTypingError(BoolType(), IntType()), 17)
-                ::
-                (SubTypingError(
-                OwnedRef(ContractType("C_Unique")),
-                SharedRef(ContractType("C_Shared"))),
+              ::
+              (SubTypingError(
+                  OwnedRef(ContractType("C_Unique")),
+                  SharedRef(ContractType("C_Shared"))),
                 19)
-                ::
-                (FieldUndefinedError(ContractType("C_Shared"), "f2"), 21)
-                ::
-                (FieldUndefinedError(ContractType("C_Shared"), "f3"), 22)
-                ::
-                (SubTypingError(
-                SharedRef(ContractType("C_Shared")),
-                SharedRef(StateType("C_Shared", "S"))),
+              ::
+              (FieldUndefinedError(ContractType("C_Shared"), "f2"), 21)
+              ::
+              (FieldUndefinedError(ContractType("C_Shared"), "f3"), 22)
+              ::
+              (SubTypingError(
+                  SharedRef(ContractType("C_Shared")),
+                  SharedRef(StateType("C_Shared", "S"))),
                 23)
-                ::
-                (VariableUndefinedError("j"), 27)
-                ::
-                Nil
+              ::
+              (VariableUndefinedError("j"), 27)
+              ::
+              Nil
         )
     }
+
     @Test def returnTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Return.obs",
-                (CannotReturnError("t_no_ret"), 7)
-                ::
-                (MustReturnError("t_has_ret"), 13)
-                ::
-                (SubTypingError(
-                OwnedRef(ContractType("C_Unique")),
-                OwnedRef(StateType("C_Unique", "S"))),
+            (CannotReturnError("t_no_ret"), 7)
+              ::
+              (MustReturnError("t_has_ret"), 13)
+              ::
+              (SubTypingError(
+                  OwnedRef(ContractType("C_Unique")),
+                  OwnedRef(StateType("C_Unique", "S"))),
                 18)
-                ::
-                (MustReturnError("t_ret_nonprimitive"), 19)
-                ::
-                (SubTypingError(IntType(),
-                OwnedRef(ContractType("C_Unique"))), 20)
-                ::
-                Nil
+              ::
+              (MustReturnError("t_ret_nonprimitive"), 19)
+              ::
+              (SubTypingError(IntType(),
+                  OwnedRef(ContractType("C_Unique"))), 20)
+              ::
+              Nil
+        )
+    }
+
+    @Test def equalityTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Equality.obs",
+            (DifferentTypeError(Variable("a"), IntType(), Variable("b"), StringType()), 7)
+              ::
+              (DifferentTypeError(
+                  TrueLiteral(),
+                  BoolType(),
+                  NumLiteral(5),
+                  IntType()), 8)
+              ::
+              (DifferentTypeError(
+                  NumLiteral(1),
+                  IntType(),
+                  FalseLiteral(),
+                  BoolType()), 9)
+              ::
+              Nil
+        )
+    }
+
+    @Test def invocationTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Invocation.obs",
+            (WrongArityError(1, 0, "a"), 16)
+              ::
+              (WrongArityError(1, 2, "a"), 17)
+              ::
+              (SubTypingError(
+                  StringType(),
+                  IntType()), 18)
+              ::
+              (MethodUndefinedError(
+                  ContractType("Invocation"),
+                  "otherMethod"), 19)
+              ::
+              (NonInvokeableError(IntType()), 20)
+              ::
+              (MethodUndefinedError(
+                  ContractType("OtherContract"),
+                  "anotherMethod"), 25)
+              ::
+              (SubTypingError(
+                  StringType(),
+                  IntType()), 26)
+              ::
+              Nil
+        )
+    }
+
+    @Test def dereferenceTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Dereference.obs",
+            (FieldUndefinedError(ContractType("Thing"), "w"), 20)
+              ::
+              (DereferenceError(StringType()), 22)
+              ::
+              Nil
+        )
+    }
+
+    @Test def constructionTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Construction.obs",
+            (WrongArityError(0, 1, "constructor of Thing"), 29)
+              ::
+              (SubTypingError(
+                  StringType(),
+                  IntType()), 29)
+              ::
+              (WrongArityError(3, 1, "constructor of Thing"), 29)
+              ::
+              (WrongArityError(0, 3, "constructor of Thing"), 30)
+              ::
+              (WrongArityError(1, 3, "constructor of Thing"), 30)
+              ::
+              (SubTypingError(
+                  IntType(),
+                  BoolType()), 30)
+              ::
+              (SubTypingError(
+                  IntType(),
+                  StringType()), 30)
+              :: Nil
         )
     }
     @Test def branchingTest(): Unit = {
@@ -147,3 +273,4 @@ class TypeCheckerTests extends JUnitSuite {
             Nil)
     }
 }
+
