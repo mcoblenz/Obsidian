@@ -174,7 +174,7 @@ class CodeGen (val target: Target) {
           decl match {
             case _: TypeDecl => assert(false, "unsupported"); // TODO
             case f: Field => translateStubField(f, inClass)
-            case Constructor(name, args, body) => // Constructors aren't translated because stubs are only for remote instances.
+            case c: Constructor => // Constructors aren't translated because stubs are only for remote instances.
             case f: Func => translateStubFunction(f, inClass)
             case t: Transaction => if (!txNames.contains(t.name)) translateStubTransaction(t, inClass, stOption)
                                                  txNames.add(t.name)
