@@ -759,10 +759,12 @@ class Checker {
 
                 var contextPrime = context
                 for ((Variable(f), e) <- updates) {
-                    val (t, contextPrime2) = checkExpr(contextPrime, e)
-                    contextPrime = contextPrime2
-                    val fieldType = translateType(indexedNewState.field(f).get.typ)
-                    assertSubType(s, t, fieldType)
+                    if(newFields.contains(f)) {
+                        val (t, contextPrime2) = checkExpr(contextPrime, e)
+                        contextPrime = contextPrime2
+                        val fieldType = translateType(indexedNewState.field(f).get.typ)
+                        assertSubType(s, t, fieldType)
+                    }
                 }
 
                 val newType = updateSimpleType(context("this"), StateType(cName, newStateName))

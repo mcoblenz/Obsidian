@@ -1,0 +1,26 @@
+main contract C {
+
+    state Start {
+
+        transaction a() {
+            ->S1;
+            ->S2;
+            ->S3;
+            ->S2({x = 2});
+            ->S1({x = 1});
+        }
+
+    }
+
+    transaction b() {
+        ->S1;
+    }
+
+    state S1 {
+
+    }
+
+    state S2 {
+        int x;
+    }
+}

@@ -146,6 +146,8 @@ class TypeCheckerTests extends JUnitSuite {
               ::
               (VariableUndefinedError("j"), 27)
               ::
+              (AssignmentError(), 28)
+              ::
               Nil
         )
     }
@@ -261,20 +263,20 @@ class TypeCheckerTests extends JUnitSuite {
             (MergeIncompatibleError("o1",
                 OwnedRef(ContractType("Ow")),
                 ReadOnlyRef(ContractType("Ow"))), 12)
-            ::
-            (UnusedOwnershipError("o2"), 12)
-            ::
-            (UnusedOwnershipError("o2"), 22)
-            ::
-            (MergeIncompatibleError("o1",
+              ::
+              (UnusedOwnershipError("o2"), 12)
+              ::
+              (UnusedOwnershipError("o2"), 22)
+              ::
+              (MergeIncompatibleError("o1",
                 OwnedRef(ContractType("Ow")),
                 ReadOnlyRef(ContractType("Ow"))), 31)
-            ::
-            (UnusedOwnershipError("o2"), 31)
-            ::
-            (VariableUndefinedError("x"), 42)
-            ::
-            Nil)
+              ::
+              (UnusedOwnershipError("o2"), 31)
+              ::
+              (VariableUndefinedError("x"), 42)
+              ::
+              Nil)
     }
 
   @Test def sideEffectTest(): Unit = {
@@ -282,16 +284,30 @@ class TypeCheckerTests extends JUnitSuite {
           (NoEffectsError(Variable("x")), 5)
             ::
             (NoEffectsError(
-                Add(NumLiteral(1),NumLiteral(3))), 6)
+              Add(NumLiteral(1),NumLiteral(3))), 6)
             ::
             (NoEffectsError(
-                LessThan(NumLiteral(1),Variable("x"))), 7)
+              LessThan(NumLiteral(1),Variable("x"))), 7)
             ::
             (NoEffectsError(
-                Disjunction(TrueLiteral(),FalseLiteral())), 8)
+              Disjunction(TrueLiteral(),FalseLiteral())), 8)
             ::
             Nil
       )
+  }
+
+  @Test def stateTest(): Unit = {
+    runTest("resources/tests/type_checker_tests/States.obs",
+      (TransitionUpdateError(Set("x")), 7)
+        ::
+        (StateUndefinedError("C", "S3"), 8)
+        ::
+        (FieldUndefinedError(StateType("C","S2"), "x"), 10)
+        ::
+        (TransitionError(), 16)
+        ::
+        Nil
+    )
   }
 }
 

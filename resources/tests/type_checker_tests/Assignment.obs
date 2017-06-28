@@ -25,5 +25,6 @@ contract C {
         i = 3;
         this.i = 3;
         j = 2;
+        3 = 5;
     }
 }
