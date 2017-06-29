@@ -131,16 +131,16 @@ class TypeCheckerTests extends JUnitSuite {
             (SubTypingError(BoolType(), IntType()), 17)
               ::
               (SubTypingError(
-                  OwnedRef(ContractType("C_Unique")),
-                  SharedRef(ContractType("C_Shared"))),
+                  OwnedRef(JustContractType("C_Unique")),
+                  SharedRef(JustContractType("C_Shared"))),
                 19)
               ::
-              (FieldUndefinedError(ContractType("C_Shared"), "f2"), 21)
+              (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 21)
               ::
-              (FieldUndefinedError(ContractType("C_Shared"), "f3"), 22)
+              (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 22)
               ::
               (SubTypingError(
-                  SharedRef(ContractType("C_Shared")),
+                  SharedRef(JustContractType("C_Shared")),
                   SharedRef(StateType("C_Shared", "S"))),
                 23)
               ::
@@ -159,14 +159,14 @@ class TypeCheckerTests extends JUnitSuite {
               (MustReturnError("t_has_ret"), 13)
               ::
               (SubTypingError(
-                  OwnedRef(ContractType("C_Unique")),
+                  OwnedRef(JustContractType("C_Unique")),
                   OwnedRef(StateType("C_Unique", "S"))),
                 18)
               ::
               (MustReturnError("t_ret_nonprimitive"), 19)
               ::
               (SubTypingError(IntType(),
-                  OwnedRef(ContractType("C_Unique"))), 20)
+                  OwnedRef(JustContractType("C_Unique"))), 20)
               ::
               Nil
         )
@@ -203,13 +203,13 @@ class TypeCheckerTests extends JUnitSuite {
                   IntType()), 18)
               ::
               (MethodUndefinedError(
-                  ContractType("Invocation"),
+                  JustContractType("Invocation"),
                   "otherMethod"), 19)
               ::
               (NonInvokeableError(IntType()), 20)
               ::
               (MethodUndefinedError(
-                  ContractType("OtherContract"),
+                  JustContractType("OtherContract"),
                   "anotherMethod"), 25)
               ::
               (SubTypingError(
@@ -222,7 +222,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def dereferenceTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Dereference.obs",
-            (FieldUndefinedError(ContractType("Thing"), "w"), 20)
+            (FieldUndefinedError(JustContractType("Thing"), "w"), 20)
               ::
               (DereferenceError(StringType()), 22)
               ::
@@ -261,16 +261,16 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             (MergeIncompatibleError("o1",
-                OwnedRef(ContractType("Ow")),
-                ReadOnlyRef(ContractType("Ow"))), 12)
+                OwnedRef(JustContractType("Ow")),
+                ReadOnlyRef(JustContractType("Ow"))), 12)
               ::
               (UnusedOwnershipError("o2"), 12)
               ::
               (UnusedOwnershipError("o2"), 22)
               ::
               (MergeIncompatibleError("o1",
-                OwnedRef(ContractType("Ow")),
-                ReadOnlyRef(ContractType("Ow"))), 31)
+                OwnedRef(JustContractType("Ow")),
+                ReadOnlyRef(JustContractType("Ow"))), 31)
               ::
               (UnusedOwnershipError("o2"), 31)
               ::

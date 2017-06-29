@@ -101,7 +101,7 @@ class CodeGen (val target: Target) {
     private def hasEmptyConstructor(c: Contract): Boolean = {
         for (d <- c.declarations) {
             d match {
-                case Constructor(_, args, _) => if (args.length == 0) return true
+                case con: Constructor => if (con.args.isEmpty) return true
                 case _ => ()
             }
         }
@@ -165,13 +165,13 @@ class CodeGen (val target: Target) {
 
     private def translateStubDeclaration(decl: Declaration, inClass: JDefinedClass, translationContext: TranslationContext) : Unit = {
         decl match {
-            case TypeDecl(_, _) => assert(false, "unsupported"); // TODO
-            case f@Field(_, _) => translateStubField(f, inClass, translationContext)
-            case Constructor(name, args, body) => // Constructors aren't translated becuase stubs are only for remote instances.
-            case f@Func(name, args, retType, body) => translateStubFunction(f, inClass)
-            case t@Transaction(_, _, _, _, _) => translateStubTransaction(t, inClass, translationContext)
-            case s@State(_, _) => translateStubState(s, inClass)
-            case c@Contract(mod, name, decls) => translateStubContract(c,
+            case _: TypeDecl => assert(false, "unsupported"); // TODO
+            case f: Field => translateStubField(f, inClass, translationContext)
+            case _: Constructor => // Constructors aren't translated becuase stubs are only for remote instances.
+            case f: Func => translateStubFunction(f, inClass)
+            case t: Transaction => translateStubTransaction(t, inClass, translationContext)
+            case s: State => translateStubState(s, inClass)
+            case c: Contract => translateStubContract(c,
                 inClass.getPackage(),
                 translationContext.contractNameResolutionMap,
                 translationContext.protobufOuterClassNames)
@@ -186,13 +186,9 @@ class CodeGen (val target: Target) {
                 if (!modifiers.contains(IsRemote))
                     AstContractType((modifiers :+ IsRemote()), name)
                 else ct
-            case ctSt@AstStateType(modifiers, cName, sName) =>
-                if (!modifiers.contains(IsRemote))
-                    AstStateType((modifiers :+ IsRemote()), cName, sName)
-                else ctSt
             case o@_ => o
         }
-        newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.fieldName)
+        newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.name)
     }
 
     private def translateStubFunction(f: Func, inClass: JDefinedClass) : Unit = {
@@ -333,7 +329,7 @@ class CodeGen (val target: Target) {
             // dynamically check the state
             getBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                    ._then()
-                   ._return(stateLookup(st.name).innerClassField.ref(f.fieldName))
+                   ._return(stateLookup(st.name).innerClassField.ref(f.name))
         }
         // exhaustive return to keep the compiler happy
         getBody._return(JExpr._null())
@@ -346,7 +342,7 @@ class CodeGen (val target: Target) {
             // dynamically check the state
             setBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
                 ._then()
-                .assign(stateLookup(st.name).innerClassField.ref(f.fieldName), newValue)
+                .assign(stateLookup(st.name).innerClassField.ref(f.name), newValue)
         }
 
         StateSpecificFieldInfo(declSeq, getMeth, setMeth)
@@ -474,7 +470,7 @@ class CodeGen (val target: Target) {
             * states, rather than two distinct declarations.
             * For each grouped declaration, the corresponding makeInfo function is called to setup
             * the necessary information for the table */
-            var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.fieldName)
+            var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.name)
                 .transform(fieldInfoFunc)
             var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name)
                 .transform(transactionInfoFunc)
@@ -484,9 +480,9 @@ class CodeGen (val target: Target) {
             /* add on any whole-contract declarations to the lookup table: these are fairly simple */
             for (decl <- contract.declarations) {
                 decl match {
-                    case f@Field(_, fieldName) => fieldLookup = fieldLookup.updated(fieldName, GlobalFieldInfo(f))
-                    case t@Transaction(name, _, _, _, _) => txLookup = txLookup.updated(name, GlobalTransactionInfo(t))
-                    case f@Func(name, _, _, _) => funLookup = funLookup.updated(name, GlobalFuncInfo(f))
+                    case f: Field => fieldLookup = fieldLookup.updated(f.name, GlobalFieldInfo(f))
+                    case t: Transaction => txLookup = txLookup.updated(t.name, GlobalTransactionInfo(t))
+                    case f: Func => funLookup = funLookup.updated(f.name, GlobalFuncInfo(f))
                     case _ => ()
                 }
             }
@@ -605,8 +601,8 @@ class CodeGen (val target: Target) {
                 val (fromName, toName) = (stFrom.astState.name, stTo.astState.name)
                 for (f <- translationContext.conservedFields(fromName, toName)) {
                     /* assign the field to the new state from the old */
-                    assignBody.assign(stTo.innerClassField.ref(f.fieldName),
-                                        stFrom.innerClassField.ref(f.fieldName))
+                    assignBody.assign(stTo.innerClassField.ref(f.name),
+                                        stFrom.innerClassField.ref(f.name))
                 }
             }
         }
@@ -962,11 +958,11 @@ class CodeGen (val target: Target) {
 
                 val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
                 val archiveVariable = nonNullBody.decl(archiveVariableType,
-                    field.fieldName + "Archive",
+                    field.name + "Archive",
                     archiveVariableInvocation)
 
                 // generate: builder.setField(field);
-                val setterName: String = setterNameForField(field.fieldName)
+                val setterName: String = setterNameForField(field.name)
 
                 val invocation: JInvocation = nonNullBody.invoke(builderVar, setterName)
                 invocation.arg(archiveVariable)
@@ -981,7 +977,7 @@ class CodeGen (val target: Target) {
                 // Special serialization for BigInteger, since that's how the Obsidian int type gets translated.
                 // The protobuf type for this is just bytes.
                 // builder.setField(ByteString.CopyFrom(field.toByteArray()))
-                val setterName: String = setterNameForField(field.fieldName)
+                val setterName: String = setterNameForField(field.name)
                 val setInvocation = JExpr.invoke(builderVar, setterName)
 
                 val byteStringClass: AbstractJClass =
@@ -994,7 +990,7 @@ class CodeGen (val target: Target) {
                 nonNullBody.add(setInvocation)
             }
             case AstBoolType() => {
-                val setterName: String = setterNameForField(field.fieldName)
+                val setterName: String = setterNameForField(field.name)
                 val setInvocation = body.invoke(builderVar, setterName)
                 setInvocation.arg(fieldVar)
             }
@@ -1002,12 +998,12 @@ class CodeGen (val target: Target) {
                 val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
                 val nonNullBody = ifNonNull._then()
 
-                val setterName: String = setterNameForField(field.fieldName)
+                val setterName: String = setterNameForField(field.name)
                 val setInvocation = nonNullBody.invoke(builderVar, setterName)
                 setInvocation.arg(fieldVar)
             }
             case n@AstContractType(_, name) => handleNonPrimitive(name, n)
-            case n@AstStateType(_, name, _) => handleNonPrimitive(name, n)
+            case _ => () // TODO handle other types
         }
     }
 
@@ -1034,7 +1030,7 @@ class CodeGen (val target: Target) {
 
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
-            val javaFieldVar = stateClass.fields().get(field.fieldName)
+            val javaFieldVar = stateClass.fields().get(field.name)
             generateFieldArchiver(field, javaFieldVar, builderVariable, archiveBody, translationContext, contract)
         }
 
@@ -1067,7 +1063,7 @@ class CodeGen (val target: Target) {
 
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
-            val javaFieldVar = inClass.fields().get(field.fieldName)
+            val javaFieldVar = inClass.fields().get(field.name)
             generateFieldArchiver(field, javaFieldVar, builderVariable, archiveBody, translationContext, contract)
         }
 
@@ -1109,7 +1105,7 @@ class CodeGen (val target: Target) {
                     translationContext: TranslationContext,
                     inContract: Contract): Unit = {
         // generate: FieldArchive fieldArchive = field.archive();
-        val javaFieldName: String = field.fieldName
+        val javaFieldName: String = field.name
         val javaFieldType: AbstractJType = resolveType(field.typ)
 
         def handleNonPrimitive(name: String, n: AstType): Unit = {
@@ -1167,6 +1163,8 @@ class CodeGen (val target: Target) {
             }
             case n@AstContractType(_, name) => handleNonPrimitive(name, n)
             case n@AstStateType(_, name, _) => handleNonPrimitive(name, n)
+            case n@AstPathStateType(_, _, name, _) => handleNonPrimitive(name, n)
+            case n@AstPathContractType(_, _, name) => handleNonPrimitive(name, n)
         }
     }
 
@@ -1206,7 +1204,7 @@ class CodeGen (val target: Target) {
         /* this takes care of fields that are not specific to any particular state */
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
-            val javaFieldVar = stateClass.fields().get(field.fieldName)
+            val javaFieldVar = stateClass.fields().get(field.name)
             generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, translationContext, contract)
         }
 
@@ -1253,7 +1251,7 @@ class CodeGen (val target: Target) {
         /* this takes care of fields that are not specific to any particular state */
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
-            val javaFieldVar = newClass.fields().get(field.fieldName)
+            val javaFieldVar = newClass.fields().get(field.name)
             generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, translationContext, contract)
         }
 
@@ -1304,13 +1302,13 @@ class CodeGen (val target: Target) {
         (aContract.mod, declaration) match {
 
             /* the main contract has special generated code, so many functions are different */
-            case (Some(IsMain()), c@Constructor(_,_,_)) =>
+            case (Some(IsMain()), c: Constructor) =>
                 mainConstructor = Some(translateMainConstructor(c, newClass, translationContext))
-            case (Some(IsMain()), f@Field(_,_)) =>
+            case (Some(IsMain()), f: Field) =>
                 translateFieldDecl(f, newClass)
-            case (Some(IsMain()), f@Func(_,_,_,_)) =>
+            case (Some(IsMain()), f: Func) =>
                 translateFuncDecl(f, newClass, translationContext)
-            case (Some(IsMain()), t@Transaction(_,_,_,_,_)) =>
+            case (Some(IsMain()), t: Transaction) =>
                 translateTransDecl(t, newClass, translationContext)
                 mainTransactions.add((currentState, t))
             case (Some(IsMain()), s@State(_,_)) =>
@@ -1320,25 +1318,25 @@ class CodeGen (val target: Target) {
             // TODO : shared contracts
             /* shared contracts will generate a sort of shim to interact with
              * a remotely deployed chaincode. */
-            case (Some(IsShared()), c@Constructor(_,_,_)) => ()
-            case (Some(IsShared()), f@Field(_,_)) => ()
-            case (Some(IsShared()), f@Func(_,_,_,_)) => ()
-            case (Some(IsShared()), t@Transaction(_,_,_,_,_)) => ()
-            case (Some(IsShared()), s@State(_,_)) => ()
-            case (Some(IsShared()), c@Contract(_,_,_)) => ()
+            case (Some(IsShared()), c: Constructor) => ()
+            case (Some(IsShared()), f: Field) => ()
+            case (Some(IsShared()), f: Func) => ()
+            case (Some(IsShared()), t: Transaction) => ()
+            case (Some(IsShared()), s: State) => ()
+            case (Some(IsShared()), c: Contract) => ()
 
             /* Unique contracts and nested contracts are translated the same way */
-            case (_, c@Constructor(_,_,_)) =>
+            case (_, c: Constructor) =>
                 translateConstructor(c, newClass, translationContext)
-            case (_, f@Field(_,_)) =>
+            case (_, f: Field) =>
                 translateFieldDecl(f, newClass)
-            case (_, f@Func(_,_,_,_)) =>
+            case (_, f: Func) =>
                 translateFuncDecl(f, newClass, translationContext)
-            case (_, t@Transaction(_,_,_,_,_)) =>
+            case (_, t: Transaction) =>
                 translateTransDecl(t, newClass, translationContext)
-            case (_, s@State(_,_)) =>
+            case (_, s: State) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
-            case (_, c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
+            case (_, c: Contract) => translateInnerContract(c, newClass, translationContext)
 
             case _ => () // TODO : type declarations
         }
@@ -1352,6 +1350,7 @@ class CodeGen (val target: Target) {
             case AstContractType(_, "address") => model.directClass("java.math.BigInteger")
             case AstContractType(modifiers, name) => if (modifiers.contains(IsRemote)) model.ref(classNameForStub(name)) else model.ref(name)
             case AstStateType(modifiers, cName, _) => if (modifiers.contains(IsRemote)) model.ref(classNameForStub(cName)) else model.ref(cName)
+            case _ => model.VOID // TODO: translate PDTs
         }
     }
 
@@ -1433,10 +1432,10 @@ class CodeGen (val target: Target) {
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
         val initializer = fieldInitializerForType(decl.typ)
         if (initializer.isDefined) {
-            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName, initializer.get)
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.name, initializer.get)
         }
         else {
-            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.fieldName)
+            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.name)
         }
     }
 
@@ -1642,7 +1641,7 @@ class CodeGen (val target: Target) {
 
                 /* assign fields in the update construct */
                 for ((f, e) <- updates) {
-                    body.assign(newStField.ref(f.x), translateExpr(e, translationContext, localContext))
+                    body.assign(newStField.ref(f.name), translateExpr(e, translationContext, localContext))
                 }
 
                 /* assign conserved fields (implicit to programmer) */

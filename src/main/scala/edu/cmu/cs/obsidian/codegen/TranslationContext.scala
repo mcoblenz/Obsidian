@@ -122,7 +122,7 @@ case class TranslationContext(
             states(stName).astState.declarations.filter(_.isInstanceOf[Field]).map(_.asInstanceOf[Field])
         val (fromFields, toFields) = (getFields(stNameFrom), getFields(stNameTo))
 
-        def conservedFilter(fieldPrime: Field): Boolean = { toFields.exists(_.fieldName == fieldPrime.fieldName) }
+        def conservedFilter(fieldPrime: Field): Boolean = { toFields.exists(_.name == fieldPrime.name) }
 
         /* take only the fields that are conserved */
         fromFields.filter(conservedFilter).toSet

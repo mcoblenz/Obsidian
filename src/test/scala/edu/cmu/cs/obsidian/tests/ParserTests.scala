@@ -4,6 +4,7 @@ import org.scalatest.junit.JUnitSuite
 import org.junit.Test
 import org.junit.Assert.assertTrue
 import edu.cmu.cs.obsidian.lexer._
+import edu.cmu.cs.obsidian.parser.Parser.ParseException
 import edu.cmu.cs.obsidian.parser._
 
 class ParserTests extends JUnitSuite {
@@ -21,13 +22,33 @@ class ParserTests extends JUnitSuite {
         Parser.parseProgram(tokens)
     }
 
+    private def readFile(fileName: String): String = {
+        val bufferedSource = scala.io.Source.fromFile(fileName)
+        val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
+
+        val tokens: Seq[Token] = Lexer.tokenize(src) match {
+            case Left(msg) => throw new ParseException(msg)
+            case Right(ts) => ts
+        }
+        src
+    }
+
     private def shouldSucceed(src: String): Unit = {
         val result = parse(src)
         assertTrue(result.isRight)
     }
+
     private def shouldFail(src: String): Unit = {
         val result = parse(src)
         assertTrue(result.isLeft)
+    }
+
+    private def shouldSucceedFile(fileName: String): Unit = {
+        shouldSucceed(readFile(fileName))
+    }
+
+    private def shouldFailFile(fileName: String): Unit = {
+        shouldFail(readFile(fileName))
     }
 
     private def testAndPrint(src: String): Unit = {
@@ -176,5 +197,9 @@ class ParserTests extends JUnitSuite {
               | transaction t(T x) { ->S({x = y}); }
               | }}
             """.stripMargin)
+    }
+
+    @Test def invocationSpec() = {
+        shouldSucceedFile("resources/tests/parser_tests/InvokableSpec.obs")
     }
 }

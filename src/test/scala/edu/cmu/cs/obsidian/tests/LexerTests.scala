@@ -113,7 +113,6 @@ class LexerTests extends JUnitSuite {
               |     }
               | }
             """.stripMargin
-        testAndPrint(commentedCode)
         shouldSucceed(commentedCode)
         shouldEqual(commentedCode,
             """

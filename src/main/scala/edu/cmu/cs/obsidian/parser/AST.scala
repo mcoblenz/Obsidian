@@ -18,7 +18,7 @@ sealed abstract class Declaration() extends AST
 sealed abstract class AstType() extends AST
 
 /* Expressions */
-case class Variable(x: String) extends Expression
+case class Variable(name: String) extends Expression
 case class NumLiteral(value: Int) extends Expression
 case class StringLiteral(value: String) extends Expression
 case class TrueLiteral() extends Expression
@@ -60,7 +60,6 @@ sealed abstract class TypeModifier() extends AST
 case class IsReadOnly() extends TypeModifier
 case class IsBorrowed() extends TypeModifier
 case class IsRemote() extends TypeModifier
-
 case class AstIntType() extends AstType
 case class AstBoolType() extends AstType
 case class AstStringType() extends AstType
@@ -68,23 +67,34 @@ case class AstContractType(modifiers: Seq[TypeModifier], name: String) extends A
 case class AstStateType(modifiers: Seq[TypeModifier],
                         contractName: String,
                         stateName: String) extends AstType
+case class AstPathContractType(modifiers: Seq[TypeModifier],
+                               path: Seq[String],
+                               name: String) extends AstType
+case class AstPathStateType(modifiers: Seq[TypeModifier],
+                            path: Seq[String],
+                            contractName: String,
+                            stateName: String) extends AstType
 
 /* Declarations */
 case class TypeDecl(name: String, typ: AstType) extends Declaration
 
-case class Field(typ: AstType, fieldName: String) extends Declaration
+case class Field(isConst: Boolean, typ: AstType, name: String) extends Declaration
 
 case class Constructor(name: String,
                        args: Seq[VariableDecl],
+                       ensuresState: Option[Set[String]],
                        body: Seq[Statement]) extends Declaration
 case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[AstType],
+                requiresState: Option[Set[String]],
                 body: Seq[Statement]) extends Declaration
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
                        retType: Option[AstType],
                        ensures: Seq[Ensures],
+                       requiresState: Option[Set[String]],
+                       ensuresState: Option[Set[String]],
                        body: Seq[Statement]) extends Declaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration
 

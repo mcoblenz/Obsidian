@@ -1,0 +1,36 @@
+/* for now, the ording is 'requires -> returns -> ensures' */
+
+// NOTE: this file should parse, but not type-check
+
+unique contract C_Unique {}
+contract C {
+    state S1 {}
+    state S2 {}
+
+    C() { return; }
+
+    C() ensures S1 { return; }
+
+    C() ensures S1 or S2 { return; }
+
+
+    transaction t() { return; }
+
+    transaction t() returns int { return; }
+
+    transaction t() returns C_Unique { return; }
+
+    transaction t() requires S1
+                    returns C_Unique { return; }
+
+    transaction t() requires S1 or S2
+                    returns C_Unique { return; }
+
+    transaction t() requires S1 or S2
+                    returns C_Unique
+                    ensures S1 { return; }
+
+    transaction t() requires S1 or S2
+                    returns C_Unique
+                    ensures S1 or S2 { return; }
+}
