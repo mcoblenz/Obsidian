@@ -311,27 +311,10 @@ object Parser extends Parsers {
         case _ ~ typ => typ
     }
 
-    private def extractStates(e: Expression): Option[Set[String]] = {
-        e match {
-            case Variable(sName: String) => Some(TreeSet[String]().insert(sName))
-            case Disjunction(e1, e2) =>
-                (extractStates(e1), extractStates(e2)) match {
-                    case (Some(states1), Some(states2)) => Some(states1 ++ states2)
-                    case _ => None
-                }
-            case _ => None
-        }
-    }
-
     private def parseStatesList: Parser[Set[String]] =
         rep(parseIdUpper ~ OrT()) ~! parseIdUpper ^^ {
         case ors ~ last => ors.map(_._1._1).toSet + last._1
     }
-
-    private def parseRequiresState: Parser[Set[String]] =
-        RequiresT() ~! parseStatesList ^^ {
-            case _ ~ s => s
-        }
 
     private def parseEnsuresState: Parser[Set[String]] =
         EnsuresT() ~! parseStatesList ^^ {
@@ -340,9 +323,9 @@ object Parser extends Parsers {
 
     private def parseFuncDecl = {
         FunctionT() ~! parseIdLower ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-            opt(parseRequiresState) ~! opt(parseReturns) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case f ~ name ~ _ ~ args ~ _ ~ requiresState ~ ret ~ _ ~ body ~ _ =>
-                Func(name._1, args, ret, requiresState, body).setLoc(f)
+            opt(parseReturns) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case f ~ name ~ _ ~ args ~ _ ~ ret ~ _ ~ body ~ _ =>
+                Func(name._1, args, ret, body).setLoc(f)
         }
     }
 
@@ -354,16 +337,16 @@ object Parser extends Parsers {
 
     private def parseTransDecl = {
         TransactionT() ~! (parseIdLower | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        opt(parseRequiresState) ~! opt(parseReturns) ~! opt(parseEnsuresState) ~! rep(parseEnsures) ~!
+        opt(parseReturns) ~! opt(parseEnsuresState) ~! rep(parseEnsures) ~!
             LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case t ~ name ~ _ ~ args ~ _ ~ requiresState ~ returnType ~
+            case t ~ name ~ _ ~ args ~ _ ~ returnType ~
                  ensuresState ~ ensures ~ _ ~ body ~ _ =>
                 val nameString: String = name match {
                     case MainT() => "main"
                     case id: Identifier => id._1
                 }
                 Transaction(nameString, args, returnType, ensures,
-                    requiresState, ensuresState, body).setLoc(t)
+                     ensuresState, body).setLoc(t)
         }
     }
 

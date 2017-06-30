@@ -20,17 +20,13 @@ contract C {
 
     transaction t() returns C_Unique { return; }
 
-    transaction t() requires S1
-                    returns C_Unique { return; }
+    transaction t() returns C_Unique { return; }
 
-    transaction t() requires S1 or S2
-                    returns C_Unique { return; }
+    transaction t() returns C_Unique { return; }
 
-    transaction t() requires S1 or S2
-                    returns C_Unique
+    transaction t() returns C_Unique
                     ensures S1 { return; }
 
-    transaction t() requires S1 or S2
-                    returns C_Unique
+    transaction t() returns C_Unique
                     ensures S1 or S2 { return; }
 }

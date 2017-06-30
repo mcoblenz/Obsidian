@@ -87,13 +87,11 @@ case class Constructor(name: String,
 case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[AstType],
-                requiresState: Option[Set[String]],
                 body: Seq[Statement]) extends Declaration
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
                        retType: Option[AstType],
                        ensures: Seq[Ensures],
-                       requiresState: Option[Set[String]],
                        ensuresState: Option[Set[String]],
                        body: Seq[Statement]) extends Declaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration

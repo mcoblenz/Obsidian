@@ -367,12 +367,15 @@ class Checker {
 
          e match {
              case Variable(x) =>
-                 context get x match {
-                     case Some(t) => t match {
+                 (context get x, indexedOfThis(context).field(x)) match {
+                     case (Some(t), _) => t match {
                          case OwnedRef(simp) => (OwnedRef(simp), context.updated(x, ReadOnlyRef(simp)))
                          case _ => (t, context)
                      }
-                     case None =>
+                     case (_, Some(f)) =>
+                         // TODO handle cases for e.g. if the field is owned
+                         (translateType(f.typ), context)
+                     case (None, None) =>
                          logError(e, VariableUndefinedError(x))
                          (BottomType(), context)
                  }
