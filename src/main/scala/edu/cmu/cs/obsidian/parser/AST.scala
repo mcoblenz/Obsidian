@@ -14,7 +14,9 @@ sealed abstract class Statement() extends AST
 /* All expressions are statements. We relegate the pruning of expressions
  * that don't have effects to a later analysis */
 sealed abstract class Expression() extends Statement
-sealed abstract class Declaration() extends AST
+sealed abstract class Declaration() extends AST {
+    val name: String
+}
 sealed abstract class AstType() extends AST
 
 /* Expressions */

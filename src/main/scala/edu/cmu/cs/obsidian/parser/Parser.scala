@@ -341,9 +341,9 @@ object Parser extends Parsers {
             LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case t ~ name ~ _ ~ args ~ _ ~ returnType ~
                  ensuresState ~ ensures ~ _ ~ body ~ _ =>
-                val nameString: String = name match {
+                val nameString = name match {
                     case MainT() => "main"
-                    case id: Identifier => id._1
+                    case id => id.asInstanceOf[Identifier]._1
                 }
                 Transaction(nameString, args, returnType, ensures,
                      ensuresState, body).setLoc(t)

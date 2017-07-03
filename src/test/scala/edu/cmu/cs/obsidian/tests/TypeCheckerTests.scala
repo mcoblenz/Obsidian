@@ -24,8 +24,9 @@ class TypeCheckerTests extends JUnitSuite {
                 fail(s"Failed with parser message $errMsg")
         }
 
-        val checker = new Checker()
-        val errs = checker.checkProgram(prog)
+        val table = new SymbolTable(prog)
+        val checker = new Checker(table)
+        val errs = checker.checkProgram()
         var remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
         for (err <- errs) {
             val pred = (expected: (Error, LineNumber)) => {

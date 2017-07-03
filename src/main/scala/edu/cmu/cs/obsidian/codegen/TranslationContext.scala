@@ -5,8 +5,7 @@ import com.helger.jcodemodel._
 
 import scala.collection._
 
-/* aggregates information about a particular state.
- * INVARIANT: the  */
+/* aggregates information about a particular state */
 case class StateContext(
     /* the AST node representing the state */
     astState: State,
@@ -38,8 +37,6 @@ sealed trait TransactionInfo
 case class GlobalTransactionInfo(decl: Transaction) extends TransactionInfo
 case class StateSpecificTransactionInfo(declSeq: Seq[(State, Transaction)],
                                            dynamicCheckMethod: JMethod) extends TransactionInfo
-
-
 
 /* aggregates information about the current state in the translation */
 case class TranslationContext(
