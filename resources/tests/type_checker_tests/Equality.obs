@@ -2,11 +2,15 @@ main contract Equality {
 
     transaction checkEqual() {
         int a = 7;
-        string b = "hi";
+        string b = "";
+        string str1 = "hi";
+        string str2 = "a";
 
         bool c = (a == b);
         bool d = (true != 5);
         bool e = (1 == false);
+        bool f = (1 != 3);
+        bool g = (2 == 2);
+        bool h = (str1 == str2);
     }
-
 }

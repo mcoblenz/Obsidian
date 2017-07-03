@@ -201,11 +201,17 @@ class Checker(table: SymbolTable) {
         }
     }
 
-    private def translateType(t: AstType): Type = {
+    private def translateType(ast: AST, t: AstType): Type = {
 
         val modifier = (t: SimpleType, mods: Seq[TypeModifier], contractName: String) => {
-            // TODO: None.get error if there is no contract with contractName
-            val contract = table.contract(contractName).get.ast
+            val contractOpt = table.contract(contractName)
+            val contract = contractOpt match {
+                case Some(c) => c.ast
+                case None =>
+                    logError(ast, ContractUndefinedError(contractName))
+                    return BottomType()
+            }
+
             // TODO: what is the behavior of a contract that is not labeled?
             val mod = contract.mod match {
                 case Some(m) => m
@@ -275,7 +281,7 @@ class Checker(table: SymbolTable) {
                      }
                      case (_, Some(f)) =>
                          // TODO handle cases for e.g. if the field is owned
-                         (translateType(f.typ), context)
+                         (translateType(e, f.typ), context)
                      case (None, None) =>
                          logError(e, VariableUndefinedError(x))
                          (BottomType(), context)
@@ -309,7 +315,7 @@ class Checker(table: SymbolTable) {
              case Equals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = checkExpr(insideOfMethod, context, e1)
                  val (t2, c2) = checkExpr(insideOfMethod, c1, e2)
-                 if (t1 == t2) (t1, c2) else {
+                 if (t1 == t2) (BoolType(), c2) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
                      (BottomType(), c2)
                  }
@@ -324,7 +330,7 @@ class Checker(table: SymbolTable) {
              case NotEquals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = checkExpr(insideOfMethod, context, e1)
                  val (t2, c2) = checkExpr(insideOfMethod, c1, e2)
-                 if (t1 == t2) (t1, c2) else {
+                 if (t1 == t2) (BoolType(), c2) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
                      (BottomType(), c2)
                  }
@@ -334,14 +340,14 @@ class Checker(table: SymbolTable) {
                  simple match {
                      case Some(JustContractType(contractName)) => val contract = table.contract(contractName).get
                          contract.field(name) match {
-                             case Some(f) => (translateType(f.typ), contextPrime)
+                             case Some(f) => (translateType(e, f.typ), contextPrime)
                              case None =>
                                  logError(e, FieldUndefinedError(simple.get, name))
                                  (BottomType(), context)
                          }
                      case Some(StateType(stateName, contractName)) => val contract = table.contract(contractName).get
                          contract.state(stateName).get.field(name) match {
-                             case Some(f) => (translateType(f.typ), contextPrime)
+                             case Some(f) => (translateType(e, f.typ), contextPrime)
                              case None =>
                                  logError(e, FieldUndefinedError(simple.get, name))
                                  (BottomType(), context)
@@ -356,14 +362,14 @@ class Checker(table: SymbolTable) {
              case LocalInvocation(name, args: Seq[Expression]) =>
                  val contract = indexedOfThis(context).contract
 
-                 val (txLookup, funLookup) = extractSimpleType(context("this")) match {
+                 val (funLookup, txLookup) = extractSimpleType(context("this")) match {
                      case Some(StateType(_, sName)) =>
                          (contract.state(sName).get.function(name),
                            contract.state(sName).get.transaction(name))
                      case _ => (contract.function(name), contract.transaction(name))
                  }
 
-                 val (spec, ret) = (txLookup, funLookup) match {
+                 val (spec, ret) = (funLookup, txLookup) match {
                      case (None, None) =>
                          logError(e, MethodUndefinedError(extractSimpleType(context("this")).get, name))
                          return (BottomType(), context)
@@ -376,7 +382,7 @@ class Checker(table: SymbolTable) {
                  assertArgsCorrect(e, name, spec::Nil, argTypes)
 
                  ret match {
-                     case Some(rType) => (translateType(rType), contextPrime)
+                     case Some(rType) => (translateType(e, rType), contextPrime)
                      case None => (BottomType(), contextPrime)
                  }
 
@@ -410,7 +416,7 @@ class Checker(table: SymbolTable) {
                  assertArgsCorrect(e, name, spec::Nil, argTypes)
 
                  ret match {
-                     case Some(rType) => (translateType(rType), contextPrime2)
+                     case Some(rType) => (translateType(e, rType), contextPrime2)
                      case None => (BottomType(), contextPrime2)
                  }
 
@@ -519,7 +525,7 @@ class Checker(table: SymbolTable) {
             val specList = spec.toIterator
             var errList: List[(AST, Error)] = Nil
             for ((argType, ast) <- args) {
-                val expectedType = translateType(specList.next().typ)
+                val expectedType = translateType(ast, specList.next().typ)
                 if (!subTypeOf(argType, expectedType)) {
                     /* this is the one place we can't simply log the error
                      * because we don't know if it should be shown to the user or not */
@@ -581,7 +587,7 @@ class Checker(table: SymbolTable) {
 
         s match {
             case VariableDecl(typ: AstType, name) =>
-                context.updated(name, translateType(typ))
+                context.updated(name, translateType(s, typ))
 
             case VariableDeclWithInit(typ: AstType, name, e: Expression) =>
                 val (t, contextPrime) = checkExpr(context, e)
@@ -590,15 +596,15 @@ class Checker(table: SymbolTable) {
                         case None =>
                             logError(s, ContractUndefinedError(name))
                             BottomType()
-                        case Some(_) => translateType(typ)
+                        case Some(_) => translateType(s, typ)
                     }
                     case AstStateType(_, cName, _) => table.contract(cName) match {
                         case None =>
                             logError(s, ContractUndefinedError(cName))
                             BottomType()
-                        case Some(_) => translateType(typ)
+                        case Some(_) => translateType(s, typ)
                     }
-                    case _ => translateType(typ)
+                    case _ => translateType(s, typ)
                 }
                 if (tDecl != BottomType()) {
                     assertSubType(s, t, tDecl)
@@ -620,9 +626,9 @@ class Checker(table: SymbolTable) {
                 val tRet = insideOfMethod match {
                     /* must be no return type */
                     case Left(t: Transaction) if t.retType.isDefined =>
-                        translateType(t.retType.get)
+                        translateType(s, t.retType.get)
                     case Right(f: Func) if f.retType.isDefined =>
-                        translateType(f.retType.get)
+                        translateType(s, f.retType.get)
                     case _ =>
                         logError(s, CannotReturnError(insideOfMethod.fold(_.name, _.name)))
                         return contextPrime
@@ -676,7 +682,7 @@ class Checker(table: SymbolTable) {
                     if(newFields.contains(f)) {
                         val (t, contextPrime2) = checkExpr(contextPrime, e)
                         contextPrime = contextPrime2
-                        val fieldType = translateType(indexedNewState.field(f).get.typ)
+                        val fieldType = translateType(s, indexedNewState.field(f).get.typ)
                         assertSubType(s, t, fieldType)
                     }
                 }
@@ -695,7 +701,7 @@ class Checker(table: SymbolTable) {
 
                     /* if it's not a field either, log an error */
                     if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x))
-                    else assertSubType(e, t, translateType(fieldLookup.get.typ))
+                    else assertSubType(e, t, translateType(s, fieldLookup.get.typ))
                 }
                 else {
                     if (t != BottomType()) {
@@ -719,7 +725,7 @@ class Checker(table: SymbolTable) {
                             logError(s, FieldUndefinedError(simple, f))
                             return contextPrime2
                         }
-                        translateType(lookup.get.typ)
+                        translateType(s, lookup.get.typ)
 
                     // [e] is of state type
                     case Some(simple@StateType(cName, sName)) =>
@@ -732,7 +738,7 @@ class Checker(table: SymbolTable) {
                             logError(s, FieldUndefinedError(simple, f))
                             return contextPrime2
                         }
-                        translateType(lookup.get.typ)
+                        translateType(s, lookup.get.typ)
 
                     // [e] is a primitive type
                     case None =>
@@ -821,14 +827,14 @@ class Checker(table: SymbolTable) {
 
             case LocalInvocation(name, args: Seq[Expression]) =>
                 val contract = indexedOfThis(context).contract
-                val (txLookup, funLookup) = extractSimpleType(context("this")) match {
+                val (funLookup, txLookup) = extractSimpleType(context("this")) match {
                     case Some(StateType(_, sName)) =>
                         (contract.state(sName).get.function(name),
                          contract.state(sName).get.transaction(name))
                     case _ => (contract.function(name), contract.transaction(name))
                 }
 
-                val (spec, ret) = (txLookup, funLookup) match {
+                val (spec, ret) = (funLookup, txLookup) match {
                     case (None, None) =>
                         logError(s, MethodUndefinedError(extractSimpleType(context("this")).get, name))
                         return context
@@ -840,7 +846,7 @@ class Checker(table: SymbolTable) {
                 val (types, contextPrime) = checkExprs(context, args)
                 assertArgsCorrect(s, name, spec::Nil, types)
 
-                if (ret.isDefined && translateType(ret.get).isInstanceOf[OwnedRef]) {
+                if (ret.isDefined && translateType(s, ret.get).isInstanceOf[OwnedRef]) {
                     logError(s, LeakReturnValueError(name))
                 }
 
@@ -849,7 +855,7 @@ class Checker(table: SymbolTable) {
             case Invocation(recipient: Expression, name, args: Seq[Expression]) =>
 
                 val (tRecipient, contextPrime) = checkExpr(context, recipient)
-                val (txLookup, funLookup) = extractSimpleType(tRecipient) match {
+                val (funLookup, txLookup) = extractSimpleType(tRecipient) match {
                     case Some(StateType(cName, sName)) =>
                         val contract = table.contract(cName).get
                         (contract.state(sName).get.function(name),
@@ -865,18 +871,18 @@ class Checker(table: SymbolTable) {
                         return contextPrime
                 }
 
-                val (spec, ret) = (txLookup, funLookup) match {
+                val (spec, ret) = (funLookup, txLookup) match {
                     case (None, None) =>
                         logError(s, MethodUndefinedError(extractSimpleType(tRecipient).get, name))
                         return context
-                    case (Some(t: Transaction), _) => (t.args, t.retType)
-                    case (_, Some(f: Func)) => (f.args, f.retType)
+                    case (_, Some(t: Transaction)) => (t.args, t.retType)
+                    case (Some(f: Func), _) => (f.args, f.retType)
                 }
 
                 val (types, contextPrime2) = checkExprs(context, args)
                 assertArgsCorrect(s, name, spec::Nil, types)
 
-                if (ret.isDefined && translateType(ret.get).isInstanceOf[OwnedRef]) {
+                if (ret.isDefined && translateType(s, ret.get).isInstanceOf[OwnedRef]) {
                     logError(s, LeakReturnValueError(name))
                 }
 
@@ -919,7 +925,7 @@ class Checker(table: SymbolTable) {
     }
 
     private def checkField(field: Field): Unit = {
-        translateType(field.typ) match {
+        translateType(field, field.typ) match {
             case OwnedRef(simple) => checkSimpleType(simple)
 
             case SharedRef(StateType(_, _)) =>
@@ -941,7 +947,7 @@ class Checker(table: SymbolTable) {
         var initContext = Context(new TreeMap[String, Type](), isThrown = false)
 
         for (arg <- tx.args) {
-            initContext = initContext.updated(arg.varName, translateType(arg.typ))
+            initContext = initContext.updated(arg.varName, translateType(tx, arg.typ))
         }
 
         val thisType = insideOfContract match {

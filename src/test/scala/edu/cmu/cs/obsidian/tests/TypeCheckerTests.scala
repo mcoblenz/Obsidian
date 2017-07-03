@@ -113,17 +113,22 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def variableTest(): Unit = {
         runTest("resources/tests/type_checker_tests/UndefinedVariable.obs",
             (VariableUndefinedError("x"), 4)
-              :: (VariableUndefinedError("z"), 5)
-              :: Nil
+              ::
+              (VariableUndefinedError("z"), 5)
+              ::
+              Nil
         )
     }
 
     @Test def fieldsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/CheckFields.obs",
             (StateSpecificSharedError(), 10)
-              :: (StateSpecificReadOnlyError(), 11)
-              :: (StateSpecificReadOnlyError(), 13)
-              :: Nil
+              ::
+              (StateSpecificReadOnlyError(), 11)
+              ::
+              (StateSpecificReadOnlyError(), 13)
+              ::
+              Nil
         )
     }
 
@@ -175,19 +180,19 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def equalityTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Equality.obs",
-            (DifferentTypeError(Variable("a"), IntType(), Variable("b"), StringType()), 7)
+            (DifferentTypeError(Variable("a"), IntType(), Variable("b"), StringType()), 9)
               ::
               (DifferentTypeError(
                   TrueLiteral(),
                   BoolType(),
                   NumLiteral(5),
-                  IntType()), 8)
+                  IntType()), 10)
               ::
               (DifferentTypeError(
                   NumLiteral(1),
                   IntType(),
                   FalseLiteral(),
-                  BoolType()), 9)
+                  BoolType()), 11)
               ::
               Nil
         )
@@ -298,25 +303,37 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def stateTest(): Unit = {
-    runTest("resources/tests/type_checker_tests/States.obs",
-      (TransitionUpdateError(Set("x")), 7)
-        ::
-        (StateUndefinedError("C", "S3"), 8)
-        ::
-        (FieldUndefinedError(StateType("C","S2"), "x"), 10)
-        ::
-        (TransitionError(), 16)
-        ::
-        Nil
-        )
+      runTest("resources/tests/type_checker_tests/States.obs",
+          (TransitionUpdateError(Set("x")), 7)
+          ::
+          (StateUndefinedError("C", "S3"), 8)
+          ::
+          (FieldUndefinedError(
+              StateType("C","S2"), "x"), 10)
+          ::
+          (TransitionError(), 16)
+          ::
+          Nil
+      )
     }
 
     @Test def bottomTest(): Unit = {
         runTest("resources/tests/type_checker_tests/BottomTypeNoError.obs",
-                (ContractUndefinedError("D"), 3)
-                ::
-                Nil
-            )
+          (ContractUndefinedError("D"), 3)
+          ::
+          Nil
+        )
     }
+
+    @Test def contractUndefinedTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/UndefinedContract.obs",
+          (ContractUndefinedError("OtherThing"), 2)
+          ::
+          (ContractUndefinedError("OtherThing"), 5)
+          ::
+          Nil
+        )
+    }
+
 }
 

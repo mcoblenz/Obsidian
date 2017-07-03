@@ -1,0 +1,8 @@
+shared contract Thing {
+    OtherThing other;
+    int x;
+
+    transaction a(OtherThing other) {
+        int x = 2;
+    }
+}
