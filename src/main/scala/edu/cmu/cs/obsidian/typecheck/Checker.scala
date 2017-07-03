@@ -347,7 +347,9 @@ class Checker(table: SymbolTable) {
                                  (BottomType(), context)
                          }
                      case _ =>
-                         logError(e, DereferenceError(t))
+                         if (!(t == BottomType())) {
+                             logError(e, DereferenceError(t))
+                         }
                          (BottomType(), contextPrime)
                  }
 
@@ -389,7 +391,9 @@ class Checker(table: SymbolTable) {
                          (contract.state(stateName).get.transaction(name),
                           contract.state(stateName).get.function(name))
                      case _ =>
-                         logError(e, NonInvokeableError(recipType))
+                         if (!(recipType == BottomType())) {
+                             logError(e, NonInvokeableError(recipType))
+                         }
                          return (BottomType(), contextPrime)
                  }
 
@@ -523,11 +527,8 @@ class Checker(table: SymbolTable) {
                     errList = (ast, err)::errList
                 }
             }
-            if (errList.isEmpty){
-                return None
-            } else{
-                return Some(errList)
-            }
+            if (errList.isEmpty) None
+            else Some(errList)
         }
     }
 
@@ -591,7 +592,7 @@ class Checker(table: SymbolTable) {
                             BottomType()
                         case Some(_) => translateType(typ)
                     }
-                    case AstStateType(mods, cName, sName) => table.contract(cName) match {
+                    case AstStateType(_, cName, _) => table.contract(cName) match {
                         case None =>
                             logError(s, ContractUndefinedError(cName))
                             BottomType()
@@ -599,7 +600,9 @@ class Checker(table: SymbolTable) {
                     }
                     case _ => translateType(typ)
                 }
-                assertSubType(s, t, tDecl)
+                if (tDecl != BottomType()) {
+                    assertSubType(s, t, tDecl)
+                }
                 contextPrime.updated(name, tDecl)
 
             case Return() =>
@@ -694,7 +697,12 @@ class Checker(table: SymbolTable) {
                     if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x))
                     else assertSubType(e, t, translateType(fieldLookup.get.typ))
                 }
-                else assertSubType(s, t, contextType.get)
+                else {
+                    if (t != BottomType()) {
+                        assertSubType(s, t, contextType.get)
+                    }
+
+                }
                 contextPrime
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
@@ -728,7 +736,9 @@ class Checker(table: SymbolTable) {
 
                     // [e] is a primitive type
                     case None =>
-                        logError(s, DereferenceError(derefType))
+                        if (!(derefType == BottomType())) {
+                            logError(s, DereferenceError(derefType))
+                        }
                         return contextPrime2
                 }
 
@@ -849,7 +859,9 @@ class Checker(table: SymbolTable) {
                         val contract = table.contract(cName).get
                         (contract.function(name), contract.transaction(name))
                     case _ =>
-                        logError(s, NonInvokeableError(tRecipient))
+                        if (!(tRecipient == BottomType())) {
+                            logError(s, NonInvokeableError(tRecipient))
+                        }
                         return contextPrime
                 }
 

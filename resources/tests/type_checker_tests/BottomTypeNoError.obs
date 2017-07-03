@@ -1,0 +1,15 @@
+contract C {
+    transaction t1() {
+        D d = 5;
+        int i = d + 3;
+        t2(i);
+        int i = d.f;
+        d.f = 3;
+        d.t();
+        int i = d.t();
+    }
+
+    transaction t2(int i) returns int {
+        return i;
+    }
+}

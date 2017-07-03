@@ -280,7 +280,7 @@ class TypeCheckerTests extends JUnitSuite {
               Nil)
     }
 
-  @Test def sideEffectTest(): Unit = {
+    @Test def sideEffectTest(): Unit = {
       runTest("resources/tests/type_checker_tests/NoSideEffects.obs",
           (NoEffectsError(Variable("x")), 5)
             ::
@@ -295,9 +295,9 @@ class TypeCheckerTests extends JUnitSuite {
             ::
             Nil
       )
-  }
+    }
 
-  @Test def stateTest(): Unit = {
+    @Test def stateTest(): Unit = {
     runTest("resources/tests/type_checker_tests/States.obs",
       (TransitionUpdateError(Set("x")), 7)
         ::
@@ -308,7 +308,15 @@ class TypeCheckerTests extends JUnitSuite {
         (TransitionError(), 16)
         ::
         Nil
-    )
-  }
+        )
+    }
+
+    @Test def bottomTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/BottomTypeNoError.obs",
+                (ContractUndefinedError("D"), 3)
+                ::
+                Nil
+            )
+    }
 }
 
