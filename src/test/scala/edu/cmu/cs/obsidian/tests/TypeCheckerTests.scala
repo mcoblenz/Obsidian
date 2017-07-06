@@ -238,27 +238,35 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def constructionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Construction.obs",
-            (WrongArityError(0, 1, "constructor of Thing"), 29)
+            (ConstructorNameError("Thing"), 24)
+              ::
+              (WrongArityError(0, 1, "constructor of Thing"), 33)
               ::
               (SubTypingError(
                   StringType(),
-                  IntType()), 29)
+                  IntType()), 33)
               ::
-              (WrongArityError(3, 1, "constructor of Thing"), 29)
+              (SubTypingError(
+                StringType(),
+                IntType()), 33)
               ::
-              (WrongArityError(0, 3, "constructor of Thing"), 30)
+              (WrongArityError(3, 1, "constructor of Thing"), 33)
               ::
-              (WrongArityError(1, 3, "constructor of Thing"), 30)
+              (WrongArityError(0, 3, "constructor of Thing"), 34)
+              ::
+              (WrongArityError(1, 3, "constructor of Thing"), 34)
+              ::
+              (WrongArityError(1, 3, "constructor of Thing"), 34)
               ::
               (SubTypingError(
                   IntType(),
-                  BoolType()), 30)
+                  BoolType()), 34)
               ::
               (SubTypingError(
                   IntType(),
-                  StringType()), 30)
+                  StringType()), 34)
               ::
-              (ContractUndefinedError("Stuff"), 31)
+              (ContractUndefinedError("Stuff"), 35)
               ::
               Nil
         )

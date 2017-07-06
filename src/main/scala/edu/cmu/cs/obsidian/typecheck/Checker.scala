@@ -92,6 +92,9 @@ case class StateSpecificReadOnlyError() extends Error {
 case class UnusedOwnershipError(name: String) extends Error {
     val msg: String = s"Variable $name holds ownership, but is unused at the end of its scope"
 }
+case class ConstructorNameError(contractName: String) extends Error {
+    val msg: String = s"Invalid constructor name for contract $contractName"
+}
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
  * In the formalism, we allow throw to result in any type: in the implementation, we don't know
@@ -249,14 +252,14 @@ class Checker(table: SymbolTable) {
 
 
     private def checkExpr(
-                             insideOfMethod: Either[Transaction, Func],
+                             decl: Declaration,
                              context: Context,
                              e: Expression
                          ): (Type, Context) = {
 
         /* returns [t] if [e : t], otherwise returns BottomType */
         def assertTypeEquality(e: Expression, t: Type, c: Context): (Type, Context) = {
-            val (tPrime, contextPrime) = checkExpr(insideOfMethod, c, e)
+            val (tPrime, contextPrime) = checkExpr(decl, c, e)
             (assertSubType(e, tPrime, t), contextPrime)
         }
 
@@ -292,11 +295,11 @@ class Checker(table: SymbolTable) {
              case FalseLiteral() => (BoolType(), context)
              case This() =>
                  val baseType = indexedOfThis(context).simpleTypeOf
-                 insideOfMethod match {
-                     // if we're in a transaction, we can consider [this] to be [owned]
-                     case Left(_) => (OwnedRef(baseType), context)
+                 decl match {
+                     // if we're in a transaction (or constructor?), we can consider [this] to be [owned]
+                     case Transaction(_,_,_,_,_,_) | Constructor(_,_,_,_) => (OwnedRef(baseType), context)
                      // if we're in a function, [this] must be deemed [readonly]
-                     case Right(_) => (ReadOnlyRef(baseType), context)
+                     case _ => (ReadOnlyRef(baseType), context)
                  }
              case Conjunction(e1: Expression, e2: Expression) =>
                  assertOperationType(e1, e2, BoolType())
@@ -313,8 +316,8 @@ class Checker(table: SymbolTable) {
              case Multiply(e1: Expression, e2: Expression) =>
                  assertOperationType(e1, e2, IntType())
              case Equals(e1: Expression, e2: Expression) =>
-                 val (t1, c1) = checkExpr(insideOfMethod, context, e1)
-                 val (t2, c2) = checkExpr(insideOfMethod, c1, e2)
+                 val (t1, c1) = checkExpr(decl, context, e1)
+                 val (t2, c2) = checkExpr(decl, c1, e2)
                  if (t1 == t2) (BoolType(), c2) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
                      (BottomType(), c2)
@@ -328,14 +331,14 @@ class Checker(table: SymbolTable) {
              case LessThanOrEquals(e1: Expression, e2: Expression) =>
                  assertComparisonType(e1, e2)
              case NotEquals(e1: Expression, e2: Expression) =>
-                 val (t1, c1) = checkExpr(insideOfMethod, context, e1)
-                 val (t2, c2) = checkExpr(insideOfMethod, c1, e2)
+                 val (t1, c1) = checkExpr(decl, context, e1)
+                 val (t2, c2) = checkExpr(decl, c1, e2)
                  if (t1 == t2) (BoolType(), c2) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
                      (BottomType(), c2)
                  }
              case Dereference(e: Expression, name) =>
-                 val (t, contextPrime) = checkExpr(insideOfMethod, context, e)
+                 val (t, contextPrime) = checkExpr(decl, context, e)
                  val simple = extractSimpleType(t)
                  simple match {
                      case Some(JustContractType(contractName)) => val contract = table.contract(contractName).get
@@ -378,7 +381,7 @@ class Checker(table: SymbolTable) {
                  }
 
 
-                 val (argTypes, contextPrime) = checkExprs(insideOfMethod, context, args)
+                 val (argTypes, contextPrime) = checkExprs(decl, context, args)
                  assertArgsCorrect(e, name, spec::Nil, argTypes)
 
                  ret match {
@@ -387,7 +390,7 @@ class Checker(table: SymbolTable) {
                  }
 
              case Invocation(recipient: Expression, name, args: Seq[Expression]) =>
-                 val (recipType, contextPrime) = checkExpr(insideOfMethod, context, recipient)
+                 val (recipType, contextPrime) = checkExpr(decl, context, recipient)
                  val (tx, fun) = extractSimpleType(recipType) match {
                      case Some(JustContractType(contractName)) =>
                          val contract = table.contract(contractName).get
@@ -412,7 +415,7 @@ class Checker(table: SymbolTable) {
                      case (_, Some(f: Func)) => (f.args, f.retType)
                  }
 
-                 val (argTypes, contextPrime2) = checkExprs(insideOfMethod, context, args)
+                 val (argTypes, contextPrime2) = checkExprs(decl, context, args)
                  assertArgsCorrect(e, name, spec::Nil, argTypes)
 
                  ret match {
@@ -423,7 +426,7 @@ class Checker(table: SymbolTable) {
              case Construction(name, args: Seq[Expression]) =>
                  table.contract(name) match {
                      case Some(c) =>
-                         val (argTypes, contextPrime) = checkExprs(insideOfMethod, context, args)
+                         val (argTypes, contextPrime) = checkExprs(decl, context, args)
                          val constrSpecs = c.constructors.map(constr => constr.args)
                          assertArgsCorrect(e, s"constructor of $name", constrSpecs, argTypes)
                          c.ast.mod match {
@@ -443,7 +446,7 @@ class Checker(table: SymbolTable) {
 
 
     private def checkExprs(
-                                    insideOfMethod: Either[Transaction, Func],
+                                    decl: Declaration,
                                     context: Context,
                                     es: Seq[Expression]
                                 ): (Seq[(Type, Expression)], Context) = {
@@ -451,7 +454,7 @@ class Checker(table: SymbolTable) {
         var contextPrime = context
         for (e <- es) {
             val (t, contextPrime2) =
-                checkExpr(insideOfMethod, contextPrime, e)
+                checkExpr(decl, contextPrime, e)
             contextPrime = contextPrime2
             types.append((t, e))
         }
@@ -459,12 +462,12 @@ class Checker(table: SymbolTable) {
     }
 
     private def checkStatementSequence(
-                                          insideOfMethod: Either[Transaction, Func],
+                                          decl: Declaration,
                                           context: Context,
                                           s: Seq[Statement]
                                       ): Context = {
         s.foldLeft(context)((prevContext: Context, s: Statement) =>
-                checkStatement(insideOfMethod, prevContext, s))
+                checkStatement(decl, prevContext, s))
     }
 
     /* returns a context that is the same as [branchContext], except only with
@@ -576,14 +579,14 @@ class Checker(table: SymbolTable) {
     }
 
     private def checkStatement(
-                                  insideOfMethod: Either[Transaction, Func],
+                                  decl: Declaration,
                                   context: Context,
                                   s: Statement
                               ): Context = {
         val checkExpr = (context: Context, e: Expression) =>
-            this.checkExpr(insideOfMethod, context, e)
+            this.checkExpr(decl, context, e)
         val checkExprs = (context: Context, es: Seq[Expression]) =>
-            this.checkExprs(insideOfMethod, context, es)
+            this.checkExprs(decl, context, es)
 
         s match {
             case VariableDecl(typ: AstType, name) =>
@@ -612,40 +615,42 @@ class Checker(table: SymbolTable) {
                 contextPrime.updated(name, tDecl)
 
             case Return() =>
-                insideOfMethod match {
+                decl match {
                     /* the tx/function must have no return type */
-                    case Left(t: Transaction) if t.retType.isEmpty => context
-                    case Right(f: Func) if f.retType.isEmpty => context
+                    case t: Transaction if t.retType.isEmpty => context
+                    case f: Func if f.retType.isEmpty => context
                     case _ =>
-                        logError(s, MustReturnError(insideOfMethod.fold(_.name, _.name)))
+                        logError(s, MustReturnError(decl.name))
                         context
                 }
 
             case ReturnExpr(e: Expression) =>
                 val (t, contextPrime) = checkExpr(context, e)
-                val tRet = insideOfMethod match {
+                val tRet = decl match {
                     /* must be no return type */
-                    case Left(t: Transaction) if t.retType.isDefined =>
+                    case t: Transaction if t.retType.isDefined =>
                         translateType(s, t.retType.get)
-                    case Right(f: Func) if f.retType.isDefined =>
+                    case f: Func if f.retType.isDefined =>
                         translateType(s, f.retType.get)
                     case _ =>
-                        logError(s, CannotReturnError(insideOfMethod.fold(_.name, _.name)))
+                        logError(s, CannotReturnError(decl.name))
                         return contextPrime
                 }
                 assertSubType(s, t, tRet)
                 contextPrime
 
             case Transition(newStateName, updates: Seq[(Variable, Expression)]) =>
-                val (cName, sName) = extractSimpleType(context("this")) match {
-                    case Some(StateType(ct, st)) => (ct, st)
-                    case _ =>
-                        logError(s, TransitionError())
-                        return context
-                }
-
                 val ContractTable = indexedOfThis(context).contract
-                val indexedOldState = ContractTable.state(sName).get
+
+                val (cName, indexedOldState) = decl match {
+                    case Constructor(name, _, _, _) => (name, None)
+                    case _ => extractSimpleType(context("this")) match {
+                        case Some(StateType(ct, st)) => (ct, ContractTable.state(st))
+                        case _ =>
+                            logError(s, TransitionError())
+                            return context
+                    }
+                }
 
                 if (ContractTable.state(newStateName).isEmpty) {
                     logError(s, StateUndefinedError(cName, newStateName))
@@ -654,9 +659,13 @@ class Checker(table: SymbolTable) {
 
                 val indexedNewState = ContractTable.state(newStateName).get
 
-                val oldFields = indexedOldState.ast.declarations
-                    .filter(_.isInstanceOf[Field])
-                    .map(_.asInstanceOf[Field].name)
+                val oldFields = indexedOldState match {
+                    case None => Nil
+                    case Some(s) =>
+                        s.ast.declarations
+                          .filter(_.isInstanceOf[Field])
+                          .map(_.asInstanceOf[Field].name)
+                }
                 val newFields = indexedNewState.ast.declarations
                     .filter(_.isInstanceOf[Field])
                     .map(_.asInstanceOf[Field].name)
@@ -763,7 +772,7 @@ class Checker(table: SymbolTable) {
                 val (t, contextPrime) = checkExpr(context, eCond)
                 assertSubType(s, t, BoolType())
                 val contextIfTrue = pruneContext(s,
-                    checkStatementSequence(insideOfMethod, contextPrime, body),
+                    checkStatementSequence(decl, contextPrime, body),
                     contextPrime)
                 mergeContext(s, contextPrime, contextIfTrue)
 
@@ -771,19 +780,19 @@ class Checker(table: SymbolTable) {
                 val (t, contextPrime) = checkExpr(context, eCond)
                 assertSubType(s, t, BoolType())
                 val contextIfTrue = pruneContext(s,
-                    checkStatementSequence(insideOfMethod, contextPrime, body1),
+                    checkStatementSequence(decl, contextPrime, body1),
                     contextPrime)
                 val contextIfFalse = pruneContext(s,
-                    checkStatementSequence(insideOfMethod, contextPrime, body2),
+                    checkStatementSequence(decl, contextPrime, body2),
                     contextPrime)
                 mergeContext(s, contextIfFalse, contextIfTrue)
 
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val contextIfTry = pruneContext(s,
-                    checkStatementSequence(insideOfMethod, context, s1),
+                    checkStatementSequence(decl, context, s1),
                     context)
                 val contextIfCatch = pruneContext(s,
-                    checkStatementSequence(insideOfMethod, context, s2),
+                    checkStatementSequence(decl, context, s2),
                     context)
                 mergeContext(s, contextIfTry, contextIfCatch)
 
@@ -818,7 +827,7 @@ class Checker(table: SymbolTable) {
                     }
 
                     val endContext = pruneContext(s,
-                        checkStatementSequence(insideOfMethod, startContext, body),
+                        checkStatementSequence(decl, startContext, body),
                         startContext)
                     mergedContext = mergeContext(s, mergedContext, endContext)
                 }
@@ -961,7 +970,7 @@ class Checker(table: SymbolTable) {
         initContext = initContext.updated("this", thisType)
 
         val outputContext =
-            checkStatementSequence(Left(tx), initContext, tx.body)
+            checkStatementSequence(tx, initContext, tx.body)
 
         assertSubType(tx, outputContext("this"), OwnedRef(JustContractType(cName)))
 
@@ -989,6 +998,37 @@ class Checker(table: SymbolTable) {
         }
     }
 
+    private def checkConstructor(c: Constructor, indexed: ContractTable): Unit = {
+
+        //maybe this error should be handled in the parser
+        if(c.name != indexed.name) {
+            logError(c, ConstructorNameError(indexed.name))
+        }
+
+        var initContext = Context(new TreeMap[String, Type](), isThrown = false)
+
+        for (arg <- c.args) {
+            initContext = initContext.updated(arg.varName, translateType(c, arg.typ))
+        }
+
+        //should it be owned?
+        val thisType = OwnedRef(JustContractType(indexed.name))
+
+        initContext = initContext.updated("this", thisType)
+
+        val outputContext =
+            checkStatementSequence(c, initContext, c.body)
+
+        assertSubType(c, outputContext("this"), OwnedRef(JustContractType(indexed.name)))
+
+        for ((x, t) <- outputContext.underlying) {
+            if (t.isInstanceOf[OwnedRef] && x != "this") {
+                logError(c, UnusedOwnershipError(x))
+            }
+        }
+
+    }
+
     private def checkContract(contract: Contract): Unit = {
         val indexed = table.contract(contract.name).get
         for (decl <- contract.declarations) {
@@ -996,6 +1036,7 @@ class Checker(table: SymbolTable) {
                 case t: Transaction => checkTransaction(t, Right(indexed))
                 case s: State => checkState(indexed, s)
                 case f: Field => checkField(f)
+                case c: Constructor => checkConstructor(c, indexed)
                 case _ => () // TODO
             }
         }

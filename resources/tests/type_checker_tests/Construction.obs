@@ -5,20 +5,24 @@ shared contract Thing {
 
     Thing() {
         this.x = 1;
-        this.y = 2;
-        this.z = 3;
+        this.y = "a";
+        this.z = true;
     }
 
     Thing(int x) {
         this.x = x;
-        this.y = 2;
-        this.z = 3;
+        this.y = "b";
+        this.z = true;
     }
 
-    Thing(int x, string y, bool x) {
+    Thing(int x, string y, bool z) {
         this.x = x;
         this.y = y;
         this.z = z;
+    }
+
+    OtherThing(int x) {
+        this.x = x;
     }
 }
 

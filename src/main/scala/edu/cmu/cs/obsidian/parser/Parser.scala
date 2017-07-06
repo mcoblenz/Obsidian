@@ -357,11 +357,12 @@ object Parser extends Parsers {
     }
 
     // maybe we can check here that the constructor has the appropriate name?
-    private def parseConstructor = {
+    private def parseConstructor() = {
         parseIdUpper ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEnsuresState) ~!
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ _ ~ args ~ _ ~ ensuresState ~ _ ~ body ~ _ =>
                 Constructor(name._1, args, ensuresState, body).setLoc(name)
+
         }
     }
 
@@ -404,7 +405,7 @@ object Parser extends Parsers {
             case Error(msg , next) =>
                 val line = next.first.pos.line
                 val col = next.first.pos.column
-                Left(s"Error: `$msg at $line:$col")
+                Left(s"Error: $msg at $line:$col")
         }
     }
 
