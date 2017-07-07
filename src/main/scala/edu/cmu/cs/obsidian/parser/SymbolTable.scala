@@ -3,28 +3,16 @@ package edu.cmu.cs.obsidian.parser
 import scala.collection.{Map, Seq}
 import scala.collection.immutable.TreeMap
 import scala.reflect.{ClassTag, classTag}
-
-sealed trait SimpleType
-case class JustContractType(contractName: String) extends SimpleType
-case class StateType(contractName: String, stateName: String) extends SimpleType
-
-/* This is necessarily different from the representation of types in the AST; it's
-* unclear in the AST if a reference is "shared" or "owned" when it has no modifier */
-sealed trait Type
-case class ReadOnlyRef(t: SimpleType) extends Type
-case class SharedRef(t: SimpleType) extends Type
-case class OwnedRef(t: SimpleType) extends Type
-case class IntType() extends Type
-case class BoolType() extends Type
-case class StringType() extends Type
-/* Used to indicate an error in the type checker when a reasonable type cannot
- * otherwise be inferred */
-case class BottomType() extends Type
+import edu.cmu.cs.obsidian.typecheck._
 
 sealed trait DeclarationTable {
     def name: String
     def ast: AST
+    /* id if this is a [ContractTable] already, or gets the [ContractTable] of a [StateTable] */
     def contract: ContractTable
+    /* looks for a contract called [name] that's in scope
+     * (either globally or in this particular contract) */
+    def contract(name: String): Option[ContractTable]
     def field(name: String): Option[Field]
     def transaction(name: String): Option[Transaction]
     def function(name: String): Option[Func]
@@ -46,7 +34,6 @@ object SymbolTableHelpers {
     }
 }
 
-
 class StateTable(astNode: State, insideOf: ContractTable) extends DeclarationTable {
 
     val fieldLookup: Map[String, Field] = {
@@ -64,6 +51,7 @@ class StateTable(astNode: State, insideOf: ContractTable) extends DeclarationTab
     def name: String = astNode.name
     def ast: State = astNode
     def contract: ContractTable = insideOf
+    def contract(name: String): Option[ContractTable] = contract.contract(name)
 
     def field(name: String): Option[Field] = {
         fieldLookup.get(name) match {
@@ -87,7 +75,16 @@ class StateTable(astNode: State, insideOf: ContractTable) extends DeclarationTab
     def simpleTypeOf: SimpleType = StateType(this.contract.name, this.name)
 }
 
-class ContractTable(astNode: Contract) extends DeclarationTable {
+class ContractTable(
+        astNode: Contract,
+        symbolTable: SymbolTable,
+        parentContract: Option[ContractTable]) extends DeclarationTable {
+
+    def this(astNode: Contract, symbolTable: SymbolTable) =
+        this(astNode, symbolTable, None)
+
+    def this(astNode: Contract, symbolTable: SymbolTable, parentContract: ContractTable) =
+        this(astNode, symbolTable, Some(parentContract))
 
     val stateLookup: Map[String, StateTable] = {
         SymbolTableHelpers.indexDecl[State](astNode.declarations).mapValues(
@@ -107,24 +104,46 @@ class ContractTable(astNode: Contract) extends DeclarationTable {
         SymbolTableHelpers.indexDecl[Func](astNode.declarations)
     }
 
+    val childContractLookup: Map[String, ContractTable] = {
+        SymbolTableHelpers.indexDecl[Contract](astNode.declarations).mapValues(
+            (ct: Contract) => new ContractTable(ct, symbolTable, this)
+        )
+    }
+
     def name: String = astNode.name
+
     def contract: ContractTable = this
+
+    /* resolves a contract from the point of view of this contract. Two cases:
+     * 1) [name] refers to a global contract and it's in the symbol table
+     * 2) [name] refers to a child/nested contract of this contract
+     */
+    def contract(name: String): Option[ContractTable] = {
+        if (name == this.name) Some(this) else
+        (symbolTable.contract(name), childContract(name)) match {
+            case (_, Some(ct)) => Some(ct)
+            case (Some(ct), _) => Some(ct)
+            case _ => None
+        }
+    }
+
     def ast: Contract = astNode
     def field(name: String): Option[Field] = fieldLookup.get(name)
     def transaction(name: String): Option[Transaction] = txLookup.get(name)
     def function(name: String): Option[Func] = funLookup.get(name)
+
     def state(name: String): Option[StateTable] = stateLookup.get(name)
+    def possibleStates: Set[String] = stateLookup.values.map(_.name).toSet
+
+    def childContract(name: String): Option[ContractTable] =
+        childContractLookup.get(name)
+
+    def parent: Option[ContractTable] = parentContract
+    def hasParent: Boolean = parent.isDefined
 
     def constructors: Seq[Constructor] = {
-        var constructors: List[Constructor] = Nil
-        for (rawDecl <- astNode.declarations) {
-            rawDecl match {
-                case c: Constructor =>
-                    constructors = c::constructors
-                case _ => ()
-            }
-        }
-        constructors
+        ast.declarations.filter(_.isInstanceOf[Constructor])
+                        .map(_.asInstanceOf[Constructor])
     }
 
     def simpleTypeOf: SimpleType = JustContractType(this.name)
@@ -134,11 +153,13 @@ class SymbolTable(program: Program) {
     var contractLookup: Map[String, ContractTable] = {
         var table = TreeMap[String, ContractTable]()
         for (contract <- program.contracts) {
-            table = table.updated(contract.name, new ContractTable(contract))
+            table = table.updated(contract.name, new ContractTable(contract, this))
         }
         table
     }
 
     def ast: Program = program
+
+    /* only retrieves top level contracts (i.e. not nested) */
     def contract: Function[String, Option[ContractTable]] = contractLookup.get
 }

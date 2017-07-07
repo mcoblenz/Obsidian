@@ -17,6 +17,12 @@ sealed abstract class Expression() extends Statement
 sealed abstract class Declaration() extends AST {
     val name: String
 }
+sealed abstract class InvokableDeclaration() extends Declaration {
+    val args: Seq[VariableDecl]
+    val retType: Option[AstType]
+    val body: Seq[Statement]
+    val ensuresState: Option[Set[String]]
+}
 sealed abstract class AstType() extends AST
 
 /* Expressions */
@@ -89,13 +95,15 @@ case class Constructor(name: String,
 case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[AstType],
-                body: Seq[Statement]) extends Declaration
+                body: Seq[Statement]) extends InvokableDeclaration {
+    val ensuresState: Option[Set[String]] = None
+}
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
                        retType: Option[AstType],
                        ensures: Seq[Ensures],
                        ensuresState: Option[Set[String]],
-                       body: Seq[Statement]) extends Declaration
+                       body: Seq[Statement]) extends InvokableDeclaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration
 
 case class Ensures(expr: Expression) extends AST

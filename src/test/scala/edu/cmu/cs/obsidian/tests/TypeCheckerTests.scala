@@ -47,8 +47,6 @@ class TypeCheckerTests extends JUnitSuite {
               ::
               (WrongArityError(1, 0, "createC"), 19)
               ::
-              (LeakReturnValueError("createC"), 19)
-              ::
               (SubTypingError(BoolType(), IntType()), 20)
               ::
               Nil
@@ -137,8 +135,8 @@ class TypeCheckerTests extends JUnitSuite {
             (SubTypingError(BoolType(), IntType()), 17)
               ::
               (SubTypingError(
-                  OwnedRef(JustContractType("C_Unique")),
-                  SharedRef(JustContractType("C_Shared"))),
+                  OwnedRef(NoPathType(JustContractType("C_Unique"))),
+                  SharedRef(NoPathType(JustContractType("C_Shared")))),
                 19)
               ::
               (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 21)
@@ -146,8 +144,8 @@ class TypeCheckerTests extends JUnitSuite {
               (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 22)
               ::
               (SubTypingError(
-                  SharedRef(JustContractType("C_Shared")),
-                  SharedRef(StateType("C_Shared", "S"))),
+                  SharedRef(NoPathType(JustContractType("C_Shared"))),
+                  SharedRef(NoPathType(StateType("C_Shared", "S")))),
                 23)
               ::
               (VariableUndefinedError("j"), 27)
@@ -165,14 +163,14 @@ class TypeCheckerTests extends JUnitSuite {
               (MustReturnError("t_has_ret"), 13)
               ::
               (SubTypingError(
-                  OwnedRef(JustContractType("C_Unique")),
-                  OwnedRef(StateType("C_Unique", "S"))),
+                  OwnedRef(NoPathType(JustContractType("C_Unique"))),
+                  OwnedRef(NoPathType(StateType("C_Unique", "S")))),
                 18)
               ::
               (MustReturnError("t_ret_nonprimitive"), 19)
               ::
               (SubTypingError(IntType(),
-                  OwnedRef(JustContractType("C_Unique"))), 20)
+                  OwnedRef(NoPathType(JustContractType("C_Unique")))), 20)
               ::
               Nil
         )
@@ -268,6 +266,8 @@ class TypeCheckerTests extends JUnitSuite {
               ::
               (ContractUndefinedError("Stuff"), 35)
               ::
+              (ContractUndefinedError("Stuff"), 35)
+              ::
               Nil
         )
     }
@@ -275,16 +275,16 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             (MergeIncompatibleError("o1",
-                OwnedRef(JustContractType("Ow")),
-                ReadOnlyRef(JustContractType("Ow"))), 12)
+                OwnedRef(NoPathType(JustContractType("Ow"))),
+                ReadOnlyRef(NoPathType(JustContractType("Ow")))), 12)
               ::
               (UnusedOwnershipError("o2"), 12)
               ::
               (UnusedOwnershipError("o2"), 22)
               ::
               (MergeIncompatibleError("o1",
-                OwnedRef(JustContractType("Ow")),
-                ReadOnlyRef(JustContractType("Ow"))), 31)
+                OwnedRef(NoPathType(JustContractType("Ow"))),
+                ReadOnlyRef(NoPathType(JustContractType("Ow")))), 31)
               ::
               (UnusedOwnershipError("o2"), 31)
               ::
