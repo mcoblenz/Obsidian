@@ -91,7 +91,9 @@ case class Field(isConst: Boolean, typ: AstType, name: String) extends Declarati
 case class Constructor(name: String,
                        args: Seq[VariableDecl],
                        ensuresState: Option[Set[String]],
-                       body: Seq[Statement]) extends Declaration
+                       body: Seq[Statement]) extends InvokableDeclaration {
+    val retType: Option[AstType] = None
+}
 case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[AstType],

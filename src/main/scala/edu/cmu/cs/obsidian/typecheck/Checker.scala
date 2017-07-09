@@ -740,7 +740,7 @@ class Checker(globalTable: SymbolTable) {
     // Checking definitions for language constructs begins here
 
     private def checkExpr(
-            decl: Declaration,
+            decl: InvokableDeclaration,
             context: Context,
             e: Expression): (Type, Context) = {
 
@@ -961,7 +961,7 @@ class Checker(globalTable: SymbolTable) {
 
 
     private def checkExprs(
-                                    decl: Declaration,
+                                    decl: InvokableDeclaration,
                                     context: Context,
                                     es: Seq[Expression]
                                 ): (Seq[(Type, Expression)], Context) = {
@@ -977,7 +977,7 @@ class Checker(globalTable: SymbolTable) {
     }
 
     private def checkStatementSequence(
-                                          decl: Declaration,
+                                          decl: InvokableDeclaration,
                                           context: Context,
                                           s: Seq[Statement]
                                       ): Context = {
@@ -1153,7 +1153,7 @@ class Checker(globalTable: SymbolTable) {
     }
 
     private def checkStatement(
-                                  decl: Declaration,
+                                  decl: InvokableDeclaration,
                                   context: Context,
                                   s: Statement
                               ): Context = {
@@ -1249,30 +1249,33 @@ class Checker(globalTable: SymbolTable) {
                 contextPrime
 
             case Transition(newStateName, updates: Seq[(Variable, Expression)]) =>
-                val (cName, sName) = extractSimpleType(context("this")) match {
-                    case Some(StateType(ct, st)) => (ct, st)
-                    case _ =>
-                        logError(s, TransitionError())
-                        return context
-                }
-
                 val thisTable = tableOfThis(context).contract
-                val indexedOldState = thisTable.state(sName).get
 
                 if (thisTable.state(newStateName).isEmpty) {
-                    logError(s, StateUndefinedError(cName, newStateName))
+                    logError(s, StateUndefinedError(thisTable.name, newStateName))
                     return context
                 }
 
-                val indexedNewState = thisTable.state(newStateName).get
+                val newStateTable = thisTable.state(newStateName).get
 
-                val oldFields = indexedOldState.ast.declarations
-                          .filter(_.isInstanceOf[Field])
-                          .map(_.asInstanceOf[Field].name)
+                val oldFields = tableOfThis(context) match {
+                    case oldStateTable: StateTable =>
+                        oldStateTable.ast.declarations
+                            .filter(_.isInstanceOf[Field])
+                            .map(_.asInstanceOf[Field].name)
+                    case _: ContractTable =>
+                        /* special case to allow transitioning during constructors */
+                        if (decl.isInstanceOf[Constructor]) {
+                            TreeSet[String]()
+                        } else {
+                            logError(s, TransitionError())
+                            return context
+                        }
+                }
 
-                val newFields = indexedNewState.ast.declarations
-                    .filter(_.isInstanceOf[Field])
-                    .map(_.asInstanceOf[Field].name)
+                val newFields = newStateTable.ast.declarations
+                                .filter(_.isInstanceOf[Field])
+                                .map(_.asInstanceOf[Field].name)
 
                 val toInitialize = newFields.toSet.diff(oldFields.toSet)
 
@@ -1280,20 +1283,15 @@ class Checker(globalTable: SymbolTable) {
                 val uninitialized = toInitialize.diff(updated)
                 val badInitializations = updated.diff(newFields.toSet)
                 if (uninitialized.nonEmpty) logError(s, TransitionUpdateError(uninitialized))
-                if (badInitializations.nonEmpty) {
-                    for (s <- badInitializations) {
-                        val err = FieldUndefinedError(extractSimpleType(context("this")).get, s)
-                        logError(updates.find(_._1.name == s).get._1, err)
-                    }
+                for (s <- badInitializations) {
+                    val err = FieldUndefinedError(extractSimpleType(context("this")).get, s)
+                    logError(updates.find(_._1.name == s).get._1, err)
                 }
-
-                var types = new ListBuffer[Type]()
-                types = BottomType() +: types
 
                 var contextPrime = context
                 for ((Variable(f), e) <- updates) {
                     if (newFields.contains(f)) {
-                        val fieldAST = indexedNewState.field(f).get
+                        val fieldAST = newStateTable.field(f).get
                         val (t, contextPrime2) = checkExpr(decl, contextPrime, e)
                         contextPrime = contextPrime2
                         val fieldType = translateType(thisTable, fieldAST.typ)
@@ -1301,7 +1299,8 @@ class Checker(globalTable: SymbolTable) {
                     }
                 }
 
-                val newType = updateSimpleType(context("this"), StateType(cName, newStateName))
+                val newSimpleType = StateType(thisTable.name, newStateName)
+                val newType = updateSimpleType(context("this"), newSimpleType)
                 contextPrime.updated("this", newType)
 
             case Assignment(Variable(x), e: Expression) =>
@@ -1528,33 +1527,35 @@ class Checker(globalTable: SymbolTable) {
         }
     }
 
-    private def checkConstructor(c: Constructor, indexed: ContractTable): Unit = {
+    private def checkConstructor(constr: Constructor, table: ContractTable): Unit = {
 
-        //maybe this error should be handled in the parser
-        if(c.name != indexed.name) {
-            logError(c, ConstructorNameError(indexed.name))
+        // maybe this error should be handled in the parser
+        if(constr.name != table.name) {
+            logError(constr, ConstructorNameError(table.name))
         }
 
         var initContext = Context(new TreeMap[String, Type](), isThrown = false)
 
-        for (arg <- c.args) {
-            val typ = unsafeTranslateType(c.args, arg.typ)
+        for (arg <- constr.args) {
+            val typ = unsafeTranslateType(constr.args, arg.typ)
             initContext = initContext.updated(arg.varName, typ)
         }
 
         //should it be owned?
-        val thisType = OwnedRef(NoPathType(JustContractType(indexed.name)))
+        val thisType = OwnedRef(NoPathType(JustContractType(table.name)))
 
         initContext = initContext.updated("this", thisType)
 
         val outputContext =
-            checkStatementSequence(c, initContext, c.body)
+            checkStatementSequence(constr, initContext, constr.body)
 
-        assertSubType(c, outputContext("this"), OwnedRef(NoPathType(JustContractType(indexed.name))))
+        val expectedThisType =
+            OwnedRef(NoPathType(simpleOf(table.name, constr.ensuresState)))
+        assertSubType(constr, outputContext("this"), expectedThisType)
 
         for ((x, t) <- outputContext.underlying) {
             if (t.isInstanceOf[OwnedRef] && x != "this") {
-                logError(c, UnusedOwnershipError(x))
+                logError(constr, UnusedOwnershipError(x))
             }
         }
 
