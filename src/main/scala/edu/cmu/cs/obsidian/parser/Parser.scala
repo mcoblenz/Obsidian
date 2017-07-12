@@ -74,16 +74,24 @@ object Parser extends Parsers {
     }
 
     private def parseType = {
-        val nonPrim = rep(parseTypeModifier) ~ rep(parseIdLower ~ DotT()) ~
+        val parsePathNode = (parseIdLower | ThisT()) ~ DotT() ^^ {
+            case name ~ DotT() =>
+                name match {
+                    case _: ThisT => "this"
+                    case id => id.asInstanceOf[Identifier]._1
+                }
+        }
+
+        val nonPrim = rep(parseTypeModifier) ~ rep(parsePathNode) ~
             parseIdUpper ~ opt(DotT() ~ parseIdUpper) ^^ {
             case mods ~ path ~ cName ~ Some(sName) if path.isEmpty =>
                 AstStateType(mods, cName._1, sName._2._1).setLoc(cName)
             case mods ~ path ~ cName ~ None if path.isEmpty =>
                 AstContractType(mods, cName._1).setLoc(cName)
             case mods ~ path ~ cName ~ None =>
-                AstPathContractType(mods, path.map(_._1._1), cName._1).setLoc(cName)
+                AstPathContractType(mods, path, cName._1).setLoc(cName)
             case mods ~ path ~ cName ~ Some(sName) =>
-                AstPathStateType(mods, path.map(_._1._1), cName._1, sName._2._1).setLoc(cName)
+                AstPathStateType(mods, path, cName._1, sName._2._1).setLoc(cName)
         }
 
         val intPrim = IntT() ^^ { t => AstIntType().setLoc(t) }

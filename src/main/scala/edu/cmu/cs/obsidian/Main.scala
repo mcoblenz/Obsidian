@@ -20,6 +20,7 @@ case class CompilerOptions (outputPath: Option[String],
                             debugPath: Option[String],
                             inputFiles: List[String],
                             verbose: Boolean,
+                            typeCheckerDebug: Boolean,
                             printTokens: Boolean,
                             printAST: Boolean,
                             buildClient: Boolean)
@@ -33,6 +34,7 @@ object Main {
           |    --output-path path/to/dir    outputs jar and proto files at the given directory
           |    --dump-debug path/to/dir     save intermediate files at the given directory
           |    --verbose                    print error codes and messages for jar and javac
+          |    --type-checker-debug         print stack trace of errors as they are logged
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
@@ -43,6 +45,7 @@ object Main {
         var debugPath: Option[String] = None
         var inputFiles: List[String] = List.empty
         var verbose = false
+        var checkerDebug = false
         var printTokens = false
         var printAST = false
         var buildClient = false
@@ -52,6 +55,9 @@ object Main {
                 case Nil => ()
                 case "--verbose" :: tail =>
                     verbose = true
+                    parseOptionsRec(tail)
+                case "--type-checker-debug" :: tail =>
+                    checkerDebug = true
                     parseOptionsRec(tail)
                 case "--print-tokens" :: tail =>
                     printTokens = true
@@ -96,7 +102,8 @@ object Main {
             println("For now: contracts can only consist of a single file")
         }
 
-        CompilerOptions(outputPath, debugPath, inputFiles, verbose, printTokens, printAST, buildClient)
+        CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
+                        printTokens, printAST, buildClient)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -256,7 +263,7 @@ object Main {
             }
 
             val table = new SymbolTable(ast)
-            val checker = new Checker(table)
+            val checker = new Checker(table, options.typeCheckerDebug)
             if (checker.checkProgramAndPrintErrors()) {
                 println("Typechecking was completed successfully.")
             } else {

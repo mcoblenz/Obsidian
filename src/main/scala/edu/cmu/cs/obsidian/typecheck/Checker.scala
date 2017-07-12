@@ -7,43 +7,71 @@ import scala.collection.immutable.{TreeMap, TreeSet, HashSet}
 import scala.collection.Map
 import scala.util.parsing.input.Position
 
-/* [SimpleType] simply indicates a contract, and possibly a state: there
+/* [SimpleType] simply indicates a contract, and possibly a state or set of states: there
  * is neither a permission nor a path associated with the type */
 sealed trait SimpleType { val contractName: String }
-case class JustContractType(contractName: String) extends SimpleType
+
+case class JustContractType(contractName: String) extends SimpleType {
+    override def toString: String = contractName
+}
 /* Invariant: [stateNames] is missing at least one of the states of the
  * contract (i.e. it is more specific than [JustContractType(contractName)],
  * but has at least 2 distinct states */
-case class StateUnionType(contractName: String, stateNames: Set[String]) extends SimpleType
-case class StateType(contractName: String, stateName: String) extends SimpleType
+case class StateUnionType(contractName: String, stateNames: Set[String]) extends SimpleType {
+    private def orOfStates: String = stateNames.toSeq.tail.foldLeft(stateNames.head)(
+        (prev: String, sName: String) => prev + " | " + sName
+    )
+    override def toString: String = contractName + "." + "(" + orOfStates + ")"
+}
 
-/* [RawType] is a type that doesn't have a permission associated with it */
+case class StateType(contractName: String, stateName: String) extends SimpleType {
+    override def toString: String = contractName + "." + stateName
+}
+
+/* [RawType] is a contract type that doesn't have a permission associated with it,
+ * but potentially has a path. */
 sealed trait RawType extends UncheckedType
-case class NoPathType(base: SimpleType) extends RawType
-case class PathType(path: Seq[String], base: SimpleType) extends RawType
 
-/* This is necessarily different from the representation of types in the AST; it's
-* unclear in the AST if a reference is "shared" or "owned" when it has no modifier */
+case class NoPathType(base: SimpleType) extends RawType {
+    override def toString: String = base.toString
+}
+
+case class PathType(path: Seq[String], base: SimpleType) extends RawType {
+    private def pathAsString = path.foldLeft("")(
+        (prev: String, pathNode: String) => prev + pathNode + "."
+    )
+    override def toString: String = pathAsString + base.toString
+}
+
+/* This is different from the representation of types in the AST in that the permission
+ * associated with the reference is always explicit */
 sealed trait Type {
     // for tests
     val isBottom: Boolean
     val tableOpt: Option[DeclarationTable]
 }
 
+/* Either a raw type or a primitive type. This class of types is important because
+ * they can be translated purely syntactically from AST types (i.e. no resolving of
+ * path/contract/state names is required */
 sealed trait UncheckedType
 
+/* int, bool, or string */
 sealed trait PrimitiveType extends Type with UncheckedType {
     val isBottom: Boolean = false
     val tableOpt: Option[DeclarationTable] = None
 }
+
 sealed trait NonPrimitiveType extends Type {
     val isBottom: Boolean = false
     def table: DeclarationTable
     val tableOpt: Option[DeclarationTable] = Some(table)
 }
 
+/* all permissioned types are associated with their corresponding symbol table */
 case class ReadOnlyRef(tableOf: DeclarationTable, t: RawType) extends NonPrimitiveType {
     override def table: DeclarationTable = tableOf
+    override def toString: String = "readonly " + t.toString
     override def equals(other: Any): Boolean = {
         other match {
             case ReadOnlyRef(_, tr) => tr == t
@@ -53,6 +81,7 @@ case class ReadOnlyRef(tableOf: DeclarationTable, t: RawType) extends NonPrimiti
 }
 case class SharedRef(tableOf: DeclarationTable, t: RawType) extends NonPrimitiveType {
     override def table: DeclarationTable = tableOf
+    override def toString: String = "shared " + t.toString
     override def equals(other: Any): Boolean = {
         other match {
             case SharedRef(_, tr) => tr == t
@@ -62,6 +91,7 @@ case class SharedRef(tableOf: DeclarationTable, t: RawType) extends NonPrimitive
 }
 case class OwnedRef(tableOf: DeclarationTable, t: RawType) extends NonPrimitiveType {
     override def table: DeclarationTable = tableOf
+    override def toString: String = "owned " + t.toString
     override def equals(other: Any): Boolean = {
         other match {
             case OwnedRef(_, tr) => tr == t
@@ -70,6 +100,7 @@ case class OwnedRef(tableOf: DeclarationTable, t: RawType) extends NonPrimitiveT
     }
 }
 case class IntType() extends PrimitiveType {
+    override def toString: String = "int"
     override def equals(other: Any): Boolean = {
         other match {
             case IntType() => true
@@ -78,6 +109,7 @@ case class IntType() extends PrimitiveType {
     }
 }
 case class BoolType() extends PrimitiveType {
+    override def toString: String = "bool"
     override def equals(other: Any): Boolean = {
         other match {
             case BoolType() => true
@@ -86,6 +118,7 @@ case class BoolType() extends PrimitiveType {
     }
 }
 case class StringType() extends PrimitiveType {
+    override def toString: String = "string"
     override def equals(other: Any): Boolean = {
         other match {
             case StringType() => true
@@ -106,102 +139,106 @@ case class BottomType() extends Type {
     val tableOpt: Option[DeclarationTable] = None
 }
 
+/* a type error: has a message (presented to the user) and a location (line and col number).
+ * The location is set when the Error is logged. The message generally depends on the
+ * parameters of the error: e.g. a subtyping error is parametrized on the types T1 and T2
+ * such that [T1 <: T2] was expected (but not the case) */
 abstract class Error {
     var loc: Position = _
     val msg: String
 }
 
 case class SubTypingError(t1: Type, t2: Type) extends Error {
-    val msg: String = s"Found type $t1, but expected something of type $t2"
+    val msg: String = s"Found type '$t1', but expected something of type '$t2'"
 }
 case class VariableUndefinedError(x: String) extends Error {
-    val msg: String = s"Variable $x is undefined in the current context"
+    val msg: String = s"Variable '$x' is undefined in the current context"
 }
 case class DifferentTypeError(e1: Expression, t1: Type, e2: Expression, t2: Type) extends Error {
-    val msg: String = s"Expression $e1 has type $t1, and expression $e2 has type $t2," +
+    val msg: String = s"Expression '$e1' has type '$t1', and expression '$e2' has type '$t2'," +
               s"but these expressions must have the same type"
 }
 case class FieldUndefinedError(insideOf: SimpleType, fName: String) extends Error {
     val msg: String = insideOf match {
-        case JustContractType(cName) => s"Field $fName is not defined in contract $cName"
-        case StateUnionType(cName, _) => s"Field $fName is not defined in contract $cName"
-        case StateType(cName, sName) => s"Field $fName is not defined in state $sName of contract $cName"
+        case JustContractType(cName) => s"Field '$fName' is not defined in contract '$cName'"
+        case StateUnionType(cName, _) => s"Field '$fName' is not defined in contract '$cName'"
+        case StateType(cName, sName) => s"Field '$fName' is not defined in state '$sName' of contract '$cName'"
     }
 }
 case class RecursiveFieldTypeError(cName: String, fName: String) extends Error {
-    val msg: String = s"The type of field $fName in contract $cName recursively refers to itself"
+    val msg: String = s"The type of field '$fName' in contract '$cName' recursively refers to itself"
 }
 case class RecursiveVariableTypeError(varName: String) extends Error {
-    val msg: String = s"The type of variable $varName recursively refers to itself"
+    val msg: String = s"The type of variable '$varName' recursively refers to itself"
 }
 case class FieldNotConstError(cName: String, fName: String) extends Error {
-    val msg: String = s"Field $fName must be labeled 'const' in contract $cName"
+    val msg: String = s"Field '$fName' must be labeled 'const' in contract '$cName'"
 }
 case class FieldConstMutationError(fName: String) extends Error {
-    val msg: String = s"Field $fName cannot be mutated because it is labeled 'const'"
+    val msg: String = s"Field '$fName' cannot be mutated because it is labeled 'const'"
 }
 case class DereferenceError(typ: Type) extends Error {
-    val msg: String = s"Type $typ cannot be dereferenced"
+    val msg: String = s"Type '$typ' cannot be dereferenced"
 }
 case class SwitchError(typ: Type) extends Error {
-    val msg: String = s"Type $typ cannot be switched on"
+    val msg: String = s"Type '$typ' cannot be switched on"
 }
 case class MethodUndefinedError(insideOf: SimpleType, name: String) extends Error {
     val msg: String = insideOf match {
         case JustContractType(cName) =>
-            s"No transaction or function with name $name was found in contract $cName"
+            s"No transaction or function with name '$name' was found in contract '$cName'"
         case StateUnionType(cName, _) =>
-            s"No transaction or function with name $name was found in contract $cName"
+            s"No transaction or function with name '$name' was found in contract '$cName'"
         case StateType(cName, sName) =>
-            s"No transaction or function with name $name was found in state $sName of contract $cName"
+            s"No transaction or function with name '$name' was found in state '$sName' of contract '$cName'"
     }
 }
 case class StateUndefinedError(cName: String, sName: String) extends Error {
-    val msg: String = s"No state with name $sName was found in contract $cName"
+    val msg: String = s"No state with name '$sName' was found in contract '$cName'"
 }
 case class ContractUndefinedError(cName: String) extends Error {
-    val msg: String = s"No contract with name $cName is defined"
+    val msg: String = s"No contract with name '$cName' is defined"
 }
 case class NonInvokeableError(t: Type) extends Error {
-    val msg: String = s"Cannot invoke functions or transactions on type $t"
+    val msg: String = s"Cannot invoke functions or transactions on type '$t'"
 }
 case class WrongArityError(expected: Int, have: Int, methName: String) extends Error {
     val msg: String =
         if (expected > have) {
-            s"Too few arguments supplied to $methName: expected $expected, but found $have"
+            s"Too few arguments supplied to '$methName': expected '$expected', but found '$have'"
         } else {
-            s"Too many arguments supplied to $methName: expected $expected, but found $have"
+            s"Too many arguments supplied to '$methName': expected '$expected', but found '$have'"
         }
 }
 case class MergeIncompatibleError(name: String, t1: Type, t2: Type) extends Error {
-    val msg: String = s"Variable $name is incompatibly typed as both $t1 and $t2 after branch"
+    val msg: String = s"Variable '$name' is incompatibly typed as both '$t1' and '$t2' after branch"
 }
 case class MustReturnError(methName: String) extends Error {
-    val msg: String = s"$methName specifies a return type, but no return value is given"
+    val msg: String = s"'$methName' specifies a return type, but no return value is given"
 }
 case class CannotReturnError(methName: String) extends Error {
-    val msg: String = s"$methName does not return anything, but a return value was given"
+    val msg: String = s"'$methName' does not return anything, but a return value was given"
 }
 case class NotAValueError(methName: String) extends Error {
-    val msg: String = s"$methName does not return anything, but is used here as a value"
+    val msg: String = s"'$methName' does not return anything, but is used here as a value"
 }
 case class TransitionError() extends Error {
     val msg: String = s"'this' must be typed to a particular state in order to transition"
 }
 case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
-    val msg: String = s"Must specify the following fields in the update clause: $mustSupply"
+    val msg: String = s"Must specify the following fields in the update clause: '$mustSupply'"
 }
 case class AssignmentError() extends Error {
     val msg: String = s"Assignment target must be a variable or a field"
 }
 case class AlreadyKnowStateError(e: Expression, sName: String) extends Error {
-    val msg: String = s"$e is already known to be in state $sName: a dynamic check is not needed"
+    val msg: String = s"'$e' is already known to be in state '$sName': a dynamic check is not needed"
 }
 case class LeakReturnValueError(methName: String) extends Error {
-    val msg: String = s"Invocation of $methName leaks ownership of return value"
+    val msg: String = s"Invocation of '$methName' leaks ownership of return value"
 }
 case class NoEffectsError(s: Statement) extends Error {
-    val msg: String = s"Statement $s has no side-effects"
+    val msg: String = s"Statement '$s' has no side-effects"
 }
 case class StateSpecificSharedError() extends Error {
     val msg: String = s"State-specific types are not safe for 'shared' references"
@@ -210,14 +247,14 @@ case class StateSpecificReadOnlyError() extends Error {
     val msg: String = s"State-specific types are not safe for 'readonly' references"
 }
 case class UnusedOwnershipError(name: String) extends Error {
-    val msg: String = s"Variable $name holds ownership, but is unused at the end of its scope"
+    val msg: String = s"Variable '$name' holds ownership, but is unused at the end of its scope"
 }
 case class ConstructorNameError(contractName: String) extends Error {
-    val msg: String = s"Invalid constructor name for contract $contractName"
+    val msg: String = s"Invalid constructor name for contract '$contractName'"
 }
 case class CannotConvertPathError(badPart: String, expr: Expression, typ: RawType) extends Error {
-    val msg: String = s"Cannot convert path in type $typ: $badPart is equivalent to" +
-        s"a non-variable expression $expr"
+    val msg: String = s"Cannot convert path in type '$typ': '$badPart' is equivalent to" +
+        s"a non-variable expression '$expr'"
 }
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
@@ -245,11 +282,10 @@ case class Context(underlying: Map[String, Type], isThrown: Boolean)  {
     }
 }
 
+class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
-class Checker(globalTable: SymbolTable) {
-
-    /* only stores [RawType]s and [PrimitiveType]s; it thus does not require
-     * types in the context to be checked */
+    /* only stores [UncheckedType]s; all types in the context can thus be
+     * translated purely syntactically */
     type UncheckedContext = Map[String, UncheckedType]
 
     val errors = new collection.mutable.ArrayStack[Error]()
@@ -258,8 +294,23 @@ class Checker(globalTable: SymbolTable) {
     private def logError(where: AST, err: Error): Unit = {
         err.loc = where.loc
         errors.push(err)
+
+        /* this is helpful for debugging (to find out what function generated an error */
+        if (verbose) {
+            println("Logging Error:")
+            val (msg, loc) = (err.msg, where.loc)
+            println(s"$msg at Location $loc")
+            println()
+            for (ste: StackTraceElement <- Thread.currentThread.getStackTrace) {
+                println(ste)
+            }
+            println("\n\n\n")
+        }
     }
 
+    /* the permission system doesn't allow arbitrary aliasing of a reference
+     * typed as [t]: aliasing forces one of the resulting types to be
+     * [residualType(t)] instead */
     private def residualType(t: Type): Type = {
         t match {
             case ReadOnlyRef(table, tr) => t
@@ -535,9 +586,45 @@ class Checker(globalTable: SymbolTable) {
         translateUncheckedTypeHelper(convertPath, t)
     }
 
-    private def tableOfThis(context: Context): DeclarationTable = {
-        context("this").asInstanceOf[NonPrimitiveType].table
+    /* fully translates a type by translating with [translateUncheckedType] and then
+     * traversing the type to "check" it */
+
+    private def translateType(insideOf: DeclarationTable, t: AstType): Type = {
+        val tr = translateUncheckedType(insideOf, t) match {
+            case prim: PrimitiveType => return prim
+            case rawType: RawType => rawType
+        }
+
+        val table = traverseRawType(insideOf, tr) match {
+            case Left(err) =>
+                logError(t, err)
+                return BottomType()
+            case Right(tab) => tab
+        }
+
+        addModifier(tr, table, t)
     }
+
+    private def translateType(context: Context, t: AstType): Type = {
+        val tr = translateUncheckedType(context, t) match {
+            case prim: PrimitiveType => return prim
+            case rawType: RawType => rawType
+        }
+
+        val table = traverseRawType(context.uncheckedContext, tableOfThis(context), tr) match {
+            case Left(err) =>
+                logError(t, err)
+                return BottomType()
+            case Right(tab) => tab
+        }
+
+        addModifier(tr, table, t)
+    }
+
+    //-------------------------------------------------------------------------
+    /* [traverse] functions try to resolve a type by looking it up.
+     * Either an error is returned, or the symbol table that was found to be
+     * associated with the type */
 
     private def traverseState(
             contractTable: ContractTable,
@@ -581,6 +668,7 @@ class Checker(globalTable: SymbolTable) {
         }
     }
 
+    // For places where no context exists: e.g. in fields
     private def traverseRawType(
             insideOf: DeclarationTable,
             tr: RawType): Either[Error, DeclarationTable] = {
@@ -594,6 +682,7 @@ class Checker(globalTable: SymbolTable) {
         traverseRawType(uncheckedContext, insideOf, new HashSet[String](), tr)
     }
 
+    // we keep track of which fields we've visited to avoid endless recursion
     private def traverseRawType(
             insideOf: DeclarationTable,
             visitedFields: Set[(DeclarationTable, String)],
@@ -648,28 +737,29 @@ class Checker(globalTable: SymbolTable) {
         }
     }
 
+    // we keep track of which local variables we've visited to avoid endless recursion
     private def traverseRawType(
-            uncheckedContext: UncheckedContext,
+            context: UncheckedContext,
             insideOf: DeclarationTable,
             visitedLocalVars: Set[String],
             tr: RawType): Either[Error, DeclarationTable] = {
         tr match {
             case NoPathType(ts) =>
                 traverseSimpleType(insideOf, ts)
-            case PathType(x::rest, ts) if uncheckedContext contains x =>
+            case PathType(x::rest, ts) if context contains x =>
 
                 if (visitedLocalVars contains x) {
                     Left(RecursiveVariableTypeError(x))
                 }
                 val newVisited = visitedLocalVars + x
 
-                val pathHeadType = uncheckedContext(x) match {
+                val pathHeadType = context(x) match {
                     case prim: PrimitiveType => return Left(DereferenceError(prim))
                     case trNext: RawType => trNext
                 }
 
                 val newInsideOf =
-                    traverseRawType(uncheckedContext, insideOf, newVisited, pathHeadType) match {
+                    traverseRawType(context, insideOf, newVisited, pathHeadType) match {
                         case l@Left(_) => return l
                         case Right(table) => table
                 }
@@ -681,13 +771,46 @@ class Checker(globalTable: SymbolTable) {
                 traverseRawType(newInsideOf, HashSet[(DeclarationTable, String)](), trNew)
 
 
-            case PathType(x::_, _) => Left(VariableUndefinedError(x))
+            case PathType(f::rest, ts) =>
+                // see if the head of the path is actually a field
+                val fieldLookup = insideOf.field(f)
+
+                if (fieldLookup.isEmpty) {
+                    return Left(VariableUndefinedError(f))
+                }
+
+                val field = fieldLookup.get
+
+                val unchecked = translateUncheckedType(insideOf, field.typ)
+
+                val visitedFields =
+                    HashSet[(DeclarationTable, String)]().+((insideOf, f))
+
+                val traverseField = unchecked match {
+                    case prim: PrimitiveType =>
+                        return Left(DereferenceError(prim))
+                    case trField: RawType =>
+                        traverseRawType(insideOf, visitedFields, trField)
+                }
+
+                val newInsideOf = traverseField match {
+                    case Left(err) => return Left(err)
+                    case Right(table) => table
+                }
+
+                val trNew =
+                    if (rest.isEmpty) NoPathType(ts)
+                    else PathType(rest, ts)
+
+                traverseRawType(newInsideOf, visitedFields, trNew)
 
             // shouldn't happen
             case PathType(Nil, _) => throw new RuntimeException("shouldn't happen")
         }
     }
 
+    /* adds the modifier from [t] to [tr], assuming that [table] is the
+     * symbol table of the type [tr] */
     private def addModifier(tr: RawType, table: DeclarationTable, t: AstType): Type = {
         val defaultMod = table.contract.ast.mod match {
                 case Some(m) => m
@@ -714,38 +837,6 @@ class Checker(globalTable: SymbolTable) {
         }
     }
 
-    private def translateType(insideOf: DeclarationTable, t: AstType): Type = {
-        val tr = translateUncheckedType(insideOf, t) match {
-            case prim: PrimitiveType => return prim
-            case rawType: RawType => rawType
-        }
-
-        val table = traverseRawType(insideOf, tr) match {
-            case Left(err) =>
-                logError(t, err)
-                return BottomType()
-            case Right(tab) => tab
-        }
-
-        addModifier(tr, table, t)
-    }
-
-    private def translateType(context: Context, t: AstType): Type = {
-        val tr = translateUncheckedType(context, t) match {
-            case prim: PrimitiveType => return prim
-            case rawType: RawType => rawType
-        }
-
-        val table = traverseRawType(context.uncheckedContext, tableOfThis(context), tr) match {
-            case Left(err) =>
-                logError(t, err)
-                return BottomType()
-            case Right(tab) => tab
-        }
-
-        addModifier(tr, table, t)
-    }
-
     private def checkType(
             context: UncheckedContext,
             insideOf: DeclarationTable,
@@ -753,7 +844,7 @@ class Checker(globalTable: SymbolTable) {
             tUnchecked: UncheckedType): Type = {
         tUnchecked match {
             case tr: RawType =>
-                traverseRawType (context, insideOf, tr) match {
+                traverseRawType(context, insideOf, tr) match {
                     case Left (err) =>
                         logError (tAst, err)
                         BottomType ()
@@ -767,6 +858,11 @@ class Checker(globalTable: SymbolTable) {
     private def checkType(context: Context, tAst: AstType, tUnchecked: UncheckedType): Type = {
         checkType(context.uncheckedContext, tableOfThis(context), tAst, tUnchecked)
     }
+
+    private def tableOfThis(context: Context): DeclarationTable = {
+        context("this").asInstanceOf[NonPrimitiveType].table
+    }
+
 
     //-------------------------------------------------------------------------
     // Checking definitions for language constructs begins here
@@ -798,6 +894,7 @@ class Checker(globalTable: SymbolTable) {
                 context: Context,
                 table: DeclarationTable,
                 name: String,
+                recip: Expression,
                 args: Seq[Expression]): (Type, Context) = {
             // Lookup the invocation
             val txLookup = table.transaction(name)
@@ -817,7 +914,7 @@ class Checker(globalTable: SymbolTable) {
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
-                assertArgsCorrect(e, name, specList, argTypes) match {
+                assertArgsCorrect(e, name, specList, recip, argTypes) match {
                     case None => return (BottomType(), contextPrime)
                     case Some(x) => x
                 }
@@ -927,7 +1024,7 @@ class Checker(globalTable: SymbolTable) {
 
              case LocalInvocation(name, args: Seq[Expression]) =>
                  val thisTable = tableOfThis(context)
-                 handleInvocation(context, thisTable, name, args)
+                 handleInvocation(context, thisTable, name, This(), args)
 
              case Invocation(recipient: Expression, name, args: Seq[Expression]) =>
                  val (recipType, contextPrime) = checkExpr(decl, context, recipient)
@@ -941,7 +1038,7 @@ class Checker(globalTable: SymbolTable) {
                      case _ => recipType.tableOpt.get
                  }
 
-                 handleInvocation(contextPrime, recipTable, name, args)
+                 handleInvocation(contextPrime, recipTable, name, recipient, args)
 
              case Construction(name, args: Seq[Expression]) =>
                  val tableLookup = tableOfThis(context).contract(name)
@@ -961,8 +1058,9 @@ class Checker(globalTable: SymbolTable) {
                                     .constructors
                                     .map(constr => (constr.args, constr))
 
+                 // todo : should this have a recipient
                  val result =
-                     assertArgsCorrect(e, s"constructor of $name", constrSpecs, argTypes)
+                     assertArgsCorrect(e, s"constructor of $name", constrSpecs, This(), argTypes)
 
                  val simpleType = result match {
                      // Even if the args didn't check, we can still output a type
@@ -1071,6 +1169,8 @@ class Checker(globalTable: SymbolTable) {
             case (_, Some(PathType(p, ts))) =>
                 val first = p.head
 
+                println(mapping)
+
                 val matchesFirst = mapping.filter((entry: (String, Expression)) => {
                     entry._2 match {
                         case Variable(x) => first == x
@@ -1120,6 +1220,7 @@ class Checker(globalTable: SymbolTable) {
             ast: AST,
             methName: String,
             spec: Seq[VariableDecl],
+            recip: Expression,
             args: Seq[(Type, Expression)]): Either[Seq[(AST, Error)], Map[String, Expression]] = {
 
         val (specL, argsL) = (spec.length, args.length)
@@ -1133,6 +1234,7 @@ class Checker(globalTable: SymbolTable) {
             for (i <- args.indices) {
                 calleeToCaller = calleeToCaller.updated(spec(i).varName, args(i)._2)
             }
+            calleeToCaller = calleeToCaller.updated("this", recip)
 
             val argsCalleePoV = args.map(te => {
                 (toInvocationPoV(calleeToCaller, te._1), te._2)
@@ -1145,6 +1247,10 @@ class Checker(globalTable: SymbolTable) {
                 val (typeCallerPoV, _) = args(i)
 
                 val expectedType = translateUncheckedType(spec, specIter.next().typ)
+                println(args(i)._1)
+                println(argsCalleePoV(i)._2)
+                println(s"Expected type: $expectedType")
+                println(s"Possible types: $possibleTypesCalleePoV")
                 val matches = possibleTypesCalleePoV.exists(uncheckedSubTypeOf(_, expectedType))
                 if (!matches) {
                     /* We use the type from the caller's point of view because
@@ -1172,11 +1278,12 @@ class Checker(globalTable: SymbolTable) {
             ast: AST,
             methName: String,
             specs: Seq[(Seq[VariableDecl], U)],
+            recip: Expression,
             args: Seq[(Type, Expression)]): Option[(U, Map[String, Expression])] = {
 
         var errs: List[(AST, Error)] = Nil
         for ((spec, extraData) <- specs) {
-            checkArgs(ast, methName, spec, args) match {
+            checkArgs(ast, methName, spec, recip, args) match {
                 case Right(calleeToCaller) =>
                     return Some((extraData, calleeToCaller))
                 case Left(newErrs) =>
@@ -1196,6 +1303,7 @@ class Checker(globalTable: SymbolTable) {
                 context: Context,
                 table: DeclarationTable,
                 name: String,
+                recip: Expression,
                 args: Seq[Expression]): Context = {
             // Lookup the invocation
             val txLookup = table.transaction(name)
@@ -1215,7 +1323,7 @@ class Checker(globalTable: SymbolTable) {
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
-                assertArgsCorrect(s, name, specList, argTypes) match {
+                assertArgsCorrect(s, name, specList, recip, argTypes) match {
                     case None => return contextPrime
                     case Some(x) => x
                 }
@@ -1476,7 +1584,7 @@ class Checker(globalTable: SymbolTable) {
 
             case LocalInvocation(name, args: Seq[Expression]) =>
                 val thisTable = tableOfThis(context)
-                handleInvocation(context, thisTable, name, args)
+                handleInvocation(context, thisTable, name, This(), args)
 
             case Invocation(recipient: Expression, name, args: Seq[Expression]) =>
                 val (recipType, contextPrime) = checkExpr(decl, context, recipient)
@@ -1489,7 +1597,7 @@ class Checker(globalTable: SymbolTable) {
                     case _ => recipType.tableOpt.get
                 }
 
-                handleInvocation(contextPrime, recipTable, name, args)
+                handleInvocation(contextPrime, recipTable, name, recipient, args)
 
             // TODO maybe allow constructors as statements later, but it's not very important
             /* expressions are statements, but we prune out expressions with no side effects */
@@ -1529,7 +1637,11 @@ class Checker(globalTable: SymbolTable) {
             uncheckedContext = uncheckedContext.updated(arg.varName, typ)
         }
 
-        val thisType = OwnedRef(insideOf, NoPathType(insideOf.simpleTypeOf))
+        val thisRawType = NoPathType(insideOf.simpleTypeOf)
+
+        uncheckedContext = uncheckedContext.updated("this", thisRawType)
+
+        val thisType = OwnedRef(insideOf, thisRawType)
         val cName = insideOf.contract.name
 
         // Construct the context that the body should start with
