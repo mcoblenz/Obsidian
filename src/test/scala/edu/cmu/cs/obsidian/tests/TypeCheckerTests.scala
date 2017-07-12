@@ -135,8 +135,8 @@ class TypeCheckerTests extends JUnitSuite {
             (SubTypingError(BoolType(), IntType()), 17)
               ::
               (SubTypingError(
-                  OwnedRef(NoPathType(JustContractType("C_Unique"))),
-                  SharedRef(NoPathType(JustContractType("C_Shared")))),
+                  OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
+                  SharedRef(null, NoPathType(JustContractType("C_Shared")))),
                 19)
               ::
               (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 21)
@@ -144,8 +144,8 @@ class TypeCheckerTests extends JUnitSuite {
               (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 22)
               ::
               (SubTypingError(
-                  SharedRef(NoPathType(JustContractType("C_Shared"))),
-                  SharedRef(NoPathType(StateType("C_Shared", "S")))),
+                  SharedRef(null, NoPathType(JustContractType("C_Shared"))),
+                  SharedRef(null, NoPathType(StateType("C_Shared", "S")))),
                 23)
               ::
               (VariableUndefinedError("j"), 27)
@@ -163,14 +163,14 @@ class TypeCheckerTests extends JUnitSuite {
               (MustReturnError("t_has_ret"), 13)
               ::
               (SubTypingError(
-                  OwnedRef(NoPathType(JustContractType("C_Unique"))),
-                  OwnedRef(NoPathType(StateType("C_Unique", "S")))),
+                  OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
+                  OwnedRef(null, NoPathType(StateType("C_Unique", "S")))),
                 18)
               ::
               (MustReturnError("t_ret_nonprimitive"), 19)
               ::
               (SubTypingError(IntType(),
-                  OwnedRef(NoPathType(JustContractType("C_Unique")))), 20)
+                  OwnedRef(null, NoPathType(JustContractType("C_Unique")))), 20)
               ::
               Nil
         )
@@ -275,16 +275,16 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             (MergeIncompatibleError("o1",
-                OwnedRef(NoPathType(JustContractType("Ow"))),
-                ReadOnlyRef(NoPathType(JustContractType("Ow")))), 12)
+                OwnedRef(null, NoPathType(JustContractType("Ow"))),
+                ReadOnlyRef(null, NoPathType(JustContractType("Ow")))), 12)
               ::
               (UnusedOwnershipError("o2"), 12)
               ::
               (UnusedOwnershipError("o2"), 22)
               ::
               (MergeIncompatibleError("o1",
-                OwnedRef(NoPathType(JustContractType("Ow"))),
-                ReadOnlyRef(NoPathType(JustContractType("Ow")))), 31)
+                OwnedRef(null, NoPathType(JustContractType("Ow"))),
+                ReadOnlyRef(null, NoPathType(JustContractType("Ow")))), 31)
               ::
               (UnusedOwnershipError("o2"), 31)
               ::
