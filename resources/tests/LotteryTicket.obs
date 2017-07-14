@@ -1,0 +1,59 @@
+// typechecking fails because LotteryTicket is an inner contract of Lottery
+contract Lottery {
+//doesn't currently use money
+    int winningNum;
+    int prizeMoneyAmount;
+
+    contract LotteryTicket {
+        int ticketNum;
+
+        // LotteryTicket constructor
+        LotteryTicket(int num) {
+            ticketNum = num;
+        }
+
+        transaction getTicketNum() returns int {
+            return this.ticketNum;
+        }
+    }
+
+    // Lottery constructor
+    Lottery(int num, int amount) {
+        winningNum = num;
+        prizeMoneyAmount = amount;
+    }
+
+    transaction buyTicket(int num) returns LotteryTicket {
+        LotteryTicket ticket = new LotteryTicket(num);
+        return ticket;
+    }
+
+    transaction checkIfWinningTicket(LotteryTicket ticket) returns bool {
+        if (ticket.getTicketNum() == this.winningNum) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    transaction redeemTicket(LotteryTicket ticket) returns int {
+       if (checkIfWinningTicket(ticket)) {
+           int prizeMoney = this.prizeMoneyAmount;
+           this.prizeMoneyAmount = 0;
+           return prizeMoney;
+       } else {
+           throw;
+       }
+    }
+}
+
+main contract C {
+    transaction a() {
+        Lottery l1 = new Lottery(27, 100);
+        Lottery l2 = new Lottery(9, 200);
+
+        LotteryTicket ticket1 = l1.buyTicket(8);
+        //this should be a type-checking error
+        bool didItWin = l2.checkIfWinningTicket(ticket1);
+    }
+}
