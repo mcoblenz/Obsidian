@@ -7,7 +7,6 @@ import edu.cmu.cs.obsidian.typecheck._
 
 sealed trait DeclarationTable {
     def name: String
-    def ast: AST
     /* id if this is a [ContractTable] already, or gets the [ContractTable] of a [StateTable] */
     def contract: ContractTable
     /* looks for a contract called [name] that's in scope
@@ -49,6 +48,7 @@ class StateTable(astNode: State, insideOf: ContractTable) extends DeclarationTab
     }
 
     def name: String = astNode.name
+
     def ast: State = astNode
     def contract: ContractTable = insideOf
     def contract(name: String): Option[ContractTable] = contract.contract(name)

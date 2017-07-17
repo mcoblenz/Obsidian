@@ -284,7 +284,9 @@ case class Context(underlying: Map[String, Type], isThrown: Boolean)  {
     }
 }
 
-class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
+class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
+
+    val globalTable = AstTransformer.disambiguateProgram(unmodifiedTable)
 
     /* only stores [UncheckedType]s; all types in the context can thus be
      * translated purely syntactically */

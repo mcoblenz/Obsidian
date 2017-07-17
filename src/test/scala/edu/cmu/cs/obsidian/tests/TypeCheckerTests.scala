@@ -343,5 +343,15 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
 
+    @Test def simplePathDependentTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/SimplePDT.obs",
+                (UnusedOwnershipError("b"), 7)::Nil)
+    }
+
+    @Test def implicitPathDependentTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/ImplicitPDT.obs",
+            (UnusedOwnershipError("b"), 7)::Nil)
+    }
+
 }
 
