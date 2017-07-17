@@ -36,6 +36,7 @@ case class NoPathType(base: SimpleType) extends RawType {
     override def toString: String = base.toString
 }
 
+/* a path starts with either a local variable or "this", but "this" can sometimes be omitted */
 case class PathType(path: Seq[String], base: SimpleType) extends RawType {
     private def pathAsString = path.foldLeft("")(
         (prev: String, pathNode: String) => prev + pathNode + "."
@@ -44,7 +45,8 @@ case class PathType(path: Seq[String], base: SimpleType) extends RawType {
 }
 
 /* This is different from the representation of types in the AST in that the permission
- * associated with the reference is always explicit */
+ * associated with the reference is always explicit.
+ * Invariant: any path that occurs in the type makes "this" explicit */
 sealed trait Type {
     // for tests
     val isBottom: Boolean
@@ -313,8 +315,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
      * [residualType(t)] instead */
     private def residualType(t: Type): Type = {
         t match {
-            case ReadOnlyRef(table, tr) => t
-            case SharedRef(table, tr) => t
+            case _: ReadOnlyRef => t
+            case _: SharedRef => t
             case OwnedRef(table, tr) => ReadOnlyRef(table, tr)
             case tOther => tOther
         }
@@ -595,14 +597,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case rawType: RawType => rawType
         }
 
-        val table = traverseRawType(insideOf, tr) match {
+        val (trNew, table) = traverseRawType(insideOf, tr) match {
             case Left(err) =>
                 logError(t, err)
                 return BottomType()
-            case Right(tab) => tab
+            case Right(travData) => travData
         }
 
-        addModifier(tr, table, t)
+        addModifier(trNew, table, t)
     }
 
     private def translateType(context: Context, t: AstType): Type = {
@@ -611,14 +613,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case rawType: RawType => rawType
         }
 
-        val table = traverseRawType(context.uncheckedContext, tableOfThis(context), tr) match {
+        val unchecked = context.uncheckedContext
+        val insideOf = tableOfThis(context)
+        val (trNew, table) = traverseRawType(unchecked, insideOf, tr) match {
             case Left(err) =>
                 logError(t, err)
                 return BottomType()
-            case Right(tab) => tab
+            case Right(travData) => travData
         }
 
-        addModifier(tr, table, t)
+        addModifier(trNew, table, t)
     }
 
     //-------------------------------------------------------------------------
@@ -642,7 +646,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     private def traverseSimpleType(
             insideOf: DeclarationTable,
-            ts: SimpleType): Either[Error, DeclarationTable] = {
+            ts: SimpleType): Either[Error, TraverseData] = {
 
         val cName = ts.contractName
         val ctLookup = insideOf.contract(cName)
@@ -653,32 +657,45 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         val contractTable = ctLookup.get
 
-        ts match {
-            case StateType(_, sName) => traverseState(contractTable, sName)
+        val table = ts match {
+            case StateType(_, sName) =>
+                traverseState(contractTable, sName) match {
+                    case Left(err) => return Left(err)
+                    case Right(stateTable) => stateTable
+                }
             case StateUnionType(_, sNames) =>
-                sNames.foldRight(
-                    Right(contractTable): Either[Error, DeclarationTable]
-                )((sName: String, prev: Either[Error, DeclarationTable]) => {
-                        traverseState(contractTable, sName) match {
-                            case err@Left(_) => err
-                            case Right(_) => prev
-                        }
-                    })
-            case _ => Right(contractTable)
+                for (sName <- sNames) {
+                    traverseState(contractTable, sName) match {
+                        case Left(err) => return Left(err)
+                        case Right(_) => ()
+                    }
+                }
+                contractTable
+            case _ => contractTable
         }
+
+        if (contractTable.hasParent) Right((PathType("this"::Nil, ts), table))
+        else Right((NoPathType(ts), table))
     }
+
+    type TraverseData = (RawType, DeclarationTable)
+
+    /* [traverseRawType] returns either an error that was reached while checking
+     * (if [tr] could not be traversed), or the declaration table of the type,
+     * as well as new raw type: this return value is only different from [tr]
+     * if [tr] starts with an implicit "this" (in this case, "this" is added) */
 
     // For places where no context exists: e.g. in fields
     private def traverseRawType(
             insideOf: DeclarationTable,
-            tr: RawType): Either[Error, DeclarationTable] = {
+            tr: RawType): Either[Error, TraverseData] = {
         traverseRawType(insideOf, new HashSet[(DeclarationTable, String)](), tr)
     }
 
     private def traverseRawType(
            uncheckedContext: UncheckedContext,
            insideOf: DeclarationTable,
-           tr: RawType): Either[Error, DeclarationTable] = {
+           tr: RawType): Either[Error, TraverseData] = {
         traverseRawType(uncheckedContext, insideOf, new HashSet[String](), tr)
     }
 
@@ -686,15 +703,17 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def traverseRawType(
             insideOf: DeclarationTable,
             visitedFields: Set[(DeclarationTable, String)],
-            tr: RawType): Either[Error, DeclarationTable] = {
+            tr: RawType): Either[Error, TraverseData] = {
         tr match {
-            case NoPathType(ts) => traverseSimpleType(insideOf, ts)
+            case NoPathType(ts) =>
+                traverseSimpleType(insideOf, ts)
+
             case PathType(first::restBeforePrune, ts) =>
 
                 // prune off "this" from the head
                 val p = if (first == "this") restBeforePrune else first::restBeforePrune
                 if (p.isEmpty) {
-                    return traverseSimpleType(insideOf, ts)
+                    return traverseRawType(insideOf, visitedFields, NoPathType(ts))
                 }
 
                 val f = p.head
@@ -725,7 +744,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val newInsideOf = traverseRawType(insideOf, newVisited, fieldRawType) match {
                     case l@Left(_) => return l
-                    case Right(table) => table
+                    case Right(travData) => travData._2
                 }
 
                 val trNew =
@@ -742,10 +761,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             context: UncheckedContext,
             insideOf: DeclarationTable,
             visitedLocalVars: Set[String],
-            tr: RawType): Either[Error, DeclarationTable] = {
+            tr: RawType): Either[Error, TraverseData] = {
         tr match {
             case NoPathType(ts) =>
                 traverseSimpleType(insideOf, ts)
+
             case PathType(x::rest, ts) if context contains x =>
 
                 if (visitedLocalVars contains x) {
@@ -761,7 +781,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val newInsideOf =
                     traverseRawType(context, insideOf, newVisited, pathHeadType) match {
                         case l@Left(_) => return l
-                        case Right(table) => table
+                        case Right(travData) => travData._2
                 }
 
                 val trNew =
@@ -795,7 +815,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val newInsideOf = traverseField match {
                     case Left(err) => return Left(err)
-                    case Right(table) => table
+                    case Right(travData) => travData._2
                 }
 
                 val trNew =
@@ -842,17 +862,36 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             insideOf: DeclarationTable,
             tAst: AstType,
             tUnchecked: UncheckedType): Type = {
+        checkTypeReturnError(context, insideOf, tAst, tUnchecked) match {
+            case Left((ast, err)) =>
+                logError(ast, err)
+                BottomType()
+            case Right(typ) => typ
+        }
+    }
+
+    private def checkTypeReturnError(
+            context: UncheckedContext,
+            insideOf: DeclarationTable,
+            tAst: AstType,
+            tUnchecked: UncheckedType): Either[(AST, Error), Type] = {
         tUnchecked match {
             case tr: RawType =>
                 traverseRawType(context, insideOf, tr) match {
-                    case Left (err) =>
-                        logError (tAst, err)
-                        BottomType ()
-                    case Right (table) =>
-                        addModifier (tr, table, tAst)
+                    case Left(err) =>
+                        Left((tAst, err))
+                    case Right(travData) =>
+                        Right(addModifier(travData._1, travData._2, tAst))
                 }
-            case prim: PrimitiveType => prim
+            case prim: PrimitiveType => Right(prim)
         }
+    }
+
+    private def checkTypeReturnError(
+            context: Context,
+            tAst: AstType,
+            tUnchecked: UncheckedType): Either[(AST, Error), Type] = {
+        checkTypeReturnError(context.uncheckedContext, tableOfThis(context), tAst, tUnchecked)
     }
 
     private def checkType(context: Context, tAst: AstType, tUnchecked: UncheckedType): Type = {
@@ -914,7 +953,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
-                assertArgsCorrect(e, name, specList, recip, argTypes) match {
+                assertArgsCorrect(e, name, context, specList, recip, argTypes) match {
                     case None => return (BottomType(), contextPrime)
                     case Some(x) => x
                 }
@@ -933,11 +972,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case tr: RawType => tr
             }
 
-            fromInvocationPoV(calleeToCaller, retTypeCalleePoV) match {
+            toCallerPoV(calleeToCaller, retTypeCalleePoV) match {
                 case Right(retTypeCallerPoV) =>
                     (checkType(contextPrime, astType, retTypeCallerPoV), contextPrime)
-                case Left(first) =>
-                    val badExpr = calleeToCaller(first)
+                case Left((first, badExpr)) =>
                     val err = CannotConvertPathError(first, badExpr, retTypeCalleePoV)
                     logError(e, err)
                     (BottomType(), contextPrime)
@@ -1026,8 +1064,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val thisTable = tableOfThis(context)
                  handleInvocation(context, thisTable, name, This(), args)
 
-             case Invocation(recipient: Expression, name, args: Seq[Expression]) =>
-                 val (recipType, contextPrime) = checkExpr(decl, context, recipient)
+             case Invocation(recip: Expression, name, args: Seq[Expression]) =>
+                 val (recipType, contextPrime) = checkExpr(decl, context, recip)
 
                  val recipTable = recipType match {
                      case BottomType() => return (BottomType(), contextPrime)
@@ -1038,7 +1076,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case _ => recipType.tableOpt.get
                  }
 
-                 handleInvocation(contextPrime, recipTable, name, recipient, args)
+                 handleInvocation(contextPrime, recipTable, name, recip, args)
 
              case Construction(name, args: Seq[Expression]) =>
                  val tableLookup = tableOfThis(context).contract(name)
@@ -1060,7 +1098,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  // todo : should this have a recipient
                  val result =
-                     assertArgsCorrect(e, s"constructor of $name", constrSpecs, This(), argTypes)
+                     assertArgsCorrect(e, s"constructor of $name", context, constrSpecs, This(), argTypes)
 
                  val simpleType = result match {
                      // Even if the args didn't check, we can still output a type
@@ -1153,59 +1191,29 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         Context(mergedMap, context1.isThrown && context2.isThrown)
     }
 
-    /* this returns a _set_ of types because there's not a single unique type in general.
-     * Example:
-     *
-     * transaction t(C a, C b, a.T p, b.T q)
-     * t(x, x, y, y)
-     *
-     * In this above example, [y] could have type [a.T] and [b.T] when translated
-     * to the method declaration's point of view.
-     */
-    private def toInvocationPoV(
-            mapping: Map[String, Expression],
-            t: Type): Set[UncheckedType] = {
-        (t, extractRawType(t)) match {
-            case (_, Some(PathType(p, ts))) =>
-                val first = p.head
-
-                println(mapping)
-
-                val matchesFirst = mapping.filter((entry: (String, Expression)) => {
-                    entry._2 match {
-                        case Variable(x) => first == x
-                        case This() => first == "this"
-                        case _ => false
-                    }
-                })
-
-                matchesFirst.toSet.map((entry: (String, Expression)) => {
-                    val newPath = entry._1 +: p.tail
-                    PathType(newPath, ts)
-                })
-
-            case (_, Some(tr: NoPathType)) => HashSet[UncheckedType]() + tr
-
-            case (prim@IntType(), _) => HashSet[UncheckedType]() + prim
-            case (prim@StringType(), _) => HashSet[UncheckedType]() + prim
-            case (prim@BoolType(), _) => HashSet[UncheckedType]() + prim
-            case _ => HashSet[UncheckedType]()
+    /* if [e] is of the form Variable(x), This(), or if [e] is a sequence of
+     * dereferences on Variable(x) or This(), [extractPath] extracts the list
+     * of identifiers on the path. If [e] isn't this form, returns None */
+    private def extractPath(e: Expression): Option[Seq[String]] = {
+        e match {
+            case Variable(x) => Some(x::Nil)
+            case This() => Some("this"::Nil)
+            case Dereference(ePrime, f) => extractPath(ePrime).map(_ ++ (f::Nil))
+            case _ => None
         }
     }
 
     /* Returns [Left(p.head)] where [p] is the head of the path if failure,
      * otherwise [Right(t)] where [t] is the type from the perspective of the caller */
-    private def fromInvocationPoV(
-            mapping: Map[String, Expression],
-            tr: RawType): Either[String, RawType] = {
+    private def toCallerPoV(
+            calleeToCaller: Map[String, Expression],
+            tr: RawType): Either[(String, Expression), RawType] = {
         tr match {
             case PathType(p, ts) =>
-                val newPathType = mapping(p.head) match {
-                    case Variable(x) => PathType(x +: p.tail, ts)
-                    case This() => PathType("this" +: p.tail, ts)
-                    case _ => return Left(p.head)
+                extractPath(calleeToCaller(p.head)) match {
+                    case Some(newPath) => Right(PathType(newPath ++ p.tail, ts))
+                    case None => Left(p.head, calleeToCaller(p.head))
                 }
-                Right(newPathType)
             case NoPathType(_) => Right(tr)
         }
     }
@@ -1219,6 +1227,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def checkArgs(
             ast: AST,
             methName: String,
+            context: Context,
             spec: Seq[VariableDecl],
             recip: Expression,
             args: Seq[(Type, Expression)]): Either[Seq[(AST, Error)], Map[String, Expression]] = {
@@ -1236,31 +1245,29 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
             calleeToCaller = calleeToCaller.updated("this", recip)
 
-            val argsCalleePoV = args.map(te => {
-                (toInvocationPoV(calleeToCaller, te._1), te._2)
+            val specCallerPoV = spec.map(arg => {
+                translateUncheckedType(spec, arg.typ) match {
+                    case prim: PrimitiveType => prim
+                    case tr: RawType => toCallerPoV(calleeToCaller, tr) match {
+                        case Left((head, e)) =>
+                            return Left((ast, CannotConvertPathError(head, e, tr))::Nil)
+                        case Right(trNew) => trNew
+                    }
+                }
             })
 
-            val specIter = spec.toIterator
             var errList: List[(AST, Error)] = Nil
             for (i <- args.indices) {
-                val (possibleTypesCalleePoV, _) = argsCalleePoV(i)
-                val (typeCallerPoV, _) = args(i)
+                val (argTypeCallerPoV, _) = args(i)
 
-                val expectedType = translateUncheckedType(spec, specIter.next().typ)
-                println(args(i)._1)
-                println(argsCalleePoV(i)._2)
-                println(s"Expected type: $expectedType")
-                println(s"Possible types: $possibleTypesCalleePoV")
-                val matches = possibleTypesCalleePoV.exists(uncheckedSubTypeOf(_, expectedType))
-                if (!matches) {
-                    /* We use the type from the caller's point of view because
-                     * there's a unique caller-PoV type to report */
-                    val dummyType = expectedType match {
-                        case rawExpected: RawType =>
-                            updateRawType(typeCallerPoV, rawExpected)
-                        case prim: PrimitiveType => prim
-                    }
-                    val err = SubTypingError(typeCallerPoV, dummyType)
+                val result = checkTypeReturnError(context, spec(i).typ, specCallerPoV(i))
+                val specTypeCallerPoV = result match {
+                    case Left(err) => return Left(err::Nil)
+                    case Right(typ) => typ
+                }
+
+                if (!subTypeOf(argTypeCallerPoV, specTypeCallerPoV)) {
+                    val err = SubTypingError(argTypeCallerPoV, specTypeCallerPoV)
                     errList = (ast, err)::errList
                 }
             }
@@ -1277,13 +1284,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def assertArgsCorrect[U](
             ast: AST,
             methName: String,
+            context: Context,
             specs: Seq[(Seq[VariableDecl], U)],
             recip: Expression,
             args: Seq[(Type, Expression)]): Option[(U, Map[String, Expression])] = {
 
         var errs: List[(AST, Error)] = Nil
         for ((spec, extraData) <- specs) {
-            checkArgs(ast, methName, spec, recip, args) match {
+            checkArgs(ast, methName, context, spec, recip, args) match {
                 case Right(calleeToCaller) =>
                     return Some((extraData, calleeToCaller))
                 case Left(newErrs) =>
@@ -1323,7 +1331,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
-                assertArgsCorrect(s, name, specList, recip, argTypes) match {
+                assertArgsCorrect(s, name, context, specList, recip, argTypes) match {
                     case None => return contextPrime
                     case Some(x) => x
                 }
@@ -1336,7 +1344,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             if (retOpt.isDefined) {
                 translateUncheckedType(spec, retOpt.get) match {
                     case rawType: RawType =>
-                        val rawTypeOurPoV = fromInvocationPoV(calleeToCaller, rawType)
+                        val rawTypeOurPoV = toCallerPoV(calleeToCaller, rawType)
                         // todo : is the [.get] here okay?
                         val retType = checkType(contextPrime, retOpt.get, rawTypeOurPoV.right.get)
                         if (retType.isInstanceOf[OwnedRef]) {

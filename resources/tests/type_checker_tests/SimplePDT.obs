@@ -1,0 +1,23 @@
+shared contract C {
+    contract T {
+        state S1 {}
+        state S2 {}
+    }
+
+    transaction t1(this.T b) {
+        return;
+    }
+
+    transaction t2() returns this.T {
+        return new T();
+    }
+}
+
+main contract UsesC {
+    const C f;
+
+    transaction t() {
+        this.f.T x = f.t2();
+        f.t1(x);
+    }
+}
