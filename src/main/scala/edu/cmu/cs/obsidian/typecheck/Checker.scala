@@ -258,6 +258,9 @@ case class CannotConvertPathError(badPart: String, expr: Expression, typ: RawTyp
     val msg: String = s"Cannot convert path in type '$typ': '$badPart' is equivalent to" +
         s"a non-variable expression '$expr'"
 }
+case class UnreachableCodeError() extends Error{
+    val msg: String = s"Statement is unreachable"
+}
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
  * In the formalism, we allow throw to result in any type: in the implementation, we don't know
@@ -1134,6 +1137,29 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         (types, contextPrime)
     }
 
+    /* returns true if the sequence of statements includes a return statement, or an if/else statement
+     * where both branches have return statements, and false otherwise
+     */
+    private def checkReturnStatement(tx: Transaction, statements: Seq[Statement]) : Boolean = {
+        var hasRet = false
+
+        for (statement <- statements) {
+            if (hasRet) {
+                logError(statement, UnreachableCodeError())
+                return hasRet
+            }
+
+            statement match {
+                case Return() | ReturnExpr(_) => hasRet = true
+                case IfThenElse(_, s1, s2) =>
+                    hasRet = checkReturnStatement(tx, s1) & checkReturnStatement(tx, s2)
+                case _ => ()
+            }
+        }
+
+        hasRet
+    }
+
     private def checkStatementSequence(
                                           decl: InvokableDeclaration,
                                           context: Context,
@@ -1679,6 +1705,11 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // todo: analyze that there is a return in every branch
+        if (tx.retType.isDefined & !checkReturnStatement(tx, tx.body)) {
+            logError(tx.body.last, MustReturnError(tx.name))
+        }
+
+        // todo: check that every declared variable is initialized before use
     }
 
     private def checkFunc(func: Func, insideOf: Contract): Unit = {

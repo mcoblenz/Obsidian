@@ -9,7 +9,7 @@ contract Lottery {
 
         // LotteryTicket constructor
         LotteryTicket(int num) {
-            ticketNum = num;
+            this.ticketNum = num;
         }
 
         transaction getTicketNum() returns int {
@@ -23,8 +23,8 @@ contract Lottery {
         prizeMoneyAmount = amount;
     }
 
-    transaction buyTicket(int num) returns LotteryTicket {
-        LotteryTicket ticket = new LotteryTicket(num);
+    transaction buyTicket(int num) returns this.LotteryTicket {
+        this.LotteryTicket ticket = new LotteryTicket(num);
         return ticket;
     }
 
@@ -36,7 +36,7 @@ contract Lottery {
         }
     }
 
-    transaction redeemTicket(LotteryTicket ticket) returns int {
+    transaction redeemTicket(this.LotteryTicket ticket) returns int {
        if (checkIfWinningTicket(ticket)) {
            int prizeMoney = this.prizeMoneyAmount;
            this.prizeMoneyAmount = 0;
@@ -48,11 +48,12 @@ contract Lottery {
 }
 
 main contract C {
-    transaction a() {
-        Lottery l1 = new Lottery(27, 100);
-        Lottery l2 = new Lottery(9, 200);
+    const Lottery l1;
+    const Lottery l2;
 
-        LotteryTicket ticket1 = l1.buyTicket(8);
+    transaction a() {
+
+        l1.LotteryTicket ticket1 = l1.buyTicket(8);
         //this should be a type-checking error
         bool didItWin = l2.checkIfWinningTicket(ticket1);
     }

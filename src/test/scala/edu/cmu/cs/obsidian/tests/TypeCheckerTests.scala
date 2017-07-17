@@ -160,17 +160,29 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Return.obs",
             (CannotReturnError("t_no_ret"), 7)
               ::
+              (UnreachableCodeError(), 8)
+              ::
               (MustReturnError("t_has_ret"), 13)
+              ::
+              (UnreachableCodeError(), 13)
               ::
               (SubTypingError(
                   OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
                   OwnedRef(null, NoPathType(StateType("C_Unique", "S")))),
                 18)
               ::
+              (UnreachableCodeError(), 18)
+              ::
               (MustReturnError("t_ret_nonprimitive"), 19)
               ::
               (SubTypingError(IntType(),
                   OwnedRef(null, NoPathType(JustContractType("C_Unique")))), 20)
+              ::
+              (MustReturnError("no_return"), 25)
+              ::
+              (UnreachableCodeError(), 34)
+              ::
+              (MustReturnError("branching_return2"), 43)
               ::
               Nil
         )

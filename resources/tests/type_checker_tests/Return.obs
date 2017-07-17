@@ -9,7 +9,7 @@ contract C {
     }
 
     transaction t_has_ret() returns int {
-        return 2;
+        return 5;
         return;
     }
 
@@ -20,4 +20,27 @@ contract C {
         return 5;
         return cs;
     }
+
+    transaction no_return() returns int {
+        int x = 5;
+    }
+
+    transaction branching_return(bool b) returns int {
+        if (b) {
+            return 2;
+        } else {
+            return 3;
+        }
+        int x = 2;
+    }
+
+    transaction branching_return2(bool b) returns int {
+        if (b) {
+            return 2;
+        } else {
+            int x = 3;
+        }
+        int y = 3;
+    }
+
 }
