@@ -38,5 +38,6 @@
     <orderEntry type="library" scope="TEST" name="SBT: junit:junit:4.12:jar" level="project" />
     <orderEntry type="library" scope="TEST" name="SBT: org.scala-lang:scala-reflect:2.11.9:jar" level="project" />
     <orderEntry type="library" scope="TEST" name="SBT: org.scalactic:scalactic_2.11:3.0.1:jar" level="project" />
+    <orderEntry type="library" name="scala-sdk-2.12.2" level="application" />
   </component>
 </module>

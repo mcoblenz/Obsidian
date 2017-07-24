@@ -1,0 +1,14 @@
+contract A {
+
+    transaction t1() {
+        C c = new C();
+        c.t2(this);
+    }
+}
+
+main contract C {
+
+    transaction t2(A a) {
+        a.t1();
+    }
+}
