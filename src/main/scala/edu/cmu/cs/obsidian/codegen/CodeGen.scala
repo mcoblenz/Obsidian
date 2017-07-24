@@ -356,6 +356,7 @@ class CodeGen (val target: Target) {
         }
 
         val meth = newClass.method(JMod.PUBLIC, retType, txExample.name)
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
 
         /* add the appropriate args to the method and collect them in a list */
         val jArgs = txExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
@@ -676,6 +677,9 @@ class CodeGen (val target: Target) {
         val _ = translateContract(aContract, newClass, newTranslationContext)
     }
 
+    /* this method generates a flag for each transaction of each contract in order to check
+     * whether a reentrant call has been made.
+     */
     private def generateTxFlags(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
         val txNames = translationContext.txLookup.keys
         for (tx <- txNames) {
@@ -1560,8 +1564,11 @@ class CodeGen (val target: Target) {
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, tx.name)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
 
+        /* if the flag has already been set, that means there has been a reentrancy */
         val jIf = meth.body()._if(JExpr.ref(transactionFlagName(tx.name)))
         jIf._then()._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException")))
+
+        /* otherwise, we set the flag to true */
         jIf._else().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(true))
 
         target match {
@@ -1583,6 +1590,7 @@ class CodeGen (val target: Target) {
         /* add body */
         translateBody(jIf._else(), tx.body, translationContext, localContext, tx)
 
+        /* once the whole transaction has been executed, we set the flag back to false */
         if (tx.retType.isEmpty) jIf._else().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(false))
 
         meth
