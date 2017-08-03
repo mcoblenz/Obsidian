@@ -116,7 +116,7 @@
 
 \section{Obsidian Core Calculus Grammar}
 
-The grammar is shown in Figure \ref{fig:obs-gram}. In the grammar, assume $\overline{I}$ means a possibly empty sequence of identifiers $I$; also assume that all items in the sequence are distinct, so that ``$x, y, z$'' is a valid sequence, but ``$x, y, x$'' is not.\\
+The grammar is shown in Figure \ref{fig:obs-gram}. Unless stated otherwise, assume $\overline{I}$ means a possibly empty sequence of identifiers $I$; also assume that all items in the sequence are distinct, so that ``$x, y, z$'' is a valid sequence, but ``$x, y, x$'' is not.\\
 
 \newcommand{\stateS}{\texttt{state}}
 \newcommand{\ownedS}{\texttt{owned}}
@@ -145,56 +145,72 @@ The grammar is shown in Figure \ref{fig:obs-gram}. In the grammar, assume $\over
 \newcommand{\trueS}{\textsf{t}}
 \newcommand{\falseS}{\textsf{f}}
 \newcommand{\constS}{\texttt{const}}
-\newcommand{\assertS}{\texttt{assert}}
-\newcommand{\resS}{\texttt{residual}}
+\newcommand{\ifS}{\texttt{if}}
+\newcommand{\thenS}{\texttt{then}}
+\newcommand{\elseS}{\texttt{else}}
+\newcommand{\resS}{\texttt{res}}
+\newcommand{\transactionLabelS}{\mathit{TL}}
+\newcommand{\methDeclS}{\mathit{MethDecl}}
+\newcommand{\methBodyS}{\mathit{MethBody}}
+
+\newcommand{\resHelp}{\textsf{res}}
+\newcommand{\mergeHelp}{\textsf{merge}}
+\newcommand{\mergeableHelp}{\textsf{mergeable}}
+\newcommand{\transHelp}{\textsf{trans}}
+\newcommand{\rmHelp}{\textsf{rm}}
+\newcommand{\wfHelp}{\textsf{wf}}
+\newcommand{\fieldsHelp}{\textsf{fields}}
+\newcommand{\constFieldsHelp}{\textsf{constFields}}
+\newcommand{\mutableFieldsHelp}{\textsf{mutableFields}}
+\newcommand{\methodsHelp}{\textsf{methods}}
+\newcommand{\parentHelp}{\textsf{parent}}
+\newcommand{\hasParentHelp}{\textsf{hasParent}}
+\newcommand{\contractOfHelp}{\textsf{contractOf}}
+\newcommand{\substHelp}{\textsf{subst}}
 
 \begin{figure}
 \fbox{
 \begin{minipage}{\pagewidth}
-$x, y, z \in \textsc{Variables} 		\hfill 		\ell \in \textsc{IndirectRefs} 	\hfill 		o \in \textsc{ObjectRefs}$		\hfill		$f \in \textsc{FieldNames}$
+$ x, y, z \in \textsc{LocalVariables} \hfill  \thisS \in \textsc{SpecialVariables} \hfill f, g \in \textsc{FieldVariables} $\\
+$ \quad \thisS, a, x, y, z, f, g \in \textsc{Variables} \hfill	 \ell \in \textsc{IndirectRefs} 	\hfill 		o \in \textsc{ObjectRefs} \quad $
 \begin{grammar}
 \renewcommand{\syntleft}{}
 \renewcommand{\syntright}{}
 
 <$Ct$> ::=  $\contractS\ C\ \{\ \overline{Ct}\ \ \overline{St}\ \ \overline{\constS\ \tau\ f}\ \ \overline{\tau\ f}\ \}$
 
-<$St$> ::= $\stateS\ S\ \{\ \overline{\tau\ f} \ \ \overline{MethDecl\ MethBody}\ \}$
+<$St$> ::= $\stateS\ S\ \{\ \overline{\tau\ f} \ \ \overline{\methDeclS\ \methBodyS}\ \}$
 
 <$p$> ::= $\ownedS
 			\ |\ 	\readonlyS
 			\ |\ 	\sharedS$
 			
-<$P$> ::= $x
-			\ |\ 	P.f$
-			
 <$\tau_{s}$> ::= $C
-			\ |\ 	C.S
-			\ |\ 	P.C
-			\ |\ 	P.C.S$
+			\ |\ 	C.S$
+			
+<$\tau_{p}$> ::= $\tau_{s}
+			\ |\ 	a.\tau_{p}$
 
-<$\tau$> ::= $p \permS \tau_{s}
+<$\tau$> ::= $p \permS \tau_{p}
 			\ |\ 	\packS[S,\tau]$
 
 <$TxLabel$> ::= $\functionS
 			\ |\ 	\transactionS$
 
-<$MethDecl$> ::= $TxLabel\ \tau\ m(\overline{\tau\ x}) \hookrightarrow \overline{S}$
+<$\methDeclS$> ::= $\transactionLabelS\ \tau\ m(\overline{\tau\ x}) \hookrightarrow \overline{S}$
 
-<$MethBody$> ::= $\{\ e\ \}$
+<$\methBodyS$> ::= $\{\ e\ \}$
 
-<$e$> ::= $x
+<$e$> ::= $a
 			\ |\ 	\letS\ x = e\ \inS\ e
 			\ |\ 	\newS\ C.S(\overline{x})\ \asS\ p
-			\ |\	x.m(\overline{x})
-			\ |\	f.m(\overline{x})$
+			\ |\	a.m(\overline{x})$
 		\alt $\throwS
 			\ |\ 	\tryS\ \{\ e\ \}\ \catchS\ \{\ e\ \}$
-		\alt $\packS\ S(\overline{x})\ \withS\ x
+		\alt $\packS\ S(\overline{x})\ \withS\ y
 			\ |\ 	\unpackS\ \{\ e\ \}
-			\ |\ 	\assertS\ x : \tau_{s}\ \inS\ e$
-		\alt $\ell
-			\ |\ 	\resS(x)
-			\ |\ 	\resS(f)$
+			\ |\ 	\ifS\ x : \tau_{s}\ \thenS\ e_{1}\ \elseS\ e_{2}$
+		\alt $\ell$
 
 \end{grammar}
 \end{minipage}
@@ -202,6 +218,9 @@ $x, y, z \in \textsc{Variables} 		\hfill 		\ell \in \textsc{IndirectRefs} 	\hfil
 \caption{Grammar}
 \label{fig:obs-gram}
 \end{figure}
+
+There are several categories of variable names in the formalism. \textsc{LocalVariables} (denoted by $x, y, z$) are variables defined in the body of a method by a $\letS$ expression, or by method arguments. \textsc{FieldVariables} (denoted by $f, g$) are variables used for fields, but they can sometimes enter the local context, for example during an unpack block. \textsc{SpecialVariables} includes only the special identifier $\thisS$. \textsc{Variables} (denoted $a, b$) is a catch-all category for all the aforementioned variable types.
+
 
 \iffalse
 
@@ -219,7 +238,8 @@ Simplifications or other notable aspects of the system:
 
 \section{Static Semantics}
 
-\newcommand{\okS}{\textsf{Ok}}
+\newcommand{\okHelp}{\textsf{Ok}}
+\newcommand{\okInHelp}{\textsf{Ok\ in}}
 
 Figure \ref{fig:static-helpers} defines auxiliary relations that are helpful in defining the typing relation; Figure \ref{fig:static-sem} defines the typing relation for expressions; Figure \ref{fig:static-ok} defines extra typing judgments to check fields, methods, and contracts.\\
 
@@ -232,8 +252,8 @@ Types can either be of contract type or of a special \packS{} type. Only the for
 
 \begin{itemize}
 \item \textsc{t-let} - this rule requires the bound variable to be of contract type
-\item the method \okS{} judgment - this determines the initial value of the typing context when typechecking a method body, and prohibits \packS{} types in the initial context
-\item the field \okS{} judgment - this ensures that fields aren't of type \packS{}, and thus \packS{} types cannot appear in the typing context via field unpacking.
+\item the method \okHelp{} judgment - this determines the initial value of the typing context when typechecking a method body, and prohibits \packS{} types in the initial context
+\item the field \okHelp{} judgment - this ensures that fields aren't of type \packS{}, and thus \packS{} types cannot appear in the typing context via field unpacking.
 \end{itemize}
 
 It is assumed that the type rules have access to the helper function $lookup$, $fields$, and $methods$. These helper functions retrieve, respectively, the contract signature, the set of fields, and the set of methods of a contract given the contract's name. If the type specifies a specific typestate, all the methods and fields that are available in that state (including those defined in the contract as a whole) are retrieved. There is also $mutableFields$, which retrieves the subset of $fields$ that are not labeled as \constS{}.\\
@@ -242,7 +262,7 @@ We say that a context $\Delta$ is well-formed if each type in the context is wel
 
 \iffalse
 
-For a field $``\tau\ f"$ to type check, we must have $``(\tau\ f)\ \okS"$. This ensures that the field's static type will remain accurate even as other transactions are executed (e.g. a \readonlyS{} reference can not store the reference as having a particular typestate). \\
+For a field $``\tau\ f"$ to type check, we must have $``(\tau\ f)\ \okHelp"$. This ensures that the field's static type will remain accurate even as other transactions are executed (e.g. a \readonlyS{} reference can not store the reference as having a particular typestate). \\
 
 Explanation of specific rules:
 
@@ -263,51 +283,46 @@ Explanation of specific rules:
 \begin{figure*}[h!]
 \fbox{\begin{minipage}{\pagewidth}
 
-\boxed{res(p)} Residual Permission
+\boxed{\resHelp(p), \resHelp(\tau), \resHelp(\overline{x}, \Delta)} Residual Permission/Type/Context
 \begin{mathpar}
 \inferlbl{}
 	{}
-	{res(\ownedS) = \readonlyS}
+	{\resHelp(\ownedS) = \readonlyS}
 \and
 \inferlbl{}
 	{}
-	{res(\readonlyS) = \readonlyS}
+	{\resHelp(\readonlyS) = \readonlyS}
 \and
 \inferlbl{}
 	{}
-	{res(\sharedS) = \sharedS}
-\end{mathpar}
-\boxed{res(\tau)} Residual Type
-\begin{mathpar}
+	{\resHelp(\sharedS) = \sharedS}
+\and
 \inferlbl{}
 	{}
-	{res(p \permS \tau_{s}) = res(p) \permS \tau_{s}}
+	{\resHelp(p \permS \tau_{s}) = \resHelp(p) \permS \tau_{s}}
+\and
+\inferlbl{}
+	{ \Delta' = \Delta[x_{i} \mapsto \resHelp(\Delta(x_{i}))]}
+	{\resHelp(\overline{x}, \Delta) = \Delta'}
 \end{mathpar}
 
-\boxed{res(\overline{x}, \Delta)} Residual Context
+\boxed{\rmHelp(x, \Delta),\ \rmHelp(\overline{x}, \Delta)} Removes variable $x$ or variables $\overline{x}$ from the context $\Delta$
 \begin{mathpar}
 \inferlbl{}
-	{ \Delta' = \Delta[x_{i} \mapsto res(\Delta(x_{i}))]}
-	{res(\overline{x}, \Delta) = \Delta'}
-\end{mathpar}
-
-\boxed{rm(x, \Delta),\ rm(\overline{x}, \Delta)} 
-\begin{mathpar}
-\inferlbl{}
-	{p \neq \ownedS}
-	{rm(x, (\Delta, x : p \permS \tau)) = \Delta}
+	{p \neq \ownedS \qquad \forall (y\ \tau) \in \Delta, \tau_{p}.\ \tau \neq x.\tau_{p}}
+	{\rmHelp(x, (\Delta, x : p \permS \tau)) = \Delta}
 \and
 \inferlbl{}
 	{x \not\in \textsf{dom}(\Delta)}
-	{rm(x, \Delta) = \Delta}
+	{\rmHelp(x, \Delta) = \Delta}
 \\
 \inferlbl{}
 	{}
-	{rm(\emptyset, \Delta) = \Delta}
+	{\rmHelp(\emptyset, \Delta) = \Delta}
 \and
 \inferlbl{}
 	{}
-	{rm(\{x_{1}, \ldots, x_{n}, x_{n+1}\}, \Delta) = rm(\{x_{1}, \ldots, x_{n}\}, rm(x_{n+1}, \Delta)) }
+	{\rmHelp(\{x_{1}, \ldots, x_{n}, x_{n+1}\}, \Delta) = \rmHelp(\{x_{1}, \ldots, x_{n}\}, \rmHelp(x_{n+1}, \Delta)) }
 \end{mathpar}
 
 \boxed{\tau <: \tau'} Subtyping
@@ -325,47 +340,62 @@ Explanation of specific rules:
 	{p \permS P.C.S <: p \permS P.C}
 \end{mathpar}
 
-\boxed{trans(\overline{S}, \tau_{s})}
+\boxed{\mergeableHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n}),\ \mergeHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n})} \\
+
+Merges contexts $\Delta_{1}, \ldots, \Delta_{n}$ after branching from the original context $\Delta$
 \begin{mathpar}
 \inferlbl{}
-	{}
-	{trans(\{S\}, C) = C.S}
+	{\mergeableHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n}) \qquad \exists \tau'. \big( \forall i. \Delta_{i}(x) <: \tau' \big)}
+	{\mergeableHelp((\Delta, x : \tau); \Delta_{1}, \ldots, \Delta_{n})}
 \and
 \inferlbl{}
 	{}
-	{trans(\{\}, \tau_{s}) = \tau_{s}}
+	{\mergeableHelp(\emptyset; \Delta_{1}, \ldots, \Delta_{n})}
 \and
 \inferlbl{}
-	{}
-	{trans(\{S_{2}\}, C.S_{1}) = C.S_{2}}
-\and
-\inferlbl{}
-	{}
-	{trans(\{ S_{1}, S_{2}, \ldots \} , C.S) =  C}
-\and
-\inferlbl{}
-	{}
-	{trans(\{ S_{1}, S_{2}, \ldots \} , C) = C}
+	{\mergeableHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n})}
+	{\mergeHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n}) = \{ (x, \tau) \ \vert\ x \in \Delta\ \&\ \Delta_{i}(x) <: \tau \} }
 \end{mathpar}
 
+\boxed{ \wfHelp(\Delta, \tau), \wfHelp(C, \tau) } Assures wellformedness of type $\tau$ w.r.t. $\Delta$ or $C$
+\begin{mathpar}
 
-\boxed{mergeable(\Delta; \Delta_{1}, \ldots, \Delta_{n})} 
+\inferlbl{}
+	{ \lnot \hasParentHelp(\contractOfHelp(\tau_{s}))  }
+	{ \wfHelp(\Delta, p \permS \tau_{s}) }
+\and
+\inferlbl{}
+	{ \contractOfHelp(\Delta(\thisS)) = \contractOfHelp(\tau_{s}) }
+	{ \wfHelp(\Delta, p \permS \tau_{s}) }
+\and
+\inferlbl{}
+	{ \contractOfHelp(\Delta(a)) = C \qquad \wfHelp(\Delta, C, p \permS \tau_{p})  }
+	{ \wfHelp(\Delta, p \permS a.\tau_{p}) }
+\and
+\inferlbl{}
+	{ (\tau_{f}\ f) \in \constFieldsHelp(C) \\\\ \wfHelp(\contractOfHelp(\tau_{f}), p \permS \tau_{p})  }
+	{ \wfHelp(C, p \permS f.\tau_{p}) }
+\and
+\inferlbl{}
+	{ C = \parentHelp(\contractOfHelp(\tau_{s})) }
+	{ \wfHelp(C, p \permS \tau_{s}) }
+
+\end{mathpar}
+\boxed{ \substHelp(\tau, \tau', M)} Changes perspective of $\tau$ using mapping $M$, with recipient type $\tau'$
 \begin{mathpar}
 \inferlbl{}
-	{mergeable(\Delta; \Delta_{1}, \ldots, \Delta_{n}) \qquad \exists \tau'. \big( \forall i. \Delta_{i}(x) <: \tau' \big)}
-	{mergeable((\Delta, x : \tau); \Delta_{1}, \ldots, \Delta_{n})}
+	{ M(z) = y }
+	{ \substHelp(p \permS z.\tau_{p}, \tau, M) = p \permS y.\tau_{p} }
 \and
 \inferlbl{}
-	{}
-	{mergeable(\emptyset; \Delta_{1}, \ldots, \Delta_{n})}
+	{ \lnot \hasParentHelp(\contractOfHelp(\tau_{s})) }
+	{ \substHelp(p \permS \tau_{s}, \tau, M) = p \permS \tau_{s} }
+\and
+\inferlbl{}
+	{ \contractOfHelp(\tau_{s}) = \contractOfHelp(\tau_{s'}) }
+	{ \substHelp(p \permS \tau_{s}, a.f_{1} \cdots .f_{n}.\tau_{s}', M) = p \permS a.f_{1} \cdots . f_{n}.\tau_{s} }
 \end{mathpar}
 
-\boxed{merge(\Delta; \Delta_{1}, \ldots, \Delta_{n})} 
-\begin{mathpar}
-\inferlbl{}
-	{mergeable(\Delta; \Delta_{1}, \ldots, \Delta_{n})}
-	{merge(\Delta; \Delta_{1}, \ldots, \Delta_{n}) = \{ (x, \tau) \ \vert\ x \in \Delta\ \&\ \Delta_{i}(x) <: \tau \} }
-\end{mathpar}
 \end{minipage}
 }
 \caption{Auxiliary Relations}
@@ -381,58 +411,64 @@ Explanation of specific rules:
 	{\Delta \vdash_{b} e : \tau' \dashv \Delta'}
 \and
 \inferlbl{t-var}
-	{ }
-    	{\Delta, x : \tau \vdash_{b} x : \tau \dashv \Delta, x : res(\tau) }
+	{ a \neq \thisS }
+    	{\Delta, a : \tau \vdash_{b} a : \tau \dashv \Delta, a : \resHelp(\tau) }
+\and
+\inferlbl{t-this}
+	{ \Delta(\thisS) = \tau }
+    	{\Delta \vdash_{\falseS} \thisS : \resHelp(\tau) \dashv \Delta }
+\and
+\inferlbl{t-field}
+	{ (\tau\ \,f) \in \fieldsHelp(\Delta(\thisS)) }
+    	{ \Delta \vdash_{\falseS} \resS(f) : \resHelp(\tau) \dashv \Delta }
 \and
 \inferlbl{t-let}
-	{ x \not\in \Delta \qquad \Delta \vdash_{b} e_{1} : p \permS \tau_{s} \dashv \Delta_{1} \qquad \Delta_{1}, x : p \permS \tau_{s}  \vdash_{b} e_{2} : \tau \dashv \Delta_{2} }
-	{ \Delta \vdash_{b} \letS\ x = e_{1}\ \inS\ e_{2} : \tau \dashv rm(x, \Delta_{2}) }
+	{ \forall \tau_{p}.\ \tau \neq x.\tau_{p} \qquad \forall \tau.\ (\tau\ x) \not\in \constFieldsHelp(\Delta(\thisS))
+	\\\\
+	x \not\in \Delta \qquad \Delta \vdash_{b} e_{1} : p \permS \tau_{s} \dashv \Delta_{1} \qquad \Delta_{1}, x : p \permS \tau_{s}  \vdash_{b} e_{2} : \tau \dashv \Delta_{2} }
+	{ \Delta \vdash_{b} \letS\ x = e_{1}\ \inS\ e_{2} : \tau \dashv \rmHelp(x, \Delta_{2}) }
 \and
 \inferlbl{t-new}
-	{ managed(C) \Rightarrow \Delta(\thisS) <: p' \permS manager(C)
+	{ \hasParentHelp(C) \Rightarrow \exists p'.\ \Delta(\thisS) <: p' \permS \parentHelp(C) \qquad \overline{\tau\ \,f} = \fieldsHelp(C.S) }
+	{ \Delta, \overline{x : \tau} \vdash_{b} \newS\ C.S(\overline{x})\ \asS\ p : p \permS C.S \dashv \Delta, \overline{x: \resHelp(\tau)}}
+\and
+\inferlbl{t-inv-1}
+	{ M = \emptyset\overline{[z \mapsto y]}[\thisS \mapsto x]
 	\\\\
-	\overline{\tau\ \,f} = fields(C.S) }
-	{ \Delta, \overline{x : \tau} \vdash_{b} \newS\ C.S(\overline{x})\ \asS\ p : p \permS C.S \dashv \Delta}
+	\big(\transactionLabelS\ \tau_{ret}\ m(\overline{\tau\ z}) \hookrightarrow \overline{S} \big) \in \methodsHelp(\tau_{recip}) \qquad \tau_{ret}' = \substHelp(\tau_{ret}, \tau_{recip}, M)
+	\\\\
+	 p = \readonlyS \Rightarrow \transactionLabelS = \functionS \qquad \forall i.\ \tau_{i}' = \substHelp(\tau_{i}, \tau_{recip}, M) }
+	{ \Delta, x : p \permS \tau_{recip}, \overline{y : \tau'} \vdash_{\falseS} x.m(\overline{y}) : \tau_{ret}' \dashv \Delta, x : p \permS \transHelp(\overline{S}, \tau_{recip}), \overline{y : \resHelp(\tau')} }
 \and
-\inferlbl{t-res-1}
-	{ (\tau\ \,f) \in fields(\Delta(\thisS)) }
-    	{ \Delta \vdash_{\falseS} \resS(f) : res(\tau) \dashv \Delta }
+\inferlbl{t-inv-2}
+	{ M = \emptyset\overline{[z \mapsto x]}[\thisS \mapsto \thisS.f] \qquad  (p \permS \tau_{recip}\ \, f) \in \fieldsHelp(\Delta(\thisS))
+	\\\\
+	\big(\transactionLabelS\ \tau_{ret}\ m(\overline{\tau\ z}) \hookrightarrow \overline{S} \big) \in \methodsHelp(\tau_{recip})
+	\\\\
+	 p = \readonlyS \Rightarrow \transactionLabelS = \functionS \qquad \transHelp(\overline{S}, \tau_{recip}) <: \tau_{recip} }
+	{ \Delta, \overline{x : \tau'} \vdash_{\falseS} f.m(\overline{x}) : \substHelp(\tau_{ret}, \tau_{recip}, M) \dashv \Delta, \overline{x : \resHelp( \substHelp(\tau, \tau_{recip}, M))} }
 \and
-\inferlbl{t-res-2}
-	{ }
-    	{ \Delta, x : \tau \vdash_{\trueS} \resS(x) : res(\tau) \dashv \Delta, x : \tau }
+\inferlbl{t-unpack}
+	{  \overline{\tau\ f} =  \mutableFieldsHelp(\Delta(\thisS))
+	\\\\
+	p \neq \readonlyS \qquad \Delta,\overline{ f : \tau}  \vdash_{\trueS} e : \packS[S, \tau_{ret}] \dashv \Delta'}
+	{ \Delta \vdash_{\falseS} \unpackS\ \{e\} : \tau_{ret} \dashv \rmHelp(\overline{f}, \Delta'), \thisS: \transHelp(S, \Delta(\thisS)) }
+\and
+\inferlbl{t-pack}
+	{ \overline{\tau\ f} = \mutableFieldsHelp(\Delta(\thisS)) \qquad \Delta' = \Delta, y : \resHelp(\tau'), \overline{x : \resHelp(\tau)} }
+	{ \Delta, y : \tau', \overline{x : \tau} \vdash_{\trueS} \packS\ S(\overline{x})\ \withS\ y : \packS[S, \tau'] \dashv  \Delta'}
+\and
+\inferlbl{t-try}
+	{ \Delta \vdash_{b} e_{1} : \tau \dashv \Delta_{1} \qquad \Delta \vdash_{b} e_{2} : \tau \dashv \Delta_{2} }
+	{ \Delta \vdash_{b} \tryS\ \{ e_{1} \}\ \catchS\ \{ e_{2} \} : \tau \dashv \mergeHelp(\Delta; \Delta_{1}, \Delta_{2}) }
 \and
 \inferlbl{t-thr}
 	{  }
 	{ \Delta \vdash_{b} \throwS : \tau \dashv \Delta' }
 \and
-\inferlbl{t-inv-1}
-	{ \big(TL\ \tau''\ m(\overline{\tau\ z}) \rightarrow \overline{S} \big) \in methods(\tau') \qquad p = \readonlyS \Rightarrow TL = \functionS }
-	{ \Delta, x : p \permS \tau', \overline{y : \tau[z \mapsto y][\thisS \mapsto x]} \vdash_{\falseS} x.m(\overline{y}) : \tau'' \dashv \Delta, x : p \permS trans(\overline{S}, \tau') }
-\and
-\inferlbl{t-inv-2}
-	{ (p \permS \tau'\ f) \in fields(\Delta(\thisS)) \qquad trans(\overline{S}, \tau') <: \tau'
-	\\\\
-	\big(TL\ \tau''\ m(\overline{\tau\ z}) \rightarrow \overline{S} \big) \in methods(\tau') \qquad p = \readonlyS \Rightarrow TL = \functionS }
-	{ \Delta, \overline{y : \tau[z \mapsto y][\thisS \mapsto \thisS.f]} \vdash_{\falseS} f.m(\overline{y}) : \tau'' \dashv \Delta }
-\and
-\inferlbl{t-unpack}
-	{ \Delta(\thisS) = p \permS C.S_{1} \qquad p \neq \readonlyS \qquad \overline{\tau\ f} =  mutableFields(C.S_{1}) 
-	\\\\
-	\forall i. f_{i} \not\in \Delta \qquad \Delta,\overline{ f : \tau}  \vdash_{\trueS} e : \packS[S_{2}, \tau] \dashv \Delta'}
-	{ \Delta \vdash_{\falseS} \unpackS\ \{e\} : \tau \dashv rm(\overline{f}, \Delta') }
-\and
-\inferlbl{t-pack}
-	{ \overline{\tau\ f} = mutableFields(trans(S, \Delta(\thisS))) }
-	{ \Delta, y : \tau', \overline{x : \tau} \vdash_{\trueS} \packS\ S(\overline{x})\ \withS\ y : \packS[S, \tau'] \dashv  \Delta }
-\and
-\inferlbl{t-try}
-	{ \Delta \vdash_{b} e_{1} : \tau \dashv \Delta_{1} \qquad \Delta \vdash_{b} e_{2} : \tau \dashv \Delta_{2}}
-	{ \Delta \vdash_{b} \tryS\ \{ e_{1} \}\ \catchS\ \{ e_{2} \} : \tau \dashv merge(\Delta; \Delta_{1}, \Delta_{2}) }
-\and
-\inferlbl{t-assert}
-	{ \Delta, x : p \permS \tau_{s}' \vdash_{t} e \dashv \Delta' }
-	{ \Delta, x : p \permS \tau_{s} \vdash_{t} \assertS\ x : \tau_{s}'\ \inS\ e \dashv \Delta' }
+\inferlbl{t-dyn}
+	{ \Delta, x : p \permS \tau_{s}' \vdash_{b} e_{1} : \tau \dashv \Delta_{1} \qquad \Delta, x : p \permS \tau_{s} \vdash_{b} e_{2} : \tau \dashv \Delta_{2} }
+	{ \Delta, x : p \permS \tau_{s} \vdash_{t} \ifS\ x : \tau_{s}'\ \thenS\ e_{1}\ \elseS\ e_{2} \dashv \mergeHelp(\Delta; \Delta_{1}, \Delta_{2})  }
 \end{mathpar}
 \end{minipage}
 }
@@ -445,30 +481,51 @@ Explanation of specific rules:
 \begin{figure*}[h!]
 \fbox{\begin{minipage}{\pagewidth}
 
-\boxed{(\tau\ f)\ \okS} Field Consistency
+\boxed{(\tau\ f)\ \okInHelp\ C} Field Consistency
 \begin{mathpar}
 \inferlbl{}
-	{ }
-	{(\ownedS \permS \tau_{s}\ f)\ \okS}
+	{ \tau = p \permS a.f_{1}.\cdots.f_{n}.C \qquad \wfHelp(\emptyset[\thisS \mapsto \readonlyS \permS D], \tau) }
+	{(\tau \ f)\ \okInHelp\ D}
 \and
 \inferlbl{}
-	{ }
-	{(p\permS C\ f)\ \okS}
+	{ \tau = \ownedS \permS a.f_{1}.\cdots.f_{n}.C.S \qquad \wfHelp(\emptyset[\thisS \mapsto \readonlyS \permS D], \tau) }
+	{(\tau \ f)\ \okInHelp\ D}
+\and
 \end{mathpar}
 
-\boxed{(MethDecl\ MethBody)\ \okS\ \textsf{in}\ C.S} Method Consistency
+\boxed{(\methDeclS\ \methBodyS)\ \okHelp\ \textsf{in}\ C.S} Method Consistency
 \begin{mathpar}
 \inferlbl{}
-	{ \falseS; \emptyset, \thisS : \ownedS \permS C.S, x_{1} : \tau_{1}, \ldots, x_{n} : \tau_{n} \vdash e : \tau \dashv \Delta
+	{ \Delta = \emptyset, \thisS : \ownedS \permS C.S, \overline{x : \tau} \qquad \forall i.\ \wfHelp(\Delta, \tau_{i})
  	\\\\
-	\forall x, \tau_{s}'.\ \Delta(x) = \ownedS \permS \tau_{s}'\ \ \text{iff}\ \ x = \thisS }
-	{\transactionS\ \tau' \ m(\overline{\tau \ x}) \hookrightarrow \overline{S}\ \{e\} \ \okS\ \textsf{in}\ C.S}
+	\Delta \vdash_{\falseS} e : \tau' \dashv \Delta' \qquad \forall a, \tau_{p}.\ \Delta'(a) = \ownedS \permS \tau_{p}\ \ \text{iff}\ \ a = \thisS
+	\\\\
+	 \Delta'(\thisS) <: \transHelp(\overline{S}, \ownedS \permS C.S)
+	 }
+	{\transactionS\ \tau' \ m(\overline{\tau \ x}) \hookrightarrow \overline{S}\ \{e\} \ \okHelp\ \textsf{in}\ C.S}
 \and
 \inferlbl{}
-	{ \falseS; \emptyset, \thisS : \readonlyS \permS C.S, x_{1} : \tau_{1}, \ldots, x_{n} : \tau_{n} \vdash e : \tau \dashv \Delta
+	{ \Delta = \emptyset, \thisS : \readonlyS \permS C.S, \overline{x : \tau} \qquad \forall i.\ \wfHelp(\Delta, \tau_{i})
  	\\\\
-	\forall x, \tau_{s}'.\ \Delta(x) \neq \ownedS \permS \tau_{s}' }
-	{\functionS\ \tau' \ m(\overline{\tau \ x})\ \{e\} \ \okS\ \textsf{in}\ C.S}
+	\Delta \vdash_{\falseS} e : \tau' \dashv \Delta' \qquad \forall a, \tau_{p}.\ \Delta'(a) \neq \ownedS \permS \tau_{p} }
+	{\functionS\ \tau' \ m(\overline{\tau \ x})\ \{e\} \ \okHelp\ \textsf{in}\ C.S}
+\end{mathpar}
+
+
+\boxed{\stateS\ S\ \{\ \ldots\ \}\ \okInHelp\ C } State Consistency
+\begin{mathpar}
+\inferlbl{}
+	{ \forall i.\ (\methDeclS_{i}\ \methBodyS_{i})\ \okInHelp\ C.S \qquad \forall i.\ (\tau_{i}\ f_{i})\ \okInHelp\ C }
+	{ \stateS\ S\ \{\ \overline{\tau\ f} \ \ \overline{\methDeclS\ \methBodyS}\ \} }
+\end{mathpar}
+
+\boxed{ \contractS\ C\ \{\ \ldots\ \}\ \okHelp} Contract Consistency
+\begin{mathpar}
+\inferlbl{}
+	{ \forall i.\ (\tau_{f_{i}}\ f_{i})\ \okInHelp\ C \qquad \forall i.\ (\tau_{g_{i}}\ g_{i})\ \okInHelp\ C \qquad \forall i.\ St_{i}\ \okInHelp\ C \qquad \forall i.\ Ct_{i}\ \okHelp
+	\\\\
+	\forall \tau, i, j.\ \big((\tau\ f_{i}) \not\in \fieldsHelp(St_{j}) \land (\tau\ g_{i}) \not\in \fieldsHelp(St_{j}) \land f_{i} \neq g_{j} \big)}
+	{ \contractS\ C\ \{\ \overline{Ct}\ \ \overline{St}\ \ \overline{\constS\ \tau_{f}\ f}\ \ \overline{\tau_{g}\ g}\ \} }
 \end{mathpar}
 
 \end{minipage}
@@ -614,11 +671,11 @@ v ::= \ell
 \and
 \inferlbl{e-dyn-ex}
 	{ type(\mu(\rho(x)))\ \textsf{instanceOf}\ \tau_{s} }
-	{ \mu, \rho, \assertS\ x : \tau_{s}\ \inS\ e \rightarrow \mu', \textsf{Ex} }
+	{ \mu, \rho, \ifS\ x : \tau_{s}\ \inS\ e \rightarrow \mu', \textsf{Ex} }
 \and
 \inferlbl{e-dyn-ok}
 	{ type(\mu(\rho(x)))\ \textsf{instanceOf}\ \tau_{s} }
-	{ \mu, \rho, \assertS\ x : \tau_{s}\ \inS\ e \rightarrow \mu', e }
+	{ \mu, \rho, \ifS\ x : \tau_{s}\ \inS\ e \rightarrow \mu', e }
 \and
 \inferlbl{e-try-1}
 	{ }
