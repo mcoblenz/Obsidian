@@ -1,0 +1,528 @@
+%% For double-blind review submission
+\documentclass[sigplan,10pt,review]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission
+%\documentclass[sigplan,10pt,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission
+%\documentclass[sigplan,10pt]{acmart}\settopmatter{}
+
+%% Note: Authors migrating a paper from traditional SIGPLAN
+%% proceedings format to PACMPL format should change 'sigplan' to
+%% 'acmsmall'.
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+\usepackage{listings}
+\usepackage{mathptmx}
+
+\makeatletter\if@ACM@journal\makeatother
+%% Journal information (used by PACMPL format)
+%% Supplied to authors by publisher for camera-ready submission
+\acmJournal{PACMPL}
+\acmVolume{1}
+\acmNumber{1}
+\acmArticle{1}
+\acmYear{2017}
+\acmMonth{1}
+\acmDOI{10.1145/nnnnnnn.nnnnninn}
+\startPage{1}
+\else\makeatother
+%% Conference information (used by SIGPLAN proceedings format)
+%% Supplied to authors by publisher for camera-ready submission
+\acmConference[PL'17]{ACM SIGPLAN Conference on Programming Languages}{January 01--03, 2017}{New York, NY, USA}
+\acmYear{2017}
+\acmISBN{978-x-xxxx-xxxx-x/YY/MM}
+\acmDOI{10.1145/nnnnnnn.nnnnnnn}
+\startPage{1}
+\fi
+
+\lstset{
+  tabsize=3,
+  basicstyle={\tiny\ttfamily},
+  stepnumber=1
+}
+
+\renewcommand{\lstlistingname}{Fig.}
+
+%% Copyright information
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission
+\setcopyright{none}             %% For review submission
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2017}           %% If different from \acmYear
+
+
+%% Bibliography style
+\bibliographystyle{ACM-Reference-Format}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+%style{acmauthoryear}  %% For author/year citations
+%\citestyle{acmnumeric}     %% For numeric citations
+%\setcitestyle{nosort}      %% With 'acmnumeric', to disable automatic
+                            %% sorting of references within a single citation;
+                            %% e.g., \cite{Smith99,Carpenter05,Baker12}
+                            %% rendered as [14,5,2] rather than [2,5,14].
+%\setcitesyle{nocompress}   %% With 'acmnumeric', to disable automatic
+                            %% compression of sequential references within a
+                            %% single citation;
+                            %% e.g., \cite{Baker12,Baker14,Baker16}
+                            %% rendered as [2,3,4] rather than [2-4].
+
+
+
+\begin{document}
+
+%% Title information
+\title{A User Study to Inform the Design of the Obsidian Blockchain DSL}         %% [Short Title] is optional;
+                                        %% when present, will be used in
+                                        %% header instead of Full Title.
+
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+%% Author with single affiliation.
+\author{Celeste Barnaby}
+\affiliation{
+  \institution{Wesleyan University}            
+}
+\email{cbarnaby@wesleyan.edu}          
+
+\author{Michael Coblenz}
+\affiliation{
+  \institution{Carnegie Mellon University}            
+}
+\email{mcoblenz@cs.cmu.edu}          
+
+\author{Tyler Etzel}
+\affiliation{
+  \institution{Cornell University}            
+ }
+\email{tje44@cornell.edu} 
+
+\author{Eliezer Kanal}
+\affiliation{
+  \institution{Carnegie Mellon University}            
+}
+\email{ekanal@cert.org}
+
+\author{Joshua Sunshine}
+\affiliation{
+  \institution{Carnegie Mellon University}            
+}
+\email{sunshine@cs.cmu.edu}
+
+\author{Brad Myers}
+\affiliation{
+  \institution{Carnegie Mellon University}            
+}
+\email{bam@cs.cmu.edu} 
+
+\author{Jonathan Aldrich}
+\affiliation{
+  \institution{Carnegie Mellon University}            }
+\email{jonathan.aldrich@cs.cmu.edu}   
+
+%% Paper note
+%% The \thanks command may be used to create a "paper note" ---
+%% similar to a title note or an author note, but not explicitly
+%% associated with a particular element.  It will appear immediately
+%% above the permission/copyright statement.
+\thanks{with paper note}                %% \thanks is optional
+                                        %% can be repeated if necesary
+                                        %% contents suppressed with 'anonymous'
+
+
+%% Abstract
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+\begin{abstract}
+%Blockchains are useful for this. There are blockchain languages that have security problems.
+%We wanna design a new language in a human-centered way. We did that with a natural 
+%programming approach. In this paper, we discuss our approach to the design of user studies,
+%and our preliminary findings
+
+Blockchain platforms such as Ethereum and Hyperledger facilitate transactions between parties that 
+have not established trust. Increased interest in these platforms has motivated the design of programming languages
+like Solidity, which allow users to create blockchain programs. However, there have been several recent instances
+where Solidity programs have contained bugs that have been exploited. 
+We are currently developing a blockchain-based programming language called Obsidian with the goal
+of minimizing the risk of common security vulnerabilities. We are designing this
+language in human-centered way, conducting exploratory user studies with a natural programming approach to
+inform our design choices. In this paper, we discuss our approach to the design of these user studies, as well
+as our preliminary findings.
+
+%Our language offers first-class typestate and linear resources in order to minimize the risk of common security 
+%vulnerabilities. It is important that users are able to understand the salient features of the 
+%language and write correct, safe code. The purpose of this user study is to explore how
+%people naturally go about expressing and implementing domain-specific problems, and how effectively 
+%users are able to understand states and linear resources. The findings of this study will inform our design 
+%choices with the goal of increasing the usability of the language.
+\end{abstract}
+
+%% Keywords
+%% comma separated list
+\keywords{keyword1, keyword2, keyword3}  %% \keywords is optional
+
+
+%% \maketitle
+%% Note: \maketitle command must come after title commands, author
+%% commands, abstract environment, Computing Classification System
+%% environment and commands, and keywords command.
+\maketitle
+
+
+\section{Introduction}
+
+%Blockchain platforms such as Ethereum and Hyperledger are decentralized databases that 
+%facilitate transactions between parties that have not established trust. Increased interest in these 
+%platforms has motivated the design of blockchain-based programming languages like Solidity, which 
+%allow users to create blockchain programs. However, there have been several recent instances
+%where Solidity programs have contained bugs that have been exploited. In a 
+%particularly calamatious example, \$50 million was stolen from a contract on the Etherium blockchain 
+%called the DAO \cite{Sirer}. As this example illustrates, the security of blockchain programs is imperative since 
+%they often involve the exchange of large amounts of money. 
+
+We are designing a blockchain-based program called Obsidian \cite{Coblenz} with the goal of 
+minimizing the risk of common security vulnerabilities in blockchain programs. Blockchain
+programs written with current domain-specific languages such as Solidity \cite{Solidity} often contain
+exploitable bugs. In a particularly calamitious example, \$50 million was stolen from a contract on the 
+Ethereum blockchain called the DAO \cite{Sirer}. Obsidian contains several core features
+ - namely, first-class typestate and linear resources - that will allow users 
+to write programs safely and effectively. The target 
+userbase of Obsidian is business professionals who will use the language to write smart contracts, 
+and its design is thus oriented towards this domain: Obsidian programs consist of contracts -
+similar in function to classes in Java - which contain fields, states, and transactions - similar in
+function to methods.
+
+\subsection{Typestate}
+
+The DAO hack was accomplished using a reentrant function call. States have the ability to 
+prohibit malicious reentrant calls by ensuring that external code is only invoked in a safe state. 
+In light of this, Obsidian makes state first class: an object in Obsidian has a mutable state that restricts which 
+transactions can be invoked on it. The states of a contract are defined as explicit blocks containing 
+transactions and fields, which can only be accessed if the contract is in the corresponding state. 
+
+\begin{lstlisting}[caption={An example of states in Obsidian.},captionpos=b]
+contract LibraryCard {
+   state NoCard {
+       transaction getCard() {
+           ...
+           ->HasCard
+       }
+   }
+  
+   state HasCard {
+       transaction checkOutBook() {
+           ...
+       }
+   }
+}
+\end{lstlisting}
+
+In the example in Figure 1,  a \texttt{\small{LibraryCard}} is always in one of two
+states, \texttt{\small{NoCard}} or \texttt{\small{HasCard}}. The transaction 
+\texttt{\small{checkOutBook}} can only be called on an instance of 
+\texttt{\small{LibraryCard}} if it is in the \texttt{\small{HasCard}} state; otherwise, it will throw an exception. 
+The \texttt{\small{->}} operator indicates a state transition.
+
+\subsection{Linear Resources}
+
+Blockchain programs may manage some kind of resource, like a cryptocurrency, or a token 
+indicating a more complicated right (e.g. ownership of a financial option). The static semantics for linear resources \cite{Wadler} 
+enforce a safe, clean programming model: resources cannot be used more than once, but must be 
+used before leaving the current scope (thus ensuring that a resource is not lost accidentally). 
+
+\begin{lstlisting}[caption={Linear resources in Obsidian},captionpos=b]
+contract Treasury {
+ // Money is a resource of Treasury
+   contract Money { ... }
+
+transaction t1(Money m) {
+       spendMoney(m);
+       Bond b = exchangeForBonds(m);
+       // compiler error: m is used twice
+       ...
+   }
+
+   transaction t2(Money m) {
+     // compiler error: m is never used
+     return;
+   }
+}
+\end{lstlisting}
+
+Obsidian also supports path-dependent types \cite{Amin}, wherein linear values can have type members. In the 
+above example, the type of Money is dependent upon a specific value of Treasury; put another way, 
+each Treasury t has its own type t.Money. 
+
+Path-dependent types assist in writing secure contracts: without such types, every instance of 
+Treasury would share the same Money type, and the programmer would have to manually check 
+that all money deposited into a treasury - for example - is of the correct type. Incorrect or insufficient 
+checks could leave contracts vulnerable to exploitation. With path-dependent types, all such checks 
+are automatic: we can ensure that only money that comes from a specific treasury is used in 
+transactions within that treasury. 
+
+\subsection{Usability}
+It is crucial that our language is usable - that is, real programmers are able to write correct Obsidian 
+code easily and efficiently. However, even with seemingly intuitive features, it is not always clear 
+which approach to design is most effective for programmers. For instance, consider the following simple 
+Obsidian contract:
+
+\begin{lstlisting}
+contract C {
+   state Start {
+       int x;
+  
+       transaction a() returns int {
+           ->S1{x1 = x};
+           return b(x1);
+       }
+   }
+  
+   state S1 {
+       int x1;
+      
+       transaction b(int y) returns int {
+           return y;
+       }
+   }
+}
+\end{lstlisting}
+
+In transaction \texttt{\small{a}}, we transition to state \texttt{\small{S1}} and then call transaction \texttt{\small{b}}. 
+However, does it make sense to call \texttt{\small{b(x1)}} after the transition? While we have just 
+transitioned to \texttt{\small{S1}}, lexically we are still in the 
+Start state, and it is not immediately apparent which variables and transactions are in scope. 
+Obviously this example is extremely simple, but in a program with many different contracts, 
+transactions, and states, a situation like this could cause serious confusion. Failure to encode state 
+machines properly has been shown to be a significant source of errors in smart-contract 
+programming \cite{Delmolino}. It is critical that users are able to understand and use states easily and 
+effectively - if not, there is potential to create the same security weaknesses as in a 
+language without states. 
+
+	Similar questions of usability arise with path dependent types. An initial approach we have taken is 
+to use nested contracts to indicate a dependency relationship; however, nesting has different 
+implications in different languages, and we are not certain that users will be able to recognize the 
+presence and utility of path dependency. 
+
+	A related issue is whether users will want to use these features if they are made available. Are 
+these logical, sensible solutions to real problems that programmers face? If people do not 
+understand or choose to use the language's core features, then any of the potential benefits 
+of those features are lost. 
+	We are conducting a user study to investigate these questions of usability in Obsidian \cite{Myers}. The 
+key research questions we address in the study are as follows:
+\begin{itemize}
+\item Are states and path dependent types a natural way of 
+	approaching the challenges that arise in blockchain programming?
+\item How do people naturally express states, state transitions, and path dependent types?
+\item Which (if any) of our proposed ways of presenting states, state transitions, and path dependent types
+	is most understandable and usable by programmers?
+\item Are people able to effectively use and understand path dependent types as they
+are implemented in Obsidian?
+\end{itemize}
+
+\section{User Study Design}
+	
+This study is explorative rather than evaluative: its purpose is to gain information about the usability of state transitions 
+and path dependent types so we can make smart choices about the design of our language. 
+We chose these two features as the focus of our study because they are both important safety features 
+that we expect users will use frequently. In addition, they both have several distinct options for how to be 
+represented syntactically, and the results of the study will factor into which option we choose to implement.  
+
+Participants are asked to complete two programming exercises, both of which are divided into parts that 
+gradually introduce the participant to Obsidian and one of its core features. 
+Participants are instructed to think aloud throughout the exercise, and are permitted to ask questions.
+
+\subsection{Voter Registration Exercise}
+
+Participants are offered a description of a voter registration system for a hypothetical democratic nation. The 
+system has certain stipulations that make a state machine a logical means of representing the required behaviors. 
+For instance, the system has specific conditions under which a citizen either becomes registered to vote, or remains unregistered. 
+
+The exercise is divided into five parts. In part one, participants are asked to implement the system using 
+pseudocode. They are encouraged to invent any language features that they may want in order to solve this 
+problem. We want to see how people naturally solve a problem in this domain: what ideas do they 
+have, and what assumptions do they make? 
+	
+In part two, participants are offered a state diagram that models the voter registration system, and are asked to 
+modify their pseudocode to include the states and state transitions shown in the diagram. Again, we want to 
+observe people's natural ideas about how to represent states and state transitions in a program.
+
+In part three, participants are offered a two-page Obsidian tutorial detailing the key components of the language. 
+The tutorial explains how state blocks work, but does not give any information about how transitions should be 
+written. Participants are then given an Obsidian program that implements the voter registration system, but is 
+missing state transitions. Participants are asked to add state transitions to the code, inventing the syntax 
+themselves.
+
+In part four, participants are offered three unique options for the syntax and functionality of state transitions, each 
+accompanied by a short code example. Participants are presented the options in a random order; the order given 
+here is arbitrary.
+
+In option 1, users are allowed to use any transaction in any state, given they have already transitioned to that 
+state. For instance, in Figure 3, it is legal to use the \texttt{\small{toS2}} transaction inside the \texttt{\small{Start}} 
+state, even though that transaction is defined with \texttt{\small{S1}}. This is because there is a transition to 
+\texttt{\small{S1}} in the previous line.
+
+\begin{lstlisting}[caption={One option for state transitions},captionpos=b]
+contract C {
+   state Start {
+       transaction t(int x) {
+           ->S1{x1 = x};
+           toS2();
+       }
+   }
+
+   state S1 {
+       int x1;
+
+       transaction toS2() {
+           ->S2{x2 = x1};
+       }
+   }
+
+   state S2 {
+       int x2;
+   }
+}
+\end{lstlisting}
+
+In option 2, each state has a constructor that is invoked when the user transitions to that state. With this
+option, there cannot be any code following a state transition, so a transition must thus be the final line of a 
+transaction. In option 3, there are conditional \texttt{\small{if in \{state\}}} blocks which allow the user
+to use the transactions and fields of that state while lexically in a different state. 
+
+Participants are asked to complete a short Obsidian contract once for each option. The contract is 
+designed to be a simple yet non-trivial use of state transitions that illustrates the benefits and drawbacks of each 
+option. The goal of this part is to assess participants' reactions and see whether they are able to implement the 
+contract successfully with each option.
+
+In part five, participants are asked to modify the Obsidian program from part three to use one of the three given 
+options for state transitions. They are then asked to explain their reasoning and elaborate on if there was 
+anything confusing about any of the options. 
+
+\subsection{Lottery Ticket Exercise}
+	
+Participants are offered a description of a program that allows users to create and participate in lotteries. Every 
+lottery sells lottery tickets, but a user should only be able to redeem a winning ticket from the lottery where they 
+bought it - thus motivating the use of path dependent types. 
+
+The exercise is divided into three parts. Part one mirrors the voter registration exercises in that participants are 
+asked to implement this program using pseudocode. Again, we want to see how people naturally go about 
+solving this problem. Will using path dependent types - or some feature similar to that - occur to anyone?
+	
+In part two, participants are given an explanation of path dependent types and offered an Obsidian contract that 
+implements the lottery program, but has two transactions left unwritten. Participants are asked to write 
+those transactions. We want to observe whether people are able to understand path dependent types and write 
+correct code using them after only a brief introduction. 
+
+\section{Discussion of Design}
+
+An important part of designing the user study was ensuring that the programming exercises have an appropriate level of difficulty. The 
+scenarios must to be simple enough that participants can comprehend and implement them in the little time they have; however, 
+they must also to be complex enough that implementing them is a non-trivial problem that actually motivates the use of 
+Obsidian's features. Our first several pilot studies revealed that the initial design of our exercises was too complicated, and 
+participants took much longer to read and understand the instructions than we had anticipated. Additionally, there were parts 
+of the exercises that people were continually confused about, which made it difficult to assess their ability to use the language. 
+We could not tell if people were confused about aspects of Obsidian, or about the instructions. 
+
+As we revised the programming exercises, we trended towards simplifying and condensing. For instance, the state diagram in 
+the voter registration exercise originally had six states and five transitions, but was modified to have three states and three 
+transitions; the tutorial was cut from three pages to one and a half; and two parts were removed from the lottery ticket exercise. 
+We also made sure that each exercise targeted exactly one feature: the voter registration exercise is focused only on state 
+transitions, the lottery ticket exercise on path dependent types. 
+
+We found that simplifying the exercises allowed us to collect better data. Participants who completed the simplified exercises 
+spoke their thoughts aloud more consistently and stated their preferences and opinions more confidently. They were able
+come up with better and more interesting solutions to the problems, and write Obsidian code more effectively. 
+But simplifying our programming exercises also created certain limitations. Since the exercises were short and not very 
+complex, participants? opinions may have been based only on a cursory understanding of the language. There may be an option 
+for state transitions, for instance, whose utility only becomes apparent in a large, complicated contract. We are currently missing 
+out on that potential insight. 
+
+\section{Preliminary Findings}
+\ldots
+
+\section{Future Work}
+
+In the future, we will conduct more user studies with our current exercises and introduce new programming
+exercises.
+\begin{itemize}
+\item We will target people in the business domain (e.g. business students and business analysts) with limited
+programming experience, in order to collect data from the intended user base of Obsidian.
+\item We will design programming exercises that further address the usability of linear resources. One question
+of interest, for example, is how to enforce linearity for field accesses and state transitions: what should happen
+when you attempt to access an owned field that has already been read once, and how can you transition
+between states with different owned fields? 
+\item We will design programming exercises that require participants to read and write longer, more complicated 
+Obsidian contracts that actually compile. This will offer us more evidence about whether people are able to write 
+correct Obsidian code. It will also allow participants to gain a deeper, less superficial understand of Obsidian's 
+features and thus offer more constructive feedback about Obsidian's usability. 
+\item We will conduct a user study to evaluate whether people are more likely to write correct, safe code with 
+Obsidian than with Solidity. 
+\end{itemize}
+
+\section{Conclusion}
+\ldots
+
+%% Acknowledgments
+\begin{acks}                            %% acks environment is optional
+                                        %% contents suppressed with 'anonymous'
+  %% Commands \grantsponsor{<sponsorID>}{<name>}{<url>} and
+  %% \grantnum[<url>]{<sponsorID>}{<number>} should be used to
+  %% acknowledge financial support and will be used by metadata
+  %% extraction tools.
+  This material is based upon work supported by the
+  \grantsponsor{GS100000001}{National Science
+    Foundation}{http://dx.doi.org/10.13039/100000001} under Grant
+  No.~\grantnum{GS100000001}{nnnnnnn} and Grant
+  No.~\grantnum{GS100000001}{mmmmmmm}.  Any opinions, findings, and
+  conclusions or recommendations expressed in this material are those
+  of the author and do not necessarily reflect the views of the
+  National Science Foundation.
+\end{acks}
+
+
+%% Bibliography
+\begin{thebibliography}{9}
+\bibitem{Coblenz}
+	M. Coblenz, "Obsidian: A Safer Blockchain Programming Language," 
+	in \emph{Proceedings of the 39th International Conference on Software Engineering -
+	ICSE '17,} 2017.
+\bibitem{Solidity}
+	------, "Solidity," https://solidity.readthedocs.io/en/develop/. Accessed Aug. 3, 2017.
+\bibitem{Amin}
+	 N. Amin, T. Rompf, and M. Odersky. "Foundations of Path-Dependent Types." 
+	 In OOPSLA, 2014.
+\bibitem{Sirer}
+	E. G{\"u}n Sirer, "Thoughts on the DAO hack," 2016. [Online]. 
+	Available: http://hackingdistributed.com/2016/06/17/thoughts-on-the-dao-hack/
+\bibitem{Wadler}
+	P. Wadler, "Linear Types Can Change the World,"
+	IFIP TC, vol. 2, pp. 347 - 359, 1990.
+\bibitem{Delmolino}
+	K. Delmolino, M. Arnett, A. E. Kosba, A. Miller, and E. Shi, 
+	"Step by step towards creating a safe smart contract: Lessons and insights from a cryptocurrency lab."
+	IACR Cryptology ePrint Archive, vol. 2015, p. 460, 2015.
+\bibitem{Myers}
+	B. Myers, A. Ko, T. LaToza, and Y. Yoon, 
+	"Programmers Are Users Too: Human-Centered Methods for Improving Programming Tools," 
+	IEEE Computer, Special issue on UI Design, 49, issue 7, July, 2016, pp. 44-52.
+\end{thebibliography}
+	
+
+
+
+\end{document}
