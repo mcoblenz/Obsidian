@@ -40,7 +40,7 @@
 
 \lstset{
   tabsize=3,
-  basicstyle={\tiny\ttfamily},
+  basicstyle={\small\ttfamily},
   stepnumber=1
 }
 
@@ -200,11 +200,11 @@ minimizing the risk of common security vulnerabilities in blockchain programs. B
 programs written with current domain-specific languages such as Solidity \cite{Solidity} often contain
 exploitable bugs. In a particularly calamitious example, \$50 million was stolen from a contract on the 
 Ethereum blockchain called the DAO \cite{Sirer}. Obsidian contains several core features
- - namely, first-class typestate and linear resources - that will allow users 
+ -- namely, first-class typestate and linear resources -- that will allow users 
 to write programs safely and effectively. The target 
 userbase of Obsidian is business professionals who will use the language to write smart contracts, 
-and its design is thus oriented towards this domain: Obsidian programs consist of contracts -
-similar in function to classes in Java - which contain fields, states, and transactions - similar in
+and its design is thus oriented towards this domain: Obsidian programs consist of contracts --
+similar in function to classes in Java -- which contain fields, states, and transactions -- similar in
 function to methods.
 
 \subsection{Typestate}
@@ -270,13 +270,13 @@ each Treasury t has its own type t.Money.
 
 Path-dependent types assist in writing secure contracts: without such types, every instance of 
 Treasury would share the same Money type, and the programmer would have to manually check 
-that all money deposited into a treasury - for example - is of the correct type. Incorrect or insufficient 
+that all money deposited into a treasury -- for example -- is of the correct type. Incorrect or insufficient 
 checks could leave contracts vulnerable to exploitation. With path-dependent types, all such checks 
 are automatic: we can ensure that only money that comes from a specific treasury is used in 
 transactions within that treasury. 
 
 \subsection{Usability}
-It is crucial that our language is usable - that is, real programmers are able to write correct Obsidian 
+It is crucial that our language is usable -- that is, real programmers are able to write correct Obsidian 
 code easily and efficiently. However, even with seemingly intuitive features, it is not always clear 
 which approach to design is most effective for programmers. For instance, consider the following simple 
 Obsidian contract:
@@ -310,7 +310,7 @@ Obviously this example is extremely simple, but in a program with many different
 transactions, and states, a situation like this could cause serious confusion. Failure to encode state 
 machines properly has been shown to be a significant source of errors in smart-contract 
 programming \cite{Delmolino}. It is critical that users are able to understand and use states easily and 
-effectively - if not, there is potential to create the same security weaknesses as in a 
+effectively -- if not, there is potential to create the same security weaknesses as in a 
 language without states. 
 
 	Similar questions of usability arise with path dependent types. An initial approach we have taken is 
@@ -323,7 +323,7 @@ these logical, sensible solutions to real problems that programmers face? If peo
 understand or choose to use the language's core features, then any of the potential benefits 
 of those features are lost. 
 	We are conducting a user study to investigate these questions of usability in Obsidian \cite{Myers}. The 
-key research questions we address in the study are as follows:
+key research questions we address in the study are as follows: 
 \begin{itemize}
 \item Are states and path dependent types a natural way of 
 	approaching the challenges that arise in blockchain programming?
@@ -417,11 +417,11 @@ anything confusing about any of the options.
 	
 Participants are offered a description of a program that allows users to create and participate in lotteries. Every 
 lottery sells lottery tickets, but a user should only be able to redeem a winning ticket from the lottery where they 
-bought it - thus motivating the use of path dependent types. 
+bought it -- thus motivating the use of path dependent types. 
 
-The exercise is divided into three parts. Part one mirrors the voter registration exercises in that participants are 
+The exercise is divided into two parts. Part one mirrors the voter registration exercises in that participants are 
 asked to implement this program using pseudocode. Again, we want to see how people naturally go about 
-solving this problem. Will using path dependent types - or some feature similar to that - occur to anyone?
+solving this problem. Will using path dependent types -- or some feature similar to that -- occur to anyone?
 	
 In part two, participants are given an explanation of path dependent types and offered an Obsidian contract that 
 implements the lottery program, but has two transactions left unwritten. Participants are asked to write 
@@ -448,12 +448,85 @@ We found that simplifying the exercises allowed us to collect better data. Parti
 spoke their thoughts aloud more consistently and stated their preferences and opinions more confidently. They were able
 come up with better and more interesting solutions to the problems, and write Obsidian code more effectively. 
 But simplifying our programming exercises also created certain limitations. Since the exercises were short and not very 
-complex, participants? opinions may have been based only on a cursory understanding of the language. There may be an option 
+complex, participants' opinions may have been based only on a cursory understanding of the language. There may be an option 
 for state transitions, for instance, whose utility only becomes apparent in a large, complicated contract. We are currently missing 
 out on that potential insight. 
 
 \section{Preliminary Findings}
-\ldots
+
+We used a convenience sample of 12 participants. They had varying levels of programming experience: some were beginners, some 
+experts. None had any knowledge about Obsidian prior to completing the study. The majority of the participants were undergraduates 
+studying computer science, though one was a computer science Ph.D student, and two were working in a business-related fields. Most 
+participants only completed one of the two exercises, and some only completed several parts of one exercise due to time constraints. The 
+exercises were revised and modified across the 12 pilots we did, though their central objectives remained consistent. 
+
+\subsection{Voter Registration Exercise}
+
+Seven participants were given the voter registration exercise. When asked to write pseudocode for the voter registration exercise, the 
+general approach every participant took was to create a globally accessible list that stored the registration status (either registered or 
+unregistered) of each citizen. While this is a logical implementation of the problem, it was not complete secure. For example, some 
+participants created separate lists for registered and unregistered citizens, meaning that it would be possible for a citizen to erroneously 
+appear on both lists. 
+ 	
+Six out of these seven participants were shown a state diagram and asked to modify their pseudocode to use states. Of these six 
+participants, two created explicit state blocks with functions and variables inside. The rest either maintained a global state variable that 
+changed based on the status of a citizen, gave each citizen a state field that changed based on their status (e.g. with syntax such as 
+"Citizen.state = CANVOTE()"), or created empty, immutable states at the top of the program. Several participants did not check whether a 
+citizen was unregistered before processing their application, meaning it would be possible for an already registered citizen to register again 
+-- which is something we expressly prohibited in the instructions. 
+	
+When looking at and writing Obsidian code with states, participants asked a lot of questions about what should be allowed to happen 
+during and after a state transition -- that is, what variable are and are not in scope, what the keyword "this" refers to, and what transaction 
+can be used. Several participants asked if there was any way to check which state you are in currently. One participant noted that he felt it 
+should never be allowed to call transitions from one state while lexically in another, saying "I'm calling S1's transaction from code for Start."
+Another participant said that she felt that state transitions were like return statements, and once you make a transition there should not be 
+any more code in that transaction. Several participants expressed a preference for the state transition option that includes state 
+constructors, maintaining that this option was easier to understand. 
+
+\subsection{Lottery Ticket Exercise}	
+	
+Six participants were given the lottery ticket exercise. When asked to implement the program using pseudocode, four out of the six defined 
+a class for Lottery. The instructions specified that users of the program should be able to buy a ticket from any lottery, but must only be 
+able to redeem a winning ticket from the lottery where they bought the ticket. Four out of the six implemented with program without 
+immediately recognizing or forming a solution to this problem. When the study facilitator pointed out this issue, the approach all four 
+participants took to resolve it was to give every lottery a fixed ID. They then made sure that the function that redeems a ticket must check 
+that the ticket's ID is equal to the lottery ID. In each case, the participant was able to understand the need to have lottery tickets be tied to 
+lotteries in some way, but four out of the six participants had trouble executing this easily and effectively. 
+
+However, this left some room for exploitation: two participants made the lottery's ID a randomly generated number, meaning it would be 
+possible for two lotteries to have the same ID, and one  participant had the ticket owner input the lottery ID themselves upon redeeming 
+the ticket, meaning that if a ticket owner somehow found the ID of a different lottery, they could redeem their ticket from there.
+
+When offered an explanation of path-dependent types and given an Obsidian program to complete, all participants were able to write 
+correct (albeit very simple) code. Four participants were asked to identify the types of two lottery tickets that had been purchased from different 
+lotteries. Since lotteries and lottery tickets had an established dependency relationship, the correct answer was that they should have different 
+types, even though they were both lottery tickets. Of these five participants, two were able to offer the correct answer with accurate reasoning. 
+One vaguely said that it "seems" like they should have different types, but was not sure since it was not indicated explicitly in the code. 
+
+Three participants noted that the use of nested classes was confusing or unclear -- one said, "it's usually bad practice to use nested 
+classes in Java."
+
+\section{Discussion}
+
+The results of the pseudocode portions of both exercises indicate that states and path dependent types are not necessarily the most obvious or 
+natural ways of solving the problems we presented. This makes sense given the backgrounds of our participants: most of them noted that they 
+were writing pseudocode resembling the language they were most comfortable with, and thus may not have thought about inventing new, 
+unfamiliar language features. Moreover, the simplicity of both exercises -- the voter registration exercise in particular -- may have made the 
+need or these features somewhat opaque. Still, we found in many cases that the approaches participants did take to implementing the 
+programs was insufficient or unsafe, and the weaknesses in their programs could have been solved by using states or path dependent 
+types. This result, coupled with our strong background evidence in the validity of these features, motivates us to continue developing these
+features in Obsidian, while further investigating the best ways to implement them and present them in exercises. 
+
+The results of the voter registration exercise indicate that a majority of participants prefer to write state transitions using state constructors. The 
+fact that participants preferred this option after a short coding exercise is not conclusive prove that this is the best option or the one we should 
+implement; however, it does indicate that Obsidian users want it to be simple and easy to tell which variables are in scope and determine the 
+current state of an object. Our results offer evidence that encapsulating all the actions of a state within that state will allow users to understand 
+clearly which state an object is currently in and which transactions and fields they are allowed to use -- thus enabling them to write better code. 
+
+The responses we received from participants in the lottery ticket exercise reveal that nesting contracts is likely not the most understandable
+way to express a dependency relationship. Three participants commented made comments about this, and those who did not were not 
+able to identify path-dependent types correctly. An alternative to this approach would be to prohibit nesting and instead use a keyword
+to denote this relationship (e.g. \texttt{"resource contract LotteryTicket of Lottery"}).
 
 \section{Future Work}
 
@@ -470,12 +543,13 @@ between states with different owned fields?
 Obsidian contracts that actually compile. This will offer us more evidence about whether people are able to write 
 correct Obsidian code. It will also allow participants to gain a deeper, less superficial understand of Obsidian's 
 features and thus offer more constructive feedback about Obsidian's usability. 
-\item We will conduct a user study to evaluate whether people are more likely to write correct, safe code with 
-Obsidian than with Solidity. 
+\item Finally, we will implement the Obsidian language using the results of these studies, 
+and evaluate the final design in a formal study testing its effectiveness.
 \end{itemize}
 
 \section{Conclusion}
-\ldots
+
+
 
 %% Acknowledgments
 \begin{acks}                            %% acks environment is optional
