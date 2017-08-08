@@ -179,7 +179,7 @@ as our preliminary findings.
 We are designing a blockchain-based programming language called Obsidian \cite{Coblenz} with the goal of 
 minimizing the risk of common security vulnerabilities in blockchain programs. Blockchain
 programs written with current domain-specific languages such as Solidity \cite{Solidity} often contain
-exploitable bugs. In a particularly calamitious example, \$50 million was stolen from a contract called \textit{The DAO} on the 
+exploitable bugs. In a particularly calamitous example, \$50 million was stolen from a contract called \textit{The DAO} on the 
 Ethereum blockchain \cite{Sirer}. Obsidian contains core features
  -- namely, first-class typestate, linear resources, and path-dependent types -- that will allow users 
 to write safe, effective programs. The target 
@@ -247,7 +247,7 @@ contract Treasury {
 
 There are certain cases in blockchain programs in which a programmer may want a resource to
 be dependent upon a specific contract. For example, we may want each instance of the 
-\texttt{\small{Treasury}} contract in Fig. \ref{treasury} to mint its own kind of money, given that this is how treasuries work in real life. If money \texttt{\small{m1}} from treasury \texttt{\small{t1}} is used with a distinct treasury \texttt{\small{t2}}, we would like the compiler to give an error message. Obsidian supports this via the inclusion of path-dependent types \cite{Amin}, wherein values can have type members. In the 
+\texttt{\small{Treasury}} contract in Fig. \ref{treasury} to mint its own kind of money. If money \texttt{\small{m1}} from treasury \texttt{\small{t1}} is used with a distinct treasury \texttt{\small{t2}}, we would like the compiler to give an error message. Obsidian supports this via the inclusion of path-dependent types \cite{Amin}, wherein values can have type members. In the 
 above example, the type of Money is dependent upon a specific value of Treasury; put another way, 
 each treasury \texttt{\small{t}} has its own type \texttt{\small{t.Money}}. 
 
@@ -286,7 +286,7 @@ contract C {
 \end{lstlisting}
 
 In transaction \texttt{\small{a}}, does it make sense to call \texttt{\small{b(x1)}} after transitioning 
-to state \texttt{\small{S1}}? Lexically we are still in the 
+to state \texttt{\small{S1}}? Lexically the contract is still in the 
 \texttt{\small{Start}} state, so it is not immediately apparent which variables and transactions are in scope. 
 In a nontrivial program with many different contracts, 
 transactions, and states, a situation like this could cause serious confusion. Failure to encode state 
@@ -539,7 +539,7 @@ In each case, the participant was able to understand the need to have lottery ti
 lotteries in some way, but four out of the six participants had trouble executing this easily and effectively. 
 
 When offered an explanation of path-dependent types and given an Obsidian program to complete, all participants were able to write 
-correct (albeit very simple) code. Four participants were asked to identify the types of two lottery tickets that had been purchased from different 
+correct (albeit very simple) code. Five participants were asked to identify the types of two lottery tickets that had been purchased from different 
 lotteries. Since lotteries and lottery tickets had an established dependency relationship, the correct answer was that they had different 
 types, even though they were both lottery tickets. Of these five participants, two were able to offer this answer with accurate reasoning. 
 One vaguely said that it "seems" like they should have different types, but was not sure since it was not indicated explicitly in the code. 
