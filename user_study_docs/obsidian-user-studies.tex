@@ -148,10 +148,6 @@
 %% Note: \begin{abstract}...\end{abstract} environment must come
 %% before \maketitle command
 \begin{abstract}
-%Blockchains are useful for this. There are blockchain languages that have security problems.
-%We wanna design a new language in a human-centered way. We did that with a natural 
-%programming approach. In this paper, we discuss our approach to the design of user studies,
-%and our preliminary findings
 
 Blockchain platforms such as Ethereum and Hyperledger facilitate transactions between parties that 
 have not established trust. Increased interest in these platforms has motivated the design of programming languages
@@ -164,12 +160,6 @@ language in a human-centered way, conducting exploratory user studies with a nat
 inform our design choices. In this paper, we discuss our approach to the design of a user study, as well
 as our preliminary findings.
 
-%Our language offers first-class typestate and linear resources in order to minimize the risk of common security 
-%vulnerabilities. It is important that users are able to understand the salient features of the 
-%language and write correct, safe code. The purpose of this user study is to explore how
-%people naturally go about expressing and implementing domain-specific problems, and how effectively 
-%users are able to understand states and linear resources. The findings of this study will inform our design 
-%choices with the goal of increasing the usability of the language.
 \end{abstract}
 
 %% Keywords
@@ -186,35 +176,24 @@ as our preliminary findings.
 
 \section{Introduction}
 
-%Blockchain platforms such as Ethereum and Hyperledger are decentralized databases that 
-%facilitate transactions between parties that have not established trust. Increased interest in these 
-%platforms has motivated the design of blockchain-based programming languages like Solidity, which 
-%allow users to create blockchain programs. However, there have been several recent instances
-%where Solidity programs have contained bugs that have been exploited. In a 
-%particularly calamatious example, \$50 million was stolen from a contract on the Etherium blockchain 
-%called the DAO \cite{Sirer}. As this example illustrates, the security of blockchain programs is imperative since 
-%they often involve the exchange of large amounts of money. 
-
 We are designing a blockchain-based programming language called Obsidian \cite{Coblenz} with the goal of 
 minimizing the risk of common security vulnerabilities in blockchain programs. Blockchain
 programs written with current domain-specific languages such as Solidity \cite{Solidity} often contain
-exploitable bugs. In a particularly calamitious example, \$50 million was stolen from a contract, called \textit{The DAO},  on the 
+exploitable bugs. In a particularly calamitous example, \$50 million was stolen from a contract called \textit{The DAO} on the 
 Ethereum blockchain \cite{Sirer}. Obsidian contains core features
- -- namely, first-class typestate and linear resources -- that will allow users 
-to write programs safely and effectively. The target 
-userbase of Obsidian is business professionals who will use the language to write smart contracts, 
+ -- namely, first-class typestate, linear resources, and path-dependent types -- that will allow users 
+to write safe, effective programs. The target 
+user base of Obsidian is business professionals who will use the language to write smart contracts, 
 and its design is thus oriented towards this domain. Obsidian programs consist of contracts --
-similar in function to classes in Java -- which contain fields, states, and transactions -- similar in
-function to methods.
+similar to classes in Java -- which contain fields, states, and transactions -- similar to methods.
 
 \subsection{Typestate}
 
 We (as well as other researchers) have observed that programs in the domains of focus for blockchain platforms are typically state-oriented \cite{State}. Furthermore, the DAO exploit stemmed from invoking a function in an external contract while the calling contract was in an inconsistent state.
 In light of this, Obsidian makes state first-class: an object in Obsidian has a mutable state that restricts which 
-transactions can be invoked on it \cite{Aldrich}. The states of a contract are defined as explicit blocks containing 
-transactions and fields, which can only be accessed if the contract is in the corresponding state. 
+transactions can be invoked on it \cite{Aldrich}. 
 
-\begin{lstlisting}[caption={An example of states in Obsidian.},captionpos=b]
+\begin{lstlisting}[caption={An example of states in Obsidian.}, captionpos = b, label = librarycard]
 contract LibraryCard {
    state NoCard {
        transaction getCard() {
@@ -231,7 +210,9 @@ contract LibraryCard {
 }
 \end{lstlisting}
 
-In the example in Figure 1,  a \texttt{\small{LibraryCard}} is always in one of two
+The states of a contract are defined as explicit blocks containing 
+transactions and fields, which can only be accessed if the contract is in the corresponding state. 
+In the example in Fig. \ref{librarycard}, a \texttt{\small{LibraryCard}} is always in one of two
 states, \texttt{\small{NoCard}} or \texttt{\small{HasCard}}. The transaction 
 \texttt{\small{checkOutBook}} can only be called on an instance of 
 \texttt{\small{LibraryCard}} if it is in the \texttt{\small{HasCard}} state; otherwise, it will throw an exception. 
@@ -242,11 +223,11 @@ The \texttt{\small{->}} operator indicates a state transition.
 Blockchain programs may manage some kind of resource, like a cryptocurrency, or a token 
 indicating a more complicated right (e.g. ownership of a financial option). Linear types \cite{Wadler} are an existing approach that allow the compiler to
 enforce a safe, clean programming model: resources cannot be used more than once, but must be 
-used before leaving the current scope (thus ensuring that a resource is not lost accidentally). However, linear types have seen limited adoption in popular programming languages (though Rust uses a form of linearity for alias control \cite{Rust}) . In this work, we are using user studies to evaluate possible user-facing approaches to integrating linear types into our design with the hope that users will be able to use them effectively and with little training.
+used before leaving the current scope (thus ensuring that a resource is not lost accidentally). 
 
-\begin{lstlisting}[caption={Linear resources in Obsidian},captionpos=b]
+\begin{lstlisting}[caption={Linear resources in Obsidian}, captionpos = b, label = treasury]
 contract Treasury {
- // Money is a resource of Treasury
+   // Money is a resource of Treasury
    resource contract Money { ... }
 
     transaction t1(Money m) {
@@ -262,12 +243,16 @@ contract Treasury {
 }
 \end{lstlisting}
 
-Suppose each Treasury mints its own kind of money. If money \textit{m1} from treasury {t1} is used with a distinct treasury \textit{t2}, we would like the compiler to give an error message. Obsidian supports this via the inclusion of path-dependent types \cite{Amin}, wherein values can have type members. In the 
-above example, the type of Money is dependent upon a specific value of Treasury; put another way, 
-each Treasury \texttt{\small{t}} has its own type \texttt{\small{t.Money}}. 
+\subsection{Path-Dependent Types}
 
-Path-dependent types assist in writing secure contracts: without such types, every instance of 
-Treasury would share the same Money type, and the programmer would have to manually check 
+There are certain cases in blockchain programs in which a programmer may want a resource to
+be dependent upon a specific contract. For example, we may want each instance of the 
+\texttt{\small{Treasury}} contract in Fig. \ref{treasury} to mint its own kind of money. If money \texttt{\small{m1}} from treasury \texttt{\small{t1}} is used with a distinct treasury \texttt{\small{t2}}, we would like the compiler to give an error message. Obsidian supports this via the inclusion of path-dependent types \cite{Amin}, wherein values can have type members. In the 
+above example, the type of Money is dependent upon a specific value of Treasury; put another way, 
+each treasury \texttt{\small{t}} has its own type \texttt{\small{t.Money}}. 
+
+Path-dependent types assist in writing secure contracts: without such types, every
+treasury would share the same money type, and the programmer would have to manually check 
 that all money deposited into a treasury (for example) is of the correct type. Incorrect or insufficient 
 checks could leave contracts vulnerable to exploitation. With path-dependent types, all such checks 
 are automatic: we can ensure that only money that comes from a specific treasury is used in 
@@ -275,7 +260,7 @@ transactions within that treasury.
 
 \subsection{Usability}
 It is crucial that real programmers are able to write \textit{correct} Obsidian 
-code easily and efficiently. However, even with seemingly intuitive features, it is not always clear 
+code easily and efficiently. But even with seemingly intuitive features, it is not always clear 
 which design is most effective for programmers. For instance, consider the following simple 
 Obsidian contract:
 
@@ -300,27 +285,35 @@ contract C {
 }
 \end{lstlisting}
 
-In transaction \texttt{\small{a}}, we transition to state \texttt{\small{S1}} and then call transaction \texttt{\small{b}}. 
-However, does it make sense to call \texttt{\small{b(x1)}} after the transition? While we have just 
-transitioned to \texttt{\small{S1}}, lexically we are still in the 
-Start state, and it is not immediately apparent which variables and transactions are in scope. 
+In transaction \texttt{\small{a}}, does it make sense to call \texttt{\small{b(x1)}} after transitioning 
+to state \texttt{\small{S1}}? Lexically the contract is still in the 
+\texttt{\small{Start}} state, so it is not immediately apparent which variables and transactions are in scope. 
 In a nontrivial program with many different contracts, 
 transactions, and states, a situation like this could cause serious confusion. Failure to encode state 
 machines properly has been shown to be a significant source of errors in smart-contract 
 programming \cite{Delmolino}. It is critical that users are able to understand and use states easily and 
-effectively -- if not, there is potential to create the same or worse bugs, including, security weaknesses, as in a 
+effectively -- if not, there is potential to create the same or worse bugs, including security weaknesses, as in a 
 language without states. 
 
-Similar questions of usability arise with path-dependent types. An initial approach we have taken is 
-to use nested contracts to indicate a dependency relationship; however, nesting has different 
+Similar questions of usability arise with linear resources and path-dependent types. 
+Despite their apparent utility, linear types have seen limited adoption in popular programming languages (though 
+Rust uses a form of linearity for alias control \cite{Rust}), so it is not clear what is the best user-facing
+approach to integrating these types into our design. As for path-dependent types, an initial approach we have 
+taken is to use nested contracts to indicate a dependency relationship; however, nesting has different 
 implications in different languages, and we are not certain that users will be able to recognize the 
 presence and utility of path dependency. 
 
-	A related issue is whether users will want to use these features if they are made available. Are 
+A related issue is whether users will want to use these features if they are made available. Are 
 these logical, sensible solutions to real problems that programmers face? If people do not 
 understand or choose to use the language's core features, then any of the potential benefits 
 of those features are lost. 
-	We are conducting a user study to investigate these questions of usability in Obsidian, consistent with prior work that showed the applicability of human-computer interaction techniques to programming tools \cite{Myers}. One aspect is the \textit{natural programming} approach, in which we ask participants how they would like to express their solutions to programming problems \cite{Natural}. The key research questions we address in the study are as follows: 
+
+We are conducting a user study to investigate the usability of state transitions and path-dependent types in 
+Obsidian (a study of the usability of linear resources will occur in future work). This study is consistent with 
+prior work that showed the applicability of human-computer interaction techniques to programming tools 
+\cite{Myers}. One technique we use is the \textit{natural programming} approach, in which we ask participants 
+how they would like to express their solutions to programming problems \cite{Natural}. The key research 
+questions we address in the study are as follows: 
 \begin{itemize}
 \item Are states and path-dependent types a natural way of 
 	approaching the challenges that arise in blockchain programming?
@@ -333,14 +326,13 @@ are implemented in Obsidian?
 
 \section{User Study Design}
 	
-This study was exploratory rather than evaluative: its purpose was to give us information about the usability of state transitions 
-and path-dependent types so we can make informed choices about the design of our language. 
-We chose these two features as the focus of our study because they are both important safety features 
+This study was exploratory rather than evaluative: its purpose was to give us information about the usability of state transitions and path-dependent types so we can make informed choices about the design of our language. 
+We chose these features as the focus of our study because they are both key safety features 
 that we expect users will use frequently. In addition, they both have several distinct options for their syntactic representation, and the results of the study will factor into which design we choose to implement.  
 
 Participants were asked to complete two programming exercises, both of which were divided into parts that 
-gradually introduced the participant to Obsidian and its core features. 
-Participants were instructed to think aloud throughout the exercise, and were permitted to ask questions. We designed the study so that the whole study could be completed in approximately an hour and a half in order to make it easier for us to find willing participants as well as to limit participant fatigue. We obtained IRB approval for the study; we obtained informed consent from participants and we paid participants \$10/hour for their time.
+gradually introduced the participant to Obsidian and its main features. 
+Participants were instructed to think aloud throughout the exercise, and were permitted to ask questions. We designed the study so that both exercises could be completed in approximately an hour and a half, in order to make it easier for us to find willing participants as well as to limit participant fatigue. We obtained IRB approval for the study; participants gave informed consent and were paid \$10/hour for their time.
 
 \subsection{Voter Registration Exercise}
 
@@ -368,12 +360,12 @@ In part \textbf{four}, participants were shown three options for the syntax and 
 accompanied by a short code example. Participants were presented the options in a random order; the order given 
 here is arbitrary.
 
-In option 1, shown in Fig. \ref{transitions}, users were allowed to use any transaction available in the current \textit{dynamic} state regardless of the lexical context. For instance, it is legal to use the \texttt{\small{toS2}} transaction (on line 5) inside the \texttt{\small{Start}} 
+In option 1, shown in Fig. \ref{transitions1}, users were allowed to use any transaction available in the current \textit{dynamic} state regardless of the lexical context. For instance, it is legal to use the \texttt{\small{toS2}} transaction (on line 5) inside the \texttt{\small{Start}} 
 state, even though that transaction is defined within \texttt{\small{S1}}. This is because there is a transition to 
 \texttt{\small{S1}} in the previous line.
 
 
-\begin{lstlisting}[caption={Option 1 for state transitions},captionpos=b, label=transitions, numbers=left, xleftmargin=.5cm]
+\begin{lstlisting}[caption={Option 1 for state transitions},captionpos=b, label=transitions1, numbers=left, xleftmargin=.5cm]
 contract C {
    state Start {
        transaction t(int x) {
@@ -396,14 +388,67 @@ contract C {
 }
 \end{lstlisting}
 
-In option 2, each state had a constructor that was invoked when the contract transitions to that state. With this
-option, there could not be any code following a state transition; thus a transition must thus be the final line of a 
-transaction. In option 3, there were conditional \texttt{\small{if in \{state\}}} blocks, which allowed the user
+In option 2, shown in Fig. \ref{transitions2}, each state had a constructor that was invoked when the contract transitioned to that state. 
+With this option, there could not be any code following a state transition; thus, a transition had to be the final line of a 
+transaction. 
+
+\begin{lstlisting}[caption = {Option 2 for state transitions}, captionpos = b, label = transitions2, numbers = left,
+xleftmargin = .5cm]
+contract C {
+    state Start {
+        transaction t(int x) {
+            ->S1(x)
+        }
+    }
+
+    state S1 {
+        int x1;
+        S1(int x) { // State constructor
+            x1 = x;
+            ->S2(x1);
+        }
+    }
+
+    state S2 {
+        int x2;
+        S2(int x) { // State constructor 
+            x2 = x;
+        }
+    }
+}
+\end{lstlisting}
+
+In option 3, shown in Fig. \ref{transitions3}, there were conditional \texttt{\small{if in \{state\}}} blocks, which allowed the user
 to lexically nest states so that another state's transactions and fields could be used directly. 
 
+\begin{lstlisting}[caption = {Option 3 for state transitions}, captionpos = b, label = transitions3, numbers = left,
+xleftmargin = .5cm]
+contract C {
+    state Start {
+        transaction t(int x) {
+            ->S1({x1 = x})
+            if in S1 {
+                ->S2({x2 = x1})
+            }
+            if in S2 {
+            	...
+            }
+        }
+    }
+
+    state S1 {
+        int x1;
+    }
+
+    state S2 {
+        int x2;
+    }
+}
+\end{lstlisting}
+
 Participants were asked to complete a short Obsidian contract once for each option. The contract was 
-designed to be a simple yet non-trivial use of state transitions that illustrates the benefits and drawbacks of each 
-option. The goal of this part was to see whether they would be able able to implement the 
+designed to be a simple yet non-trivial use of state transitions that illustrated the benefits and drawbacks of each 
+option. The goal of this part was to see whether participants would be able able to implement the 
 contract successfully with each option, as well as to gather feedback about which option they preferred and why.
 
 In part \textbf{five}, participants were asked to pick one of the three options for state transitions and use it to complete 
@@ -428,8 +473,8 @@ correct code using them after only a brief introduction.
 \section{Discussion of Study Design}
 
 One challenge in designing the user study was ensuring that the programming exercises had an appropriate level of difficulty. The 
-scenarios had to be simple enough that participants could comprehend and implement them in the little time they had; however, 
-they also had to be complex enough that implementing them was a non-trivial problem that actually motivated the use of 
+scenarios had to be simple enough that participants could comprehend and implement them in the little time they had, but 
+ complex enough that implementing them was a non-trivial problem that actually motivated the use of 
 Obsidian's features. Our first several pilot studies revealed that our exercises were too complicated, and 
 participants took much longer to read and understand the instructions than we had anticipated. Additionally, there were parts 
 of the exercises that people were continually confused about, which made it difficult to assess their ability to use the language. 
@@ -470,7 +515,7 @@ citizen was unregistered before processing their application, meaning it would b
 -- something we expressly prohibited in the instructions. 
 	
 When looking at and writing Obsidian code with states, participants asked a lot of questions about what should be allowed to happen 
-during and after a state transition -- that is, what variable are and are not in scope, what the keyword ``\texttt{\small{this}}" refers to, and what transactions 
+during and after a state transition -- that is, what variables are and are not in scope, what the keyword ``\texttt{\small{this}}" refers to, and what transactions 
 can be used. Several participants asked if there was any way to check which state the contract was in. One participant noted that he felt it 
 should never be allowed to call transitions from one state while lexically in another, saying ``I'm calling S1's transaction from code for Start.''
 Another participant said that she felt that state transitions were like return statements, and after completing a transition there should not be 
@@ -487,16 +532,16 @@ immediately recognizing or forming a solution to this problem. When the study fa
 participants took to resolve it was to give every lottery a fixed ID. They then made sure that the function that redeems a ticket must check 
 that the ticket's ID is equal to the lottery ID. 
 
-This implementation left some room for exploitation: two participants made the lottery's ID a randomly generated number, meaning it would be 
-possible for two lotteries to have the same ID, and one  participant had the ticket owner input the lottery ID themselves upon redeeming 
+This implementation left some room for exploitation. Two participants made the lottery's ID a randomly generated number, meaning it would be 
+possible for two lotteries to have the same ID. One participant had the ticket owner input the lottery ID themselves upon redeeming 
 the ticket, meaning that if a ticket owner somehow found the ID of a different lottery, they could redeem their ticket from there.
 In each case, the participant was able to understand the need to have lottery tickets be tied to 
 lotteries in some way, but four out of the six participants had trouble executing this easily and effectively. 
 
 When offered an explanation of path-dependent types and given an Obsidian program to complete, all participants were able to write 
-correct (albeit very simple) code. Four participants were asked to identify the types of two lottery tickets that had been purchased from different 
-lotteries. Since lotteries and lottery tickets had an established dependency relationship, the correct answer was that they should have different 
-types, even though they were both lottery tickets. Of these five participants, two were able to offer the correct answer with accurate reasoning. 
+correct (albeit very simple) code. Five participants were asked to identify the types of two lottery tickets that had been purchased from different 
+lotteries. Since lotteries and lottery tickets had an established dependency relationship, the correct answer was that they had different 
+types, even though they were both lottery tickets. Of these five participants, two were able to offer this answer with accurate reasoning. 
 One vaguely said that it "seems" like they should have different types, but was not sure since it was not indicated explicitly in the code. 
 
 Three participants noted that the use of nested classes was confusing or unclear -- one said, "it's usually bad practice to use nested 
@@ -508,7 +553,7 @@ The results of the pseudocode portions of both exercises indicate that states an
 natural ways of solving the problems we presented. This makes sense given the backgrounds of our participants: most of them noted that they 
 were writing pseudocode resembling the language they were most comfortable with, and thus may not have thought about inventing new, 
 unfamiliar language features. Moreover, the simplicity of both exercises -- the voter registration exercise in particular -- may have made the 
-need or these features somewhat opaque. However, we found it encouraging that two participants independently invented special syntax denoting states, with appropriate scoping for fields and transactions. Further, we found in many cases that the approaches participants did take (reflecting approaches representative of commonly-used languages) to implementing the 
+need for these features somewhat opaque. Still, we found it encouraging that two participants independently invented special syntax denoting states, with appropriate scoping for fields and transactions. Further, we found in many cases that the approaches participants did take (reflecting approaches representative of commonly-used languages) to implementing the 
 programs were insufficient or unsafe, and the weaknesses in their programs could have been solved by using states or path-dependent 
 types. This result, coupled with our strong background evidence of the utility of these features, motivates us to continue developing these
 features in Obsidian, while further investigating the best ways to design, present, and evaluate them. 
@@ -595,7 +640,9 @@ contracts more safely and easily than currently available blockchain DSLs.
 	``Programmers Are Users Too: Human-Centered Methods for Improving Programming Tools,"
 	IEEE Computer, Special issue on UI Design, 49, issue 7, July, 2016, pp. 44-52.
 \bibitem{State}
-	Ethereum Foundation, ``Common patterns,''	http://solidity.readthedocs.io/en/develop/common-patterns.html.	Accessed Jan. 4, 2017.
+	Ethereum Foundation, ``Common patterns,''
+	http://solidity.readthedocs.io/en/develop/common-patterns.html.
+	Accessed Jan. 4, 2017.
 \bibitem{Rust}
 	N. D. Matsakis and F. S. Klock, II. 2014. ``The Rust language." Ada Lett. 34, 3 (October 2014), 103-104.
 \bibitem{Natural}
