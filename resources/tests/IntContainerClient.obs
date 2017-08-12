@@ -1,8 +1,8 @@
 import "resources/tests/IntContainer.obs"
 
 main contract IntContainerClient {
-	transaction main(remote IntContainer container) {
-		int oldX = container.setX(42);
-		container.setX(oldX);
-	}
+    transaction main(remote IntContainer container) {
+        int oldX = container.setX(3);
+        container.setX(4);
+    }
 }
