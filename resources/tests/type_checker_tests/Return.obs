@@ -1,4 +1,7 @@
 unique contract C_Unique {
+  C_Unique() {
+    ->S;
+  }
   state S {}
 }
 

@@ -1,5 +1,9 @@
 main contract C {
 
+    C() {
+        ->Start;
+    }
+
     state Start {
 
         transaction a() {

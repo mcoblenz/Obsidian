@@ -258,8 +258,14 @@ case class CannotConvertPathError(badPart: String, expr: Expression, typ: RawTyp
     val msg: String = s"Cannot convert path in type '$typ': '$badPart' is equivalent to" +
         s"a non-variable expression '$expr'"
 }
-case class UnreachableCodeError() extends Error{
+case class UnreachableCodeError() extends Error {
     val msg: String = s"Statement is unreachable"
+}
+case class NoStartStateError(contractName: String) extends Error {
+    val msg: String = s"Constructor for '$contractName' does not transition to a named state"
+}
+case class NoConstructorError(contractName: String) extends Error {
+    val msg: String = s"Contract '$contractName' must have a constructor since it contains states"
 }
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
@@ -1160,6 +1166,25 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         hasRet
     }
 
+    /* returns true if the sequence of statements includes a state transition, or an if/else statement
+    * where both branches have state transitions, and false otherwise
+    */
+    private def checkTransition(c: Constructor, statements: Seq[Statement]) : Boolean = {
+        var hasTransition = false
+
+        for (statement <- statements) {
+
+            statement match {
+                case Transition(_, _) => hasTransition = true
+                case IfThenElse(_, s1, s2) =>
+                    hasTransition = checkTransition(c, s1) & checkTransition(c, s2)
+                case _ => ()
+            }
+        }
+
+        hasTransition
+    }
+
     private def checkStatementSequence(
                                           decl: InvokableDeclaration,
                                           context: Context,
@@ -1727,7 +1752,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def checkConstructor(constr: Constructor, table: ContractTable): Unit = {
+    private def checkConstructor(constr: Constructor, table: ContractTable, hasStates: Boolean): Unit = {
 
         // maybe this error should be handled in the parser
         if(constr.name != table.name) {
@@ -1769,6 +1794,11 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
+        // if the contract contains states, its constructor must contain a state transition
+        if (hasStates & !checkTransition(constr, constr.body)) {
+            logError(constr, NoStartStateError(constr.name))
+        }
+
     }
 
     private def checkContract(contract: Contract): Unit = {
@@ -1778,9 +1808,13 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 case t: Transaction => checkTransaction(t, table)
                 case s: State => checkState(table, s)
                 case f: Field => checkField(f, table)
-                case c: Constructor => checkConstructor(c, table)
+                case c: Constructor => checkConstructor(c, table, !table.stateLookup.isEmpty)
                 case _ => () // TODO
             }
+        }
+
+        if (table.constructors.isEmpty & !table.stateLookup.isEmpty) {
+            logError(contract, NoConstructorError(contract.name))
         }
     }
 

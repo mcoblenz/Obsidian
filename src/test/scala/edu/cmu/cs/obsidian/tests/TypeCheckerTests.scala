@@ -120,11 +120,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def fieldsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/CheckFields.obs",
-            (StateSpecificSharedError(), 10)
+            (StateSpecificSharedError(), 16)
               ::
-              (StateSpecificReadOnlyError(), 11)
+              (StateSpecificReadOnlyError(), 17)
               ::
-              (StateSpecificReadOnlyError(), 13)
+              (StateSpecificReadOnlyError(), 19)
               ::
               Nil
         )
@@ -132,25 +132,25 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
-            (SubTypingError(BoolType(), IntType()), 17)
+            (SubTypingError(BoolType(), IntType()), 22)
               ::
               (SubTypingError(
                   OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
                   SharedRef(null, NoPathType(JustContractType("C_Shared")))),
-                19)
+                24)
               ::
-              (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 21)
+              (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 26)
               ::
-              (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 22)
+              (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 27)
               ::
               (SubTypingError(
                   SharedRef(null, NoPathType(JustContractType("C_Shared"))),
                   SharedRef(null, NoPathType(StateType("C_Shared", "S")))),
-                23)
+                28)
               ::
-              (VariableUndefinedError("j"), 27)
+              (VariableUndefinedError("j"), 32)
               ::
-              (AssignmentError(), 28)
+              (AssignmentError(), 33)
               ::
               Nil
         )
@@ -158,31 +158,31 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def returnTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Return.obs",
-            (CannotReturnError("t_no_ret"), 7)
+            (CannotReturnError("t_no_ret"), 10)
               ::
-              (UnreachableCodeError(), 8)
+              (UnreachableCodeError(), 11)
               ::
-              (MustReturnError("t_has_ret"), 13)
+              (MustReturnError("t_has_ret"), 16)
               ::
-              (UnreachableCodeError(), 13)
+              (UnreachableCodeError(), 16)
               ::
               (SubTypingError(
                   OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
                   OwnedRef(null, NoPathType(StateType("C_Unique", "S")))),
-                18)
+                21)
               ::
-              (UnreachableCodeError(), 18)
+              (UnreachableCodeError(), 21)
               ::
-              (MustReturnError("t_ret_nonprimitive"), 19)
+              (MustReturnError("t_ret_nonprimitive"), 22)
               ::
               (SubTypingError(IntType(),
-                  OwnedRef(null, NoPathType(JustContractType("C_Unique")))), 20)
+                  OwnedRef(null, NoPathType(JustContractType("C_Unique")))), 23)
               ::
-              (MustReturnError("no_return"), 25)
+              (MustReturnError("no_return"), 28)
               ::
-              (UnreachableCodeError(), 34)
+              (UnreachableCodeError(), 37)
               ::
-              (MustReturnError("branching_return2"), 43)
+              (MustReturnError("branching_return2"), 46)
               ::
               Nil
         )
@@ -324,14 +324,14 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def stateTest(): Unit = {
       runTest("resources/tests/type_checker_tests/States.obs",
-          (TransitionUpdateError(Set("x")), 7)
+          (TransitionUpdateError(Set("x")), 11)
           ::
-          (StateUndefinedError("C", "S3"), 8)
+          (StateUndefinedError("C", "S3"), 12)
           ::
           (FieldUndefinedError(
-              StateType("C","S2"), "x"), 10)
+              StateType("C","S2"), "x"), 14)
           ::
-          (TransitionError(), 16)
+          (TransitionError(), 20)
           ::
           Nil
       )
@@ -363,6 +363,16 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def implicitPathDependentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ImplicitPDT.obs",
             (UnusedOwnershipError("b"), 7)::Nil)
+    }
+
+    @Test def noStartStateTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/StartState.obs",
+            (NoStartStateError("HasStates"), 12)
+            ::
+            (NoConstructorError("StatesNoConstr"), 31)
+            ::
+            Nil
+        )
     }
 
 }
