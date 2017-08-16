@@ -1218,7 +1218,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
     /* returns true if the sequence of statements includes a return statement, or an if/else statement
      * where both branches have return statements, and false otherwise
      */
-    private def checkReturnStatement(tx: Transaction, statements: Seq[Statement]) : Boolean = {
+    private def hasReturnStatement(tx: Transaction, statements: Seq[Statement]) : Boolean = {
         var hasRet = false
 
         for (statement <- statements) {
@@ -1230,7 +1230,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             statement match {
                 case Return() | ReturnExpr(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
-                    hasRet = checkReturnStatement(tx, s1) & checkReturnStatement(tx, s2)
+                    hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
                 case _ => ()
             }
         }
@@ -1241,20 +1241,19 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
     /* returns true if the sequence of statements includes a state transition, or an if/else statement
     * where both branches have state transitions, and false otherwise
     */
-    private def checkTransition(c: Constructor, statements: Seq[Statement]) : Boolean = {
-        var hasTransition = false
+    private def hasTransition(statements: Seq[Statement]) : Boolean = {
+        var transition = false
 
         for (statement <- statements) {
-
             statement match {
-                case Transition(_, _) => hasTransition = true
+                case Transition(_, _) => transition = true
                 case IfThenElse(_, s1, s2) =>
-                    hasTransition = checkTransition(c, s1) & checkTransition(c, s2)
+                    transition = hasTransition(s1) && hasTransition(s2)
                 case _ => ()
             }
         }
 
-        hasTransition
+        transition
     }
 
     private def checkStatementSequence(
@@ -1831,7 +1830,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // todo: analyze that there is a return in every branch
-        if (tx.retType.isDefined & !checkReturnStatement(tx, tx.body)) {
+        if (tx.retType.isDefined && !hasReturnStatement(tx, tx.body)) {
             logError(tx.body.last, MustReturnError(tx.name))
         }
 
@@ -1896,7 +1895,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // if the contract contains states, its constructor must contain a state transition
-        if (hasStates & !checkTransition(constr, constr.body)) {
+        if (hasStates && !hasTransition(constr.body)) {
             logError(constr, NoStartStateError(constr.name))
         }
 
@@ -1914,7 +1913,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
-        if (table.constructors.isEmpty & !table.stateLookup.isEmpty) {
+        if (table.constructors.isEmpty && !table.stateLookup.isEmpty) {
             logError(contract, NoConstructorError(contract.name))
         }
     }
