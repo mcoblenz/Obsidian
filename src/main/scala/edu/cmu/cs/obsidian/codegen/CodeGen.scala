@@ -47,7 +47,7 @@ class CodeGen (val target: Target) {
         "__state" + stName
     }
     private def transactionFlagName(txName: String): String = {
-        txName + "__flag"
+        "__" + txName + "__flag"
     }
     /* This method dynamically checks type state and copies the value of conserved fields
      * (i.e. defined in both states) from one state to another */
@@ -640,7 +640,7 @@ class CodeGen (val target: Target) {
 
         val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
         translateContract(aContract, newClass, translationContext)
-        generateTxFlags(newClass, translationContext)
+        generateTxReentrantFlags(newClass, translationContext)
 
         target match {
             case Client(mainContract) =>
@@ -680,7 +680,7 @@ class CodeGen (val target: Target) {
     /* this method generates a flag for each transaction of each contract in order to check
      * whether a reentrant call has been made.
      */
-    private def generateTxFlags(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
+    private def generateTxReentrantFlags(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
         val txNames = translationContext.txLookup.keys
         for (tx <- txNames) {
             newClass.field(JMod.PUBLIC, model.BOOLEAN, transactionFlagName(tx), JExpr.lit(false))
@@ -815,7 +815,7 @@ class CodeGen (val target: Target) {
                         case IntType() => txInvoke.invoke("toByteArray")
                         case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("booleanToBytes").arg(txInvoke)
                         case StringType() => txInvoke.invoke("getBytes")
-                        case _ => txInvoke.invoke("archiveBytes")
+                        case _ => txInvoke.invoke("__archiveBytes")
                     }
                 )
             } else {
@@ -1527,7 +1527,7 @@ class CodeGen (val target: Target) {
         val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
-        translateBody(meth.body(), c.body, translationContext, localContext, c)
+        translateBody(meth.body(), c.body, translationContext, localContext)
 
         meth
     }
@@ -1547,7 +1547,7 @@ class CodeGen (val target: Target) {
         val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
-        translateBody(meth.body(), c.body, translationContext, localContext, c)
+        translateBody(meth.body(), c.body, translationContext, localContext)
 
         meth
     }
@@ -1564,8 +1564,14 @@ class CodeGen (val target: Target) {
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, tx.name)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
 
+        /* We put the method body in a try block, and set the tx flag to false in a finally
+         * block. Thus, even if a transaction is thrown, or there is a return statement,
+         * the tx flag is still set to false once the whole transaction has been executed.
+         */
+        val jTry = meth.body()._try()
+
         /* if the flag has already been set, that means there has been a reentrancy */
-        val jIf = meth.body()._if(JExpr.ref(transactionFlagName(tx.name)))
+        val jIf = jTry.body()._if(JExpr.ref(transactionFlagName(tx.name)))
         jIf._then()._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException")))
 
         /* otherwise, we set the flag to true */
@@ -1588,10 +1594,10 @@ class CodeGen (val target: Target) {
         val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
-        translateBody(jIf._else(), tx.body, translationContext, localContext, tx)
+        translateBody(jIf._else(), tx.body, translationContext, localContext)
 
         /* once the whole transaction has been executed, we set the flag back to false */
-        if (tx.retType.isEmpty) jIf._else().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(false))
+        jTry._finally().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(false))
 
         meth
     }
@@ -1623,8 +1629,7 @@ class CodeGen (val target: Target) {
                     body: JBlock,
                     statement: Statement,
                     translationContext: TranslationContext,
-                    localContext: Map[String, JVar],
-                    inDecl: Declaration): Map[String, JVar] = {
+                    localContext: Map[String, JVar]): Map[String, JVar] = {
         var nextContext = localContext
         statement match {
             case VariableDecl(typ, name) =>
@@ -1636,16 +1641,7 @@ class CodeGen (val target: Target) {
             case VariableDeclWithInit(typ, name, e) =>
                 nextContext = localContext.updated(name, body.decl(resolveType(typ), name, translateExpr(e, translationContext, localContext)))
             case Return => body._return()
-            case ReturnExpr(e) =>
-                val (declName, retType) = inDecl match {
-                    case Transaction(name,_, ret,_,_) => (name, ret.get)
-                    case Func(name,_, ret,_) => (name, ret.get)
-                    //shouldn't happen
-                    case _ => return nextContext
-                }
-                body.decl(resolveType(retType), declName + "_return_val", translateExpr(e, translationContext, localContext))
-                body.assign(JExpr.ref(transactionFlagName(declName)), JExpr.lit(false))
-                body._return(JExpr.ref(declName + "_return_val"))
+            case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newState, updates) =>
                 /* We must (in this order):
                  *     1) construct the new state's inner class,
@@ -1689,17 +1685,17 @@ class CodeGen (val target: Target) {
 
             case If(e, s) =>
                 translateBody(body._if(translateExpr(e, translationContext, localContext))._then(),
-                              s, translationContext, localContext, inDecl)
+                              s, translationContext, localContext)
             case IfThenElse(e, s1, s2) =>
                 val jIf = body._if(translateExpr(e, translationContext, localContext))
-                translateBody(jIf._then(), s1, translationContext, localContext, inDecl)
-                translateBody(jIf._else(), s2, translationContext, localContext, inDecl)
+                translateBody(jIf._then(), s1, translationContext, localContext)
+                translateBody(jIf._else(), s2, translationContext, localContext)
 
             case TryCatch(s1, s2) =>
                 val jTry = body._try()
                 val jCatch = jTry._catch(model.ref("RuntimeException"))
-                translateBody(jTry.body(), s1, translationContext, localContext, inDecl)
-                translateBody(jCatch.body(), s2, translationContext, localContext, inDecl)
+                translateBody(jTry.body(), s1, translationContext, localContext)
+                translateBody(jCatch.body(), s2, translationContext, localContext)
 
             case Switch(e, cases) =>
                 val h :: remainingCases = cases
@@ -1711,12 +1707,12 @@ class CodeGen (val target: Target) {
                      * to link references to declarations */
                     JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
                 val jIf = body._if(eqState(h.stateName))
-                translateBody(jIf._then(), h.body, translationContext, localContext, inDecl)
+                translateBody(jIf._then(), h.body, translationContext, localContext)
 
                 var jPrev = jIf
                 for (_case <- remainingCases) {
                     jPrev = jPrev._elseif(eqState(_case.stateName))
-                    translateBody(jPrev._then(), _case.body, translationContext, localContext, inDecl)
+                    translateBody(jPrev._then(), _case.body, translationContext, localContext)
                 }
             case LocalInvocation(methName, args) =>
                 addArgs(translationContext.invokeTransactionOrFunction(methName),
@@ -1741,11 +1737,10 @@ class CodeGen (val target: Target) {
                     body: JBlock,
                     statements: Seq[Statement],
                     translationContext: TranslationContext,
-                    localContext: Map[String, JVar],
-                    inDecl: Declaration): Unit = {
+                    localContext: Map[String, JVar]): Unit = {
         var nextContext = localContext
         for (st <- statements) {
-            nextContext = translateStatement(body, st, translationContext, nextContext, inDecl)
+            nextContext = translateStatement(body, st, translationContext, nextContext)
         }
     }
 
@@ -1768,6 +1763,6 @@ class CodeGen (val target: Target) {
         val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
-        translateBody(meth.body(), decl.body, translationContext, localContext, decl)
+        translateBody(meth.body(), decl.body, translationContext, localContext)
     }
 }

@@ -131,6 +131,7 @@ class ChaincodeBaseServer {
                 retBytes = base.run(base.stub, txName, txArgs);
             } catch (ReentrancyException re) {
                 System.out.println("Error: Reentrant call made");
+                re.printStackTrace(System.out);
                 retBytes = null;
                 failureMessage = ": Reentrant call made";
             }
