@@ -228,7 +228,8 @@ case class TransitionError() extends Error {
     val msg: String = s"'this' must be typed to a particular state in order to transition"
 }
 case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
-    val msg: String = s"Must specify the following fields in the update clause: '$mustSupply'"
+    val fieldNames = mustSupply.mkString(", ")
+    val msg: String = s"Must specify the following fields in the update clause: '$fieldNames'"
 }
 case class AssignmentError() extends Error {
     val msg: String = s"Assignment target must be a variable or a field"
