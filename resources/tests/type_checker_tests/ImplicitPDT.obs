@@ -16,8 +16,38 @@ shared contract C {
 main contract UsesC {
     const C f;
 
-    transaction t() {
+    /* try all combinations */
+
+    transaction t1() {
         f.T x = f.t2();
         f.t1(x);
+    }
+    transaction t2() {
+        this.f.T x = f.t2();
+        f.t1(x);
+    }
+    transaction t3() {
+        this.f.T x = this.f.t2();
+        f.t1(x);
+    }
+    transaction t4() {
+        f.T x = this.f.t2();
+        f.t1(x);
+    }
+    transaction t5() {
+        f.T x = f.t2();
+        this.f.t1(x);
+    }
+    transaction t6() {
+        this.f.T x = f.t2();
+        this.f.t1(x);
+    }
+    transaction t7() {
+        f.T x = this.f.t2();
+        this.f.t1(x);
+    }
+    transaction t8() {
+        this.f.T x = this.f.t2();
+        this.f.t1(x);
     }
 }

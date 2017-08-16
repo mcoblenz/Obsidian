@@ -74,10 +74,11 @@ object Parser extends Parsers {
     }
 
     private def parseType = {
-        val parsePathNode = (parseIdLower | ThisT()) ~ DotT() ^^ {
+        val parsePathNode = (parseIdLower | ThisT() | ParentT()) ~ DotT() ^^ {
             case name ~ DotT() =>
                 name match {
                     case _: ThisT => "this"
+                    case _: ParentT => "parent"
                     case id => id.asInstanceOf[Identifier]._1
                 }
         }
@@ -295,10 +296,12 @@ object Parser extends Parsers {
         val parseLiterals = parseTrue | parseFalse | parseNumLiteral | parseStringLiteral
 
         val parseThis = { ThisT() ^^ (t => This().setLoc(t))}
+        val parseParent = { ParentT() ^^ (p => Parent().setLoc(p))}
 
         val fail = failure("expression expected")
 
-        val simpleExpr = parseThis | parseNew | parseLocalInv | parseLiterals | parseVar | parenExpr | fail
+        val simpleExpr = parseThis | parseParent | parseNew | parseLocalInv |
+            parseLiterals | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }

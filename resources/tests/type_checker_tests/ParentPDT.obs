@@ -1,0 +1,21 @@
+shared contract C {
+    shared contract T {
+        this.parent.T f;
+        C x;
+        transaction t(T arg) {
+            T a = this;
+            this.parent.T b = arg;
+            this.parent.T c = this;
+            parent.T d = arg;
+            parent.T e = this;
+            C f = parent;
+        }
+    }
+}
+
+main contract UsesC {
+    transaction t() {
+        readonly UsesC a = this;
+        UsesC b = parent;
+    }
+}

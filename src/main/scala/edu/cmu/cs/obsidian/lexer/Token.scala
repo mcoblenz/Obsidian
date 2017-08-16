@@ -37,6 +37,7 @@ case class BoolT() extends Token { override def toString: String = "bool"}
 case class TrueT() extends Token { override def toString: String = "true"}
 case class FalseT() extends Token { override def toString: String = "false"}
 case class ThisT() extends Token { override def toString: String = "this"}
+case class ParentT() extends Token { override def toString: String = "parent"}
 case class ImportT() extends Token { override def toString: String = "import"}
 case class RemoteT() extends Token { override def toString: String = "remote"}
 case class EnsuresT() extends Token { override def toString: String = "ensures"}

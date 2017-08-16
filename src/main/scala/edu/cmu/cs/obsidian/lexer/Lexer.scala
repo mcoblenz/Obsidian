@@ -49,6 +49,7 @@ object Lexer extends RegexParsers {
         case "true" => TrueT()
         case "false" => FalseT()
         case "this" => ThisT()
+        case "parent" => ParentT()
         case "import" => ImportT()
         case "remote" => RemoteT()
         case "ensures" => EnsuresT()

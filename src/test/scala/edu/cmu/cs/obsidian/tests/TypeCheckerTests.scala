@@ -368,11 +368,20 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def noStartStateTest(): Unit = {
         runTest("resources/tests/type_checker_tests/StartState.obs",
             (NoStartStateError("HasStates"), 12)
-            ::
-            (NoConstructorError("StatesNoConstr"), 31)
-            ::
-            Nil
+                ::
+                (NoConstructorError("StatesNoConstr"), 31)
+                ::
+                Nil
         )
+    }
+
+    @Test def parentPathDependentTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/ParentPDT.obs",
+            (NoParentError("UsesC"), 19)::Nil)
+    }
+
+    @Test def thisAndParentPathDependentTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/ThisTypePDT.obs", Nil)
     }
 
 }

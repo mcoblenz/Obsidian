@@ -6,7 +6,13 @@ import scala.collection.immutable.TreeSet
 
 /* Important Note: be sure to take into account the fact that AST nodes need a location.
  * To construct a new AST node in this file, explicitly set the location using [setLoc] */
+
 object AstTransformer {
+
+    /* [disamiguate] functions change the [AstType]s in a ast node to have a standardized form.
+     * This standardized form has the following rule:
+     * - all path-dependent types start with either a local variable or "this"
+     */
 
     def disambiguateProgram(table: SymbolTable): SymbolTable = {
         val newContracts = table.contractLookup.values.map(disambiguateContract)
@@ -81,30 +87,38 @@ object AstTransformer {
         typ match {
 
             case AstContractType(mods, cName) =>
-                (insideOf.contract.childContract(cName), insideOf.contract.name) match {
-                    case (_, cNameOfThis) if cNameOfThis == cName =>
-                        AstPathContractType(mods, "this"::Nil, cName).setLoc(typ)
-                    case (Some(_), _) =>
-                        AstPathContractType(mods, "this"::Nil, cName).setLoc(typ)
-                    case _ => typ
+                if (insideOf.contract.hasParent && insideOf.contract.name == cName) {
+                    AstPathContractType(mods, "this"::"parent"::Nil, cName).setLoc(typ)
+                }
+                else if (insideOf.contract.childContract(cName).isDefined) {
+                    AstPathContractType(mods, "this"::Nil, cName).setLoc(typ)
+                }
+                else {
+                    typ
                 }
 
             case AstStateType(mods, cName, sName) =>
-                (insideOf.contract.childContract(cName), insideOf.contract.name) match {
-                    case (_, cNameOfThis) if cNameOfThis == cName =>
-                        AstPathStateType(mods, "this"::Nil, cName, sName).setLoc(typ)
-                    case (Some(_), _) =>
-                        AstPathStateType(mods, "this"::Nil, cName, sName).setLoc(typ)
-                    case _ => typ
+                if (insideOf.contract.hasParent && insideOf.contract.name == cName) {
+                    AstPathStateType(mods, "this"::"parent"::Nil, cName, sName).setLoc(typ)
+                }
+                else if (insideOf.contract.childContract(cName).isDefined) {
+                    AstPathStateType(mods, "this"::Nil, cName, sName).setLoc(typ)
+                }
+                else {
+                    typ
                 }
 
             case oldTyp@AstPathContractType(_, path, _) =>
-                if ((inScope contains path.head) || path.head == "this") typ
-                else oldTyp.copy(path = "this" +: oldTyp.path).setLoc(oldTyp)
+                if ((inScope contains path.head) || path.head == "this")
+                    typ
+                else
+                    oldTyp.copy(path = "this" +: oldTyp.path).setLoc(oldTyp)
 
             case oldTyp@AstPathStateType(_, path, _, _) =>
-                if ((inScope contains path.head) || path.head == "this") typ
-                else oldTyp.copy(path = "this" +: oldTyp.path).setLoc(oldTyp)
+                if ((inScope contains path.head) || path.head == "this")
+                    typ
+                else
+                    oldTyp.copy(path = "this" +: oldTyp.path).setLoc(oldTyp)
 
             case other => other
 
