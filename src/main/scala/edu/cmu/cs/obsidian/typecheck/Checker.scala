@@ -1353,8 +1353,8 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                     case Some(t) =>
                         extractRawType(t) match {
                             /* shouldn't happen, but can be reported later */
-                            case None => tr
                             case Some(PathType(newPath, _)) => PathType(newPath ++ rest, ts)
+                            case _ => tr
                         }
                     /* shouldn't happen, but can be reported later */
                     case _ => tr
