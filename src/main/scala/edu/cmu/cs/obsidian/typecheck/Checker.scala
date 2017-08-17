@@ -268,6 +268,7 @@ case class NoStartStateError(contractName: String) extends Error {
 case class NoConstructorError(contractName: String) extends Error {
     val msg: String = s"Contract '$contractName' must have a constructor since it contains states"
 }
+
 case class NoParentError(cName: String) extends Error {
     val msg: String = s"Contract $cName has no parent contract"
 }
@@ -1595,7 +1596,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 val badInitializations = updated.diff(newFields.toSet)
                 if (uninitialized.nonEmpty) logError(s, TransitionUpdateError(uninitialized))
                 for (s <- badInitializations) {
-                    val err = FieldUndefinedError(extractSimpleType(context("this")).get, s)
+                    val err = FieldUndefinedError(newStateTable.simpleTypeOf, s)
                     logError(updates.find(_._1.name == s).get._1, err)
                 }
 

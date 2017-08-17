@@ -15,7 +15,7 @@ unique contract C2 {
 }
 
 main contract C {
-    // bad
+    // bad because state specific information can change via other references
     C1.S f1;
     readonly C2.S f4;
     readonly C1.S f2;

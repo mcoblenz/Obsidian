@@ -1,3 +1,6 @@
+/* checks type-checking of return statements and various flow-sensitive
+ * properties about statement sequences w.r.t. returns */
+
 unique contract C_Unique {
   C_Unique() {
     ->S;
@@ -7,24 +10,31 @@ unique contract C_Unique {
 
 contract C {
     transaction t_no_ret() {
+        // should fail: cannot return a value in a transaction with no return type
         return 3;
+        // should fail: unreachable
         return;
     }
 
     transaction t_has_ret() returns int {
         return 5;
+        // should fail twice: unreachable code, and also return statement has no value
         return;
     }
 
     transaction t_ret_nonprimitive() returns C_Unique {
         return new C_Unique();
+        // should fail twice, once for subtyping and again for unreachable code
         C_Unique.S cs = new C_Unique();
+        // should fail: no return value
         return;
+        // should fail: wrong type
         return 5;
         return cs;
     }
 
     transaction no_return() returns int {
+        // should fail: no return statements
         int x = 5;
     }
 
@@ -34,6 +44,7 @@ contract C {
         } else {
             return 3;
         }
+        // should fail: unreachable code
         int x = 2;
     }
 
@@ -43,6 +54,7 @@ contract C {
         } else {
             int x = 3;
         }
+        // should fail: no return in every branch
         int y = 3;
     }
 

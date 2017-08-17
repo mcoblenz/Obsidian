@@ -1,7 +1,11 @@
+// checks that undefined variable errors are thrown at proper times
+
 main contract Variable {
 
     transaction accessVariable() {
+        // error: x not defined
         x = 7;
+        // error: z not defined (use before definition)
         int y = z + 5;
 
         int z = 5;

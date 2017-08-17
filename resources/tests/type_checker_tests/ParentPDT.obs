@@ -18,6 +18,7 @@ shared contract C {
 main contract UsesC {
     transaction t() {
         readonly UsesC a = this;
+        // should fail: no parent for UsesC
         UsesC b = parent;
     }
 }

@@ -5,7 +5,7 @@
  * like an typo in a type or variable name, is responsible) */
 contract C {
     transaction t1() {
-        // [d] will have BottomType because [D] doesn't exist
+        // should fail: [d] will have BottomType because [D] doesn't exist
         D d = 5;
         // test with arithmetic stuff
         int i = d + 3;

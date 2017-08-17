@@ -4,10 +4,15 @@ main contract Comparisons {
 
     transaction doComparisons() {
         bool a = 3 < 4;
+        // should fail: bool is not int
         a = 2 < true;
+        // should fail: bool is not int
         bool b = true > 6;
+        // should fail: string is not int
         bool c = "hi" <= 7;
+        // should fail: string is not int
         bool d = 8 >= "aaaa";
+        // should fail twice (2 errors): bool is not int
         bool e = true > false;
     }
 

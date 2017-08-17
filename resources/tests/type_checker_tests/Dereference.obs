@@ -19,8 +19,9 @@ main contract Construct {
       Thing thing1 = new Thing(5);
 
       int a = thing1.x;
+      // should fail: no such field
       int b = thing1.w;
-
+      // should fail: not dereferenceable
       string c = "hi".y;
 
     }

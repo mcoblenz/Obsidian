@@ -8,15 +8,19 @@ main contract C {
 
         transaction a() {
             ->S1;
+            // should fail: need to assign x
             ->S2;
+            // should fail: no such state
             ->S3;
             ->S2({x = 2});
+            // should fail: no such field x
             ->S1({x = 1});
         }
 
     }
 
     transaction b() {
+        // should fail: transitioning when we don't know the state
         ->S1;
     }
 

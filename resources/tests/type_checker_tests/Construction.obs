@@ -23,6 +23,7 @@ shared contract Thing {
         this.z = z;
     }
 
+    // should fail: constructor name error
     OtherThing(int x) {
         this.x = x;
     }
@@ -32,8 +33,11 @@ main contract Construct {
 
     transaction constructThings() {
         Thing thing1 = new Thing();
+        // should fail for each constructor above
         Thing thing2 = new Thing("hi");
+        // should fail for each constructor above
         Thing thing3 = new Thing(1, 2, 3);
+        // should fail twice: undefined contract
         Stuff stuff = new Stuff();
     }
 

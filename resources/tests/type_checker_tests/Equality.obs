@@ -8,8 +8,11 @@ main contract Equality {
         string str1 = "hi";
         string str2 = "a";
 
+        // should fail: incompatible types
         bool c = (a == b);
+        // should fail: incompatible types
         bool d = (true != 5);
+        // should fail: incompatible types
         bool e = (1 == false);
         bool f = (1 != 3);
         bool g = (2 == 2);

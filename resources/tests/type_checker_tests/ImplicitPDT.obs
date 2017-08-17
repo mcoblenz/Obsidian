@@ -6,6 +6,7 @@ shared contract C {
         state S2 {}
     }
 
+    // should fail but not important to test: unused ownership
     transaction t1(T b) {
         return;
     }

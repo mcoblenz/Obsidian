@@ -4,6 +4,7 @@ shared contract C {
         state S2 {}
     }
 
+    // should fail but not important for test: unused ownership
     transaction t1(this.T b) {
         return;
     }
