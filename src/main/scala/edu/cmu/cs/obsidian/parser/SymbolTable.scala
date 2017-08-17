@@ -34,7 +34,7 @@ sealed trait DeclarationTable {
     }
 }
 
-class StateTable(astNode: State, insideOf: ContractTable) extends DeclarationTable {
+class StateTable(astNode: State, lexicallyInsideOf: ContractTable) extends DeclarationTable {
 
     val fieldLookup: Map[String, Field] = {
         indexDecl[Field](astNode.declarations)
@@ -51,25 +51,25 @@ class StateTable(astNode: State, insideOf: ContractTable) extends DeclarationTab
     def name: String = astNode.name
 
     def ast: State = astNode
-    def contract: ContractTable = insideOf
+    def contract: ContractTable = lexicallyInsideOf
     def lookupContract(name: String): Option[ContractTable] = contract.lookupContract(name)
 
     def lookupField(name: String): Option[Field] = {
         fieldLookup.get(name) match {
             case x@Some(_) => x
-            case None => insideOf.lookupField(name)
+            case None => lexicallyInsideOf.lookupField(name)
         }
     }
     def lookupTransaction(name: String): Option[Transaction] = {
         txLookup.get(name) match {
             case x@Some(_) => x
-            case None => insideOf.lookupTransaction(name)
+            case None => lexicallyInsideOf.lookupTransaction(name)
         }
     }
     def lookupFunction(name: String): Option[Func] = {
         funLookup.get(name) match {
             case x@Some(_) => x
-            case None => insideOf.lookupFunction(name)
+            case None => lexicallyInsideOf.lookupFunction(name)
         }
     }
 

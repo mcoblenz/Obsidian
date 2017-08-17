@@ -39,46 +39,46 @@ object AstTransformer {
         ast.copy(declarations = newDecls).setLoc(ast)
     }
 
-    def disambiguateDecl(insideOf: DeclarationTable, decl: Declaration): Declaration = {
+    def disambiguateDecl(lexicallyInsideOf: DeclarationTable, decl: Declaration): Declaration = {
         decl match {
 
             case f: Field =>
-                val newTyp = disambiguateType(insideOf, TreeSet[String](), f.typ)
+                val newTyp = disambiguateType(lexicallyInsideOf, TreeSet[String](), f.typ)
                 f.copy(typ = newTyp).setLoc(f)
 
             case t: Transaction =>
                 val inScope = t.args.map(_.varName).toSet
                 val newArgs = t.args.map(arg => {
-                    val newType = disambiguateType(insideOf, inScope, arg.typ)
+                    val newType = disambiguateType(lexicallyInsideOf, inScope, arg.typ)
                     arg.copy(typ = newType).setLoc(arg)
                 })
-                val newRet = t.retType.map(disambiguateType(insideOf, inScope, _))
-                val newBody = disambiguateBody(insideOf, inScope, t.body)
+                val newRet = t.retType.map(disambiguateType(lexicallyInsideOf, inScope, _))
+                val newBody = disambiguateBody(lexicallyInsideOf, inScope, t.body)
                 t.copy(args = newArgs, retType = newRet, body = newBody).setLoc(t)
 
             case f: Func =>
                 val inScope = f.args.map(_.varName).toSet
                 val newArgs = f.args.map(arg => {
-                    val newType = disambiguateType(insideOf, inScope, arg.typ)
+                    val newType = disambiguateType(lexicallyInsideOf, inScope, arg.typ)
                     arg.copy(typ = newType).setLoc(arg)
                 })
-                val newRet = f.retType.map(disambiguateType(insideOf, inScope, _))
-                val newBody = disambiguateBody(insideOf, inScope, f.body)
+                val newRet = f.retType.map(disambiguateType(lexicallyInsideOf, inScope, _))
+                val newBody = disambiguateBody(lexicallyInsideOf, inScope, f.body)
                 f.copy(args = newArgs, retType = newRet, body = newBody).setLoc(f)
 
             case c: Constructor =>
                 val inScope = c.args.map(_.varName).toSet
                 val newArgs = c.args.map(arg => {
-                    val newType = disambiguateType(insideOf, inScope, arg.typ)
+                    val newType = disambiguateType(lexicallyInsideOf, inScope, arg.typ)
                     arg.copy(typ = newType).setLoc(arg)
                 })
-                val newBody = disambiguateBody(insideOf, inScope, c.body)
+                val newBody = disambiguateBody(lexicallyInsideOf, inScope, c.body)
 
                 c.copy(args = newArgs, body = newBody).setLoc(c)
 
-            case s: State => disambiguateState(insideOf.contract.state(s.name).get)
+            case s: State => disambiguateState(lexicallyInsideOf.contract.state(s.name).get)
 
-            case c: Contract => disambiguateContract(insideOf.lookupContract(c.name).get)
+            case c: Contract => disambiguateContract(lexicallyInsideOf.lookupContract(c.name).get)
 
             case t: TypeDecl => t
 
@@ -86,16 +86,17 @@ object AstTransformer {
     }
 
     def disambiguateType(
-            insideOf: DeclarationTable,
+            lexicallyInsideOf: DeclarationTable,
             inScope: Set[String],
             typ: AstType): AstType = {
         typ match {
 
             case AstContractType(mods, cName) =>
-                if (insideOf.contract.hasParent && insideOf.contract.name == cName) {
+                if (lexicallyInsideOf.contract.hasParent &&
+                    lexicallyInsideOf.contract.name == cName) {
                     AstPathContractType(mods, "this"::"parent"::Nil, cName).setLoc(typ)
                 }
-                else if (insideOf.contract.childContract(cName).isDefined) {
+                else if (lexicallyInsideOf.contract.childContract(cName).isDefined) {
                     AstPathContractType(mods, "this"::Nil, cName).setLoc(typ)
                 }
                 else {
@@ -103,10 +104,11 @@ object AstTransformer {
                 }
 
             case AstStateType(mods, cName, sName) =>
-                if (insideOf.contract.hasParent && insideOf.contract.name == cName) {
+                if (lexicallyInsideOf.contract.hasParent &&
+                    lexicallyInsideOf.contract.name == cName) {
                     AstPathStateType(mods, "this"::"parent"::Nil, cName, sName).setLoc(typ)
                 }
-                else if (insideOf.contract.childContract(cName).isDefined) {
+                else if (lexicallyInsideOf.contract.childContract(cName).isDefined) {
                     AstPathStateType(mods, "this"::Nil, cName, sName).setLoc(typ)
                 }
                 else {
@@ -131,30 +133,30 @@ object AstTransformer {
     }
 
     def disambiguateStatement(
-            insideOf: DeclarationTable,
+            lexicallyInsideOf: DeclarationTable,
             inScope: Set[String],
             s: Statement): (Statement, Set[String]) = {
         s match {
             case oldDecl@VariableDecl(typ, varName) =>
-                val newTyp = disambiguateType(insideOf, inScope, typ)
+                val newTyp = disambiguateType(lexicallyInsideOf, inScope, typ)
                 (oldDecl.copy(typ = newTyp).setLoc(oldDecl), inScope + varName)
             case oldDecl@VariableDeclWithInit(typ, varName, _) =>
-                val newTyp = disambiguateType(insideOf, inScope, typ)
+                val newTyp = disambiguateType(lexicallyInsideOf, inScope, typ)
                 (oldDecl.copy(newTyp).setLoc(oldDecl), inScope + varName)
             case oldIf@If(_, sIf) =>
-                val sIfNew = disambiguateBody(insideOf, inScope, sIf)
+                val sIfNew = disambiguateBody(lexicallyInsideOf, inScope, sIf)
                 (oldIf.copy(s = sIfNew).setLoc(oldIf), inScope)
             case oldIf@IfThenElse(e, s1, s2) =>
-                val s1New = disambiguateBody(insideOf, inScope, s1)
-                val s2New = disambiguateBody(insideOf, inScope, s2)
+                val s1New = disambiguateBody(lexicallyInsideOf, inScope, s1)
+                val s2New = disambiguateBody(lexicallyInsideOf, inScope, s2)
                 (oldIf.copy(s1 = s1New, s2 = s2New).setLoc(oldIf), inScope)
             case oldTry@TryCatch(s1, s2) =>
-                val s1New = disambiguateBody(insideOf, inScope, s1)
-                val s2New = disambiguateBody(insideOf, inScope, s2)
+                val s1New = disambiguateBody(lexicallyInsideOf, inScope, s1)
+                val s2New = disambiguateBody(lexicallyInsideOf, inScope, s2)
                 (oldTry.copy(s1 = s1New, s2 = s2New).setLoc(oldTry), inScope)
             case oldSwitch@Switch(_, cases) =>
                 val newCases = cases.map(_case => {
-                    val newBody = disambiguateBody(insideOf, inScope, _case.body)
+                    val newBody = disambiguateBody(lexicallyInsideOf, inScope, _case.body)
                     _case.copy(body = newBody).setLoc(oldSwitch)
                 })
                 (oldSwitch.copy(cases = newCases).setLoc(oldSwitch), inScope)
@@ -163,14 +165,14 @@ object AstTransformer {
     }
 
     def disambiguateBody(
-            insideOf: DeclarationTable,
+            lexicallyInsideOf: DeclarationTable,
             inScope: Set[String],
             body: Seq[Statement]): Seq[Statement] = {
         body match {
             case Seq() => Seq()
             case s +: rest =>
-                val (sNew, inScopeNew) = disambiguateStatement(insideOf, inScope, s)
-                sNew +: disambiguateBody(insideOf, inScopeNew, rest)
+                val (sNew, inScopeNew) = disambiguateStatement(lexicallyInsideOf, inScope, s)
+                sNew +: disambiguateBody(lexicallyInsideOf, inScopeNew, rest)
         }
     }
 }
