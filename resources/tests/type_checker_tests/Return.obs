@@ -58,4 +58,12 @@ contract C {
         int y = 3;
     }
 
+    transaction branching_return3(C_Owned c, bool b) returns C_Owned {
+        if (b) {
+            return c;
+        } else {
+            int i = 3;
+        }
+        return c;
+    }
 }

@@ -166,6 +166,8 @@ class TypeCheckerTests extends JUnitSuite {
               ::
               (UnreachableCodeError(), 22)
               ::
+              (UnusedOwnershipError("cs"), 32)
+              ::
               (SubTypingError(
                   OwnedRef(null, NoPathType(JustContractType("C_Owned"))),
                   OwnedRef(null, NoPathType(StateType("C_Owned", "S")))),
@@ -357,12 +359,12 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def simplePathDependentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimplePDT.obs",
-                (UnusedOwnershipError("b"), 8)::Nil)
+                (UnusedOwnershipError("b"), 9)::Nil)
     }
 
     @Test def implicitPathDependentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ImplicitPDT.obs",
-            (UnusedOwnershipError("b"), 10)::Nil)
+            (UnusedOwnershipError("b"), 11)::Nil)
     }
 
     @Test def noStartStateTest(): Unit = {

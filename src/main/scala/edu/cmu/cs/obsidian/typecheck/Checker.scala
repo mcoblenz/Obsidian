@@ -301,6 +301,7 @@ case class Context(underlyingVariableMap: Map[String, ResolvedType], isThrown: B
         }
         rawContext
     }
+    def makeThrown: Context = this.copy(isThrown = true)
     def tableOfThis: DeclarationTable = this("this").asInstanceOf[NonPrimitiveType].table
 }
 
@@ -1193,7 +1194,22 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             statement match {
                 case Return() | ReturnExpr(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
-                    hasRet = hasReturnStatement(tx, s1) & hasReturnStatement(tx, s2)
+                    hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
+                case _ => ()
+            }
+        }
+
+        hasRet
+    }
+
+    private def hasReturnStatementDontLog(statements: Seq[Statement]) : Boolean = {
+        var hasRet = false
+
+        for (statement <- statements) {
+            statement match {
+                case Return() | ReturnExpr(_) => return true
+                case IfThenElse(_, s1, s2) =>
+                    hasRet = hasReturnStatementDontLog(s1) && hasReturnStatementDontLog(s2)
                 case _ => ()
             }
         }
@@ -1494,24 +1510,52 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             case Return() =>
                 decl match {
                     /* the tx/function must have no return type */
-                    case t: Transaction if t.retType.isEmpty => context
-                    case f: Func if f.retType.isEmpty => context
+                    case tx: Transaction if tx.retType.isEmpty =>
+                        for ((x, t) <- context.underlyingVariableMap) {
+                            if (t.isInstanceOf[OwnedRef] && x != "this") {
+                                logError(s, UnusedOwnershipError(x))
+                            }
+                        }
+                        context.makeThrown
+                    case f: Func if f.retType.isEmpty =>
+                        for ((x, t) <- context.underlyingVariableMap) {
+                            if (t.isInstanceOf[OwnedRef] && x != "this") {
+                                logError(s, UnusedOwnershipError(x))
+                            }
+                        }
+                        context.makeThrown
                     case _ =>
                         logError(s, MustReturnError(decl.name))
-                        context
+                        context.makeThrown
                 }
 
             case ReturnExpr(e: Expression) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
                 val (tRet, tAst) = decl match {
                     /* must be no return type */
-                    case t: Transaction if t.retType.isDefined =>
-                        (translateUncheckedType(t.args, t.retType.get), t.retType.get)
+                    case tx: Transaction if tx.retType.isDefined =>
+                        for ((x, t) <- context.underlyingVariableMap) {
+                            if (t.isInstanceOf[OwnedRef] && x != "this") {
+                                e match {
+                                    case Variable(xOther) if x == xOther => ()
+                                    case _ => logError(s, UnusedOwnershipError(x))
+                                }
+                            }
+                        }
+                        (translateUncheckedType(tx.args, tx.retType.get), tx.retType.get)
                     case f: Func if f.retType.isDefined =>
+                        for ((x, t) <- context.underlyingVariableMap) {
+                            if (t.isInstanceOf[OwnedRef] && x != "this") {
+                                e match {
+                                    case Variable(xOther) if x == xOther => ()
+                                    case _ => logError(s, UnusedOwnershipError(x))
+                                }
+                            }
+                        }
                         (translateUncheckedType(f.args, f.retType.get), f.retType.get)
                     case _ =>
                         logError(s, CannotReturnError(decl.name))
-                        return contextPrime
+                        return contextPrime.makeThrown
                 }
 
                 val expectedRet = tRet match {
@@ -1520,7 +1564,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 if (!expectedRet.isBottom) checkIsSubtype(s, t, expectedRet)
-                contextPrime
+                contextPrime.makeThrown
 
             case Transition(newStateName, updates: Seq[(Variable, Expression)]) =>
                 val thisTable = context.tableOfThis.contract
@@ -1786,9 +1830,11 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         val expectedType = OwnedRef(lexicallyInsideOf, NoPathType(JustContractType(cName)))
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
-        for ((x, t) <- outputContext.underlyingVariableMap) {
-            if (t.isInstanceOf[OwnedRef] && x != "this") {
-                logError(tx, UnusedOwnershipError(x))
+        if (!hasReturnStatementDontLog(tx.body)) {
+            for ((x, t) <- outputContext.underlyingVariableMap) {
+                if (t.isInstanceOf[OwnedRef] && x != "this") {
+                    logError(tx, UnusedOwnershipError(x))
+                }
             }
         }
 
