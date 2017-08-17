@@ -67,7 +67,6 @@ case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
 
 sealed abstract class TypeModifier() extends AST
 case class IsReadOnly() extends TypeModifier
-case class IsBorrowed() extends TypeModifier
 case class IsRemote() extends TypeModifier
 case class AstIntType() extends AstType
 case class AstBoolType() extends AstType

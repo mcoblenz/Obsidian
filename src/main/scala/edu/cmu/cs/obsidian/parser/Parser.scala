@@ -68,9 +68,8 @@ object Parser extends Parsers {
 
     private def parseTypeModifier = {
         val linearP = ReadOnlyT() ^^ (t => IsReadOnly().setLoc(t))
-        val borrowsP = BorrowsT() ^^ (t => IsBorrowed().setLoc(t))
         val remoteP = RemoteT() ^^ (t => IsRemote().setLoc(t))
-        linearP | remoteP | borrowsP
+        linearP | remoteP
     }
 
     private def parseType = {

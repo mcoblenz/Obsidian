@@ -24,7 +24,6 @@ case class OrT() extends Token { override def toString: String = "or" }
 case class ReturnT() extends Token { override def toString: String = "return" }
 case class ReturnsT() extends Token { override def toString: String = "returns" }
 case class ReadOnlyT() extends Token { override def toString: String = "readonly" }
-case class BorrowsT() extends Token { override def toString: String = "borrows" }
 case class NewT() extends Token { override def toString: String = "new" }
 case class SwitchT() extends Token { override def toString: String = "switch"}
 case class CaseT() extends Token { override def toString: String = "case"}
