@@ -135,7 +135,7 @@ class TypeCheckerTests extends JUnitSuite {
             (SubTypingError(BoolType(), IntType()), 25)
               ::
               (SubTypingError(
-                  OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
+                  OwnedRef(null, NoPathType(JustContractType("C_Owned"))),
                   SharedRef(null, NoPathType(JustContractType("C_Shared")))),
                 28)
               ::
@@ -167,8 +167,8 @@ class TypeCheckerTests extends JUnitSuite {
               (UnreachableCodeError(), 22)
               ::
               (SubTypingError(
-                  OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
-                  OwnedRef(null, NoPathType(StateType("C_Unique", "S")))),
+                  OwnedRef(null, NoPathType(JustContractType("C_Owned"))),
+                  OwnedRef(null, NoPathType(StateType("C_Owned", "S")))),
                 28)
               ::
               (UnreachableCodeError(), 28)
@@ -176,7 +176,7 @@ class TypeCheckerTests extends JUnitSuite {
               (MustReturnError("t_ret_nonprimitive"), 30)
               ::
               (SubTypingError(IntType(),
-                  OwnedRef(null, NoPathType(JustContractType("C_Unique")))), 32)
+                  OwnedRef(null, NoPathType(JustContractType("C_Owned")))), 32)
               ::
               (MustReturnError("no_return"), 38)
               ::

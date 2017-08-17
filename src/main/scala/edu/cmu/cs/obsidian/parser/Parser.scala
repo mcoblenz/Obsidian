@@ -384,9 +384,9 @@ object Parser extends Parsers {
 
     private def parseContractModifier = {
         val mainP = MainT() ^^ (t => IsMain().setLoc(t))
-        val uniqueP = UniqueT() ^^ (t => IsOwned().setLoc(t))
+        val ownedP = OwnedT() ^^ (t => IsOwned().setLoc(t))
         val sharedP = SharedT() ^^ (t => IsShared().setLoc(t))
-        opt(mainP | uniqueP | sharedP)
+        opt(mainP | ownedP | sharedP)
     }
 
     private def parseContractDecl = {

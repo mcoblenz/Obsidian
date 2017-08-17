@@ -1325,7 +1325,7 @@ class CodeGen (val target: Target) {
             case (Some(IsShared()), s: State) => ()
             case (Some(IsShared()), c: Contract) => ()
 
-            /* Unique contracts and nested contracts are translated the same way */
+            /* Owned contracts and nested contracts are translated the same way */
             case (_, c: Constructor) =>
                 translateConstructor(c, newClass, translationContext)
             case (_, f: Field) =>

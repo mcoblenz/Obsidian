@@ -2,7 +2,7 @@
 
 // NOTE: this file should parse, but not type-check
 
-unique contract C_Unique {}
+owned contract C_Owned {}
 contract C {
     state S1 {}
     state S2 {}
@@ -18,15 +18,15 @@ contract C {
 
     transaction t() returns int { return; }
 
-    transaction t() returns C_Unique { return; }
+    transaction t() returns C_Owned { return; }
 
-    transaction t() returns C_Unique { return; }
+    transaction t() returns C_Owned { return; }
 
-    transaction t() returns C_Unique { return; }
+    transaction t() returns C_Owned { return; }
 
-    transaction t() returns C_Unique
+    transaction t() returns C_Owned
                     ensures S1 { return; }
 
-    transaction t() returns C_Unique
+    transaction t() returns C_Owned
                     ensures S1 or S2 { return; }
 }

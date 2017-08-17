@@ -1,6 +1,6 @@
 // checks that assignments work as expected
 
-unique contract C_Unique {
+owned contract C_Owned {
     int f1;
 }
 
@@ -24,8 +24,8 @@ contract C {
         // should fail: bool is not int
         b = true;
         C_Shared c = new C_Shared();
-        // should fail: C_Unique is not C_Shared
-        c = new C_Unique();
+        // should fail: C_Owned is not C_Shared
+        c = new C_Owned();
         c.f1 = 3;
         // should fail: this type isn't guaranteed to have this field
         c.f2 = 2;

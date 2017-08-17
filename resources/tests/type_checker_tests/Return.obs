@@ -1,8 +1,8 @@
 /* checks type-checking of return statements and various flow-sensitive
  * properties about statement sequences w.r.t. returns */
 
-unique contract C_Unique {
-  C_Unique() {
+owned contract C_Owned {
+  C_Owned() {
     ->S;
   }
   state S {}
@@ -22,10 +22,10 @@ contract C {
         return;
     }
 
-    transaction t_ret_nonprimitive() returns C_Unique {
-        return new C_Unique();
+    transaction t_ret_nonprimitive() returns C_Owned {
+        return new C_Owned();
         // should fail twice, once for subtyping and again for unreachable code
-        C_Unique.S cs = new C_Unique();
+        C_Owned.S cs = new C_Owned();
         // should fail: no return value
         return;
         // should fail: wrong type

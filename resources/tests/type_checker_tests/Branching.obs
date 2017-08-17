@@ -4,7 +4,7 @@
 shared contract Sh/*ared*/ {
 }
 
-unique contract Ow/*ned*/ {
+owned contract Ow/*ned*/ {
 
 }
 

@@ -1,4 +1,4 @@
-unique contract NodeMaybe {
+owned contract NodeMaybe {
     NodeMaybe(IntNode node) {
         ->NodeSome({ node = node });
     }
@@ -21,7 +21,7 @@ unique contract NodeMaybe {
     state NodeNone {}
 }
 
-unique contract IntNode {
+owned contract IntNode {
     IntNode(int elem, NodeMaybe next) {
         this.elem = elem;
         this.next = next;
@@ -75,7 +75,7 @@ unique contract IntNode {
     }
 }
 
-unique contract IntList {
+owned contract IntList {
 
     NodeMaybe first;
 

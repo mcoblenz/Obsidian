@@ -7,7 +7,7 @@ shared contract C1 {
   state S {}
 }
 
-unique contract C2 {
+owned contract C2 {
   C2(){
     ->S;
   }
