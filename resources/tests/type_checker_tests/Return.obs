@@ -1,0 +1,69 @@
+/* checks type-checking of return statements and various flow-sensitive
+ * properties about statement sequences w.r.t. returns */
+
+owned contract C_Owned {
+  C_Owned() {
+    ->S;
+  }
+  state S {}
+}
+
+contract C {
+    transaction t_no_ret() {
+        // should fail: cannot return a value in a transaction with no return type
+        return 3;
+        // should fail: unreachable
+        return;
+    }
+
+    transaction t_has_ret() returns int {
+        return 5;
+        // should fail twice: unreachable code, and also return statement has no value
+        return;
+    }
+
+    transaction t_ret_nonprimitive() returns C_Owned {
+        return new C_Owned();
+        // should fail twice, once for subtyping and again for unreachable code
+        C_Owned.S cs = new C_Owned();
+        // should fail: no return value
+        return;
+        // should fail: wrong type
+        return 5;
+        return cs;
+    }
+
+    transaction no_return() returns int {
+        // should fail: no return statements
+        int x = 5;
+    }
+
+    transaction branching_return(bool b) returns int {
+        if (b) {
+            return 2;
+        } else {
+            return 3;
+        }
+        // should fail: unreachable code
+        int x = 2;
+    }
+
+    transaction branching_return2(bool b) returns int {
+        if (b) {
+            return 2;
+        } else {
+            int x = 3;
+        }
+        // should fail: no return in every branch
+        int y = 3;
+    }
+
+    transaction branching_return3(C_Owned c, bool b) returns C_Owned {
+        if (b) {
+            return c;
+        } else {
+            int i = 3;
+        }
+        return c;
+    }
+}

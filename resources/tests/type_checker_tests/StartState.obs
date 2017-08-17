@@ -1,0 +1,44 @@
+contract NoStates {
+
+    NoStates(){
+        int x = 1;
+    }
+
+}
+
+contract HasStates {
+
+    // Error: constructor does not transition to a named state
+    HasStates() {
+        int x = 1;
+    }
+
+    state Start {
+
+        transaction a() {
+            ->S1;
+        }
+
+    }
+
+    state S1 {
+
+    }
+}
+
+// Error: contract contains states but no constructor
+// (i.e. there is no way to get to an initial state)
+main contract StatesNoConstr {
+
+ state Start {
+
+        transaction a() {
+            ->S1;
+        }
+    }
+
+    state S1 {
+
+    }
+}
+

@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian
 
-import java.nio.file.{Files, Paths, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.io.File
 import java.util.Scanner
 
@@ -10,13 +10,17 @@ import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.protobuf._
 import edu.cmu.cs.obsidian.util._
 import com.helger.jcodemodel.JCodeModel
+import edu.cmu.cs.obsidian.typecheck.{Checker, VariableUndefinedError}
 
 import scala.sys.process._
+import scala.util.parsing.input.NoPosition
+import scala.util.parsing.input.OffsetPosition
 
 case class CompilerOptions (outputPath: Option[String],
                             debugPath: Option[String],
                             inputFiles: List[String],
                             verbose: Boolean,
+                            typeCheckerDebug: Boolean,
                             printTokens: Boolean,
                             printAST: Boolean,
                             buildClient: Boolean)
@@ -30,6 +34,7 @@ object Main {
           |    --output-path path/to/dir    outputs jar and proto files at the given directory
           |    --dump-debug path/to/dir     save intermediate files at the given directory
           |    --verbose                    print error codes and messages for jar and javac
+          |    --type-checker-debug         print stack trace of errors as they are logged
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
@@ -40,6 +45,7 @@ object Main {
         var debugPath: Option[String] = None
         var inputFiles: List[String] = List.empty
         var verbose = false
+        var checkerDebug = false
         var printTokens = false
         var printAST = false
         var buildClient = false
@@ -49,6 +55,9 @@ object Main {
                 case Nil => ()
                 case "--verbose" :: tail =>
                     verbose = true
+                    parseOptionsRec(tail)
+                case "--type-checker-debug" :: tail =>
+                    checkerDebug = true
                     parseOptionsRec(tail)
                 case "--print-tokens" :: tail =>
                     printTokens = true
@@ -93,7 +102,8 @@ object Main {
             println("For now: contracts can only consist of a single file")
         }
 
-        CompilerOptions(outputPath, debugPath, inputFiles, verbose, printTokens, printAST, buildClient)
+        CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
+                        printTokens, printAST, buildClient)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -110,7 +120,7 @@ object Main {
     }
 
     def findMainContract(ast: Program): Option[Contract] = {
-        ast.contracts.find((c: Contract) => c.mod.contains(IsMain))
+        ast.contracts.find((c: Contract) => c.mod.contains(IsMain()))
     }
 
     def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
@@ -132,7 +142,7 @@ object Main {
 
         val sourcePath = sourceDir.toString
         val classPath =
-            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.3.0.jar:lib/json-20160810.jar"
+            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.3.1.jar:lib/json-20160810.jar"
         val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
         val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
                                                        "-classpath", classPath,
@@ -252,6 +262,12 @@ object Main {
                 println()
             }
 
+            val table = new SymbolTable(ast)
+            val checker = new Checker(table, options.typeCheckerDebug)
+            if (!checker.checkProgramAndPrintErrors()) {
+                println("Typechecking failed.\n")
+                return
+            }
 
             val lastSlash = filename.lastIndexOf("/")
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)

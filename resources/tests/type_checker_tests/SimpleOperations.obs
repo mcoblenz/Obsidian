@@ -1,0 +1,18 @@
+// checks primitive operators (boolean and numeric)
+
+main contract Operations {
+
+    transaction doOperations() {
+        int a = 3 + 5;
+        // should fail: adding with a boolean
+        a = 3 + true;
+        // should fail: adding with a string
+        int b = "hi" * 1;
+        // should fail: dividing with boolean
+        int c = true/10;
+        // should fail: bool op with string
+        bool d = true and "false";
+        // should fail twice (2 errors): bool op with ints
+        bool e = 5 or 6;
+    }
+}
