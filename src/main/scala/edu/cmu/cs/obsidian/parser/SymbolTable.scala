@@ -7,22 +7,23 @@ import edu.cmu.cs.obsidian.typecheck._
 
 sealed trait DeclarationTable {
     def name: String
-    /* id if this is a [ContractTable] already, or gets the [ContractTable] of a [StateTable] */
+
+    /* merely returns "this" if this is a [ContractTable] already,
+     * or gets the [ContractTable] of a [StateTable] */
     def contract: ContractTable
+
     /* looks for a contract called [name] that's in scope
      * (either globally or in this particular contract) */
-    def contract(name: String): Option[ContractTable]
-    def field(name: String): Option[Field]
-    def transaction(name: String): Option[Transaction]
-    def function(name: String): Option[Func]
-    def simpleTypeOf: SimpleType
-}
+    def lookupContract(name: String): Option[ContractTable]
+    def lookupField(name: String): Option[Field]
+    def lookupTransaction(name: String): Option[Transaction]
+    def lookupFunction(name: String): Option[Func]
+    def simpleType: SimpleType
 
-object SymbolTableHelpers {
-    /* reflection is used here to get around generic type erasure */
     def indexDecl[D <: Declaration: ClassTag](decls: Seq[Declaration]): Map[String, D] = {
         var lookup = new TreeMap[String, D]()
 
+        /* reflection is used here to get around generic type erasure */
         val classOfD = classTag[D].runtimeClass
 
         for (decl <- decls if classOfD.isInstance(decl)) {
@@ -36,46 +37,46 @@ object SymbolTableHelpers {
 class StateTable(astNode: State, insideOf: ContractTable) extends DeclarationTable {
 
     val fieldLookup: Map[String, Field] = {
-        SymbolTableHelpers.indexDecl[Field](astNode.declarations)
+        indexDecl[Field](astNode.declarations)
     }
 
     val txLookup: Map[String, Transaction] = {
-        SymbolTableHelpers.indexDecl[Transaction](astNode.declarations)
+        indexDecl[Transaction](astNode.declarations)
     }
 
     val funLookup: Map[String, Func] = {
-        SymbolTableHelpers.indexDecl[Func](astNode.declarations)
+        indexDecl[Func](astNode.declarations)
     }
 
     def name: String = astNode.name
 
     def ast: State = astNode
     def contract: ContractTable = insideOf
-    def contract(name: String): Option[ContractTable] = contract.contract(name)
+    def lookupContract(name: String): Option[ContractTable] = contract.lookupContract(name)
 
-    def field(name: String): Option[Field] = {
+    def lookupField(name: String): Option[Field] = {
         fieldLookup.get(name) match {
             case x@Some(_) => x
-            case None => insideOf.field(name)
+            case None => insideOf.lookupField(name)
         }
     }
-    def transaction(name: String): Option[Transaction] = {
+    def lookupTransaction(name: String): Option[Transaction] = {
         txLookup.get(name) match {
             case x@Some(_) => x
-            case None => insideOf.transaction(name)
+            case None => insideOf.lookupTransaction(name)
         }
     }
-    def function(name: String): Option[Func] = {
+    def lookupFunction(name: String): Option[Func] = {
         funLookup.get(name) match {
             case x@Some(_) => x
-            case None => insideOf.function(name)
+            case None => insideOf.lookupFunction(name)
         }
     }
 
-    def simpleTypeOf: SimpleType = StateType(this.contract.name, this.name)
+    def simpleType: SimpleType = StateType(this.contract.name, this.name)
 }
 
-class ContractTable(
+class ContractTable (
         astNode: Contract,
         symbolTable: SymbolTable,
         parentContract: Option[ContractTable]) extends DeclarationTable {
@@ -87,25 +88,25 @@ class ContractTable(
         this(astNode, symbolTable, Some(parentContract))
 
     val stateLookup: Map[String, StateTable] = {
-        SymbolTableHelpers.indexDecl[State](astNode.declarations).mapValues(
+        indexDecl[State](astNode.declarations).mapValues(
             (st: State) => new StateTable(st, this)
         )
     }
 
     val fieldLookup: Map[String, Field] = {
-        SymbolTableHelpers.indexDecl[Field](astNode.declarations)
+        indexDecl[Field](astNode.declarations)
     }
 
     val txLookup: Map[String, Transaction] = {
-        SymbolTableHelpers.indexDecl[Transaction](astNode.declarations)
+        indexDecl[Transaction](astNode.declarations)
     }
 
     val funLookup: Map[String, Func] = {
-        SymbolTableHelpers.indexDecl[Func](astNode.declarations)
+        indexDecl[Func](astNode.declarations)
     }
 
     val childContractLookup: Map[String, ContractTable] = {
-        SymbolTableHelpers.indexDecl[Contract](astNode.declarations).mapValues(
+        indexDecl[Contract](astNode.declarations).mapValues(
             (ct: Contract) => new ContractTable(ct, symbolTable, this)
         )
     }
@@ -118,7 +119,7 @@ class ContractTable(
      * 1) [name] refers to a global contract and it's in the symbol table
      * 2) [name] refers to a child/nested contract of this contract
      */
-    def contract(name: String): Option[ContractTable] = {
+    def lookupContract(name: String): Option[ContractTable] = {
         if (name == this.name) Some(this) else
         (symbolTable.contract(name), childContract(name)) match {
             case (_, Some(ct)) => Some(ct)
@@ -128,9 +129,9 @@ class ContractTable(
     }
 
     def ast: Contract = astNode
-    def field(name: String): Option[Field] = fieldLookup.get(name)
-    def transaction(name: String): Option[Transaction] = txLookup.get(name)
-    def function(name: String): Option[Func] = funLookup.get(name)
+    def lookupField(name: String): Option[Field] = fieldLookup.get(name)
+    def lookupTransaction(name: String): Option[Transaction] = txLookup.get(name)
+    def lookupFunction(name: String): Option[Func] = funLookup.get(name)
 
     def state(name: String): Option[StateTable] = stateLookup.get(name)
     def possibleStates: Set[String] = stateLookup.values.map(_.name).toSet
@@ -146,7 +147,7 @@ class ContractTable(
                         .map(_.asInstanceOf[Constructor])
     }
 
-    def simpleTypeOf: SimpleType = JustContractType(this.name)
+    def simpleType: SimpleType = JustContractType(this.name)
 }
 
 class SymbolTable(program: Program) {

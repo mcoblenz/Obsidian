@@ -78,7 +78,7 @@ object AstTransformer {
 
             case s: State => disambiguateState(insideOf.contract.state(s.name).get)
 
-            case c: Contract => disambiguateContract(insideOf.contract(c.name).get)
+            case c: Contract => disambiguateContract(insideOf.lookupContract(c.name).get)
 
             case t: TypeDecl => t
 

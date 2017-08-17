@@ -452,7 +452,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             insideOf: DeclarationTable,
             cName: String,
             states: Set[String]): SimpleType = {
-        val allPossibleStates = insideOf.contract(cName).get.possibleStates
+        val allPossibleStates = insideOf.lookupContract(cName).get.possibleStates
         if (states == allPossibleStates) {
             JustContractType(cName)
         } else if (states.size > 1) {
@@ -771,9 +771,9 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 val f = p.head
                 val rest = p.tail
 
-                val fieldLookup = insideOf.field(f)
+                val fieldLookup = insideOf.lookupField(f)
                 if (fieldLookup.isEmpty) {
-                    return Left(FieldUndefinedError(insideOf.simpleTypeOf, f))
+                    return Left(FieldUndefinedError(insideOf.simpleType, f))
                 }
 
                 val field = fieldLookup.get
@@ -848,7 +848,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
 
             case PathType(f::rest, ts) =>
                 // see if the head of the path is actually a field
-                val fieldLookup = insideOf.field(f)
+                val fieldLookup = insideOf.lookupField(f)
 
                 if (fieldLookup.isEmpty) {
                     return Left(VariableUndefinedError(f))
@@ -1001,12 +1001,12 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 recip: Expression,
                 args: Seq[Expression]): (Type, Context) = {
             // Lookup the invocation
-            val txLookup = table.transaction(name)
-            val funLookup = table.function(name)
+            val txLookup = table.lookupTransaction(name)
+            val funLookup = table.lookupFunction(name)
 
             val invokable: InvokableDeclaration = (txLookup, funLookup) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(table.simpleTypeOf, name)
+                    val err = MethodUndefinedError(table.simpleType, name)
                     logError(e, err)
                     return (BottomType(), context)
                 case (_, Some(f)) => f
@@ -1051,7 +1051,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
 
          e match {
              case Variable(x) =>
-                 (context get x, tableOfThis(context).field(x)) match {
+                 (context get x, tableOfThis(context).lookupField(x)) match {
                      case (Some(t), _) =>
                          (t, context.updated(x, residualType(t)))
                      case (_, Some(f)) =>
@@ -1073,7 +1073,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                  val thisTable = tableOfThis(context).contract
                  if (thisTable.hasParent) {
                      val parentTable = thisTable.parent.get
-                     val ts = parentTable.simpleTypeOf
+                     val ts = parentTable.simpleType
                      val tr = if (parentTable.hasParent) {
                          PathType("this"::"parent"::"parent"::Nil, ts)
                      } else {
@@ -1135,10 +1135,10 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                      case _ => derefType.tableOpt.get
                  }
 
-                 val fieldAST = derefTable.field(f) match {
+                 val fieldAST = derefTable.lookupField(f) match {
                      case Some(ast) => ast
                      case None =>
-                         logError(e, FieldUndefinedError(derefTable.simpleTypeOf, f))
+                         logError(e, FieldUndefinedError(derefTable.simpleType, f))
                          return (BottomType(), contextPrime)
                  }
 
@@ -1163,7 +1163,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                  handleInvocation(contextPrime, recipTable, name, recip, args)
 
              case Construction(name, args: Seq[Expression]) =>
-                 val tableLookup = tableOfThis(context).contract(name)
+                 val tableLookup = tableOfThis(context).lookupContract(name)
                  if (tableLookup.isEmpty) {
                      logError(e, ContractUndefinedError(name))
                      return (BottomType(), context)
@@ -1459,12 +1459,12 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 recip: Expression,
                 args: Seq[Expression]): Context = {
             // Lookup the invocation
-            val txLookup = table.transaction(name)
-            val funLookup = table.function(name)
+            val txLookup = table.lookupTransaction(name)
+            val funLookup = table.lookupFunction(name)
 
             val invokable: InvokableDeclaration = (txLookup, funLookup) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(table.simpleTypeOf, name)
+                    val err = MethodUndefinedError(table.simpleType, name)
                     logError(s, err)
                     return context
                 case (_, Some(f)) => f
@@ -1596,14 +1596,14 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 val badInitializations = updated.diff(newFields.toSet)
                 if (uninitialized.nonEmpty) logError(s, TransitionUpdateError(uninitialized))
                 for (s <- badInitializations) {
-                    val err = FieldUndefinedError(newStateTable.simpleTypeOf, s)
+                    val err = FieldUndefinedError(newStateTable.simpleType, s)
                     logError(updates.find(_._1.name == s).get._1, err)
                 }
 
                 var contextPrime = context
                 for ((Variable(f), e) <- updates) {
                     if (newFields.contains(f)) {
-                        val fieldAST = newStateTable.field(f).get
+                        val fieldAST = newStateTable.lookupField(f).get
                         val (t, contextPrime2) = checkExpr(decl, contextPrime, e)
                         contextPrime = contextPrime2
                         val fieldType = translateType(thisTable, fieldAST.typ)
@@ -1622,7 +1622,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                 /* if the variable is not in the context, see if it's a field */
                 if (contextType.isEmpty) {
                     val thisTable = tableOfThis(contextPrime)
-                    val fieldLookup = thisTable.field(x)
+                    val fieldLookup = thisTable.lookupField(x)
 
                     /* if it's not a field either, log an error */
                     if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x))
@@ -1648,10 +1648,10 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                     case _ => derefType.tableOpt.get
                 }
 
-                val fieldAST = derefTable.field(f) match {
+                val fieldAST = derefTable.lookupField(f) match {
                     case Some(ast) => ast
                     case None =>
-                        logError(s, FieldUndefinedError(derefTable.simpleTypeOf, f))
+                        logError(s, FieldUndefinedError(derefTable.simpleType, f))
                         return contextPrime2
                 }
 
@@ -1782,9 +1782,9 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
 
     private def rawTypeOfThis(insideOf: DeclarationTable): RawType = {
         if (insideOf.contract.hasParent) {
-            PathType("this"::"parent"::Nil, insideOf.simpleTypeOf)
+            PathType("this"::"parent"::Nil, insideOf.simpleType)
         } else {
-            NoPathType(insideOf.simpleTypeOf)
+            NoPathType(insideOf.simpleType)
         }
     }
 
