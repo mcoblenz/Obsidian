@@ -1,0 +1,703 @@
+
+%%%%%%%%%%%%%%%%%%%%%%% file typeinst.tex %%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% This is the LaTeX source for the instructions to authors using
+% the LaTeX document class 'llncs.cls' for contributions to
+% the Lecture Notes in Computer Sciences series.
+% http://www.springer.com/lncs       Springer Heidelberg 2006/05/04
+%
+% It may be used as a template for your own input - copy it
+% to a new file with a new name and use it as the basis
+% for your article.
+%
+% NB: the document class 'llncs' has its own and detailed documentation, see
+% ftp://ftp.springer.de/data/pubftp/pub/tex/latex/llncs/latex2e/llncsdoc.pdf
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\documentclass[runningheads,a4paper]{llncs}
+
+
+\setcounter{tocdepth}{3}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{epstopdf}
+\usepackage{listings}	
+\usepackage{syntax}
+\usepackage{mathabx}
+\usepackage{longtable,proof,listings,tabulary,float, mathpartir}
+\usepackage{graphicx}
+
+\usepackage{xcolor}
+\usepackage{color}
+
+\usepackage{tipa}
+\usepackage{bbm} % for \mathbbm{2}
+\usepackage{enumerate}
+
+
+\lstset{tabsize=3, basicstyle=\ttfamily\small, commentstyle=\itshape\rmfamily, numbers=left, numberstyle=\tiny, language=java, mathescape=true, showspaces=false, showstringspaces=false, columns=fullflexible, frame=single, xleftmargin=15pt, numberbychapter=false, captionpos=b}
+
+\lstset{emph={%
+    initialize, @Liquid, @Immutable%
+  },emphstyle={\color{gray}\bfseries}%
+}%
+
+\usepackage{url}
+\urldef{\mailsa}\path|tyleretzel1@gmail.com|    
+\newcommand{\keywords}[1]{\par\addvspace\baselineskip
+\noindent\keywordname\enspace\ignorespaces#1}
+
+\begin{document}
+
+\mainmatter  % start of an individual contribution
+
+% first the title is needed
+\title{Obsidian Language Formalism}
+
+% a short form should be given in case it is too long for the running head
+\titlerunning{Obsidian Formalism} 
+
+% the name(s) of the author(s) follow(s) next
+%
+% NB: Chinese authors should write their first names(s) in front of
+% their surnames. This ensures that the names appear correctly in
+% the running heads and the author index.
+%
+\author{}
+%
+\authorrunning{}
+% (feature abused for this document to repeat the title also on left hand pages)
+
+% the affiliations are given next; don't give your e-mail address
+% unless you accept that it will be published
+\institute{}
+
+%
+% NB: a more complex sample for affiliations and the mapping to the
+% corresponding authors can be found in the file "llncs.dem"
+% (search for the string "\mainmatter" where a contribution starts).
+% "llncs.dem" accompanies the document class "llncs.cls".
+%
+
+\toctitle{Lecture Notes in Computer Science}
+\tocauthor{Authors' Instructions}
+\maketitle
+
+\newcommand{\pagewidth}{11.75cm}
+
+\newcommand{\inferlbl}[3] {\inferrule{#2}{#3}{\textsf{\footnotesize{\sc #1}}}}
+
+\section{Language Overview}
+
+% things that maybe go in a paper, but not for a quick review of the formal system
+\iffalse
+
+\subsection{Problems with Solidity}
+
+\begin{itemize}
+\item Solidity provides an unsafe interface to computations involving money.
+\item While many common smart contracts can be fruitfully modeled using finite-state machines, there is no support for state-machines at the language level.
+\item All contracts can be referenced by anyone on the blockchain, and access control is programmed in with explicit dynamic checks. This makes it impossible to have any access control information in the type system.
+\item The transactional semantics of the language are error-prone. Errors related to reentrancy are one example of this, and ``stuck'' contracts (specifically: whereby a transaction cannot execute because of a failing external call) is another.
+\end{itemize}
+
+\subsection{Key Features}
+
+\begin{itemize}
+\item a safer and more natural model for programming contracts that move around and store money and other resource-like objects.
+\item allows programmers to specify contract behavior using finite state-machines.
+\item possibly: a safer transaction model (we've talked about actions, anonymous states, other techniques/restrictions to handle this).
+\end{itemize}
+
+\fi
+
+\section{Obsidian Core Calculus Grammar}
+
+The grammar is shown in Figure \ref{fig:obs-gram}. Unless stated otherwise, assume $\overline{I}$ means a possibly empty sequence of identifiers $I$; also assume that all items in the sequence are distinct, so that ``$x, y, z$'' is a valid sequence, but ``$x, y, x$'' is not.\\
+
+\newcommand{\stateS}{\texttt{state}}
+\newcommand{\ownedS}{\texttt{owned}}
+\newcommand{\readonlyS}{\texttt{readonly}}
+\newcommand{\sharedS}{\texttt{shared}}
+\newcommand{\contractS}{\texttt{contract}}
+\newcommand{\extcontractS}{\texttt{external\ contract}}
+\newcommand{\letS}{\texttt{let}}
+\newcommand{\throwS}{\texttt{throw}}
+\newcommand{\tryS}{\texttt{try}}
+\newcommand{\catchS}{\texttt{catch}}
+\newcommand{\thisS}{\texttt{this}}
+\newcommand{\inS}{\texttt{in}}
+\newcommand{\caseS}{\texttt{case}}
+\newcommand{\defaultS}{\texttt{default}}
+\newcommand{\newS}{\texttt{new}}
+\newcommand{\permS}{\triangleright}
+\newcommand{\functionS}{\texttt{function}}
+\newcommand{\transactionS}{\texttt{transaction}}
+\newcommand{\voidS}{\textsf{void}}
+\newcommand{\unpackS}{\texttt{unpack}}
+\newcommand{\packS}{\texttt{pack_to}}
+\newcommand{\withS}{\texttt{returns}}
+\newcommand{\asS}{\texttt{as}}
+\newcommand{\ofS}{\texttt{managed_by}}
+\newcommand{\trueS}{\textsf{t}}
+\newcommand{\falseS}{\textsf{f}}
+\newcommand{\constS}{\texttt{const}}
+\newcommand{\ifS}{\texttt{if}}
+\newcommand{\thenS}{\texttt{then}}
+\newcommand{\elseS}{\texttt{else}}
+\newcommand{\resS}{\texttt{res}}
+\newcommand{\transactionLabelS}{\mathit{TL}}
+\newcommand{\methDeclS}{\mathit{MethDecl}}
+\newcommand{\methBodyS}{\mathit{MethBody}}
+
+\newcommand{\resHelp}{\textsf{res}}
+\newcommand{\mergeHelp}{\textsf{merge}}
+\newcommand{\mergeableHelp}{\textsf{mergeable}}
+\newcommand{\transHelp}{\textsf{trans}}
+\newcommand{\rmHelp}{\textsf{rm}}
+\newcommand{\wfHelp}{\textsf{wf}}
+\newcommand{\fieldsHelp}{\textsf{fields}}
+\newcommand{\constFieldsHelp}{\textsf{constFields}}
+\newcommand{\mutableFieldsHelp}{\textsf{mutableFields}}
+\newcommand{\methodsHelp}{\textsf{methods}}
+\newcommand{\parentHelp}{\textsf{parent}}
+\newcommand{\hasParentHelp}{\textsf{hasParent}}
+\newcommand{\contractOfHelp}{\textsf{contractOf}}
+\newcommand{\substHelp}{\textsf{subst}}
+
+\begin{figure}
+\fbox{
+\begin{minipage}{\pagewidth}
+$ x, y, z \in \textsc{LocalVariables} \hfill  \thisS \in \textsc{SpecialVariables} \hfill f, g \in \textsc{FieldVariables} $\\
+$ \quad \thisS, a, x, y, z, f, g \in \textsc{Variables} \hfill	 \ell \in \textsc{IndirectRefs} 	\hfill 		o \in \textsc{ObjectRefs} \quad $
+\begin{grammar}
+\renewcommand{\syntleft}{}
+\renewcommand{\syntright}{}
+
+<$Ct$> ::=  $\contractS\ C\ \{\ \overline{Ct}\ \ \overline{St}\ \ \overline{\constS\ \tau\ f}\ \ \overline{\tau\ f}\ \}$
+
+<$St$> ::= $\stateS\ S\ \{\ \overline{\tau\ f} \ \ \overline{\methDeclS\ \methBodyS}\ \}$
+
+<$p$> ::= $\ownedS
+			\ |\ 	\readonlyS
+			\ |\ 	\sharedS$
+			
+<$\tau_{s}$> ::= $C
+			\ |\ 	C.S$
+			
+<$\tau_{p}$> ::= $\tau_{s}
+			\ |\ 	a.\tau_{p}$
+
+<$\tau$> ::= $p \permS \tau_{p}
+			\ |\ 	\packS[S,\tau]$
+
+<$TxLabel$> ::= $\functionS
+			\ |\ 	\transactionS$
+
+<$\methDeclS$> ::= $\transactionLabelS\ \tau\ m(\overline{\tau\ x}) \hookrightarrow \overline{S}$
+
+<$\methBodyS$> ::= $\{\ e\ \}$
+
+<$e$> ::= $a
+			\ |\ 	\letS\ x = e\ \inS\ e
+			\ |\ 	\newS\ C.S(\overline{x})\ \asS\ p
+			\ |\	a.m(\overline{x})$
+		\alt $\throwS
+			\ |\ 	\tryS\ \{\ e\ \}\ \catchS\ \{\ e\ \}$
+		\alt $\packS\ S(\overline{x})\ \withS\ y
+			\ |\ 	\unpackS\ \{\ e\ \}
+			\ |\ 	\ifS\ x : \tau_{s}\ \thenS\ e_{1}\ \elseS\ e_{2}$
+		\alt $\ell$
+
+\end{grammar}
+\end{minipage}
+} %fbox end
+\caption{Grammar}
+\label{fig:obs-gram}
+\end{figure}
+
+There are several categories of variable names in the formalism. \textsc{LocalVariables} (denoted by $x, y, z$) are variables defined in the body of a method by a $\letS$ expression, or by method arguments. \textsc{FieldVariables} (denoted by $f, g$) are variables used for fields, but they can sometimes enter the local context, for example during an unpack block. \textsc{SpecialVariables} includes only the special identifier $\thisS$. \textsc{Variables} (denoted $a, b$) is a catch-all category for all the aforementioned variable types.
+
+
+\iffalse
+
+Simplifications or other notable aspects of the system:
+\begin{itemize}
+\item all transactions are defined in a particular state. A transaction that is general to the entire contract could potentially lose some \ownedS{} references specific to the actual dynamic typestate.
+\item encapsulation is enforced completely (i.e. only method calls are allowed on other contracts).
+\item all references are explicitly assigned one of 3 permissions: \readonlyS, \ownedS, or \sharedS.
+\item the assignment operator is somewhat special: the operation``$f := x$" puts the value of $x$ in $f$ as one would expect. However, it also leaves the variable $x$ to contain the residual permission of the previous value of $x$, while the expression as a whole then evaluates to the previous value of the field $f$. These peculiarities are necessary to enforce the ``must-use'' nature of the \ownedS{} permission. In addition to using the swap operator, a program can also simply reference a field $f$, but this only yields the residual permission to the object in that field.
+\item for simplicity, there are no constructors, and contracts are constructed by specifying a state and specifying all fields.
+\item transitioning to another state is also complicated by the desired semantics of the \ownedS{} permission. With a naive conception of state transitions, an \ownedS{} references that is in $S_{1}$ but not $S_{2}$ is lost when transitioning from $S_{1}$ to $S_{2}$. To mitigate this, the transition ``$\letS\ \overline{x} = \thisS \rightarrow S(\overline{y})\ \inS\ e$" represents a transition that appropriately accounts for all of the destroyed fields in $S_{1}$. The variables $\overline{y}$ are assigned to the fields that are in $S$ but not the current state, while the fields that are in the current state but not in the new state are assigned to $\overline{x}$.
+\end{itemize}
+
+\fi
+
+\section{Static Semantics}
+
+\newcommand{\okHelp}{\textsf{Ok}}
+\newcommand{\okInHelp}{\textsf{Ok\ in}}
+
+Figure \ref{fig:static-helpers} defines auxiliary relations that are helpful in defining the typing relation; Figure \ref{fig:static-sem} defines the typing relation for expressions; Figure \ref{fig:static-ok} defines extra typing judgments to check fields, methods, and contracts.\\
+
+
+The typing relation $\Delta \vdash_{b} e : \tau \dashv \Delta'$ is flow-sensitive: it outputs a typing context, in addition to giving a type to the expression $e$. The following invariant also holds for the typing relation: $x \in \textsf{dom}(\Delta)$ if and only if $x \in \textsf{dom}(\Delta')$. Informally, this says that the contexts $\Delta$ and $\Delta'$ have the exact same variables in them, only differing perhaps by the type assigned to those variables.\\
+
+The boolean $b$ in the typing judgment indicates whether the expression $e$ should be typed as if it were inside an \unpackS{} statement: inside an \unpackS{}, $b = \trueS$, while outside of an unpack, $b = \falseS$. Some typing judgments are valid for only one or the other case (e.g. \textsc{t-pack} and \textsc{t-inv}) but others are valid in either case (e.g. \textsc{t-let}).\\
+
+Types can either be of contract type or of a special \packS{} type. Only the former sort of types, however, are allowed in the typing context. This is implicitly enforced by:
+
+\begin{itemize}
+\item \textsc{t-let} - this rule requires the bound variable to be of contract type
+\item the method \okHelp{} judgment - this determines the initial value of the typing context when typechecking a method body, and prohibits \packS{} types in the initial context
+\item the field \okHelp{} judgment - this ensures that fields aren't of type \packS{}, and thus \packS{} types cannot appear in the typing context via field unpacking.
+\end{itemize}
+
+It is assumed that the type rules have access to the helper function $lookup$, $fields$, and $methods$. These helper functions retrieve, respectively, the contract signature, the set of fields, and the set of methods of a contract given the contract's name. If the type specifies a specific typestate, all the methods and fields that are available in that state (including those defined in the contract as a whole) are retrieved. There is also $mutableFields$, which retrieves the subset of $fields$ that are not labeled as \constS{}.\\
+
+We say that a context $\Delta$ is well-formed if each type in the context is well-formed with respect to the context: a context is well-formed if 
+
+\iffalse
+
+For a field $``\tau\ f"$ to type check, we must have $``(\tau\ f)\ \okHelp"$. This ensures that the field's static type will remain accurate even as other transactions are executed (e.g. a \readonlyS{} reference can not store the reference as having a particular typestate). \\
+
+Explanation of specific rules:
+
+\begin{itemize}
+\item \textsc{t-sub}: this simply allows typestate specific information about an object (e.g. that it is in state $S$) to be discarded.
+
+\item \textsc{t-let}: notably, shadowing is disallowed entirely. In terms of the dynamic semantics, this restriction allows us to say that if $\Delta \vdash e \dashv \Delta'$, then some variable $x$ refers to the same object in the heap before and after the evaluation of $e$. Also, the rule deletes the newly defined variable in the output context, which ensures that $\Delta$ and $\Delta'$ have the same domains.
+
+\item \textsc{t-new}: all objects constructed during runtime are \ownedS{}. Perhaps we could allow explicit casting to \sharedS{}, but implicit casting would be problematic because it could circumnavigate the linearity of \ownedS{} (specifically, the ``no weakening" aspect of linearity).
+
+\item \textsc{t-inv}: if the method recipient is not \ownedS{}, the method must be $pure$; that is, non-mutating.
+\item \textsc{t-trans}: this rule disallows shadowing like the \letS{} rule, and also deletes all new bindings in the output context
+\item \textsc{t-switch}: the use of $merge$ here ensure that the different branches of the expression don't change permissions differently. For example, if there is some $\ownedS{}$ permission bound to $x$ in $\Delta$, we shouldn't be able to use that permission in $e_{1}$, but leave it intact in $e_{2}$, because then it is unclear after the switch statement what the status of $x$ should be. Essentially, for each permission in $\Delta$, $mergeable$ ensures that an upper bound exists for the modifications made to that permission in each branch, and $merge$ calculates this upper bound, if it exists.
+\end{itemize}
+
+\fi
+
+\begin{figure*}[h!]
+\fbox{\begin{minipage}{\pagewidth}
+
+\boxed{\resHelp(p), \resHelp(\tau), \resHelp(\overline{x}, \Delta)} Residual Permission/Type/Context
+\begin{mathpar}
+\inferlbl{}
+	{}
+	{\resHelp(\ownedS) = \readonlyS}
+\and
+\inferlbl{}
+	{}
+	{\resHelp(\readonlyS) = \readonlyS}
+\and
+\inferlbl{}
+	{}
+	{\resHelp(\sharedS) = \sharedS}
+\and
+\inferlbl{}
+	{}
+	{\resHelp(p \permS \tau_{s}) = \resHelp(p) \permS \tau_{s}}
+\and
+\inferlbl{}
+	{ \Delta' = \Delta[x_{i} \mapsto \resHelp(\Delta(x_{i}))]}
+	{\resHelp(\overline{x}, \Delta) = \Delta'}
+\end{mathpar}
+
+\boxed{\rmHelp(x, \Delta),\ \rmHelp(\overline{x}, \Delta)} Removes variable $x$ or variables $\overline{x}$ from the context $\Delta$
+\begin{mathpar}
+\inferlbl{}
+	{p \neq \ownedS \qquad \forall (y\ \tau) \in \Delta, \tau_{p}.\ \tau \neq x.\tau_{p}}
+	{\rmHelp(x, (\Delta, x : p \permS \tau)) = \Delta}
+\and
+\inferlbl{}
+	{x \not\in \textsf{dom}(\Delta)}
+	{\rmHelp(x, \Delta) = \Delta}
+\\
+\inferlbl{}
+	{}
+	{\rmHelp(\emptyset, \Delta) = \Delta}
+\and
+\inferlbl{}
+	{}
+	{\rmHelp(\{x_{1}, \ldots, x_{n}, x_{n+1}\}, \Delta) = \rmHelp(\{x_{1}, \ldots, x_{n}\}, \rmHelp(x_{n+1}, \Delta)) }
+\end{mathpar}
+
+\boxed{\tau <: \tau'} Subtyping
+\begin{mathpar}
+\inferlbl{}
+	{}
+	{\tau <: \tau}
+\and
+\inferlbl{}
+	{}
+	{p \permS C.S <: p \permS C}
+\and
+\inferlbl{}
+	{}
+	{p \permS P.C.S <: p \permS P.C}
+\end{mathpar}
+
+\boxed{\mergeableHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n}),\ \mergeHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n})} \\
+
+Merges contexts $\Delta_{1}, \ldots, \Delta_{n}$ after branching from the original context $\Delta$
+\begin{mathpar}
+\inferlbl{}
+	{\mergeableHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n}) \qquad \exists \tau'. \big( \forall i. \Delta_{i}(x) <: \tau' \big)}
+	{\mergeableHelp((\Delta, x : \tau); \Delta_{1}, \ldots, \Delta_{n})}
+\and
+\inferlbl{}
+	{}
+	{\mergeableHelp(\emptyset; \Delta_{1}, \ldots, \Delta_{n})}
+\and
+\inferlbl{}
+	{\mergeableHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n})}
+	{\mergeHelp(\Delta; \Delta_{1}, \ldots, \Delta_{n}) = \{ (x, \tau) \ \vert\ x \in \Delta\ \&\ \Delta_{i}(x) <: \tau \} }
+\end{mathpar}
+
+\boxed{ \wfHelp(\Delta, \tau), \wfHelp(C, \tau) } Assures wellformedness of type $\tau$ w.r.t. $\Delta$ or $C$
+\begin{mathpar}
+
+\inferlbl{}
+	{ \lnot \hasParentHelp(\contractOfHelp(\tau_{s}))  }
+	{ \wfHelp(\Delta, p \permS \tau_{s}) }
+\and
+\inferlbl{}
+	{ \contractOfHelp(\Delta(\thisS)) = \contractOfHelp(\tau_{s}) }
+	{ \wfHelp(\Delta, p \permS \tau_{s}) }
+\and
+\inferlbl{}
+	{ \contractOfHelp(\Delta(a)) = C \qquad \wfHelp(\Delta, C, p \permS \tau_{p})  }
+	{ \wfHelp(\Delta, p \permS a.\tau_{p}) }
+\and
+\inferlbl{}
+	{ (\tau_{f}\ f) \in \constFieldsHelp(C) \\\\ \wfHelp(\contractOfHelp(\tau_{f}), p \permS \tau_{p})  }
+	{ \wfHelp(C, p \permS f.\tau_{p}) }
+\and
+\inferlbl{}
+	{ C = \parentHelp(\contractOfHelp(\tau_{s})) }
+	{ \wfHelp(C, p \permS \tau_{s}) }
+
+\end{mathpar}
+\boxed{ \substHelp(\tau, \tau', M)} Changes perspective of $\tau$ using mapping $M$, with recipient type $\tau'$
+\begin{mathpar}
+\inferlbl{}
+	{ M(z) = y }
+	{ \substHelp(p \permS z.\tau_{p}, \tau, M) = p \permS y.\tau_{p} }
+\and
+\inferlbl{}
+	{ \lnot \hasParentHelp(\contractOfHelp(\tau_{s})) }
+	{ \substHelp(p \permS \tau_{s}, \tau, M) = p \permS \tau_{s} }
+\and
+\inferlbl{}
+	{ \contractOfHelp(\tau_{s}) = \contractOfHelp(\tau_{s'}) }
+	{ \substHelp(p \permS \tau_{s}, a.f_{1} \cdots .f_{n}.\tau_{s}', M) = p \permS a.f_{1} \cdots . f_{n}.\tau_{s} }
+\end{mathpar}
+
+\end{minipage}
+}
+\caption{Auxiliary Relations}
+\label{fig:static-helpers}
+\end{figure*}
+
+\begin{figure*}[h!]
+\fbox{\begin{minipage}{\pagewidth}
+\boxed{\Delta \vdash_{b} e : \tau \dashv \Delta'}
+\begin{mathpar}
+\inferlbl{t-sub}
+	{ \tau <: \tau'  \qquad \Delta \vdash_{b} e : \tau \dashv \Delta' }
+	{\Delta \vdash_{b} e : \tau' \dashv \Delta'}
+\and
+\inferlbl{t-var}
+	{ a \neq \thisS }
+    	{\Delta, a : \tau \vdash_{b} a : \tau \dashv \Delta, a : \resHelp(\tau) }
+\and
+\inferlbl{t-this}
+	{ \Delta(\thisS) = \tau }
+    	{\Delta \vdash_{\falseS} \thisS : \resHelp(\tau) \dashv \Delta }
+\and
+\inferlbl{t-field}
+	{ (\tau\ \,f) \in \fieldsHelp(\Delta(\thisS)) }
+    	{ \Delta \vdash_{\falseS} \resS(f) : \resHelp(\tau) \dashv \Delta }
+\and
+\inferlbl{t-let}
+	{ \forall \tau_{p}.\ \tau \neq x.\tau_{p} \qquad \forall \tau.\ (\tau\ x) \not\in \constFieldsHelp(\Delta(\thisS))
+	\\\\
+	x \not\in \Delta \qquad \Delta \vdash_{b} e_{1} : p \permS \tau_{s} \dashv \Delta_{1} \qquad \Delta_{1}, x : p \permS \tau_{s}  \vdash_{b} e_{2} : \tau \dashv \Delta_{2} }
+	{ \Delta \vdash_{b} \letS\ x = e_{1}\ \inS\ e_{2} : \tau \dashv \rmHelp(x, \Delta_{2}) }
+\and
+\inferlbl{t-new}
+	{ \hasParentHelp(C) \Rightarrow \exists p'.\ \Delta(\thisS) <: p' \permS \parentHelp(C) \qquad \overline{\tau\ \,f} = \fieldsHelp(C.S) }
+	{ \Delta, \overline{x : \tau} \vdash_{b} \newS\ C.S(\overline{x})\ \asS\ p : p \permS C.S \dashv \Delta, \overline{x: \resHelp(\tau)}}
+\and
+\inferlbl{t-inv-1}
+	{ M = \emptyset\overline{[z \mapsto y]}[\thisS \mapsto x]
+	\\\\
+	\big(\transactionLabelS\ \tau_{ret}\ m(\overline{\tau\ z}) \hookrightarrow \overline{S} \big) \in \methodsHelp(\tau_{recip}) \qquad \tau_{ret}' = \substHelp(\tau_{ret}, \tau_{recip}, M)
+	\\\\
+	 p = \readonlyS \Rightarrow \transactionLabelS = \functionS \qquad \forall i.\ \tau_{i}' = \substHelp(\tau_{i}, \tau_{recip}, M) }
+	{ \Delta, x : p \permS \tau_{recip}, \overline{y : \tau'} \vdash_{\falseS} x.m(\overline{y}) : \tau_{ret}' \dashv \Delta, x : p \permS \transHelp(\overline{S}, \tau_{recip}), \overline{y : \resHelp(\tau')} }
+\and
+\inferlbl{t-inv-2}
+	{ M = \emptyset\overline{[z \mapsto x]}[\thisS \mapsto \thisS.f] \qquad  (p \permS \tau_{recip}\ \, f) \in \fieldsHelp(\Delta(\thisS))
+	\\\\
+	\big(\transactionLabelS\ \tau_{ret}\ m(\overline{\tau\ z}) \hookrightarrow \overline{S} \big) \in \methodsHelp(\tau_{recip})
+	\\\\
+	 p = \readonlyS \Rightarrow \transactionLabelS = \functionS \qquad \transHelp(\overline{S}, \tau_{recip}) <: \tau_{recip} }
+	{ \Delta, \overline{x : \tau'} \vdash_{\falseS} f.m(\overline{x}) : \substHelp(\tau_{ret}, \tau_{recip}, M) \dashv \Delta, \overline{x : \resHelp( \substHelp(\tau, \tau_{recip}, M))} }
+\and
+\inferlbl{t-unpack}
+	{  \overline{\tau\ f} =  \mutableFieldsHelp(\Delta(\thisS))
+	\\\\
+	p \neq \readonlyS \qquad \Delta,\overline{ f : \tau}  \vdash_{\trueS} e : \packS[S, \tau_{ret}] \dashv \Delta'}
+	{ \Delta \vdash_{\falseS} \unpackS\ \{e\} : \tau_{ret} \dashv \rmHelp(\overline{f}, \Delta'), \thisS: \transHelp(S, \Delta(\thisS)) }
+\and
+\inferlbl{t-pack}
+	{ \overline{\tau\ f} = \mutableFieldsHelp(\Delta(\thisS)) \qquad \Delta' = \Delta, y : \resHelp(\tau'), \overline{x : \resHelp(\tau)} }
+	{ \Delta, y : \tau', \overline{x : \tau} \vdash_{\trueS} \packS\ S(\overline{x})\ \withS\ y : \packS[S, \tau'] \dashv  \Delta'}
+\and
+\inferlbl{t-try}
+	{ \Delta \vdash_{b} e_{1} : \tau \dashv \Delta_{1} \qquad \Delta \vdash_{b} e_{2} : \tau \dashv \Delta_{2} }
+	{ \Delta \vdash_{b} \tryS\ \{ e_{1} \}\ \catchS\ \{ e_{2} \} : \tau \dashv \mergeHelp(\Delta; \Delta_{1}, \Delta_{2}) }
+\and
+\inferlbl{t-thr}
+	{  }
+	{ \Delta \vdash_{b} \throwS : \tau \dashv \Delta' }
+\and
+\inferlbl{t-dyn}
+	{ \Delta, x : p \permS \tau_{s}' \vdash_{b} e_{1} : \tau \dashv \Delta_{1} \qquad \Delta, x : p \permS \tau_{s} \vdash_{b} e_{2} : \tau \dashv \Delta_{2} }
+	{ \Delta, x : p \permS \tau_{s} \vdash_{t} \ifS\ x : \tau_{s}'\ \thenS\ e_{1}\ \elseS\ e_{2} \dashv \mergeHelp(\Delta; \Delta_{1}, \Delta_{2})  }
+\end{mathpar}
+\end{minipage}
+}
+\caption{Statics}
+\label{fig:static-sem}
+\end{figure*}
+
+
+
+\begin{figure*}[h!]
+\fbox{\begin{minipage}{\pagewidth}
+
+\boxed{(\tau\ f)\ \okInHelp\ C} Field Consistency
+\begin{mathpar}
+\inferlbl{}
+	{ \tau = p \permS a.f_{1}.\cdots.f_{n}.C \qquad \wfHelp(\emptyset[\thisS \mapsto \readonlyS \permS D], \tau) }
+	{(\tau \ f)\ \okInHelp\ D}
+\and
+\inferlbl{}
+	{ \tau = \ownedS \permS a.f_{1}.\cdots.f_{n}.C.S \qquad \wfHelp(\emptyset[\thisS \mapsto \readonlyS \permS D], \tau) }
+	{(\tau \ f)\ \okInHelp\ D}
+\and
+\end{mathpar}
+
+\boxed{(\methDeclS\ \methBodyS)\ \okHelp\ \textsf{in}\ C.S} Method Consistency
+\begin{mathpar}
+\inferlbl{}
+	{ \Delta = \emptyset, \thisS : \ownedS \permS C.S, \overline{x : \tau} \qquad \forall i.\ \wfHelp(\Delta, \tau_{i})
+ 	\\\\
+	\Delta \vdash_{\falseS} e : \tau' \dashv \Delta' \qquad \forall a, \tau_{p}.\ \Delta'(a) = \ownedS \permS \tau_{p}\ \ \text{iff}\ \ a = \thisS
+	\\\\
+	 \Delta'(\thisS) <: \transHelp(\overline{S}, \ownedS \permS C.S)
+	 }
+	{\transactionS\ \tau' \ m(\overline{\tau \ x}) \hookrightarrow \overline{S}\ \{e\} \ \okHelp\ \textsf{in}\ C.S}
+\and
+\inferlbl{}
+	{ \Delta = \emptyset, \thisS : \readonlyS \permS C.S, \overline{x : \tau} \qquad \forall i.\ \wfHelp(\Delta, \tau_{i})
+ 	\\\\
+	\Delta \vdash_{\falseS} e : \tau' \dashv \Delta' \qquad \forall a, \tau_{p}.\ \Delta'(a) \neq \ownedS \permS \tau_{p} }
+	{\functionS\ \tau' \ m(\overline{\tau \ x})\ \{e\} \ \okHelp\ \textsf{in}\ C.S}
+\end{mathpar}
+
+
+\boxed{\stateS\ S\ \{\ \ldots\ \}\ \okInHelp\ C } State Consistency
+\begin{mathpar}
+\inferlbl{}
+	{ \forall i.\ (\methDeclS_{i}\ \methBodyS_{i})\ \okInHelp\ C.S \qquad \forall i.\ (\tau_{i}\ f_{i})\ \okInHelp\ C }
+	{ \stateS\ S\ \{\ \overline{\tau\ f} \ \ \overline{\methDeclS\ \methBodyS}\ \} }
+\end{mathpar}
+
+\boxed{ \contractS\ C\ \{\ \ldots\ \}\ \okHelp} Contract Consistency
+\begin{mathpar}
+\inferlbl{}
+	{ \forall i.\ (\tau_{f_{i}}\ f_{i})\ \okInHelp\ C \qquad \forall i.\ (\tau_{g_{i}}\ g_{i})\ \okInHelp\ C \qquad \forall i.\ St_{i}\ \okInHelp\ C \qquad \forall i.\ Ct_{i}\ \okHelp
+	\\\\
+	\forall \tau, i, j.\ \big((\tau\ f_{i}) \not\in \fieldsHelp(St_{j}) \land (\tau\ g_{i}) \not\in \fieldsHelp(St_{j}) \land f_{i} \neq g_{j} \big)}
+	{ \contractS\ C\ \{\ \overline{Ct}\ \ \overline{St}\ \ \overline{\constS\ \tau_{f}\ f}\ \ \overline{\tau_{g}\ g}\ \} }
+\end{mathpar}
+
+\end{minipage}
+}
+\caption{Auxiliary Judgments}
+\label{fig:static-ok}
+\end{figure*}
+
+\section{Dynamic Semantics}
+
+
+\newcommand{\callS}{\texttt{call}}
+
+Auxiliary definitions for the dynamic semantics are shown in Figure \ref{fig:dyn-helpers}. The small-step evaluation relation is defined in Figure \ref{fig:dyn-sem}. We augment the set of expressions $e$ in the runtime to make it easier to express the desired semantics for exceptions: it is assumed that whole programs do not make use of the new $\tryS$-$\catchS$ and method call constructs.
+
+\begin{figure*}[h!]
+\fbox{\begin{minipage}{\pagewidth}
+\begin{mathpar}
+\mu \in \textsc{Locations} \rightharpoonup \textsc{Objects}\\
+\rho \in \textsc{Variables} \rightharpoonup \textsc{Locations}\\
+
+T ::= C.S
+	\ |\ 	\ell.C.S\\
+
+\textsc{Objects} = \{ (T, f_{map})\ \vert\ f_{map} \in \textsc{FieldNames} \rightharpoonup \textsc{Locations})\\
+
+field(f, (T, f_{map})) = f_{map}(f)\\
+type((T, f_{map})) = T\\
+(T, f_{map})[f \mapsto \ell] = (T, f_{map}[f \mapsto \ell])\\
+\ell \in \textsc{Locations}\\
+e ::= \ldots
+	\ |\ 	\tryS(\mu)\ \{ e_{1} \}\ \catchS\ \{ e_{2} \}
+	\ |\ 	\ell
+	\ |\ 	\textsf{Ex}
+	\ |\ 	\callS(\rho)\ \{ e \}\\
+v ::= \ell
+	\ |\ 	\packS\ S(\overline{\ell})\ \withS\ \ell\\
+
+\end{mathpar}
+
+\boxed{\mathbb{E}, \mathbb{E}[e]} Evaluation Context, Substitution
+\begin{mathpar}
+\mathbb{E} ::=
+		\square
+	\ |\ 	\letS\ x = \mathbb{E}\ \inS\ e
+	\ |\ 	\letS\ x = \ell\ \inS\ \mathbb{E}
+	\ |\ 	\unpackS\ \{\, \mathbb{E}\, \}
+	\ |\ 	\callS(\rho)\ \{ \mathbb{E} \}\\
+\mathbb{\square}[e] = e\\
+(\letS\ x = \mathbb{E}\ \inS\ e')[e] = (\letS\ x = \mathbb{E}[e]\ \inS\ e')\\
+(\letS\ x = \ell\ \inS\ \mathbb{E})[e] = (\letS\ x = \ell\ \inS\ \mathbb{E}[e])\\
+(\unpackS\ \{\mathbb{E}\})[e] = (\unpackS\ \{\mathbb{E}[e]\})\\
+(\callS(\rho)\ \{ \mathbb{E} \})[e] = (\callS(\rho)\ \{ \mathbb{E}[e] \})\\
+
+\end{mathpar}
+
+
+\boxed{context(\mu, \rho, \mathbb{E})} Calculates a suitable $\rho'$ for evaluation inside of $\mathbb{E}$
+\begin{mathpar}
+
+\inferlbl{}
+	{}
+	{  context(\mu, \rho, \square) = \rho }
+\and
+\inferlbl{}
+	{}
+	{  context(\mu, \rho, \letS\ x = \mathbb{E}\ \inS\ e) = context(\mu, \rho, \mathbb{E}) }
+\and
+\inferlbl{}
+	{}
+	{  context(\mu, \rho, \letS\ x = \ell\ \inS\ \mathbb{E}) = context(\mu, \rho[x \mapsto \ell], \mathbb{E}) }
+\and
+\inferlbl{}
+	{\overline{\tau\ f} = fields(type(\mu(\rho(\thisS))))
+	\\\\
+	 \rho' = \rho[f_{1} \mapsto field(f_{1}, \mu(\rho(\thisS)))]\ldots[f_{n} \mapsto field(f_{n}, \mu(\rho(\thisS)))]}
+	{  context(\mu, \rho, \unpackS\ \{\, \mathbb{E}\, \}) = context(\mu, \rho' \setminus \{ \thisS \}, \mathbb{E}) }
+\and
+\inferlbl{}
+	{}
+	{  context(\mu, \rho, \callS(\rho')\ \{ \mathbb{E} \}) = context(\mu, \rho', \mathbb{E}) }\\
+	
+\end{mathpar}
+
+\end{minipage}
+
+}
+\caption{Auxiliary Definitions}
+\label{fig:dyn-helpers}
+\end{figure*}
+
+\begin{figure*}[h!]
+\fbox{\begin{minipage}{\pagewidth}
+\boxed{\mu, \rho, e \rightarrow \mu, e}
+\begin{mathpar}
+\inferlbl{e-var}
+	{  }
+    	{ \mu, \rho, x \rightarrow \mu, \rho(x) }
+\and
+\inferlbl{e-read}
+	{ }
+	{ \mu, \rho, f \rightarrow \mu, field(f, \mu(\rho(\thisS))) }
+\and
+\inferlbl{e-bubble-up}
+	{ }
+	{  \mu, \rho, \mathbb{E}[\textsf{Ex}] \rightarrow \mu, \textsf{Ex} }
+\and
+\inferlbl{e-ev}
+	{ context(\mu, \rho, \mathbb{E}) = \rho' \qquad \mu, \rho', e \rightarrow \mu', e' }
+	{  \mu, \rho, \mathbb{E}[e] \rightarrow \mu', \mathbb{E}[e'] }
+\and
+\inferlbl{e-let}
+	{  }
+	{  \mu, \rho, \letS\ x = \ell\ \inS\ v \rightarrow \mu, v }
+\and
+\inferlbl{e-throw}
+	{  }
+	{ \mu, \rho, \throwS{} \rightarrow \mu, \textsf{Ex} }
+\and
+\inferlbl{e-method}
+	{ lookup(type(\mu(\rho(x))), m) = \tau\ m(\overline{\tau\ z}) \hookrightarrow \overline{S}\ \{ e \}
+		\\\\
+	 \rho' = \emptyset[z_{i} \mapsto \rho(y_{i})][\thisS \mapsto \rho(x)] }
+	{\mu, \rho, x.m(\overline{y}) \rightarrow \mu, \callS(\rho')\ \{e\}}
+\and
+\inferlbl{e-return}
+	{ }
+	{ \mu, \rho, \callS(\rho')\ \{ \ell \} \rightarrow \mu,  \ell }
+\and
+\inferlbl{e-new}
+	{ \ell \not\in \textsf{Dom}(\mu) \qquad \overline{\tau\ f} = fields(C.S) \qquad f_{map} = \{ (f_{1}, \rho(x_{1})), \ldots, (f_{n}, \rho(x_{n})) \} }
+	{\mu, \rho, \newS\ C.S(\overline{x}) \ \asS\ p \rightarrow \mu[\ell \mapsto (C.S, f_{map})], \ell }
+\and
+\inferlbl{e-pack}
+	{ \forall i. \rho(x_{i}) = \ell_{i} \qquad \rho(y) = \ell' }
+	{ \mu, \rho, \packS\ S(\overline{x})\ \withS\ y \rightarrow \mu, \packS\ S(\overline{\ell})\ \withS\ \ell'  }
+\and
+\inferlbl{e-trans}
+	{ \overline{\tau\ f} = fields(type(\mu(\rho(\thisS))))
+	\\\\
+	O_{this} = \rho(\thisS)[f_{1} \mapsto \ell_{1}]\ldots[f_{n} \mapsto \ell_{n}] \qquad \mu' = \mu[\rho(\thisS) \mapsto O_{this} ]}
+	{ \mu, \rho, \unpackS\ \{\, \packS\ S(\overline{\ell})\ \withS\ \ell'\, \} \rightarrow \mu', \ell' }
+\and
+\inferlbl{e-dyn-ex}
+	{ type(\mu(\rho(x)))\ \textsf{instanceOf}\ \tau_{s} }
+	{ \mu, \rho, \ifS\ x : \tau_{s}\ \inS\ e \rightarrow \mu', \textsf{Ex} }
+\and
+\inferlbl{e-dyn-ok}
+	{ type(\mu(\rho(x)))\ \textsf{instanceOf}\ \tau_{s} }
+	{ \mu, \rho, \ifS\ x : \tau_{s}\ \inS\ e \rightarrow \mu', e }
+\and
+\inferlbl{e-try-1}
+	{ }
+	{ \mu, \rho, \tryS\ \{ e_{1} \}\ \catchS\ \{ e_{2} \} \rightarrow \mu, \tryS(\mu)\ \{ e_{1} \}\ \catchS\ \{ e_{2} \}  }
+\and
+\inferlbl{e-try-2}
+	{ \mu, \rho, e_{1} \rightarrow \mu', e_{1}' }
+	{ \mu, \rho, \tryS(\mu_{1})\ \{ e_{1} \}\ \catchS\ \{ e_{2} \} \rightarrow \mu', \tryS(\mu_{1})\ \{ e_{1}' \}\ \catchS\ \{ e_{2} \}  }
+\and
+\inferlbl{e-try-3}
+	{ }
+	{ \mu, \rho, \tryS(\mu)\ \{ \ell \}\ \catchS\ \{ e_{2} \} \rightarrow \mu, \ell  }
+\and
+\inferlbl{e-catch}
+	{ }
+	{ \mu, \rho, \tryS(\mu_{1})\ \{ \textsf{Ex} \}\ \catchS\ \{ e_{2} \} \rightarrow \mu_{1}, e_{2} }
+
+\end{mathpar}
+\end{minipage}
+}
+\caption{Dynamics}
+\label{fig:dyn-sem}
+\end{figure*}
+
+\end{document}

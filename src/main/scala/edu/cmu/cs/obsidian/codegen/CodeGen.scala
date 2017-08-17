@@ -46,6 +46,12 @@ class CodeGen (val target: Target) {
     private def innerClassFieldName(stName: String): String = {
         "__state" + stName
     }
+    private def transactionGetMethodName(txName: String, stOption: Option[String]): String = {
+        stOption match {
+          case Some(stName) => txName + "__" + "state" + stName
+          case None => txName
+        }
+    }
     /* This method dynamically checks type state and copies the value of conserved fields
      * (i.e. defined in both states) from one state to another */
     private final val conserveFieldsName = "__conserveFields"
@@ -135,7 +141,7 @@ class CodeGen (val target: Target) {
         assert(program.imports.isEmpty, "imports in imported contracts are not yet supported");
 
         for (contract <- program.contracts) {
-            translateStubContract(contract, programPackage, contractNameResolutionMap, protobufOuterClassNames)
+            translateStubContract(contract, programPackage)
         }
     }
 
@@ -144,9 +150,7 @@ class CodeGen (val target: Target) {
     }
 
     private def translateStubContract(contract: Contract,
-                                      programPackage: JPackage,
-                                      contractNameResolutionMap: Map[Contract, String],
-                                      protobufOuterClassNames: Map[String, String]): Unit = {
+                                      programPackage: JPackage): Unit = {
         var contractClass = programPackage._class(JMod.PUBLIC, classNameForStub(contract.name))
         contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
 
@@ -155,30 +159,32 @@ class CodeGen (val target: Target) {
         val superConstructorInvocation = constructor.body().invoke("super")
         superConstructorInvocation.arg(param)
 
-        val stubTranslationContext = makeTranslationContext(contract, contractClass, contractNameResolutionMap, protobufOuterClassNames, true)
-
+      val txNames: mutable.Set[String] = new mutable.HashSet[String]()
 
         for (decl <- contract.declarations) {
-            translateStubDeclaration(decl, contractClass, stubTranslationContext)
+            translateStubDeclaration(decl, contractClass, None, txNames)
         }
     }
 
-    private def translateStubDeclaration(decl: Declaration, inClass: JDefinedClass, translationContext: TranslationContext) : Unit = {
-        decl match {
+    private def translateStubDeclaration(decl: Declaration,
+                                         inClass: JDefinedClass,
+                                         stOption: Option[State],
+                                         txNames: mutable.Set[String]) : Unit = {
+
+          decl match {
             case _: TypeDecl => assert(false, "unsupported"); // TODO
-            case f: Field => translateStubField(f, inClass, translationContext)
-            case _: Constructor => // Constructors aren't translated becuase stubs are only for remote instances.
+            case f: Field => translateStubField(f, inClass)
+            case Constructor(name, args, body) => // Constructors aren't translated because stubs are only for remote instances.
             case f: Func => translateStubFunction(f, inClass)
-            case t: Transaction => translateStubTransaction(t, inClass, translationContext)
-            case s: State => translateStubState(s, inClass)
+            case t: Transaction => if (!txNames.contains(t.name)) translateStubTransaction(t, inClass, stOption)
+                                                 txNames.add(t.name)
+            case s: State => translateStubState(s, inClass, txNames)
             case c: Contract => translateStubContract(c,
-                inClass.getPackage(),
-                translationContext.contractNameResolutionMap,
-                translationContext.protobufOuterClassNames)
-        }
+              inClass.getPackage())
+          }
     }
 
-    private def translateStubField(decl: Field, newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
+    private def translateStubField(decl: Field, newClass: JDefinedClass): Unit = {
         // In a stub, every non-primitive field is also a stub, so we need to make the field of appropriate type for that.
         // Primitive fields will not map to anything; instead, their accesses will translate to remote calls.
         val remoteFieldType = decl.typ match {
@@ -238,11 +244,21 @@ class CodeGen (val target: Target) {
         }
     }
 
-    private def translateStubTransaction(transaction: Transaction, newClass: JDefinedClass, translationContext: TranslationContext) : JMethod = {
+    private def translateStubTransaction(transaction: Transaction,
+                                         newClass: JDefinedClass,
+                                         stOption: Option[State]) : JMethod = {
+        val stName = stOption match {
+            case Some(st) => Some(st.name)
+            case None => None
+        }
+
+        //val txName = transactionGetMethodName(transaction.name, stName)
+
         val javaRetType = transaction.retType match {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
         }
+
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, transaction.name)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
 
@@ -310,8 +326,10 @@ class CodeGen (val target: Target) {
         meth
     }
 
-    private def translateStubState(s: State, inClass: JDefinedClass) : Unit = {
-        // TODO
+    private def translateStubState(s: State, inClass: JDefinedClass, txNames: mutable.Set[String]) : Unit = {
+        for (decl <- s.declarations) {
+            translateStubDeclaration(decl, inClass, Some(s), txNames)
+        }
     }
 
 
@@ -334,6 +352,7 @@ class CodeGen (val target: Target) {
         // exhaustive return to keep the compiler happy
         getBody._return(JExpr._null())
 
+
         /* setup set method */
         val setMeth = newClass.method(JMod.PRIVATE, model.VOID, fieldSetMethodName(name))
         val setBody = setMeth.body()
@@ -351,15 +370,18 @@ class CodeGen (val target: Target) {
     def makeTransactionInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
                            (name: String, declSeq: Seq[(State, Transaction)]): TransactionInfo = {
         val txExample = declSeq.head._2
+        val stExample = declSeq.head._1
+
+        val txExampleName = transactionGetMethodName(txExample.name, Some(stExample.name))
 
         val (hasReturn, retType) = txExample.retType match {
             case Some(typ) => (true, resolveType(typ))
             case None => (false, model.VOID)
         }
 
-        val meth = newClass.method(JMod.PUBLIC, retType, txExample.name)
+        val meth = newClass.method(JMod.PUBLIC, retType, txExampleName)
 
-        /* add the appropriate args to the method and collect them in a list */
+      /* add the appropriate args to the method and collect them in a list */
         val jArgs = txExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
 
         val body = meth.body()
@@ -375,9 +397,13 @@ class CodeGen (val target: Target) {
 
             if (hasReturn) stBody._return(inv)
             else stBody.add(inv)
+
         }
         // exhaustive return to please compiler
         if (hasReturn) body._return(JExpr._null())
+
+
+
 
         StateSpecificTransactionInfo(declSeq, meth)
     }
@@ -412,6 +438,7 @@ class CodeGen (val target: Target) {
         }
         // exhaustive return to please compiler
         if (hasReturn) body._return(JExpr._null())
+
 
         StateSpecificFuncInfo(declSeq, meth)
     }
@@ -733,27 +760,41 @@ class CodeGen (val target: Target) {
                               model.BYTE.array(), "returnBytes",
                               JExpr.newArray(model.BYTE, 0))
 
-        /* for each possible transaction, we have a branch in the run method */
-        for ((state, tx) <- mainTransactions) {
-            val cond = {
-                state match {
-                    case Some(stName) =>
-                        JExpr.ref(stateField)
-                            .eq(
-                                translationContext.getEnum(stName))
-                            .band(
-                                JExpr.ref("transName")
-                                    .invoke("equals").arg(
-                                        JExpr.lit(tx.name))
-                            )
-                    case None =>
-                        JExpr.ref("transName")
-                            .invoke("equals").arg(
-                                JExpr.lit(tx.name))
-                }
-            }
+        runMeth._throws(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
 
-            val stateCond = runMeth.body()._if(cond)
+        /* we use this map to group together all transactions with the same name */
+        val txsByName = new mutable.HashMap[String, mutable.Set[(Transaction, Option[String])]]()
+
+        for ((state, tx) <- mainTransactions) {
+            val opt = txsByName.get(tx.name)
+            opt match {
+              case Some(sameNameTxs) =>
+                sameNameTxs += ((tx, state))
+                txsByName.put(tx.name, sameNameTxs)
+              case None =>
+                txsByName.+=((tx.name, mutable.Set((tx, state))))
+            }
+        }
+
+        /* for each transaction name, we have a branch in the run method */
+        for (txName <- txsByName.keySet) {
+            val transEq = JExpr.ref("transName").invoke("equals").arg(JExpr.lit(txName))
+
+            val transCond = runMeth.body()._if(transEq)
+            val transCondBody = transCond._then()
+
+            for ((tx, state) <- txsByName.getOrElse(txName, Set())) {
+                val stateEq = {
+                    state match {
+                        case Some(stName) =>
+                            JExpr.invoke(getStateMeth)
+                              .eq(translationContext.getEnum(stName))
+                        case None => JExpr.invoke(getStateMeth)
+                                       .eq(JExpr._null())
+                    }
+                }
+
+            val stateCond = transCondBody._if(stateEq)
             val stateCondBody = stateCond._then()
 
             /* parse the (typed) args from raw bytes */
@@ -775,7 +816,8 @@ class CodeGen (val target: Target) {
                         val lengthCheck = stateCondBody._if(lengthCheckCall.not())
                         val _ = lengthCheck._then()._return(JExpr._null())
 
-                        JExpr.cond(runArg.component(JExpr.lit(0)).eq0(), JExpr.lit(false),JExpr.lit(true))
+
+                        JExpr.cond(runArg.component(JExpr.lit(0)).eq0(), JExpr.lit(false), JExpr.lit(true))
                     case AstStringType() =>
                         val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                         val newString = JExpr._new(model.ref("java.lang.String"))
@@ -796,27 +838,34 @@ class CodeGen (val target: Target) {
             }
 
             var txInvoke: JInvocation = null
+            val txMethName = transactionGetMethodName(tx.name, state)
 
             if (tx.retType.isDefined) {
-                txInvoke = JExpr.invoke(tx.name)
-                stateCondBody.assign (returnBytes,
+                txInvoke = JExpr.invoke(txMethName)
+                stateCondBody.assign(returnBytes,
                     tx.retType.get match {
                         case AstIntType() => txInvoke.invoke("toByteArray")
-                        case AstBoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("booleanToBytes").arg(txInvoke)
+                        case AstBoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
+                                                .staticInvoke("booleanToBytes").arg(txInvoke)
                         case AstStringType() => txInvoke.invoke("getBytes")
                         case _ => txInvoke.invoke("archiveBytes")
                     }
                 )
             } else {
-                txInvoke = stateCondBody.invoke(tx.name)
+                txInvoke = transCondBody.invoke(txMethName)
             }
 
             for (txArg <- txArgsList.reverse) {
                 txInvoke.arg(txArg)
             }
-        }
 
-        runMeth.body()._return(returnBytes)
+            stateCondBody._return(returnBytes)
+
+          }
+          /* If we aren't in any of the states were we can use this transaction, we throw an exception */
+          transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+        }
+      runMeth.body()._return(returnBytes)
     }
 
     private def generateServerMainMethod(newClass: JDefinedClass) = {
@@ -1196,6 +1245,9 @@ class CodeGen (val target: Target) {
         val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
+
+
+
         fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
 
         // Call setters.
