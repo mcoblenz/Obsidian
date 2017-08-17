@@ -1230,7 +1230,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             statement match {
                 case Return() | ReturnExpr(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
-                    hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
+                    hasRet = hasReturnStatement(tx, s1) & hasReturnStatement(tx, s2)
                 case _ => ()
             }
         }
@@ -1830,7 +1830,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // todo: analyze that there is a return in every branch
-        if (tx.retType.isDefined && !hasReturnStatement(tx, tx.body)) {
+        if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
             logError(tx.body.last, MustReturnError(tx.name))
         }
 
