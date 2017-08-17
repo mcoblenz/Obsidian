@@ -1,4 +1,4 @@
-##Overview
+## Overview
 
 Obsidian is a new programming language for writing *smart contracts*, which are programs for blockchain platforms.
 
@@ -8,7 +8,7 @@ Obsidian includes two main innovations relative to current languages for these p
 
 Obsidian is currently under development and is not ready for general use. For more detail about Obsidian, for now, please read our papers.
 
-##Team
+## Team
 Obsidian is a project by:
 
 * [Michael Coblenz](http://www.cs.cmu.edu/~mcoblenz)
@@ -19,7 +19,7 @@ Obsidian is a project by:
 * [Joshua Sunshine](http://www.cs.cmu.edu/~jssunshi)
 
 
-##Publications
+## Publications
 Michael Coblenz. 2017. Obsidian: a safer blockchain programming language. In Proceedings of the 39th International Conference on Software Engineering Companion (ICSE-C '17). IEEE Press, Piscataway, NJ, USA, 97-99. [ACM DL](http://dl.acm.org/citation.cfm?id=3098376)
 
 Michael Coblenz. 2017. Principles of usable programming language design. In Proceedings of the 39th International Conference on Software Engineering Companion (ICSE-C '17). IEEE Press, Piscataway, NJ, USA, 469-470. [ACM DL](http://dl.acm.org/citation.cfm?id=3098500)
