@@ -264,9 +264,7 @@ object Main {
 
             val table = new SymbolTable(ast)
             val checker = new Checker(table, options.typeCheckerDebug)
-            if (checker.checkProgramAndPrintErrors()) {
-                println("Typechecking was completed successfully.")
-            } else {
+            if (!checker.checkProgramAndPrintErrors()) {
                 println("Typechecking failed.\n")
                 return
             }
