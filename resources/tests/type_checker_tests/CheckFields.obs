@@ -1,3 +1,5 @@
+// ensures that fields are checked appropriately
+
 shared contract C1 {
   C1(){
     ->S;
@@ -13,10 +15,13 @@ unique contract C2 {
 }
 
 main contract C {
+    // bad
     C1.S f1;
-    readonly C1.S f2;
-    C2.S f3;
     readonly C2.S f4;
+    readonly C1.S f2;
+
+    // okay
+    C2.S f3;
     C1 f5;
     readonly C1 f6;
     C2 f7;

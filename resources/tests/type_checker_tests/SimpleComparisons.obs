@@ -1,3 +1,5 @@
+// checks primitive comparison operators
+
 main contract Comparisons {
 
     transaction doComparisons() {

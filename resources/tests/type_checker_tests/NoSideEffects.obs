@@ -1,3 +1,5 @@
+// checks that there are errors for statements that don't have side effects
+
 main contract NoSideEffects {
 
     transaction a() {

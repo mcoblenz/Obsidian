@@ -1,3 +1,5 @@
+// checks path-dependent types involving "parent"
+
 shared contract C {
     shared contract T {
         this.parent.T f;

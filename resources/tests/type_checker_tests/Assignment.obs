@@ -1,3 +1,5 @@
+// checks that assignments work as expected
+
 unique contract C_Unique {
     int f1;
 }

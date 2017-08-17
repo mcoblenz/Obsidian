@@ -1,3 +1,5 @@
+// checks path-dependent types where some part is implicit: e.g. where "f.T" means "this.f.T"
+
 shared contract C {
     contract T {
         state S1 {}

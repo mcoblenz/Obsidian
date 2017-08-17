@@ -1,3 +1,5 @@
+// Checks type-checking for field dereferences (e.g. "x.f")
+
 shared contract Thing {
     int x;
     string y;

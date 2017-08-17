@@ -1,3 +1,5 @@
+// checks "==" and "!=" operators
+
 main contract Equality {
 
     transaction checkEqual() {

@@ -43,11 +43,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def basicTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ExampleTypeFailure.obs",
-            (SubTypingError(BoolType(), IntType()), 18)
+            (SubTypingError(BoolType(), IntType()), 19)
               ::
-              (WrongArityError(1, 0, "createC"), 19)
+              (WrongArityError(1, 0, "createC"), 21)
               ::
-              (SubTypingError(BoolType(), IntType()), 20)
+              (SubTypingError(BoolType(), IntType()), 23)
               ::
               Nil
         )
@@ -55,43 +55,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def operationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleOperations.obs",
-            (SubTypingError(BoolType(), IntType()), 5)
-              ::
-              (SubTypingError(
-                  StringType(),
-                  IntType()), 6)
-              ::
-              (SubTypingError(
-                  BoolType(),
-                  IntType()), 7)
-              ::
-              (SubTypingError(
-                  StringType(),
-                  BoolType()), 8)
-              ::
-              (SubTypingError(
-                  IntType(),
-                  BoolType()), 9)
-              ::
-              (SubTypingError(
-                  IntType(),
-                  BoolType()), 9)
-              ::
-              Nil
-        )
-    }
-
-    @Test def comparisonTest(): Unit = {
-        runTest("resources/tests/type_checker_tests/SimpleComparisons.obs",
-            (SubTypingError(BoolType(), IntType()), 5)
-              ::
-              (SubTypingError(
-                  BoolType(),
-                  IntType()), 6)
-              ::
-              (SubTypingError(
-                  StringType(),
-                  IntType()), 7)
+            (SubTypingError(BoolType(), IntType()), 7)
               ::
               (SubTypingError(
                   StringType(),
@@ -102,8 +66,44 @@ class TypeCheckerTests extends JUnitSuite {
                   IntType()), 9)
               ::
               (SubTypingError(
+                  StringType(),
+                  BoolType()), 10)
+              ::
+              (SubTypingError(
+                  IntType(),
+                  BoolType()), 11)
+              ::
+              (SubTypingError(
+                  IntType(),
+                  BoolType()), 11)
+              ::
+              Nil
+        )
+    }
+
+    @Test def comparisonTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/SimpleComparisons.obs",
+            (SubTypingError(BoolType(), IntType()), 7)
+              ::
+              (SubTypingError(
                   BoolType(),
+                  IntType()), 8)
+              ::
+              (SubTypingError(
+                  StringType(),
                   IntType()), 9)
+              ::
+              (SubTypingError(
+                  StringType(),
+                  IntType()), 10)
+              ::
+              (SubTypingError(
+                  BoolType(),
+                  IntType()), 11)
+              ::
+              (SubTypingError(
+                  BoolType(),
+                  IntType()), 11)
               :: Nil
         )
     }
@@ -120,11 +120,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def fieldsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/CheckFields.obs",
-            (StateSpecificSharedError(), 16)
+            (StateSpecificSharedError(), 19)
               ::
-              (StateSpecificReadOnlyError(), 17)
+              (StateSpecificReadOnlyError(), 20)
               ::
-              (StateSpecificReadOnlyError(), 19)
+              (StateSpecificReadOnlyError(), 21)
               ::
               Nil
         )
@@ -132,25 +132,25 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
-            (SubTypingError(BoolType(), IntType()), 22)
+            (SubTypingError(BoolType(), IntType()), 24)
               ::
               (SubTypingError(
                   OwnedRef(null, NoPathType(JustContractType("C_Unique"))),
                   SharedRef(null, NoPathType(JustContractType("C_Shared")))),
-                24)
+                26)
               ::
-              (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 26)
+              (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 28)
               ::
-              (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 27)
+              (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 29)
               ::
               (SubTypingError(
                   SharedRef(null, NoPathType(JustContractType("C_Shared"))),
                   SharedRef(null, NoPathType(StateType("C_Shared", "S")))),
-                28)
+                30)
               ::
-              (VariableUndefinedError("j"), 32)
+              (VariableUndefinedError("j"), 34)
               ::
-              (AssignmentError(), 33)
+              (AssignmentError(), 35)
               ::
               Nil
         )
@@ -190,19 +190,19 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def equalityTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Equality.obs",
-            (DifferentTypeError(Variable("a"), IntType(), Variable("b"), StringType()), 9)
+            (DifferentTypeError(Variable("a"), IntType(), Variable("b"), StringType()), 11)
               ::
               (DifferentTypeError(
                   TrueLiteral(),
                   BoolType(),
                   NumLiteral(5),
-                  IntType()), 10)
+                  IntType()), 12)
               ::
               (DifferentTypeError(
                   NumLiteral(1),
                   IntType(),
                   FalseLiteral(),
-                  BoolType()), 11)
+                  BoolType()), 13)
               ::
               Nil
         )
@@ -238,9 +238,9 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def dereferenceTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Dereference.obs",
-            (FieldUndefinedError(JustContractType("Thing"), "w"), 20)
+            (FieldUndefinedError(JustContractType("Thing"), "w"), 22)
               ::
-              (DereferenceError(StringType()), 22)
+              (DereferenceError(StringType()), 24)
               ::
               Nil
         )
@@ -248,37 +248,37 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def constructionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Construction.obs",
-            (ConstructorNameError("Thing"), 24)
+            (ConstructorNameError("Thing"), 26)
               ::
-              (WrongArityError(0, 1, "constructor of Thing"), 33)
+              (WrongArityError(0, 1, "constructor of Thing"), 35)
               ::
               (SubTypingError(
                   StringType(),
-                  IntType()), 33)
+                  IntType()), 35)
               ::
               (SubTypingError(
                 StringType(),
-                IntType()), 33)
+                IntType()), 35)
               ::
-              (WrongArityError(3, 1, "constructor of Thing"), 33)
+              (WrongArityError(3, 1, "constructor of Thing"), 35)
               ::
-              (WrongArityError(0, 3, "constructor of Thing"), 34)
+              (WrongArityError(0, 3, "constructor of Thing"), 36)
               ::
-              (WrongArityError(1, 3, "constructor of Thing"), 34)
+              (WrongArityError(1, 3, "constructor of Thing"), 36)
               ::
-              (WrongArityError(1, 3, "constructor of Thing"), 34)
-              ::
-              (SubTypingError(
-                  IntType(),
-                  BoolType()), 34)
+              (WrongArityError(1, 3, "constructor of Thing"), 36)
               ::
               (SubTypingError(
                   IntType(),
-                  StringType()), 34)
+                  BoolType()), 36)
               ::
-              (ContractUndefinedError("Stuff"), 35)
+              (SubTypingError(
+                  IntType(),
+                  StringType()), 36)
               ::
-              (ContractUndefinedError("Stuff"), 35)
+              (ContractUndefinedError("Stuff"), 37)
+              ::
+              (ContractUndefinedError("Stuff"), 37)
               ::
               Nil
         )
@@ -288,35 +288,35 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             (MergeIncompatibleError("o1",
                 OwnedRef(null, NoPathType(JustContractType("Ow"))),
-                ReadOnlyRef(null, NoPathType(JustContractType("Ow")))), 12)
+                ReadOnlyRef(null, NoPathType(JustContractType("Ow")))), 16)
               ::
-              (UnusedOwnershipError("o2"), 12)
+              (UnusedOwnershipError("o2"), 16)
               ::
-              (UnusedOwnershipError("o2"), 22)
+              (UnusedOwnershipError("o2"), 27)
               ::
               (MergeIncompatibleError("o1",
                 OwnedRef(null, NoPathType(JustContractType("Ow"))),
-                ReadOnlyRef(null, NoPathType(JustContractType("Ow")))), 31)
+                ReadOnlyRef(null, NoPathType(JustContractType("Ow")))), 36)
               ::
-              (UnusedOwnershipError("o2"), 31)
+              (UnusedOwnershipError("o2"), 36)
               ::
-              (VariableUndefinedError("x"), 42)
+              (VariableUndefinedError("x"), 48)
               ::
               Nil)
     }
 
     @Test def sideEffectTest(): Unit = {
       runTest("resources/tests/type_checker_tests/NoSideEffects.obs",
-          (NoEffectsError(Variable("x")), 5)
+          (NoEffectsError(Variable("x")), 7)
             ::
             (NoEffectsError(
-              Add(NumLiteral(1),NumLiteral(3))), 6)
+              Add(NumLiteral(1),NumLiteral(3))), 8)
             ::
             (NoEffectsError(
-              LessThan(NumLiteral(1),Variable("x"))), 7)
+              LessThan(NumLiteral(1),Variable("x"))), 9)
             ::
             (NoEffectsError(
-              Disjunction(TrueLiteral(),FalseLiteral())), 8)
+              Disjunction(TrueLiteral(),FalseLiteral())), 10)
             ::
             Nil
       )
@@ -339,7 +339,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def bottomTest(): Unit = {
         runTest("resources/tests/type_checker_tests/BottomTypeNoError.obs",
-          (ContractUndefinedError("D"), 3)
+          (ContractUndefinedError("D"), 9)
           ::
           Nil
         )
@@ -362,7 +362,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def implicitPathDependentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ImplicitPDT.obs",
-            (UnusedOwnershipError("b"), 7)::Nil)
+            (UnusedOwnershipError("b"), 9)::Nil)
     }
 
     @Test def noStartStateTest(): Unit = {
@@ -377,7 +377,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def parentPathDependentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ParentPDT.obs",
-            (NoParentError("UsesC"), 19)::Nil)
+            (NoParentError("UsesC"), 21)::Nil)
     }
 
     @Test def thisAndParentPathDependentTest(): Unit = {

@@ -15,8 +15,11 @@ main contract IntContainer {
 
     transaction setX(int newX) returns int {
         int oldX = this.x;
+        // type failure: adding with a boolean
         this.x = newX + true;
+        // wrong arity
         createC();
+        // not the correct return value
         return this.b;
     }
 

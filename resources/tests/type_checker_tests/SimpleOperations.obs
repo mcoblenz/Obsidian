@@ -1,3 +1,5 @@
+// checks primitive operators (boolean and numeric)
+
 main contract Operations {
 
     transaction doOperations() {

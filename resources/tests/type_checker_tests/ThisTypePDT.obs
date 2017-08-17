@@ -1,5 +1,8 @@
+// more checks where "this" is implicit
+
 shared contract C {
     contract T {
+        // [T] here means [this.parent.T]
         transaction t1_implicit(T x) {
             return;
         }
