@@ -28,13 +28,13 @@ class TypeCheckerTests extends JUnitSuite {
         val checker = new Checker(table)
         val errs = checker.checkProgram()
         val remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
-        for (err <- errs) {
+        for ((err, loc) <- errs) {
             val pred = (expected: (Error, LineNumber)) => {
-                expected._1 == err && expected._2 == err.loc.line
+                expected._1 == err && expected._2 == loc.line
             }
-            val line = err.loc.line
+            val line = loc.line
             assertTrue(s"Nothing matches $err at line $line", remaining.exists(pred))
-            val indexToRemove = remaining.indexOf((err, err.loc.line))
+            val indexToRemove = remaining.indexOf((err, loc.line))
             remaining.remove(indexToRemove)
         }
         val msg = s"The following errors weren't found when checking: $remaining"
