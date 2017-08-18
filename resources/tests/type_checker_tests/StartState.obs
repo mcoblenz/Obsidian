@@ -15,14 +15,14 @@ contract HasStates {
 
     state Start {
 
-        transaction a() {
-            ->S1;
-        }
-
     }
 
     state S1 {
 
+    }
+
+    transaction a() available in Start{
+         ->S1;
     }
 }
 
@@ -32,11 +32,11 @@ main contract StatesNoConstr {
 
  state Start {
 
-        transaction a() {
-            ->S1;
-        }
     }
 
+    transaction a() available in Start {
+        ->S1;
+    }
     state S1 {
 
     }

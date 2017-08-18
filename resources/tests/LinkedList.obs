@@ -9,15 +9,18 @@ owned contract NodeMaybe {
 
     state NodeSome {
         IntNode node;
-
-        transaction getNode() returns IntNode {
+    }
+    transaction getNode()
+        returns IntNode
+        available in NodeSome
+        {
             return node;
         }
 
-        transaction getValue() returns int {
-            return node.getValue();
-        }
+    transaction getValue() returns int {
+        return node.getValue();
     }
+
     state NodeNone {}
 }
 

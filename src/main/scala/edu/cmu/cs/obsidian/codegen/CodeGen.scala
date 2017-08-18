@@ -3,6 +3,7 @@ package edu.cmu.cs.obsidian.codegen
 import CodeGen._
 import edu.cmu.cs.obsidian.parser._
 import com.helger.jcodemodel._
+import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.util._
 
 import scala.collection.{mutable, _}
@@ -1626,10 +1627,12 @@ class CodeGen (val target: Target) {
         meth
     }
 
-    private def translateTransDecl(
-                    tx: Transaction,
-                    newClass: JDefinedClass,
-                    translationContext: TranslationContext): JMethod = {
+    private def translateTransDeclInPossibleState (
+                                                      tx: Transaction,
+                                                      newClass: JDefinedClass,
+                                                      translationContext: TranslationContext
+                                                  ): JMethod = {
+
         val javaRetType = tx.retType match {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
@@ -1655,7 +1658,7 @@ class CodeGen (val target: Target) {
             case Client(mainContract) =>
                 if ((translationContext.contract == mainContract) && tx.name.equals("main")) {
                     meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
-            }
+                }
             case Server() =>
         }
 
@@ -1674,6 +1677,31 @@ class CodeGen (val target: Target) {
         jTry._finally().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(false))
 
         meth
+    }
+
+    private def translateTransDecl(
+                    tx: Transaction,
+                    newClass: JDefinedClass,
+                    translationContext: TranslationContext): Unit = {
+        // Does this transaction need to go in a set of states?
+        // If so, put a copy of the translated method in each state.
+        val availableIn: Seq[Identifier] = tx.availableIn
+        if (availableIn.nonEmpty) {
+            for (z <- availableIn) {
+                val inStateName = z._1
+                val inStateContext: StateContext = translationContext.states(inStateName)
+                val inStateClass = inStateContext.innerClass
+
+                /* we change one thing: the currently translated state */
+                val newTranslationContext = translationContext.copy(currentStateName = Some(inStateName))
+                for (decl <- inStateContext.astState.declarations) {
+                    translateTransDeclInPossibleState(tx, inStateClass, newTranslationContext)
+                }
+            }
+        }
+        else {
+            translateTransDeclInPossibleState(tx, newClass, translationContext)
+        }
     }
 
     /* these methods make shadowing possible */

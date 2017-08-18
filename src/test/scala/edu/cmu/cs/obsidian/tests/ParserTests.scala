@@ -35,7 +35,8 @@ class ParserTests extends JUnitSuite {
 
     private def shouldSucceed(src: String): Unit = {
         val result = parse(src)
-        assertTrue(result.isRight)
+        val message: String = if (result.isRight) "" else result.left.get
+        assertTrue(message, result.isRight)
     }
 
     private def shouldFail(src: String): Unit = {
@@ -88,11 +89,13 @@ class ParserTests extends JUnitSuite {
             """
               | main contract C {
               |     state S1 {
-              |         transaction t1() {
-              |             x = (x.f.y.z((((5)))));
-              |             (x).f = (new A()).f;
-              |         }
               |     }
+              |
+              |     transaction t1 () available in S1 {
+              |       x = (x.f.y.z((((5)))));
+              |       (x).f = (new A()).f;
+              |     }
+              |
               | }
             """.stripMargin
         )
@@ -103,7 +106,9 @@ class ParserTests extends JUnitSuite {
             """
               | main contract C {
               |     state S1 {
-              |         transaction t1() {
+              |
+              |     }
+              |     transaction t1() available in S1 {
               |             x.x = x.f1.f2.f3();
               |             x = x();
               |             x();
@@ -120,7 +125,6 @@ class ParserTests extends JUnitSuite {
               |             return x;
               |             return x.f;
               |         }
-              |     }
               | }
             """.stripMargin
         )
@@ -144,9 +148,10 @@ class ParserTests extends JUnitSuite {
               |         function f(T x) { return x; }
               |         function f(T1 x, T2 y, T3 z) { return x; }
               |
-              |         transaction t() { return x; }
-              |         transaction t(T x) { return x; }
-              |         transaction t(T1 x, T2 y, T3 z) {
+              |     }
+              |     transaction t() available in S1 { return x; }
+              |         transaction t(T x) available in S1 { return x; }
+              |         transaction t(T1 x, T2 y, T3 z) available in S1 {
               |             f(x, y, z);
               |             f();
               |             x.f(x, y, z);
@@ -155,7 +160,6 @@ class ParserTests extends JUnitSuite {
               |             f(5, x, f());
               |             f(g(g(5)));
               |         }
-              |     }
               | }
             """.stripMargin
         )
@@ -179,23 +183,27 @@ class ParserTests extends JUnitSuite {
     @Test def transitions() = {
         shouldSucceed(
             """ main contract C { state S {
-              | transaction t(T x) { ->S({x = y, y = x}); }
-              | }}
+              | }
+              | transaction t(T x) available in S { ->S({x = y, y = x}); }
+              | }
             """.stripMargin)
         shouldSucceed(
             """ main contract C { state S {
-              | transaction t(T x) { ->S({}); }
-              | }}
+              | }
+              | transaction t(T x) available in S { ->S({}); }
+              | }
             """.stripMargin)
         shouldSucceed(
             """ main contract C { state S {
-              | transaction t(T x) { ->S; }
-              | }}
+              | }
+              |  transaction t(T x) available in S { ->S; }
+              | }
             """.stripMargin)
         shouldSucceed(
             """ main contract C { state S {
-              | transaction t(T x) { ->S({x = y}); }
-              | }}
+              | }
+              |  transaction t(T x) available in S { ->S({x = y}); }
+              | }
             """.stripMargin)
     }
 

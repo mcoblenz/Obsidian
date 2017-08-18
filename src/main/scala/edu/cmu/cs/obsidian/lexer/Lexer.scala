@@ -54,6 +54,8 @@ object Lexer extends RegexParsers {
         case "ensures" => EnsuresT()
         case "requires" => RequiresT()
         case "const" => ConstT()
+        case "available" => AvailableT()
+        case "in" => InT()
         case id => IdentifierT(id)
     }
 

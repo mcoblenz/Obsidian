@@ -345,23 +345,31 @@ object Parser extends Parsers {
         }
     }
 
+    private def parseAvailableIn = {
+        AvailableT() ~> InT() ~> rep(parseId)
+    }
+
     private def parseTransDecl = {
         TransactionT() ~! (parseIdLower | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        opt(parseReturns) ~! opt(parseEnsuresState) ~! rep(parseEnsures) ~!
+        opt(parseReturns) ~! opt(parseAvailableIn) ~! opt(parseEnsuresState) ~! rep(parseEnsures) ~!
             LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case t ~ name ~ _ ~ args ~ _ ~ returnType ~
+            case t ~ name ~ _ ~ args ~ _ ~ returnType ~ availableIn ~
                  ensuresState ~ ensures ~ _ ~ body ~ _ =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
                 }
-                Transaction(nameString, args, returnType, ensures,
+                val availableTransactions = availableIn match {
+                    case None => List.empty
+                    case Some(l) => l
+                }
+                Transaction(nameString, args, returnType, availableTransactions, ensures,
                      ensuresState, body).setLoc(t)
         }
     }
 
     private def parseStateDecl = {
-        StateT() ~! parseIdUpper ~! LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
+        StateT() ~! parseIdUpper ~! LBraceT() ~! rep(parseDeclInState) ~! RBraceT() ^^ {
             case st ~ name ~ _ ~ defs ~ _ => State(name._1, defs).setLoc(st)
         }
     }
@@ -376,9 +384,13 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseDecl: Parser[Declaration] = {
-        parseFieldDecl | parseFuncDecl | parseTransDecl |
+    private def parseDeclInState: Parser[Declaration] = {
+        parseFieldDecl | parseFuncDecl |
         parseStateDecl | parseConstructor | parseContractDecl | failure("declaration expected")
+    }
+
+    private def parseDeclInContract: Parser[Declaration] = {
+        parseDeclInState | parseTransDecl
     }
 
     private def parseContractModifier = {
@@ -390,7 +402,7 @@ object Parser extends Parsers {
 
     private def parseContractDecl = {
         parseContractModifier ~ ContractT() ~! parseIdUpper ~!
-            LBraceT() ~! rep(parseDecl) ~! RBraceT() ^^ {
+            LBraceT() ~! rep(parseDeclInContract) ~! RBraceT() ^^ {
             case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod, name._1, defs).setLoc(ct)
         }
     }

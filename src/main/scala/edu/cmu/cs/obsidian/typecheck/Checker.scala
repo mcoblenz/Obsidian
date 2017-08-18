@@ -1794,22 +1794,12 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def checkTransaction(tx: Transaction, lexicallyInsideOf: DeclarationTable): Unit = {
+    private def checkTransactionInState(tx: Transaction,
+                                        lexicallyInsideOf: DeclarationTable,
+                                        uncheckedContext: UncheckedContext,
+                                        thisType: NonPrimitiveType): Unit = {
 
-        // first create this unchecked context so we can translate types
-        var uncheckedContext = new TreeMap[String, UnresolvedType]()
 
-        // Add all the args first (in an unsafe way) before checking anything
-        for (arg <- tx.args) {
-            val typ = translateUncheckedType(tx.args, arg.typ)
-            uncheckedContext = uncheckedContext.updated(arg.varName, typ)
-        }
-
-        val thisRawType = rawTypeOfThis(lexicallyInsideOf)
-
-        uncheckedContext = uncheckedContext.updated("this", thisRawType)
-
-        val thisType = OwnedRef(lexicallyInsideOf, thisRawType)
         val cName = lexicallyInsideOf.contract.name
 
         // Construct the context that the body should start with
@@ -1844,6 +1834,43 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // todo: check that every declared variable is initialized before use
+    }
+
+    private def checkTransaction(tx: Transaction, lexicallyInsideOf: DeclarationTable): Unit = {
+
+        // first create this unchecked context so we can translate types
+        var uncheckedContext = new TreeMap[String, UnresolvedType]()
+
+        // Add all the args first (in an unsafe way) before checking anything
+        for (arg <- tx.args) {
+            val typ = translateUncheckedType(tx.args, arg.typ)
+            uncheckedContext = uncheckedContext.updated(arg.varName, typ)
+        }
+
+        val thisRawType = rawTypeOfThis(lexicallyInsideOf)
+
+        if (tx.availableIn.length > 0) {
+            // We could be in any of the given states. Typecheck as if we were in each one.
+            for (containingStateTok <- tx.availableIn) {
+                val containingStateName = containingStateTok._1
+                val stateTableOpt = lexicallyInsideOf.contract.state(containingStateName)
+                stateTableOpt match {
+                    case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, containingStateName))
+                    case Some(stateTable) =>
+                        val stateRawType = NoPathType(stateTable.simpleType)
+                        val thisType = OwnedRef(stateTable, thisRawType)
+                        val thisUncheckedContext = uncheckedContext.updated("this", stateRawType)
+
+
+                        checkTransactionInState(tx, lexicallyInsideOf, thisUncheckedContext, thisType)
+                }
+            }
+        }
+        else {
+            val thisType = OwnedRef(lexicallyInsideOf, thisRawType)
+            val thisUncheckedContext = uncheckedContext.updated("this", thisRawType)
+            checkTransactionInState(tx, lexicallyInsideOf, thisUncheckedContext, thisType)
+        }
     }
 
     private def checkFunc(func: Func, lexicallyInsideOf: Contract): Unit = {

@@ -17,33 +17,35 @@ main contract States {
         int x;
         /* z is a conserved field */
         int z;
-        transaction set_x(int x) {
-            this.x = x;
-        }
+    }
 
-        transaction set_z(int z) {
-            this.z = z;
-        }
+    transaction set_x(int x) available in S1 {
+        this.x = x;
+    }
 
-        transaction toS2() {
-            ->S2({y = x});
-        }
+    transaction set_z(int z) available in S1 {
+        this.z = z;
+    }
 
-        transaction getX() returns int {
-            return x;
-        }
+    transaction toS2() available in S1 {
+        ->S2({y = x});
+    }
+
+    transaction getX() returns int available in S1 {
+        return x;
     }
 
     state S2 {
         int y;
         int z;
-        transaction toS1() {
-            ->S1({x = y});
-        }
+    }
 
-        transaction getY() returns int {
-            return y;
-        }
+    transaction toS1() available in S2 {
+        ->S1({x = y});
+    }
+
+    transaction getY() returns int available in S2 {
+        return y;
     }
 
     transaction getZ() returns int {

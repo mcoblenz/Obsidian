@@ -42,6 +42,8 @@ case class RemoteT() extends Token { override def toString: String = "remote"}
 case class EnsuresT() extends Token { override def toString: String = "ensures"}
 case class RequiresT() extends Token { override def toString: String = "requires"}
 case class ConstT() extends Token { override def toString: String = "const" }
+case class AvailableT() extends Token { override def toString: String = "available" }
+case class InT() extends Token { override def toString: String = "in" }
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }

@@ -326,14 +326,14 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def stateTest(): Unit = {
       runTest("resources/tests/type_checker_tests/States.obs",
-          (TransitionUpdateError(Set("x")), 12)
+          (TransitionUpdateError(Set("x")), 13)
           ::
-          (StateUndefinedError("C", "S3"), 14)
+          (StateUndefinedError("C", "S3"), 15)
           ::
           (FieldUndefinedError(
-              StateType("C","S1"), "x"), 17)
+              StateType("C","S1"), "x"), 18)
           ::
-          (TransitionError(), 24)
+          (TransitionError(), 23)
           ::
           Nil
       )

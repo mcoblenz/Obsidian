@@ -2,6 +2,7 @@ package edu.cmu.cs.obsidian.parser
 
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
+import edu.cmu.cs.obsidian.parser.Parser.Identifier
 
 sealed abstract class AST() {
     var loc: Position = NoPosition
@@ -103,6 +104,7 @@ case class Func(name: String,
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
                        retType: Option[AstType],
+                       availableIn: Seq[Identifier],
                        ensures: Seq[Ensures],
                        ensuresState: Option[Set[String]],
                        body: Seq[Statement]) extends InvokableDeclaration

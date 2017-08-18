@@ -17,17 +17,19 @@ main contract StateTest {
     }
 
     state S1{
-        transaction setX(int newX) returns int {
-            x = newX;
-            return 5;
-        }
+    }
+
+    transaction setX(int newX) returns int available in S1 {
+        x = newX;
+        return 5;
     }
 
     state S2 {
-        transaction f(string newS) returns string {
-            s = "b";
-            return s;
-        }
+    }
+
+    transaction f(string newS) returns string available in S2 {
+        s = "b";
+        return s;
     }
 
 }
