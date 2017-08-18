@@ -10,7 +10,8 @@ import java.net.Socket;
  */
 public abstract class ChaincodeClientBase extends ChaincodeClientStub {
 
-    public abstract void invokeClientMain() throws java.io.IOException, ChaincodeClientAbortTransactionException;
+    public abstract void invokeClientMain()
+            throws java.io.IOException, ChaincodeClientAbortTransactionException, edu.cmu.cs.obsidian.chaincode.ReentrancyException;
 
 
     public void delegatedMain (String args[]) {
@@ -71,6 +72,9 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
         }
         catch (ChaincodeClientAbortTransactionException e) {
             System.err.println("Transaction aborted: " + e);
+        }
+        catch (edu.cmu.cs.obsidian.chaincode.ReentrancyException e) {
+            System.err.println("Error: Reentrant call made");
         }
     }
 }

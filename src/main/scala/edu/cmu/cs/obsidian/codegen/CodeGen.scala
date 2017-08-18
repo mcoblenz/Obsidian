@@ -46,6 +46,9 @@ class CodeGen (val target: Target) {
     private def innerClassFieldName(stName: String): String = {
         "__state" + stName
     }
+    private def transactionFlagName(txName: String): String = {
+        "__" + txName + "__flag"
+    }
     private def transactionGetMethodName(txName: String, stOption: Option[String]): String = {
         stOption match {
           case Some(stName) => txName + "__" + "state" + stName
@@ -378,8 +381,10 @@ class CodeGen (val target: Target) {
             case Some(typ) => (true, resolveType(typ))
             case None => (false, model.VOID)
         }
-
+                             
         val meth = newClass.method(JMod.PUBLIC, retType, txExampleName)
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+
 
       /* add the appropriate args to the method and collect them in a list */
         val jArgs = txExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
@@ -668,7 +673,7 @@ class CodeGen (val target: Target) {
 
         val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
         translateContract(aContract, newClass, translationContext)
-
+        generateTxReentrantFlags(newClass, translationContext)
 
         target match {
             case Client(mainContract) =>
@@ -685,7 +690,6 @@ class CodeGen (val target: Target) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
                     generateMainServerClassMethods(newClass, translationContext)
-
                 }
                 generateSerialization(aContract, newClass, translationContext)
         }
@@ -704,6 +708,16 @@ class CodeGen (val target: Target) {
         )
 
         val _ = translateContract(aContract, newClass, newTranslationContext)
+    }
+
+    /* this method generates a flag for each transaction of each contract in order to check
+     * whether a reentrant call has been made.
+     */
+    private def generateTxReentrantFlags(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
+        val txNames = translationContext.txLookup.keys
+        for (tx <- txNames) {
+            newClass.field(JMod.PUBLIC, model.BOOLEAN, transactionFlagName(tx), JExpr.lit(false))
+        }
     }
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
@@ -752,6 +766,9 @@ class CodeGen (val target: Target) {
                     translationContext: TranslationContext,
                     stubType: AbstractJClass): Unit = {
         val runMeth = newClass.method(JMod.PUBLIC, model.BYTE.array(), "run")
+        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+        runMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         runMeth.param(stubType, "stub")
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
@@ -905,6 +922,7 @@ class CodeGen (val target: Target) {
     private def generateInvokeClientMainMethod(aContract: Contract, newClass: JDefinedClass) = {
         val method = newClass.method(JMod.PUBLIC, model.VOID, "invokeClientMain")
         method._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
 
         val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
                                                                   .asInstanceOf[Option[Transaction]]
@@ -1609,25 +1627,40 @@ class CodeGen (val target: Target) {
     }
 
     private def translateTransDecl(
-                    decl: Transaction,
+                    tx: Transaction,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext): JMethod = {
-        val javaRetType = decl.retType match {
+        val javaRetType = tx.retType match {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
         }
-        val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, decl.name)
+
+        val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, tx.name)
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+
+        /* We put the method body in a try block, and set the tx flag to false in a finally
+         * block. Thus, even if a transaction is thrown, or there is a return statement,
+         * the tx flag is still set to false once the whole transaction has been executed.
+         */
+        val jTry = meth.body()._try()
+
+        /* if the flag has already been set, that means there has been a reentrancy */
+        val jIf = jTry.body()._if(JExpr.ref(transactionFlagName(tx.name)))
+        jIf._then()._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException")))
+
+        /* otherwise, we set the flag to true */
+        jIf._else().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(true))
+
         target match {
             case Client(mainContract) =>
-                if ((translationContext.contract == mainContract) && decl.name.equals("main")) {
+                if ((translationContext.contract == mainContract) && tx.name.equals("main")) {
                     meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
             }
-            case _ =>
+            case Server() =>
         }
 
-
         /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
+        val argList: Seq[(String, JVar)] = tx.args.map((arg: VariableDecl) =>
             (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
         )
 
@@ -1635,7 +1668,10 @@ class CodeGen (val target: Target) {
         val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
-        translateBody(meth.body(), decl.body, translationContext, localContext)
+        translateBody(jIf._else(), tx.body, translationContext, localContext)
+
+        /* once the whole transaction has been executed, we set the flag back to false */
+        jTry._finally().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(false))
 
         meth
     }

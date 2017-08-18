@@ -114,6 +114,7 @@ class ChaincodeBaseServer {
 
         byte[] retBytes = new byte[0];
         boolean abortTransaction = false;
+        String failureMessage = "";
 
         if (method.equals("deploy")) {
             if (printDebug) System.out.println("Calling constructor...");
@@ -131,6 +132,15 @@ class ChaincodeBaseServer {
                 System.out.println("Invalid state access");
             }
 
+            if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
+            try {
+                retBytes = base.run(base.stub, txName, txArgs);
+            } catch (ReentrancyException re) {
+                System.out.println("Error: Reentrant call made");
+                re.printStackTrace(System.out);
+                retBytes = null;
+                failureMessage = ": Reentrant call made";
+            }
         }
         else if (method.equals("query")) {
             /* TODO : do we support queries? */
@@ -157,7 +167,7 @@ class ChaincodeBaseServer {
         JSONObject retObject = new JSONObject();
         JSONObject result = new JSONObject();
         if (retBytes == null) {
-            result.put("status", "Failure");
+            result.put("status", "Failure" + failureMessage);
         }
         else {
             result.put("status", "OK");
@@ -273,8 +283,7 @@ public abstract class ChaincodeBaseMock {
     // Must be overridden in generated class.
     public abstract byte[] init(ChaincodeStubMock stub, byte[][] args);
     public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args)
-                                                                                  throws BadTransactionException;
-
+            throws InvalidProtocolBufferException, ReentrancyException, BadTransactionException;
     public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
 }

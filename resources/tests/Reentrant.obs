@@ -1,0 +1,14 @@
+contract A {
+
+    transaction t1() returns int {
+        C c = new C();
+        return c.t2(this);
+    }
+}
+
+main contract C {
+
+    transaction t2(A a) returns int {
+        return a.t1();
+    }
+}
