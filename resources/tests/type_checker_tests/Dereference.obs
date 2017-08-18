@@ -1,0 +1,29 @@
+// Checks type-checking for field dereferences (e.g. "x.f")
+
+shared contract Thing {
+    int x;
+    string y;
+    bool z;
+
+    Thing(int x) {
+        this.x = x;
+        this.y = "a";
+        this.z = true;
+    }
+
+}
+
+main contract Construct {
+
+    transaction derefThings() {
+      Thing thing1 = new Thing(5);
+
+      int a = thing1.x;
+      // should fail: no such field
+      int b = thing1.w;
+      // should fail: not dereferenceable
+      string c = "hi".y;
+
+    }
+
+}

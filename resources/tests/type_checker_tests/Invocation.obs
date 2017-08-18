@@ -1,0 +1,36 @@
+shared contract OtherContract {
+
+    transaction otherMethod(int x) returns int {
+        return x + 3;
+    }
+}
+
+main contract Invocation {
+
+    transaction a(int x) returns int {
+        return x + 2;
+    }
+
+    transaction makeInvocations() {
+        int x = a(2);
+        // should fail: wrong arity
+        int b = a();
+        // should fail: wrong arity
+        int c = a(2, 4);
+        // should fail: wrong arg type
+        int d = a("hi");
+        // should fail: method undefined
+        int e = otherMethod(5);
+        // should fail: int not invokable
+        int f = 5.otherMethod(1);
+
+        OtherContract other = new OtherContract();
+
+        int g = other.otherMethod(3);
+        // should fail: method undefined
+        int h = other.anotherMethod();
+        // should fail: wrong arg type
+        int i = other.otherMethod("a");
+    }
+
+}

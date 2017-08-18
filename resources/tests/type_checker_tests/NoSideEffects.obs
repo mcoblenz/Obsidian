@@ -1,0 +1,17 @@
+// checks that there are errors for statements that don't have side effects
+
+main contract NoSideEffects {
+
+    transaction a() {
+        int x = 2;
+        // should fail
+        x;
+        // should fail
+        1 + 3;
+        // should fail
+        1 < x;
+        // should fail
+        true or false;
+    }
+
+}

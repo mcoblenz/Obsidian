@@ -1,0 +1,10 @@
+shared contract Thing {
+    // should fail
+    OtherThing other;
+    int x;
+
+    // should fail
+    transaction a(OtherThing other) {
+        int x = 2;
+    }
+}

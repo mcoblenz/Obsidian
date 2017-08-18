@@ -125,6 +125,12 @@ class ChaincodeBaseServer {
             String txName = root.getJSONObject("params")
                     .getJSONObject("ctorMsg")
                     .getString("function");
+            try {
+                if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
+                retBytes = base.run(base.stub, txName, txArgs);
+            } catch (BadTransactionException e) {
+                System.out.println("Invalid state access");
+            }
 
             if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
             try {
@@ -277,8 +283,7 @@ public abstract class ChaincodeBaseMock {
     // Must be overridden in generated class.
     public abstract byte[] init(ChaincodeStubMock stub, byte[][] args);
     public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args)
-            throws InvalidProtocolBufferException, ReentrancyException;
-
+            throws InvalidProtocolBufferException, ReentrancyException, BadTransactionException;
     public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
 }

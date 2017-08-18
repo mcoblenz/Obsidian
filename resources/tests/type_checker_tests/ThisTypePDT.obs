@@ -1,0 +1,37 @@
+// more checks where "this" is implicit
+
+shared contract C {
+    contract T {
+        // [T] here means [this.parent.T]
+        transaction t1_implicit(T x) {
+            return;
+        }
+
+        transaction t1(parent.T x) {
+            return;
+        }
+
+        transaction t2_implicit() returns T {
+            return new T();
+        }
+
+        transaction t2() returns parent.T {
+            return new T();
+        }
+    }
+
+    transaction getT() returns this.T {
+        return new T();
+    }
+}
+
+main contract UsesC {
+    const C f;
+
+    transaction t() {
+        f.T x1 = f.getT();
+        f.T x2 = x1.t2();
+        f.T x2 = x1.t2_implicit();
+        x1.t1(x2);
+    }
+}

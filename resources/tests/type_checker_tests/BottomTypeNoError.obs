@@ -1,0 +1,25 @@
+/* BottomType is used in the checker code to indicate a type that is unknown
+ * because of a previous error. This code checks that using a variable or
+ * expression that has been given the type BottomType does not cause another
+ * error (this would create potentially many errors when merely one problem,
+ * like an typo in a type or variable name, is responsible) */
+contract C {
+    transaction t1() {
+        // should fail: [d] will have BottomType because [D] doesn't exist
+        D d = 5;
+        // test with arithmetic stuff
+        int i = d + 3;
+        // test as an argument
+        t2(i);
+        // test with dereferences
+        int i = d.f;
+        d.f = 3;
+        // test as recipient of a call
+        d.t();
+        int i = d.t();
+    }
+
+    transaction t2(int i) returns int {
+        return i;
+    }
+}

@@ -1,0 +1,29 @@
+owned contract C {
+    C(string s) {
+        ->HasString({s = s});
+    }
+
+    state HasString {
+        string s;
+    }
+}
+
+main contract IntContainer {
+    int x;
+    string s;
+    bool b;
+
+    transaction setX(int newX) returns int {
+        int oldX = this.x;
+        // type failure: adding with a boolean
+        this.x = newX + true;
+        // wrong arity
+        createC();
+        // not the correct return value
+        return this.b;
+    }
+
+    transaction createC(string s) returns C {
+        return new C(s);
+    }
+}

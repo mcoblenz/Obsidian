@@ -1,0 +1,23 @@
+owned contract IsOwned {
+    int x;
+
+    transaction setX(int y) {
+        x = y;
+    }
+
+    IsOwned(int x_init) {
+        x = x_init;
+    }
+}
+
+main contract UsesOwned {
+    IsOwned u;
+
+    transaction changeOwned(int y) {
+        u.setX(y);
+    }
+
+    UsesOwned() {
+        u = new IsOwned(5);
+    }
+}
