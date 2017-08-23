@@ -2,9 +2,9 @@ name := "Obsidian"
 
 version := "1.0"
 
-scalaVersion := "2.11.9"
+scalaVersion := "2.12.3"
 
-libraryDependencies += "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.5"
+libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 
 /* testing dependencies */
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.1" % "test"
