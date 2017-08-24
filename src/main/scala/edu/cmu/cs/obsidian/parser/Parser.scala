@@ -326,8 +326,8 @@ object Parser extends Parsers {
         case ors ~ last => ors.map(_._1._1).toSet + last._1
     }
 
-    private def parseEnsuresState: Parser[Set[String]] =
-        EnsuresT() ~! parseStatesList ^^ {
+    private def parseEndsInState: Parser[Set[String]] =
+        EndsT() ~! InT() ~! parseStatesList ^^ {
             case _ ~ s => s
         }
 
@@ -351,7 +351,8 @@ object Parser extends Parsers {
 
     private def parseTransDecl = {
         TransactionT() ~! (parseIdLower | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        opt(parseReturns) ~! opt(parseAvailableIn) ~! opt(parseEnsuresState) ~! rep(parseEnsures) ~!
+        opt(parseReturns) ~! opt(parseAvailableIn) ~! opt(parseEndsInState) ~! rep(parseEnsures) ~!
+
             LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case t ~ name ~ _ ~ args ~ _ ~ returnType ~ availableIn ~
                  ensuresState ~ ensures ~ _ ~ body ~ _ =>
@@ -376,7 +377,7 @@ object Parser extends Parsers {
 
     // maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor() = {
-        parseIdUpper ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEnsuresState) ~!
+        parseIdUpper ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEndsInState) ~!
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ _ ~ args ~ _ ~ ensuresState ~ _ ~ body ~ _ =>
                 Constructor(name._1, args, ensuresState, body).setLoc(name)

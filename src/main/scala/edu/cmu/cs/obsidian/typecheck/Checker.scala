@@ -272,14 +272,13 @@ case class NoStartStateError(contractName: String) extends Error {
 case class NoConstructorError(contractName: String) extends Error {
     val msg: String = s"Contract '$contractName' must have a constructor since it contains states"
 }
-
 case class NoParentError(cName: String) extends Error {
     val msg: String = s"Contract $cName has no parent contract"
 }
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
  * In the formalism, we allow throw to result in any type: in the implementation, we don't know
- * which immediately which type this needs to be in order for type checking to work */
+ * immediately which type this needs to be in order for type checking to work */
 case class Context(underlyingVariableMap: Map[String, ResolvedType], isThrown: Boolean)  {
     def keys: Iterable[String] = underlyingVariableMap.keys
     def updated(s: String, t: ResolvedType): Context =
@@ -1151,7 +1150,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                      // Even if the args didn't check, we can still output a type
                      case None => JustContractType(name)
                      case Some((constr, _)) =>
-                         simpleOf(contextPrime.tableOfThis, name, constr.ensuresState)
+                         simpleOf(contextPrime.tableOfThis, name, constr.endsInState)
                  }
 
                  val rawType = rawOf(simpleType, path)
@@ -1828,7 +1827,6 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
-        // todo: analyze that there is a return in every branch
         if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
             logError(tx.body.last, MustReturnError(tx.name))
         }
@@ -1921,7 +1919,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             checkStatementSequence(constr, initContext, constr.body)
 
         val expectedThisType =
-            OwnedRef(table, NoPathType(simpleOf(table, table.name, constr.ensuresState)))
+            OwnedRef(table, NoPathType(simpleOf(table, table.name, constr.endsInState)))
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
         for ((x, t) <- outputContext.underlyingVariableMap) {

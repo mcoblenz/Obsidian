@@ -386,5 +386,16 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/ThisTypePDT.obs", Nil)
     }
 
+    @Test def endsInStateTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/EndsInState.obs",
+          (SubTypingError(
+            OwnedRef(null, NoPathType(StateType("C", "S1"))),
+            OwnedRef(null, NoPathType(StateType("C", "S2")))), 2
+          )
+          ::
+          Nil
+        )
+    }
+
 }
 

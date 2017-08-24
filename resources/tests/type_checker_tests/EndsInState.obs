@@ -1,0 +1,8 @@
+contract C {
+    C() ends in S2 {
+        ->S1;
+    }
+
+    state S1 {}
+    state S2 {}
+}
