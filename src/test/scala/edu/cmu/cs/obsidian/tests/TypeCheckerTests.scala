@@ -397,5 +397,20 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
 
+    @Test def endsInStateUnionTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
+          (SubTypingError(
+            OwnedRef(null, NoPathType(StateUnionType("C1", Set("S2", "S3")))),
+            OwnedRef(null, NoPathType(StateUnionType("C1", Set("S1", "S2"))))), 3
+            )
+            ::
+            (SubTypingError(
+              OwnedRef(null, NoPathType(JustContractType("C2"))),
+              OwnedRef(null, NoPathType(StateType("C2", "S1")))), 18
+            )
+            ::
+            Nil
+        )
+    }
 }
 

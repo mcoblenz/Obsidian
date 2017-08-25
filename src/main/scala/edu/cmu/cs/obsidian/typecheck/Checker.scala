@@ -464,7 +464,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             case (JustContractType(_), _) => Some(t1)
             case (StateType(c, s1), StateType(_, s2)) =>
                 if (s1 == s2) Some(StateType(c, s1))
-                else Some(JustContractType(c))
+                else handleStateUnion(TreeSet[String]().insert(s1), TreeSet[String]().insert(s2))
             case (StateUnionType(_, ss1), StateUnionType(_, ss2)) =>
                 handleStateUnion(ss1, ss2)
             case (StateUnionType(_, ss), StateType(_, s)) =>

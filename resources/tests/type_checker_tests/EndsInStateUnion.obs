@@ -1,0 +1,28 @@
+contract C1 {
+
+    C1(bool b) ends in S1 or S2 {
+        if(b) {
+            ->S2;
+        } else {
+            ->S3;
+        }
+    }
+
+    state S1{}
+    state S2{}
+    state S3{}
+}
+
+contract C2 {
+
+    C2(bool b) ends in S1 {
+        if(b) {
+            ->S1;
+        } else {
+            ->S2;
+        }
+    }
+
+    state S1 {}
+    state S2 {}
+}

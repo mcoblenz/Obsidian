@@ -352,8 +352,7 @@ object Parser extends Parsers {
     private def parseTransDecl = {
         TransactionT() ~! (parseIdLower | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
         opt(parseReturns) ~! opt(parseAvailableIn) ~! opt(parseEndsInState) ~! rep(parseEnsures) ~!
-
-            LBraceT() ~! parseBody ~! RBraceT() ^^ {
+        LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case t ~ name ~ _ ~ args ~ _ ~ returnType ~ availableIn ~
                  ensuresState ~ ensures ~ _ ~ body ~ _ =>
                 val nameString = name match {
