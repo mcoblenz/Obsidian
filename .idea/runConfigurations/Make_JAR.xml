@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Make JAR" type="SbtRunConfiguration" factoryName="SBT Task">
     <setting name="tasks" value="assembly" />
-    <setting name="vmparams" value="-Xms512M -Xmx1024M -Xss1M -XX:+CMSClassUnloadingEnabled" />
+    <setting name="vmparams" value="-Xms512M -Xmx1024M -Xss8M -XX:+CMSClassUnloadingEnabled" />
     <setting name="workingDir" value="$PROJECT_DIR$" />
     <envs />
     <method />
