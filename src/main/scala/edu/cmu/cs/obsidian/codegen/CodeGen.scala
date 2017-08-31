@@ -1685,10 +1685,10 @@ class CodeGen (val target: Target) {
                     translationContext: TranslationContext): Unit = {
         // Does this transaction need to go in a set of states?
         // If so, put a copy of the translated method in each state.
-        val availableIn: Seq[Identifier] = tx.availableIn
-        if (availableIn.nonEmpty) {
-            for (z <- availableIn) {
-                val inStateName = z._1
+        val availableIn: Option[Set[String]] = tx.availableIn
+        if (availableIn.isDefined) {
+            for (z <- availableIn.get) {
+                val inStateName = z
                 val inStateContext: StateContext = translationContext.states(inStateName)
                 val inStateClass = inStateContext.innerClass
 

@@ -345,8 +345,10 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseAvailableIn = {
-        AvailableT() ~> InT() ~> rep(parseId)
+    private def parseAvailableIn: Parser[Set[String]] = {
+        AvailableT() ~! InT() ~! parseStatesList ^^ {
+            case _ ~ s => s
+        }
     }
 
     private def parseTransDecl = {
@@ -354,17 +356,13 @@ object Parser extends Parsers {
         opt(parseReturns) ~! opt(parseAvailableIn) ~! opt(parseEndsInState) ~! rep(parseEnsures) ~!
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case t ~ name ~ _ ~ args ~ _ ~ returnType ~ availableIn ~
-                 ensuresState ~ ensures ~ _ ~ body ~ _ =>
+                 endsInState ~ ensures ~ _ ~ body ~ _ =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
                 }
-                val availableTransactions = availableIn match {
-                    case None => List.empty
-                    case Some(l) => l
-                }
-                Transaction(nameString, args, returnType, availableTransactions, ensures,
-                     ensuresState, body).setLoc(t)
+                Transaction(nameString, args, returnType, availableIn, ensures,
+                     endsInState, body).setLoc(t)
         }
     }
 

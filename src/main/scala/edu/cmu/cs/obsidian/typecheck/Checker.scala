@@ -417,6 +417,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             lexicallyInsideOf: DeclarationTable,
             cName: String,
             states: Set[String]): SimpleType = {
+
         val allPossibleStates = lexicallyInsideOf.lookupContract(cName).get.possibleStates
         if (states == allPossibleStates) {
             JustContractType(cName)
@@ -464,13 +465,13 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             case (JustContractType(_), _) => Some(t1)
             case (StateType(c, s1), StateType(_, s2)) =>
                 if (s1 == s2) Some(StateType(c, s1))
-                else handleStateUnion(TreeSet[String]().insert(s1), TreeSet[String]().insert(s2))
+                else handleStateUnion(TreeSet[String]() + s1, TreeSet[String]() + s2)
             case (StateUnionType(_, ss1), StateUnionType(_, ss2)) =>
                 handleStateUnion(ss1, ss2)
             case (StateUnionType(_, ss), StateType(_, s)) =>
-                handleStateUnion(ss, TreeSet[String]().insert(s))
+                handleStateUnion(ss, TreeSet[String]() + s)
             case (StateType(_, s), StateUnionType(_, ss)) =>
-                handleStateUnion(ss, TreeSet[String]().insert(s))
+                handleStateUnion(ss, TreeSet[String]() + s)
             case _ => None
         }
     }
@@ -1798,9 +1799,6 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                                         uncheckedContext: UncheckedContext,
                                         thisType: NonPrimitiveType): Unit = {
 
-
-        val cName = lexicallyInsideOf.contract.name
-
         // Construct the context that the body should start with
         var initContext = Context(new TreeMap[String, ResolvedType](), isThrown = false)
         initContext = initContext.updated("this", thisType)
@@ -1816,7 +1814,20 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         val outputContext =
             checkStatementSequence(tx, initContext, tx.body)
 
-        val expectedType = OwnedRef(lexicallyInsideOf, NoPathType(JustContractType(cName)))
+        // Check that all the states the transaction can end in are valid, named states
+        if (tx.endsInState.isDefined) {
+            for (stateName <- tx.endsInState.get) {
+                val stateTableOpt = lexicallyInsideOf.contract.state(stateName)
+                stateTableOpt match {
+                    case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, stateName))
+                    case Some(_) => ()
+                }
+            }
+        }
+
+        val expectedType =
+            OwnedRef(lexicallyInsideOf,
+                NoPathType(simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState)))
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
         if (!hasReturnStatementDontLog(tx.body)) {
@@ -1847,18 +1858,16 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
 
         val thisRawType = rawTypeOfThis(lexicallyInsideOf)
 
-        if (tx.availableIn.length > 0) {
+        if (tx.availableIn.isDefined) {
             // We could be in any of the given states. Typecheck as if we were in each one.
-            for (containingStateTok <- tx.availableIn) {
-                val containingStateName = containingStateTok._1
+            for (containingStateName <- tx.availableIn.get) {
                 val stateTableOpt = lexicallyInsideOf.contract.state(containingStateName)
                 stateTableOpt match {
                     case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, containingStateName))
                     case Some(stateTable) =>
                         val stateRawType = NoPathType(stateTable.simpleType)
-                        val thisType = OwnedRef(stateTable, thisRawType)
+                        val thisType = OwnedRef(stateTable, stateRawType)
                         val thisUncheckedContext = uncheckedContext.updated("this", stateRawType)
-
 
                         checkTransactionInState(tx, lexicallyInsideOf, thisUncheckedContext, thisType)
                 }
@@ -1917,6 +1926,17 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
 
         val outputContext =
             checkStatementSequence(constr, initContext, constr.body)
+
+        // Check that all the states the constructor can end in are valid, named states
+        if (constr.endsInState.isDefined) {
+            for (stateName <- constr.endsInState.get) {
+                val stateTableOpt = table.contract.state(stateName)
+                stateTableOpt match {
+                    case None => logError(constr, StateUndefinedError(table.contract.name, stateName))
+                    case Some(_) => ()
+                }
+            }
+        }
 
         val expectedThisType =
             OwnedRef(table, NoPathType(simpleOf(table, table.name, constr.endsInState)))

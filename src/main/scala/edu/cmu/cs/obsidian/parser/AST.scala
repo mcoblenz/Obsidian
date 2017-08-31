@@ -104,7 +104,7 @@ case class Func(name: String,
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
                        retType: Option[AstType],
-                       availableIn: Seq[Identifier],
+                       availableIn: Option[Set[String]],
                        ensures: Seq[Ensures],
                        endsInState: Option[Set[String]],
                        body: Seq[Statement]) extends InvokableDeclaration
