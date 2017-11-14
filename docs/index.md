@@ -12,6 +12,7 @@ Obsidian is currently under development and is not ready for general use. For mo
 Obsidian is a project by:
 
 * [Michael Coblenz](http://www.cs.cmu.edu/~mcoblenz)
+* [Jenna Wise](http://www.cs.cmu.edu/~jlwise/)
 * Tyler Etzel
 * Celeste Barnaby
 * [Brad Myers](http://www.cs.cmu.edu/~bam)
@@ -20,6 +21,8 @@ Obsidian is a project by:
 
 
 ## Publications
+Celeste Barnaby, Michael Coblenz, Tyler Etzel, Eliezer Kanal, Joshua Sunshine, Brad Myers, Jonathan Aldrich. "A User Study to Inform the Design of the Obsidian Blockchain DSL." 8th Workshop on Evaluation and Usability of Programming Languages and Tools (PLATEAU'2017) at SPLASH 2017, October 23, 2017.
+
 Michael Coblenz. 2017. Obsidian: a safer blockchain programming language. In Proceedings of the 39th International Conference on Software Engineering Companion (ICSE-C '17). IEEE Press, Piscataway, NJ, USA, 97-99. [ACM DL](http://dl.acm.org/citation.cfm?id=3098376)
 
 Michael Coblenz. 2017. Principles of usable programming language design. In Proceedings of the 39th International Conference on Software Engineering Companion (ICSE-C '17). IEEE Press, Piscataway, NJ, USA, 469-470. [ACM DL](http://dl.acm.org/citation.cfm?id=3098500)
