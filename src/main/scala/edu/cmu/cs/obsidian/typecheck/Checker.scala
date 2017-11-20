@@ -1729,7 +1729,13 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
 
                     /* special case to allow types to change in the context if we match on a variable */
                     val startContext = e match {
-                        case This() => contextPrime.updated("this", newType)
+                        case This() =>
+                            /* reading "this" as an expression takes the residual of "this",
+                             * so we want "this" in the context to have the old permission of
+                             * "this" with the new state information in the raw type */
+                            val newContextThisType =
+                                updatedRawType(context("this"), newType.extractRawType.get)
+                            contextPrime.updated("this", newContextThisType)
                         case Variable(x) => contextPrime.updated(x, newType)
                         case _ => contextPrime
                     }
