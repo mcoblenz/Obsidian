@@ -326,8 +326,8 @@ object Parser extends Parsers {
         case ors ~ last => ors.map(_._1._1).toSet + last._1
     }
 
-    private def parseEnsuresState: Parser[Set[String]] =
-        EnsuresT() ~! parseStatesList ^^ {
+    private def parseEndsInState: Parser[Set[String]] =
+        EndsT() ~! InT() ~! parseStatesList ^^ {
             case _ ~ s => s
         }
 
@@ -345,26 +345,24 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseAvailableIn = {
-        AvailableT() ~> InT() ~> rep(parseId)
+    private def parseAvailableIn: Parser[Set[String]] = {
+        AvailableT() ~! InT() ~! parseStatesList ^^ {
+            case _ ~ s => s
+        }
     }
 
     private def parseTransDecl = {
         TransactionT() ~! (parseIdLower | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        opt(parseReturns) ~! opt(parseAvailableIn) ~! opt(parseEnsuresState) ~! rep(parseEnsures) ~!
-            LBraceT() ~! parseBody ~! RBraceT() ^^ {
+        opt(parseReturns) ~! opt(parseAvailableIn) ~! opt(parseEndsInState) ~! rep(parseEnsures) ~!
+        LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case t ~ name ~ _ ~ args ~ _ ~ returnType ~ availableIn ~
-                 ensuresState ~ ensures ~ _ ~ body ~ _ =>
+                 endsInState ~ ensures ~ _ ~ body ~ _ =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
                 }
-                val availableTransactions = availableIn match {
-                    case None => List.empty
-                    case Some(l) => l
-                }
-                Transaction(nameString, args, returnType, availableTransactions, ensures,
-                     ensuresState, body).setLoc(t)
+                Transaction(nameString, args, returnType, availableIn, ensures,
+                     endsInState, body).setLoc(t)
         }
     }
 
@@ -376,7 +374,7 @@ object Parser extends Parsers {
 
     // maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor() = {
-        parseIdUpper ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEnsuresState) ~!
+        parseIdUpper ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEndsInState) ~!
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ _ ~ args ~ _ ~ ensuresState ~ _ ~ body ~ _ =>
                 Constructor(name._1, args, ensuresState, body).setLoc(name)

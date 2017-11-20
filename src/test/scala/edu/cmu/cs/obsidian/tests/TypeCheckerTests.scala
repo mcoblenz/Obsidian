@@ -386,5 +386,43 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/ThisTypePDT.obs", Nil)
     }
 
+    @Test def endsInStateTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/EndsInState.obs",
+          (SubTypingError(
+            OwnedRef(null, NoPathType(StateType("C", "S1"))),
+            OwnedRef(null, NoPathType(StateType("C", "S2")))), 3
+          )
+          ::
+          (SubTypingError(
+            OwnedRef(null, NoPathType(StateType("C", "S2"))),
+            OwnedRef(null, NoPathType(StateType("C", "S1")))), 8
+           )
+          ::
+          Nil
+        )
+    }
+
+    @Test def endsInStateUnionTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
+          (SubTypingError(
+            OwnedRef(null, NoPathType(StateUnionType("C1", Set("S2", "S3")))),
+            OwnedRef(null, NoPathType(StateUnionType("C1", Set("S1", "S2"))))), 4
+            )
+            ::
+            (StateUndefinedError("C1", "OtherState"), 13)
+            ::
+            (SubTypingError(
+              OwnedRef(null, NoPathType(StateType("C1", "S2"))),
+              OwnedRef(null, NoPathType(StateUnionType("C1", Set("S1", "S3"))))), 19
+            )
+            ::
+            (SubTypingError(
+              OwnedRef(null, NoPathType(JustContractType("C2"))),
+              OwnedRef(null, NoPathType(StateType("C2", "S1")))), 33
+            )
+            ::
+            Nil
+        )
+    }
 }
 

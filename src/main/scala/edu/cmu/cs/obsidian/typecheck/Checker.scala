@@ -272,14 +272,13 @@ case class NoStartStateError(contractName: String) extends Error {
 case class NoConstructorError(contractName: String) extends Error {
     val msg: String = s"Contract '$contractName' must have a constructor since it contains states"
 }
-
 case class NoParentError(cName: String) extends Error {
     val msg: String = s"Contract $cName has no parent contract"
 }
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
  * In the formalism, we allow throw to result in any type: in the implementation, we don't know
- * which immediately which type this needs to be in order for type checking to work */
+ * immediately which type this needs to be in order for type checking to work */
 case class Context(underlyingVariableMap: Map[String, ResolvedType], isThrown: Boolean)  {
     def keys: Iterable[String] = underlyingVariableMap.keys
     def updated(s: String, t: ResolvedType): Context =
@@ -418,6 +417,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             lexicallyInsideOf: DeclarationTable,
             cName: String,
             states: Set[String]): SimpleType = {
+
         val allPossibleStates = lexicallyInsideOf.lookupContract(cName).get.possibleStates
         if (states == allPossibleStates) {
             JustContractType(cName)
@@ -465,13 +465,13 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             case (JustContractType(_), _) => Some(t1)
             case (StateType(c, s1), StateType(_, s2)) =>
                 if (s1 == s2) Some(StateType(c, s1))
-                else Some(JustContractType(c))
+                else handleStateUnion(TreeSet[String]() + s1, TreeSet[String]() + s2)
             case (StateUnionType(_, ss1), StateUnionType(_, ss2)) =>
                 handleStateUnion(ss1, ss2)
             case (StateUnionType(_, ss), StateType(_, s)) =>
-                handleStateUnion(ss, TreeSet[String]().insert(s))
+                handleStateUnion(ss, TreeSet[String]() + s)
             case (StateType(_, s), StateUnionType(_, ss)) =>
-                handleStateUnion(ss, TreeSet[String]().insert(s))
+                handleStateUnion(ss, TreeSet[String]() + s)
             case _ => None
         }
     }
@@ -1151,7 +1151,7 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                      // Even if the args didn't check, we can still output a type
                      case None => JustContractType(name)
                      case Some((constr, _)) =>
-                         simpleOf(contextPrime.tableOfThis, name, constr.ensuresState)
+                         simpleOf(contextPrime.tableOfThis, name, constr.endsInState)
                  }
 
                  val rawType = rawOf(simpleType, path)
@@ -1805,9 +1805,6 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
                                         uncheckedContext: UncheckedContext,
                                         thisType: NonPrimitiveType): Unit = {
 
-
-        val cName = lexicallyInsideOf.contract.name
-
         // Construct the context that the body should start with
         var initContext = Context(new TreeMap[String, ResolvedType](), isThrown = false)
         initContext = initContext.updated("this", thisType)
@@ -1823,7 +1820,20 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         val outputContext =
             checkStatementSequence(tx, initContext, tx.body)
 
-        val expectedType = OwnedRef(lexicallyInsideOf, NoPathType(JustContractType(cName)))
+        // Check that all the states the transaction can end in are valid, named states
+        if (tx.endsInState.isDefined) {
+            for (stateName <- tx.endsInState.get) {
+                val stateTableOpt = lexicallyInsideOf.contract.state(stateName)
+                stateTableOpt match {
+                    case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, stateName))
+                    case Some(_) => ()
+                }
+            }
+        }
+
+        val expectedType =
+            OwnedRef(lexicallyInsideOf,
+                NoPathType(simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState)))
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
         if (!hasReturnStatementDontLog(tx.body)) {
@@ -1834,7 +1844,6 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
-        // todo: analyze that there is a return in every branch
         if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
             logError(tx.body.last, MustReturnError(tx.name))
         }
@@ -1855,18 +1864,16 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
 
         val thisRawType = rawTypeOfThis(lexicallyInsideOf)
 
-        if (tx.availableIn.length > 0) {
+        if (tx.availableIn.isDefined) {
             // We could be in any of the given states. Typecheck as if we were in each one.
-            for (containingStateTok <- tx.availableIn) {
-                val containingStateName = containingStateTok._1
+            for (containingStateName <- tx.availableIn.get) {
                 val stateTableOpt = lexicallyInsideOf.contract.state(containingStateName)
                 stateTableOpt match {
                     case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, containingStateName))
                     case Some(stateTable) =>
                         val stateRawType = NoPathType(stateTable.simpleType)
-                        val thisType = OwnedRef(stateTable, thisRawType)
+                        val thisType = OwnedRef(stateTable, stateRawType)
                         val thisUncheckedContext = uncheckedContext.updated("this", stateRawType)
-
 
                         checkTransactionInState(tx, lexicallyInsideOf, thisUncheckedContext, thisType)
                 }
@@ -1926,8 +1933,19 @@ class Checker(unmodifiedTable: SymbolTable, verbose: Boolean = false) {
         val outputContext =
             checkStatementSequence(constr, initContext, constr.body)
 
+        // Check that all the states the constructor can end in are valid, named states
+        if (constr.endsInState.isDefined) {
+            for (stateName <- constr.endsInState.get) {
+                val stateTableOpt = table.contract.state(stateName)
+                stateTableOpt match {
+                    case None => logError(constr, StateUndefinedError(table.contract.name, stateName))
+                    case Some(_) => ()
+                }
+            }
+        }
+
         val expectedThisType =
-            OwnedRef(table, NoPathType(simpleOf(table, table.name, constr.ensuresState)))
+            OwnedRef(table, NoPathType(simpleOf(table, table.name, constr.endsInState)))
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
         for ((x, t) <- outputContext.underlyingVariableMap) {

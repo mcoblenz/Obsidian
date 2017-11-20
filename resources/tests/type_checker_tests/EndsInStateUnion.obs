@@ -1,0 +1,43 @@
+contract C1 {
+
+    // error: constructor for 'C1' ends in S2 or S3 instead of S1 or S2
+    C1(bool b) ends in S1 or S2 {
+        if(b) {
+            ->S2;
+        } else {
+            ->S3;
+        }
+    }
+
+    // error: 'OtherState' is not a valid state
+    transaction t1() available in S2
+                    ends in S2 or OtherState {
+        int x = 1;
+    }
+
+    // error: if we access t2 from S2, it will not end in S1 or S3
+    transaction t2() available in S1 or S2
+                     ends in S1 or S3 {
+        int x = 1;
+    }
+
+
+    state S1{}
+    state S2{}
+    state S3{}
+}
+
+contract C2 {
+
+    // error: C2 ends in S1 or S2 but must end in S1
+    C2(bool b) ends in S1 {
+        if(b) {
+            ->S1;
+        } else {
+            ->S2;
+        }
+    }
+
+    state S1 {}
+    state S2 {}
+}

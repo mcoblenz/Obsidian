@@ -1,0 +1,16 @@
+contract C {
+    // error: constructor for 'C' ends in S1 instead of S2
+    C() ends in S2 {
+        ->S1;
+    }
+
+    // error: t ends in S2 instead of S1
+    transaction t() available in S2
+                    ends in S1 {
+        int x = 1;
+    }
+
+
+    state S1 {}
+    state S2 {}
+}

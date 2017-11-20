@@ -22,7 +22,7 @@ sealed abstract class InvokableDeclaration() extends Declaration {
     val args: Seq[VariableDecl]
     val retType: Option[AstType]
     val body: Seq[Statement]
-    val ensuresState: Option[Set[String]]
+    val endsInState: Option[Set[String]]
 }
 sealed abstract class AstType() extends AST
 
@@ -91,7 +91,7 @@ case class Field(isConst: Boolean, typ: AstType, name: String) extends Declarati
 
 case class Constructor(name: String,
                        args: Seq[VariableDecl],
-                       ensuresState: Option[Set[String]],
+                       endsInState: Option[Set[String]],
                        body: Seq[Statement]) extends InvokableDeclaration {
     val retType: Option[AstType] = None
 }
@@ -99,14 +99,14 @@ case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[AstType],
                 body: Seq[Statement]) extends InvokableDeclaration {
-    val ensuresState: Option[Set[String]] = None
+    val endsInState: Option[Set[String]] = None
 }
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
                        retType: Option[AstType],
-                       availableIn: Seq[Identifier],
+                       availableIn: Option[Set[String]],
                        ensures: Seq[Ensures],
-                       ensuresState: Option[Set[String]],
+                       endsInState: Option[Set[String]],
                        body: Seq[Statement]) extends InvokableDeclaration
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration
 
