@@ -1225,6 +1225,8 @@ class CodeGen (val target: Target) {
                 ifNonempty._then().assign(fieldVar, getCall)
             }
             case n@NonPrimitiveType(_, unpermissionedType, _) => handleNonPrimitive(field.name, n)
+            case u: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
+            case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
         }
     }
 
@@ -1552,6 +1554,7 @@ class CodeGen (val target: Target) {
                 addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext)
             case Construction(name, args) =>
                 addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
+            case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
         }
     }
 
