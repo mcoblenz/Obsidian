@@ -3,28 +3,46 @@ package edu.cmu.cs.obsidian.parser
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
+import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
-sealed abstract class AST() {
+trait HasLocation {
     var loc: Position = NoPosition
     def setLoc(t: Token): this.type = { loc = t.pos; this }
-    def setLoc(ast: AST): this.type = { loc = ast.loc; this }
+    def setLoc(other: HasLocation): this.type = { loc = other.loc; this }
     def setLoc(id: (String, Position)): this.type = { loc = id._2; this }
+    def setLoc(pos: Position): this.type = { loc = pos; this }
 }
+
+sealed abstract class AST() extends HasLocation
+
 sealed abstract class Statement() extends AST
 
 /* All expressions are statements. We relegate the pruning of expressions
  * that don't have effects to a later analysis */
 sealed abstract class Expression() extends Statement
+
+/* this is to circumnavigate type erasure: it makes it possible to match on the exact
+ * type of a Declarations at runtime */
+sealed trait DeclarationTag
+object TypeDeclTag extends DeclarationTag
+object FieldDeclTag extends DeclarationTag
+object ContractDeclTag extends DeclarationTag
+object StateDeclTag extends DeclarationTag
+object FuncDeclTag extends DeclarationTag
+object ConstructorDeclTag extends DeclarationTag
+object TransactionDeclTag extends DeclarationTag
+
 sealed abstract class Declaration() extends AST {
     val name: String
+    val tag: DeclarationTag
 }
+
 sealed abstract class InvokableDeclaration() extends Declaration {
     val args: Seq[VariableDecl]
-    val retType: Option[AstType]
+    val retType: Option[ObsidianType]
     val body: Seq[Statement]
-    val endsInState: Option[Set[String]]
+    val endsInState: Option[Set[Identifier]]
 }
-sealed abstract class AstType() extends AST
 
 /* Expressions */
 case class Variable(name: String) extends Expression
@@ -53,8 +71,8 @@ case class Invocation(recipient: Expression, name: String, args: Seq[Expression]
 case class Construction(name: String, args: Seq[Expression]) extends Expression
 
 /* statements and control flow constructs */
-case class VariableDecl(typ: AstType, varName: String) extends Statement
-case class VariableDeclWithInit(typ: AstType, varName: String, e: Expression) extends Statement
+case class VariableDecl(typ: ObsidianType, varName: String) extends Statement
+case class VariableDeclWithInit(typ: ObsidianType, varName: String, e: Expression) extends Statement
 case class Return() extends Statement
 case class ReturnExpr(e: Expression) extends Statement
 case class Transition(newStateName: String, updates: Seq[(Variable, Expression)]) extends Statement
@@ -66,54 +84,46 @@ case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement
 case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
 
-sealed abstract class TypeModifier() extends AST
-case class IsReadOnly() extends TypeModifier
-case class IsRemote() extends TypeModifier
-case class AstIntType() extends AstType
-case class AstBoolType() extends AstType
-case class AstStringType() extends AstType
-case class AstContractType(modifiers: Seq[TypeModifier], name: String) extends AstType
-case class AstStateType(modifiers: Seq[TypeModifier],
-                        contractName: String,
-                        stateName: String) extends AstType
-case class AstPathContractType(modifiers: Seq[TypeModifier],
-                               path: Seq[String],
-                               name: String) extends AstType
-case class AstPathStateType(modifiers: Seq[TypeModifier],
-                            path: Seq[String],
-                            contractName: String,
-                            stateName: String) extends AstType
-
 /* Declarations */
-case class TypeDecl(name: String, typ: AstType) extends Declaration
+case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {
+    val tag: DeclarationTag = TypeDeclTag
+}
 
-case class Field(isConst: Boolean, typ: AstType, name: String) extends Declaration
+case class Field(isConst: Boolean, typ: ObsidianType, name: String) extends Declaration {
+    val tag: DeclarationTag = FieldDeclTag
+}
 
 case class Constructor(name: String,
                        args: Seq[VariableDecl],
-                       endsInState: Option[Set[String]],
+                       endsInState: Option[Set[Identifier]],
                        body: Seq[Statement]) extends InvokableDeclaration {
-    val retType: Option[AstType] = None
+    val retType: Option[ObsidianType] = None
+    val tag: DeclarationTag = ConstructorDeclTag
 }
 case class Func(name: String,
                 args: Seq[VariableDecl],
-                retType: Option[AstType],
+                retType: Option[ObsidianType],
                 body: Seq[Statement]) extends InvokableDeclaration {
-    val endsInState: Option[Set[String]] = None
+    val endsInState: Option[Set[Identifier]] = None
+    val tag: DeclarationTag = FuncDeclTag
 }
 case class Transaction(name: String,
                        args: Seq[VariableDecl],
-                       retType: Option[AstType],
-                       availableIn: Option[Set[String]],
+                       retType: Option[ObsidianType],
+                       availableIn: Option[Set[Identifier]],
                        ensures: Seq[Ensures],
-                       endsInState: Option[Set[String]],
-                       body: Seq[Statement]) extends InvokableDeclaration
-case class State(name: String, declarations: Seq[Declaration]) extends Declaration
+                          endsInState: Option[Set[Identifier]],
+                       body: Seq[Statement]) extends InvokableDeclaration {
+    val tag: DeclarationTag = TransactionDeclTag
+}
+case class State(name: String, declarations: Seq[Declaration]) extends Declaration {
+    val tag: DeclarationTag = StateDeclTag
+}
 
 case class Ensures(expr: Expression) extends AST
 
-sealed abstract class ContractModifier() extends AST
-case class IsOwned() extends ContractModifier
+sealed abstract trait ContractModifier extends HasLocation
+case class IsResource() extends ContractModifier
 case class IsShared() extends ContractModifier
 case class IsMain() extends ContractModifier
 
@@ -121,7 +131,9 @@ case class Import(name: String) extends AST
 
 case class Contract(mod: Option[ContractModifier],
                     name: String,
-                    declarations: Seq[Declaration]) extends Declaration
+                    declarations: Seq[Declaration]) extends Declaration {
+    val tag: DeclarationTag = ContractDeclTag
+}
 
 /* Program */
 case class Program(imports: Seq[Import], contracts: Seq[Contract]) extends AST

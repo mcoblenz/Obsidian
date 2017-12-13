@@ -4,6 +4,7 @@ import java.io.File
 
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.util.Util
+import edu.cmu.cs.obsidian.typecheck._
 
 class Unimplemented extends Exception {}
 
@@ -83,13 +84,12 @@ object ProtobufGen {
 
     private def translateFieldDecl(f: edu.cmu.cs.obsidian.parser.Field): ProtobufDeclaration = {
         f.typ match {
-            case i@edu.cmu.cs.obsidian.parser.AstIntType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.name)
-            case b@edu.cmu.cs.obsidian.parser.AstBoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.name)
-            case s@edu.cmu.cs.obsidian.parser.AstStringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.name)
-            case n@edu.cmu.cs.obsidian.parser.AstContractType(modifiers, typeName) =>
-                ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName), f.name)
-            case n@edu.cmu.cs.obsidian.parser.AstStateType(modifiers, typeName, _) =>
-                ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(typeName), f.name)
+            case i@edu.cmu.cs.obsidian.typecheck.IntType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.name)
+            case b@edu.cmu.cs.obsidian.typecheck.BoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.name)
+            case s@edu.cmu.cs.obsidian.typecheck.StringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.name)
+                // TODO: get the right type for the state if this is type specifies typestate?
+            case np@NonPrimitiveType(table, unpermissionedType, mods) => ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(unpermissionedType.toString), f.name)
+
         }
     }
 

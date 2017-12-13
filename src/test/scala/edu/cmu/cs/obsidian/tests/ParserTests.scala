@@ -207,6 +207,17 @@ class ParserTests extends JUnitSuite {
             """.stripMargin)
     }
 
+    @Test def pathTests() = {
+
+        shouldSucceed(
+            """main contract UsesC {
+              |    transaction t1() {
+              |        z.T x = 3;
+              |    }
+              |}
+            """.stripMargin)
+    }
+
     @Test def invocationSpec() = {
         shouldSucceedFile("resources/tests/parser_tests/InvokableSpec.obs")
     }

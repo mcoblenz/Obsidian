@@ -6,7 +6,7 @@ scalaVersion := "2.12.4"
 
 javaOptions in run += "-Xms8m"
 javaOptions in test += "-Xms8m"
-javaOptions in compile += "-Xms8m"
+javaOptions in compile += "-Xms16m"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 

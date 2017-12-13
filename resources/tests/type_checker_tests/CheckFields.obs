@@ -21,7 +21,10 @@ main contract C {
     readonly C1.S f2;
 
     // okay
-    C2.S f3;
+
+// TODO: enable this line and make it owned
+//    C2.S f3;
+
     C1 f5;
     readonly C1 f6;
     C2 f7;
