@@ -2,11 +2,8 @@ name := "Obsidian"
 
 version := "1.0"
 
-scalaVersion := "2.12.4"
-
-javaOptions in run += "-Xms8m"
-javaOptions in test += "-Xms8m"
-javaOptions in compile += "-Xms16m"
+// Obsidian must be built with a patch to the Scala compiler: https://github.com/hrhino/scala/commits/t10387
+scalaVersion := "2.12.5-bin-SNAPSHOT"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 
