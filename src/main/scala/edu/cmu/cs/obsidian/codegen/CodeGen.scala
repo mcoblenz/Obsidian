@@ -21,11 +21,9 @@ class CodeGen (val target: Target) {
     private val model: JCodeModel = new JCodeModel()
 
     /* we must keep track of the transactions in main so that we can match on
-     * them in the "invoke" function. Each tuple [(Some(s), tr)] is a transaction
-     * represented by a transaction [tr], in a state identified by [s]. If the first
-     * element in the pair is [None], then the transaction works in all states */
-    private val mainTransactions: mutable.Set[(Option[String], Transaction)] =
-        new mutable.HashSet[(Option[String], Transaction)]()
+     * them in the "invoke" function. */
+    private val mainTransactions: mutable.Set[Transaction] =
+        new mutable.HashSet[Transaction]()
 
     /* we track the constructor for essentially the same reason */
     private var mainConstructor: Option[JMethod] = None
@@ -653,7 +651,7 @@ class CodeGen (val target: Target) {
                     translationContext: TranslationContext) = {
 
         for (decl <- aContract.declarations) {
-            translateDeclaration(decl, newClass, translationContext, None, aContract)
+            translateDeclaration(decl, newClass, translationContext, aContract)
         }
 
         translationContext
@@ -682,7 +680,7 @@ class CodeGen (val target: Target) {
                     generateSerialization(aContract, newClass, translationContext)
                 }
             case Server() =>
-                if (aContract.mod.contains(IsMain)) {
+                if (aContract.mod.contains(IsMain())) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
                     generateMainServerClassMethods(newClass, translationContext)
@@ -776,16 +774,16 @@ class CodeGen (val target: Target) {
         runMeth._throws(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
 
         /* we use this map to group together all transactions with the same name */
-        val txsByName = new mutable.HashMap[String, mutable.Set[(Transaction, Option[String])]]()
+        val txsByName = new mutable.HashMap[String, mutable.Set[Transaction]]()
 
-        for ((state, tx) <- mainTransactions) {
+        for (tx <- mainTransactions) {
             val opt = txsByName.get(tx.name)
             opt match {
               case Some(sameNameTxs) =>
-                sameNameTxs += ((tx, state))
+                sameNameTxs += tx
                 txsByName.put(tx.name, sameNameTxs)
               case None =>
-                txsByName.+=((tx.name, mutable.Set((tx, state))))
+                  txsByName.put(tx.name, mutable.Set(tx))
             }
         }
 
@@ -795,88 +793,99 @@ class CodeGen (val target: Target) {
 
             val transCond = runMeth.body()._if(transEq)
             val transCondBody = transCond._then()
+            var transactionIsConditional = false // assume transaction is only available in one state unless we find otherwise
 
-            for ((tx, state) <- txsByName.getOrElse(txName, Set())) {
-                val stateEq = {
-                    state match {
-                        case Some(stName) =>
-                            JExpr.invoke(getStateMeth)
-                              .eq(translationContext.getEnum(stName))
-                        case None => JExpr.invoke(getStateMeth)
-                                       .eq(JExpr._null())
+            // Iterate through all the transactions by this name.
+            for (tx <- txsByName.getOrElse(txName, Set())) {
+                val stateEq: IJExpression = {
+                    tx.availableIn match {
+                        case Some(stateSet) =>
+                            var test: IJExpression = JExpr.TRUE
+                            for (state <- stateSet) {
+                                val stateName = state._1
+                                val thisTest = JExpr.invoke(getStateMeth)
+                                    .eq(translationContext.getEnum(stateName))
+
+                                test = JOp.cor(test, thisTest)
+                            }
+                            test
+
+                        case None =>  JExpr.TRUE // No need to check anything before running this transaction.
                     }
                 }
 
-            val stateCond = transCondBody._if(stateEq)
-            val stateCondBody = stateCond._then()
+                val stateCond = transCondBody._if(stateEq)
+                val stateCondBody = stateCond._then()
 
-            /* parse the (typed) args from raw bytes */
-            var txArgsList: List[JVar] = List.empty
-            var runArgNumber = 0
-            for (txArg <- tx.args) {
-                val runArg = runArgs.component(JExpr.lit(runArgNumber))
-                val javaArgType = resolveType(txArg.typ)
+                /* parse the (typed) args from raw bytes */
+                var txArgsList: List[JVar] = List.empty
+                var runArgNumber = 0
+                for (txArg <- tx.args) {
+                    val runArg = runArgs.component(JExpr.lit(runArgNumber))
+                    val javaArgType = resolveType(txArg.typ)
 
-                val transactionArgExpr: IJExpression = txArg.typ match {
-                    case IntType() =>
-                        JExpr._new(javaArgType).arg(runArg)
-                    case BoolType() =>
-                        // Arg has to be a 1-element-long array containing
-                        // either 0 or 1.
-                        val lengthCheckCall = model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("bytesRepresentBoolean")
-                        lengthCheckCall.arg(runArg)
+                    val transactionArgExpr: IJExpression = txArg.typ match {
+                        case IntType() =>
+                            JExpr._new(javaArgType).arg(runArg)
+                        case BoolType() =>
+                            // Arg has to be a 1-element-long array containing
+                            // either 0 or 1.
+                            val lengthCheckCall = model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("bytesRepresentBoolean")
+                            lengthCheckCall.arg(runArg)
 
-                        val lengthCheck = stateCondBody._if(lengthCheckCall.not())
-                        val _ = lengthCheck._then()._return(JExpr._null())
+                            val lengthCheck = stateCondBody._if(lengthCheckCall.not())
+                            val _ = lengthCheck._then()._return(JExpr._null())
 
 
-                        JExpr.cond(runArg.component(JExpr.lit(0)).eq0(), JExpr.lit(false), JExpr.lit(true))
-                    case StringType() =>
-                        val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                        val newString = JExpr._new(model.ref("java.lang.String"))
-                        newString.arg(runArg)
-                        newString.arg(charset)
-                        newString
-                    case _ => JExpr._new(javaArgType).invoke("__initFromArchiveBytes").arg(runArg)
+                            JExpr.cond(runArg.component(JExpr.lit(0)).eq0(), JExpr.lit(false), JExpr.lit(true))
+                        case StringType() =>
+                            val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                            val newString = JExpr._new(model.ref("java.lang.String"))
+                            newString.arg(runArg)
+                            newString.arg(charset)
+                            newString
+                        case _ => JExpr._new(javaArgType).invoke("__initFromArchiveBytes").arg(runArg)
+                    }
+
+                    val newTxArg: JVar = stateCondBody.decl(
+                        javaArgType,
+                        txArg.varName,
+                        transactionArgExpr
+                    )
+
+                    txArgsList = newTxArg :: txArgsList
+                    runArgNumber += 1
                 }
 
-                val newTxArg: JVar = stateCondBody.decl(
-                    javaArgType,
-                    txArg.varName,
-                    transactionArgExpr
-                )
+                var txInvoke: JInvocation = null
+                val txMethName = transactionGetMethodName(tx.name, None) // XXX
 
-                txArgsList = newTxArg :: txArgsList
-                runArgNumber += 1
+                if (tx.retType.isDefined) {
+                    txInvoke = JExpr.invoke(txMethName)
+                    stateCondBody.assign(returnBytes,
+                        tx.retType.get match {
+                            case IntType() => txInvoke.invoke("toByteArray")
+                            case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
+                                .staticInvoke("booleanToBytes").arg(txInvoke)
+                            case StringType() => txInvoke.invoke("getBytes")
+                            case _ => txInvoke.invoke("archiveBytes")
+                        }
+                    )
+                } else {
+                    txInvoke = transCondBody.invoke(txMethName)
+                }
+
+                for (txArg <- txArgsList.reverse) {
+                    txInvoke.arg(txArg)
+                }
+
+                stateCondBody._return(returnBytes)
+
             }
-
-            var txInvoke: JInvocation = null
-            val txMethName = transactionGetMethodName(tx.name, state)
-
-            if (tx.retType.isDefined) {
-                txInvoke = JExpr.invoke(txMethName)
-                stateCondBody.assign(returnBytes,
-                    tx.retType.get match {
-                        case IntType() => txInvoke.invoke("toByteArray")
-                        case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
-                                                .staticInvoke("booleanToBytes").arg(txInvoke)
-                        case StringType() => txInvoke.invoke("getBytes")
-                        case _ => txInvoke.invoke("archiveBytes")
-                    }
-                )
-            } else {
-                txInvoke = transCondBody.invoke(txMethName)
+            /* If we aren't in any of the states were we can use this transaction, we throw an exception */
+            if (transactionIsConditional) {
+                transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
             }
-
-            for (txArg <- txArgsList.reverse) {
-                txInvoke.arg(txArg)
-            }
-
-            stateCondBody._return(returnBytes)
-
-          }
-          /* If we aren't in any of the states were we can use this transaction, we throw an exception */
-          transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
         }
       runMeth.body()._return(returnBytes)
     }
@@ -1362,7 +1371,6 @@ class CodeGen (val target: Target) {
                     declaration: Declaration,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext,
-                    currentState: Option[String],
                     aContract: Contract): Unit = {
         (aContract.mod, declaration) match {
 
@@ -1375,7 +1383,7 @@ class CodeGen (val target: Target) {
                 translateFuncDecl(f, newClass, translationContext)
             case (Some(IsMain()), t: Transaction) =>
                 translateTransDecl(t, newClass, translationContext)
-                mainTransactions.add((currentState, t))
+                mainTransactions.add(t)
             case (Some(IsMain()), s@State(_,_)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
             case (Some(IsMain()), c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
@@ -1568,7 +1576,7 @@ class CodeGen (val target: Target) {
         /* we change one thing: the currently translated state */
         val newTranslationContext = translationContext.copy(currentStateName = Some(state.name))
         for (decl <- state.declarations) {
-            translateDeclaration(decl, stateClass, newTranslationContext, Some(state.name), contract)
+            translateDeclaration(decl, stateClass, newTranslationContext, contract)
         }
         generateStateArchiveInitializer(contract, state, stateClass, translationContext)
         generateStateArchiver(contract, state, stateClass, translationContext)
@@ -1677,10 +1685,9 @@ class CodeGen (val target: Target) {
                     tx: Transaction,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext): Unit = {
-        // Does this transaction need to go in a set of states?
-        // If so, put a copy of the translated method in each state.
+        // Does this transaction need to go in a set of states? If so, put it at the top level as if it's available in all states.
         val availableIn: Option[Set[Identifier]] = tx.availableIn
-        if (availableIn.isDefined) {
+        if (availableIn.isDefined && availableIn.get.size == 1) {
             for (inState <- availableIn.get) {
                 val inStateName = inState._1
                 val inStateContext: StateContext = translationContext.states(inStateName)
@@ -1688,9 +1695,7 @@ class CodeGen (val target: Target) {
 
                 /* we change one thing: the currently translated state */
                 val newTranslationContext = translationContext.copy(currentStateName = Some(inStateName))
-                for (decl <- inStateContext.astState.declarations) {
-                    translateTransDeclInPossibleState(tx, inStateClass, newTranslationContext)
-                }
+                translateTransDeclInPossibleState(tx, inStateClass, newTranslationContext)
             }
         }
         else {

@@ -270,12 +270,10 @@ object Main {
                 println()
             }
 
-            println("Transform errors:");
             for (error <- transformErrors) {
                 error.printMessage()
             }
 
-            println("Typechecker errors:");
             val checker = new Checker(globalTable, options.typeCheckerDebug)
             if (!checker.checkProgramAndPrintErrors() || !transformErrors.isEmpty) {
                 println("Typechecking failed.\n")
