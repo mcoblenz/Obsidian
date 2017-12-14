@@ -41,3 +41,24 @@ contract C2 {
     state S1 {}
     state S2 {}
 }
+
+contract C3 {
+  state S1 {}
+  state S2 {
+    int f2;
+  }
+
+
+  C3() {
+    ->S1;
+  }
+
+  transaction toUnknownState(int x) available in S1 ends in S1, S2 {
+    if (x > 3) {
+      ->S2({f2 = 0});
+    }
+      ->S2({f2 = 0});
+    // Error: f2 may not be available.
+    f2 = 3;
+  }
+}

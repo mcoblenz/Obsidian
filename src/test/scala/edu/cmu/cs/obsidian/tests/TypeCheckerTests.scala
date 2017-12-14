@@ -423,7 +423,7 @@ class TypeCheckerTests extends JUnitSuite {
             (StateUndefinedError("C1", "OtherState"), 13)
             ::
             (SubTypingError(
-                NonPrimitiveType(null, NoPathType(StateType("C1", "S2")), Set(IsOwned())),
+                NonPrimitiveType(null, NoPathType(StateUnionType("C1", Set("S1", "S2"))), Set(IsOwned())),
                 NonPrimitiveType(null, NoPathType(StateUnionType("C1", Set("S1", "S3"))), Set(IsOwned()))), 19
             )
             ::
@@ -431,6 +431,10 @@ class TypeCheckerTests extends JUnitSuite {
                 NonPrimitiveType(null, NoPathType(StateUnionType("C2", Set("S1", "S2"))), Set(IsOwned())),
                 NonPrimitiveType(null, NoPathType(StateType("C2", "S1")), Set(IsOwned()))), 33
             )
+              ::
+              (
+                  VariableUndefinedError("f2", null), 62
+              )
             ::
             Nil
         )
