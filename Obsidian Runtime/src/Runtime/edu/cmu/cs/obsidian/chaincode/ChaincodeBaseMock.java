@@ -125,12 +125,6 @@ class ChaincodeBaseServer {
             String txName = root.getJSONObject("params")
                     .getJSONObject("ctorMsg")
                     .getString("function");
-            try {
-                if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
-                retBytes = base.run(base.stub, txName, txArgs);
-            } catch (BadTransactionException e) {
-                System.out.println("Invalid state access");
-            }
 
             if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
             try {
@@ -140,6 +134,8 @@ class ChaincodeBaseServer {
                 re.printStackTrace(System.out);
                 retBytes = null;
                 failureMessage = ": Reentrant call made";
+            } catch (BadTransactionException e) {
+                System.out.println("Invalid state access");
             }
         }
         else if (method.equals("query")) {
