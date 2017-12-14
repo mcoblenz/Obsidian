@@ -339,7 +339,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          // TODO handle cases for e.g. if the field is owned
                          (f.typ, context)
                      case (None, None) =>
-                         logError(e, VariableUndefinedError(x))
+                         logError(e, VariableUndefinedError(x, context.tableOfThis.name))
                          (BottomType(), context)
                  }
              case NumLiteral(_) => (IntType(), context)
@@ -947,7 +947,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     val fieldLookup = thisTable.lookupField(x)
 
                     /* if it's not a field either, log an error */
-                    if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x))
+                    if (fieldLookup.isEmpty) logError(s, VariableUndefinedError(x, thisTable.name))
                     else checkIsSubtype(e, t, fieldLookup.get.typ)
                 }
                 else {

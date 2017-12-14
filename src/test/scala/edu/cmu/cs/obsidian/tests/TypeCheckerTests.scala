@@ -117,9 +117,9 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def variableTest(): Unit = {
         runTest("resources/tests/type_checker_tests/UndefinedVariable.obs",
-            (VariableUndefinedError("x"), 7)
+            (VariableUndefinedError("x", null), 7)
               ::
-              (VariableUndefinedError("z"), 9)
+              (VariableUndefinedError("z", null), 9)
               ::
               Nil
         )
@@ -155,7 +155,7 @@ class TypeCheckerTests extends JUnitSuite {
                   NonPrimitiveType(null, NoPathType(StateType("C_Shared", "S")), Set())),
                 36)
               ::
-              (VariableUndefinedError("j"), 41)
+              (VariableUndefinedError("j", null), 41)
               ::
               (AssignmentError(), 43)
               ::
@@ -309,7 +309,7 @@ class TypeCheckerTests extends JUnitSuite {
 //              ::
 //              (UnusedOwnershipError("o2"), 36)
 //              ::
-              (VariableUndefinedError("x"), 48)
+              (VariableUndefinedError("x", null), 48)
               ::
               Nil)
     }
@@ -431,6 +431,18 @@ class TypeCheckerTests extends JUnitSuite {
                 NonPrimitiveType(null, NoPathType(StateUnionType("C2", Set("S1", "S2"))), Set(IsOwned())),
                 NonPrimitiveType(null, NoPathType(StateType("C2", "S1")), Set(IsOwned()))), 33
             )
+            ::
+            Nil
+        )
+    }
+
+    @Test def multistateFieldsTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/MultistateFields.obs",
+            (VariableUndefinedError("foo", null), 19)
+            ::
+                (VariableUndefinedError("foo", null), 24)
+            ::
+                (VariableUndefinedError("foo", null), 27)
             ::
             Nil
         )

@@ -89,7 +89,14 @@ case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {
     val tag: DeclarationTag = TypeDeclTag
 }
 
-case class Field(isConst: Boolean, typ: ObsidianType, name: String) extends Declaration {
+sealed trait IsAvailableInStates {
+    val availableIn: Option[Set[Identifier]]
+}
+
+case class Field(isConst: Boolean,
+                 typ: ObsidianType,
+                 name: String,
+                 availableIn: Option[Set[Identifier]]) extends Declaration with IsAvailableInStates {
     val tag: DeclarationTag = FieldDeclTag
 }
 
@@ -103,7 +110,8 @@ case class Constructor(name: String,
 case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[ObsidianType],
-                body: Seq[Statement]) extends InvokableDeclaration {
+                availableIn: Option[Set[Identifier]],
+                body: Seq[Statement]) extends InvokableDeclaration with IsAvailableInStates {
     val endsInState: Option[Set[Identifier]] = None
     val tag: DeclarationTag = FuncDeclTag
 }
@@ -113,7 +121,7 @@ case class Transaction(name: String,
                        availableIn: Option[Set[Identifier]],
                        ensures: Seq[Ensures],
                           endsInState: Option[Set[Identifier]],
-                       body: Seq[Statement]) extends InvokableDeclaration {
+                       body: Seq[Statement]) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 }
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration {

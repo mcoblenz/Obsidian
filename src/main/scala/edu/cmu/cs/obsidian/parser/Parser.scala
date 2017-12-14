@@ -302,13 +302,13 @@ object Parser extends Parsers {
     }
 
     private def parseFieldDecl = {
-        opt(ConstT()) ~ parseType ~ parseId ~! SemicolonT() ^^ {
-            case isConst ~ typ ~ name ~ _ =>
+        opt(ConstT()) ~ parseType ~ parseId ~! opt(parseAvailableIn) ~! SemicolonT() ^^ {
+            case isConst ~ typ ~ name ~ availableIn ~ _ =>
                 isConst match {
                     case Some(constToken) =>
-                        Field(isConst = true, typ, name._1).setLoc(constToken)
+                        Field(isConst = true, typ, name._1, availableIn).setLoc(constToken)
                     case None =>
-                        Field(isConst = false, typ, name._1).setLoc(typ)
+                        Field(isConst = false, typ, name._1, availableIn).setLoc(typ)
             }
         }
     }
@@ -318,7 +318,7 @@ object Parser extends Parsers {
     }
 
     private def parseStatesList: Parser[Set[Identifier]] =
-        rep(parseId ~ OrT()) ~! parseId ^^ {
+        rep(parseId ~ CommaT()) ~! parseId ^^ {
         case ors ~ last => ors.map(_._1).toSet + last
     }
 
@@ -329,9 +329,9 @@ object Parser extends Parsers {
 
     private def parseFuncDecl = {
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-            opt(parseReturns) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case f ~ name ~ _ ~ args ~ _ ~ ret ~ _ ~ body ~ _ =>
-                Func(name._1, args, ret, body).setLoc(f)
+            opt(parseReturns) ~! opt(parseAvailableIn) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case f ~ name ~ _ ~ args ~ _ ~ ret ~ availableIn ~ _ ~ body ~ _ =>
+                Func(name._1, args, ret, availableIn, body).setLoc(f)
         }
     }
 

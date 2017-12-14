@@ -1,7 +1,7 @@
 contract C1 {
 
-    // error: constructor for 'C1' ends in S2 or S3 instead of S1 or S2
-    C1(bool b) ends in S1 or S2 {
+    // error: constructor for 'C1' ends in S2, S3 instead of S1, S2
+    C1(bool b) ends in S1, S2 {
         if(b) {
             ->S2;
         } else {
@@ -11,13 +11,13 @@ contract C1 {
 
     // error: 'OtherState' is not a valid state
     transaction t1() available in S2
-                    ends in S2 or OtherState {
+                    ends in S2, OtherState {
         int x = 1;
     }
 
-    // error: if we access t2 from S2, it will not end in S1 or S3
-    transaction t2() available in S1 or S2
-                     ends in S1 or S3 {
+    // error: if we access t2 from S2, it will not end in S1, S3
+    transaction t2() available in S1, S2
+                     ends in S1, S3 {
         int x = 1;
     }
 
@@ -29,7 +29,7 @@ contract C1 {
 
 contract C2 {
 
-    // error: C2 ends in S1 or S2 but must end in S1
+    // error: C2 ends in S1, S2 but must end in S1
     C2(bool b) ends in S1 {
         if(b) {
             ->S1;

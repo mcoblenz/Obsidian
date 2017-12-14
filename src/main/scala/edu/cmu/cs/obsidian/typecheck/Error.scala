@@ -18,8 +18,18 @@ case class ErrorRecord (error: Error, pos: scala.util.parsing.input.Position) {
 case class SubTypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Found type '$t1', but expected something of type '$t2'"
 }
-case class VariableUndefinedError(x: String) extends Error {
-    val msg: String = s"Variable '$x' is undefined in the current context"
+case class VariableUndefinedError(x: String, context: String) extends Error {
+    val msg: String = s"Variable '$x' is undefined in $context"
+
+    override def equals(that: Any): Boolean = {
+        that match {
+            case that@VariableUndefinedError(y, _) => y == x
+            case _ => false
+        }
+    }
+
+    override def hashCode(): Int = x.hashCode()
+
 }
 case class DifferentTypeError(e1: Expression, t1: ObsidianType, e2: Expression, t2: ObsidianType) extends Error {
     val msg: String = s"Expression '$e1' has type '$t1', and expression '$e2' has type '$t2'," +

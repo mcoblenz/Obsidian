@@ -71,23 +71,36 @@ class StateTable(
 
     def lookupContract(name: String): Option[ContractTable] = contractTable.lookupContract(name)
 
-    def lookupField(name: String): Option[Field] = {
-        fieldLookup.get(name) match {
+    // Implements two-stage lookup for two nested scopes (state and then contract).
+    private def doLookup[FoundType <: IsAvailableInStates](toFind: String,
+                                    lookupFunction1: (String => Option[FoundType]),
+                                    lookupFunction2: (String => Option[FoundType])): Option[FoundType] = {
+        lookupFunction1(toFind) match {
             case x@Some(_) => x
-            case None => lexicallyInsideOf.lookupField(name)
+            case None =>
+                val found = lookupFunction2(toFind)
+                if (found.isDefined) {
+                    val availableIn = found.get.availableIn
+                    if (availableIn.isDefined) {
+                        val availableInCurrentState = availableIn.get.exists(p => p._1 == name)
+                        if (availableInCurrentState) found else None
+                    }
+                    else found // The field is available in all states.
+                }
+                else None // There's no field by this name.
         }
     }
-    def lookupTransaction(name: String): Option[Transaction] = {
-        txLookup.get(name) match {
-            case x@Some(_) => x
-            case None => lexicallyInsideOf.lookupTransaction(name)
-        }
+
+    def lookupField(fieldName: String): Option[Field] = {
+        doLookup[Field](fieldName, fieldLookup.get, lexicallyInsideOf.lookupField)
     }
-    def lookupFunction(name: String): Option[Func] = {
-        funLookup.get(name) match {
-            case x@Some(_) => x
-            case None => lexicallyInsideOf.lookupFunction(name)
-        }
+
+    def lookupTransaction(transactionName: String): Option[Transaction] = {
+        doLookup[Transaction](transactionName, txLookup.get, lexicallyInsideOf.lookupTransaction)
+    }
+
+    def lookupFunction(functionName: String): Option[Func] = {
+        doLookup[Func](functionName, funLookup.get, lexicallyInsideOf.lookupFunction)
     }
 
     def lookupFieldRaw(name: String): Option[Field] = {
