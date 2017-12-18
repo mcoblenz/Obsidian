@@ -221,4 +221,8 @@ class ParserTests extends JUnitSuite {
     @Test def invocationSpec() = {
         shouldSucceedFile("resources/tests/parser_tests/InvokableSpec.obs")
     }
+
+    @Test def emptyBody() = {
+        shouldSucceedFile("resources/tests/parser_tests/EmptyBody.obs")
+    }
 }
