@@ -1,6 +1,6 @@
 // tests type checking for constructors
 
-shared contract Thing {
+contract Thing {
     int x;
     string y;
     bool z;

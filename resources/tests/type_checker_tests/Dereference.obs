@@ -1,6 +1,6 @@
 // Checks type-checking for field dereferences (e.g. "x.f")
 
-shared contract Thing {
+contract Thing {
     int x;
     string y;
     bool z;

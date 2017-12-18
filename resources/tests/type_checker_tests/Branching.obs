@@ -1,7 +1,7 @@
 /* This test checks various aspects of type-checking related to branching that
  * is, if/else statements */
 
-shared contract Sh/*ared*/ {
+contract Sh/*ared*/ {
 }
 
 owned contract Ow/*ned*/ {

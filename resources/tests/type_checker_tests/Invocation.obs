@@ -1,4 +1,4 @@
-shared contract OtherContract {
+contract OtherContract {
 
     transaction otherMethod(int x) returns int {
         return x + 3;

@@ -1,7 +1,7 @@
 // checks path-dependent types involving "parent"
 
-shared contract C {
-    shared contract T {
+contract C {
+    contract T {
         this.parent.T f;
         C x;
         transaction t(T arg) {

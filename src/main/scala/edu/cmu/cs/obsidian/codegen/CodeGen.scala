@@ -1388,16 +1388,6 @@ class CodeGen (val target: Target) {
                 translateStateDecl(s, aContract, newClass, translationContext)
             case (Some(IsMain()), c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
 
-            // TODO : shared contracts
-            /* shared contracts will generate a sort of shim to interact with
-             * a remotely deployed chaincode. */
-            case (Some(IsShared()), c: Constructor) => ()
-            case (Some(IsShared()), f: Field) => ()
-            case (Some(IsShared()), f: Func) => ()
-            case (Some(IsShared()), t: Transaction) => ()
-            case (Some(IsShared()), s: State) => ()
-            case (Some(IsShared()), c: Contract) => ()
-
             /* Owned contracts and nested contracts are translated the same way */
             case (_, c: Constructor) =>
                 translateConstructor(c, newClass, translationContext)

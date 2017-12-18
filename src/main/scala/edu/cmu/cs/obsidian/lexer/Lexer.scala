@@ -40,7 +40,6 @@ object Lexer extends RegexParsers {
         case "switch" => SwitchT()
         case "case" => CaseT()
         case "owned" => OwnedT()
-        case "shared" => SharedT()
         case "main" => MainT()
         case "int" => IntT()
         case "bool" => BoolT()

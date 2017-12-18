@@ -1,4 +1,4 @@
-shared contract C {
+contract C {
     contract T {
         state S1 {}
         state S2 {}

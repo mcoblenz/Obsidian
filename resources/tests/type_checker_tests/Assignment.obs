@@ -4,7 +4,7 @@ owned contract C_Owned {
     int f1;
 }
 
-shared contract C_Shared {
+contract C_Shared {
     int f1;
 
     C_Shared() {

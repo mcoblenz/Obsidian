@@ -1,4 +1,4 @@
-shared contract Thing {
+contract Thing {
     // should fail
     OtherThing other;
     int x;

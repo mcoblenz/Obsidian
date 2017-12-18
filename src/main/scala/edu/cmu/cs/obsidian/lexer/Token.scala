@@ -28,7 +28,6 @@ case class NewT() extends Token { override def toString: String = "new" }
 case class SwitchT() extends Token { override def toString: String = "switch"}
 case class CaseT() extends Token { override def toString: String = "case"}
 case class OwnedT() extends Token { override def toString: String = "owned"}
-case class SharedT() extends Token { override def toString: String = "shared"}
 case class MainT() extends Token { override def toString: String = "main"}
 case class IntT() extends Token { override def toString: String = "int"}
 case class StringT() extends Token { override def toString: String = "string"}
