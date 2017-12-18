@@ -191,31 +191,41 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def isRawSubtype(t1: UnpermissionedType, t2: UnpermissionedType): Boolean = {
-        (t1, t2) match {
-            case (NoPathType(ts1), NoPathType(ts2)) => isSimpleSubtype(ts1, ts2)
-            case (PathType(p1, ts1), PathType(p2, ts2)) if p1 == p2 =>
-                isSimpleSubtype(ts1, ts2)
-            case _ => false
-        }
-    }
-
     /* true iff [t1 <: t2] */
-    private def isSubtype(t1: ObsidianType, t2: ObsidianType): Boolean = {
+    private def isSubtype(t1: ObsidianType, t2: ObsidianType): Option[Error] = {
         (t1, t2) match {
-            case (BottomType(), _) => true
-            case (IntType(), IntType()) => true
-            case (BoolType(), BoolType()) => true
-            case (StringType(), StringType()) => true
-            case (NonPrimitiveType(_, typ1, _), NonPrimitiveType(_, typ2, _)) => isRawSubtype(typ1, typ2)
-            case _ => false
+            case (BottomType(), _) => None
+            case (IntType(), IntType()) => None
+            case (BoolType(), BoolType()) => None
+            case (StringType(), StringType()) => None
+            case (NonPrimitiveType(_, typ1, mods1), NonPrimitiveType(_, typ2, mods2)) =>
+                val mainSubtype = (typ1, typ2) match {
+                    case (NoPathType(ts1), NoPathType(ts2)) => isSimpleSubtype(ts1, ts2)
+                    case (PathType(p1, ts1), PathType(p2, ts2)) if p1 == p2 =>
+                        isSimpleSubtype(ts1, ts2)
+                    case _ => false
+                }
+
+                // For now, just make sure we don't get ownership from an expression that doesn't have it.
+                val modifierSubtype = if (mods2.contains(IsOwned())) {
+                    mods1.contains(IsOwned())
+                }
+                else {
+                    true
+                }
+
+                if (!mainSubtype) Some(SubTypingError(t1, t2))
+                else if (!modifierSubtype) Some(OwnershipSubtypingError(t1, t2))
+                else None
+            case _ => Some(SubTypingError(t1, t2))
         }
     }
 
     /* returns [t1] if [t1 <: t2], logs an error and returns [BottomType] otherwise */
     private def checkIsSubtype(ast: AST, t1: ObsidianType, t2: ObsidianType): ObsidianType = {
-        if (!isSubtype(t1, t2)) {
-            logError(ast, SubTypingError(t1, t2))
+        val errorOpt = isSubtype(t1, t2)
+        if (errorOpt.isDefined) {
+            logError(ast, errorOpt.get)
             BottomType()
         }
         else t1
@@ -799,7 +809,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (argTypeCallerPoV, _) = args(i)
                 val specTypeCallerPoV = specCallerPoV(i)
 
-                if (!isSubtype(argTypeCallerPoV, specTypeCallerPoV)) {
+                if (isSubtype(argTypeCallerPoV, specTypeCallerPoV).isDefined) {
                     val err = SubTypingError(argTypeCallerPoV, specTypeCallerPoV)
                     errList = (ast, err)::errList
                 }
@@ -1214,7 +1224,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 if (typ.isOwned) {
                     // Nothing to do
                 }
-                else if (typ.isReadOnly) {
+                else if (typ.isReadOnlyState) {
                     val simpleType = typ.extractSimpleType.get
                     checkNonStateSpecific(simpleType, StateSpecificReadOnlyError())
                 }
@@ -1348,6 +1358,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         // maybe this error should be handled in the parser
         if(constr.name != table.name) {
             logError(constr, ConstructorNameError(table.name))
+        }
+
+        if (table.contract.isResource && !constr.isOwned) {
+            logError(constr, ResourceContractConstructorError(table.name))
         }
 
         // first create this unchecked context so we can resolve types

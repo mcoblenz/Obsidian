@@ -7,8 +7,8 @@ contract C1 {
   state S {}
 }
 
-owned contract C2 {
-  C2(){
+resource contract C2 {
+  owned C2(){
     ->S;
   }
   state S {}
@@ -17,8 +17,8 @@ owned contract C2 {
 main contract C {
     // bad because state specific information can change via other references
     C1.S f1;
-    readonly C2.S f4;
-    readonly C1.S f2;
+    readonlyState C2.S f4;
+    readonlyState C1.S f2;
 
     // okay
 
@@ -26,9 +26,9 @@ main contract C {
 //    C2.S f3;
 
     C1 f5;
-    readonly C1 f6;
+    readonlyState C1 f6;
     C2 f7;
-    readonly C2 f8;
+    readonlyState C2 f8;
     int f9;
     string f10;
     bool f11;

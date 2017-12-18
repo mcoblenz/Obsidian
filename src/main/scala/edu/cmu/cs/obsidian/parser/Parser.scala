@@ -41,9 +41,10 @@ object Parser extends Parsers {
     }
 
     private def parseTypeModifier = {
-        val linearP = ReadOnlyT() ^^ (t => IsReadOnly().setLoc(t))
+        val readOnlyStateP = ReadOnlyT() ^^ (t => IsReadOnlyState().setLoc(t))
         val remoteP = RemoteT() ^^ (t => IsRemote().setLoc(t))
-        linearP | remoteP
+        val ownedP = OwnedT() ^^ (t => IsOwned().setLoc(t))
+        readOnlyStateP | remoteP | ownedP
     }
 
     private def parseType: Parser[ObsidianType] = {
@@ -370,10 +371,10 @@ object Parser extends Parsers {
 
     // maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor = {
-        parseId ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEndsInState) ~!
+        opt(OwnedT()) ~ parseId ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEndsInState) ~!
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case name ~ _ ~ args ~ _ ~ ensuresState ~ _ ~ body ~ _ =>
-                Constructor(name._1, args, ensuresState, body).setLoc(name)
+            case isOwned ~ name ~ _ ~ args ~ _ ~ ensuresState ~ _ ~ body ~ _ =>
+                Constructor(name._1, isOwned.isDefined, args, ensuresState, body).setLoc(name)
 
         }
     }
@@ -389,14 +390,14 @@ object Parser extends Parsers {
 
     private def parseContractModifier = {
         val mainP: Parser[ContractModifier] = MainT() ^^ (t => IsMain().setLoc(t))
-        val ownedP: Parser[ContractModifier] = OwnedT() ^^ (t => IsResource().setLoc(t))
-        opt(mainP | ownedP)
+        val resourceP: Parser[ContractModifier] = ResourceT() ^^ (t => IsResource().setLoc(t))
+        mainP | resourceP
     }
 
     private def parseContractDecl = {
-        parseContractModifier ~ ContractT() ~! parseId ~!
+        rep(parseContractModifier) ~ ContractT() ~! parseId ~!
             LBraceT() ~! rep(parseDeclInContract) ~! RBraceT() ^^ {
-            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod, name._1, defs).setLoc(ct)
+            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod.toSet, name._1, defs).setLoc(ct)
         }
     }
 

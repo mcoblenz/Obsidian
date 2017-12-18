@@ -120,7 +120,7 @@ object Main {
     }
 
     def findMainContract(ast: Program): Option[Contract] = {
-        ast.contracts.find((c: Contract) => c.mod.contains(IsMain()))
+        ast.contracts.find((c: Contract) => c.modifiers.contains(IsMain()))
     }
 
     def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {

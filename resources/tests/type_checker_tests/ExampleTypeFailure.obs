@@ -1,4 +1,4 @@
-owned contract C {
+contract C {
     C(string s) {
         ->HasString({s = s});
     }

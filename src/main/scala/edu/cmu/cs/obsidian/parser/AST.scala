@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.parser
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
+import edu.cmu.cs.obsidian.typecheck.{ObsidianType, TypeModifier}
 
 trait HasLocation {
     var loc: Position = NoPosition
@@ -101,6 +101,7 @@ case class Field(isConst: Boolean,
 }
 
 case class Constructor(name: String,
+                       isOwned: Boolean,
                        args: Seq[VariableDecl],
                        endsInState: Option[Set[Identifier]],
                        body: Seq[Statement]) extends InvokableDeclaration {
@@ -132,15 +133,16 @@ case class Ensures(expr: Expression) extends AST
 
 sealed abstract trait ContractModifier extends HasLocation
 case class IsResource() extends ContractModifier
-case class IsShared() extends ContractModifier
 case class IsMain() extends ContractModifier
 
 case class Import(name: String) extends AST
 
-case class Contract(mod: Option[ContractModifier],
+case class Contract(modifiers: Set[ContractModifier],
                     name: String,
                     declarations: Seq[Declaration]) extends Declaration {
     val tag: DeclarationTag = ContractDeclTag
+
+    val isResource = modifiers.contains(IsResource())
 }
 
 /* Program */

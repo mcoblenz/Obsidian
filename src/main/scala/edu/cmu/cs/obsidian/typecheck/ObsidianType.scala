@@ -2,8 +2,8 @@ package edu.cmu.cs.obsidian.typecheck
 import edu.cmu.cs.obsidian.parser._
 
 sealed abstract class TypeModifier() extends HasLocation
-case class IsReadOnly() extends TypeModifier {
-    override def toString: String = "readonly"
+case class IsReadOnlyState() extends TypeModifier {
+    override def toString: String = "readonlyState"
 }
 
 case class IsRemote() extends TypeModifier {
@@ -73,7 +73,7 @@ sealed trait ObsidianType extends HasLocation {
 
     def isOwned = false
     def isShared = false
-    def isReadOnly = false
+    def isReadOnlyState = false
     def isRemote = false
 }
 
@@ -99,7 +99,17 @@ case class NonPrimitiveType(tableOf: DeclarationTable,
     def table: DeclarationTable = tableOf
     val tableOpt: Option[DeclarationTable] = Some(table)
 
-    override def toString: String = modifiers.map(m => m.toString).mkString(" ") + " " + t.toString
+    override def toString: String = {
+        val modifiersString = modifiers.map(m => m.toString).mkString(" ")
+
+        if (modifiers.size > 0) {
+            modifiersString + " " + t.toString
+        }
+        else {
+            t.toString
+        }
+    }
+
     override def equals(other: Any): Boolean = {
         other match {
             case NonPrimitiveType(_, typ, mod) => typ == t && mod == modifiers
@@ -108,14 +118,14 @@ case class NonPrimitiveType(tableOf: DeclarationTable,
     }
     override def hashCode(): Int = t.hashCode()
     val residualType: ObsidianType = if (modifiers.contains(IsOwned()))
-        NonPrimitiveType(tableOf, t, modifiers - IsOwned() + IsReadOnly())
+        NonPrimitiveType(tableOf, t, modifiers - IsOwned() + IsReadOnlyState())
     else this
 
     val extractSimpleType: Option[SimpleType] = Some(t.extractSimpleType)
     val extractUnpermissionedType: Option[UnpermissionedType] = Some(t)
 
     override def isOwned = modifiers.contains(IsOwned())
-    override def isReadOnly = modifiers.contains(IsReadOnly())
+    override def isReadOnlyState = modifiers.contains(IsReadOnlyState())
     override def isRemote = modifiers.contains(IsRemote())
 }
 
@@ -143,6 +153,10 @@ case class BottomType() extends ResolvedType {
 case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeModifier]) extends PotentiallyUnresolvedType {
     val isBottom: Boolean = false
     val tableOpt: Option[DeclarationTable] = None
+
+    override def toString: String = mods.map(m => m.toString).mkString(" ") + " " + identifiers.mkString(".")
+
+
     override val residualType: ObsidianType = this // Should never be invoked
     override val extractSimpleType: Option[SimpleType] = None
 

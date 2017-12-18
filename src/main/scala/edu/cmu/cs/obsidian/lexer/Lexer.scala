@@ -36,7 +36,7 @@ object Lexer extends RegexParsers {
         case "return" => ReturnT()
         case "returns" => ReturnsT()
         case "new" => NewT()
-        case "readonly" => ReadOnlyT()
+        case "readonlyState" => ReadOnlyT()
         case "switch" => SwitchT()
         case "case" => CaseT()
         case "owned" => OwnedT()
@@ -56,6 +56,7 @@ object Lexer extends RegexParsers {
         case "available" => AvailableT()
         case "ends" => EndsT()
         case "in" => InT()
+        case "resource" => ResourceT()
         case id => IdentifierT(id)
     }
 

@@ -1,8 +1,8 @@
 /* checks type-checking of return statements and various flow-sensitive
  * properties about statement sequences w.r.t. returns */
 
-owned contract C_Owned {
-  C_Owned() {
+resource contract C_Owned {
+  owned C_Owned() {
     ->S;
   }
   state S {}

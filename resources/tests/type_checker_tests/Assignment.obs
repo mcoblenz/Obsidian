@@ -1,6 +1,6 @@
 // checks that assignments work as expected
 
-owned contract C_Owned {
+resource contract C_Owned {
     int f1;
 }
 

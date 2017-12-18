@@ -21,12 +21,9 @@ sealed trait DeclarationTable {
     def lookupTransaction(name: String): Option[Transaction]
     def lookupFunction(name: String): Option[Func]
 
-    def lookupFieldRaw(name: String): Option[Field]
-    def lookupTransactionRaw(name: String): Option[Transaction]
-    def lookupFunctionRaw(name: String): Option[Func]
     def simpleType: SimpleType
 
-    def indexDecl[T, TCast](decls: Seq[Declaration], tag: DeclarationTag): Map[String, TCast] = {
+    def indexDecl[TCast](decls: Seq[Declaration], tag: DeclarationTag): Map[String, TCast] = {
         var lookup = new TreeMap[String, TCast]()
 
         for (decl <- decls if decl.tag == tag) {
@@ -44,24 +41,12 @@ class StateTable(
     assert(astNodeRaw != null)
 
     private var astNode: State = astNodeRaw
-    private var fieldLookup: Map[String, Field] = indexDecl[ObsidianType, Field](ast.declarations, FieldDeclTag)
-    private var txLookup: Map[String, Transaction] = indexDecl[ObsidianType, Transaction](ast.declarations, TransactionDeclTag)
-    private var funLookup: Map[String, Func] = indexDecl[ObsidianType, Func](ast.declarations, FuncDeclTag)
+    private var fieldLookup: Map[String, Field] = indexDecl[Field](ast.declarations, FieldDeclTag)
+    private var txLookup: Map[String, Transaction] = indexDecl[Transaction](ast.declarations, TransactionDeclTag)
+    private var funLookup: Map[String, Func] = indexDecl[Func](ast.declarations, FuncDeclTag)
 
     def contractTable: ContractTable = lexicallyInsideOf
     def contract: Contract = lexicallyInsideOf.contract
-
-    val fieldLookupRaw: Map[String, Field] = {
-        indexDecl[ParsableType, Field](astNodeRaw.declarations, FieldDeclTag)
-    }
-
-    val txLookupRaw: Map[String, Transaction] = {
-        indexDecl[ParsableType, Transaction](astNodeRaw.declarations, TransactionDeclTag)
-    }
-
-    val funLookupRaw: Map[String, Func] = {
-        indexDecl[ParsableType, Func](astNodeRaw.declarations, FuncDeclTag)
-    }
 
     def name: String = astNodeRaw.name
 
@@ -102,25 +87,6 @@ class StateTable(
     def lookupFunction(functionName: String): Option[Func] = {
         doLookup[Func](functionName, funLookup.get, lexicallyInsideOf.lookupFunction)
     }
-
-    def lookupFieldRaw(name: String): Option[Field] = {
-        fieldLookupRaw.get(name) match {
-            case x@Some(_) => x
-            case None => lexicallyInsideOf.lookupFieldRaw(name)
-        }
-    }
-    def lookupTransactionRaw(name: String): Option[Transaction] = {
-        txLookupRaw.get(name) match {
-            case x@Some(_) => x
-            case None => lexicallyInsideOf.lookupTransactionRaw(name)
-        }
-    }
-    def lookupFunctionRaw(name: String): Option[Func] = {
-        funLookupRaw.get(name) match {
-            case x@Some(_) => x
-            case None => lexicallyInsideOf.lookupFunctionRaw(name)
-        }
-    }
 }
 
 class ContractTable(
@@ -135,32 +101,21 @@ class ContractTable(
     def this(astNodeRaw: Contract, symbolTable: SymbolTable, parentContract: ContractTable) =
         this(astNodeRaw, symbolTable, Some(parentContract))
 
-    private var fieldLookup: Map[String, Field] = indexDecl[ObsidianType, Field](contract.declarations, FieldDeclTag)
-    private var txLookup: Map[String, Transaction] = indexDecl[ObsidianType, Transaction](contract.declarations, TransactionDeclTag)
-    private var funLookup: Map[String, Func] = indexDecl[ObsidianType, Func](contract.declarations, FuncDeclTag)
+    private var fieldLookup: Map[String, Field] = indexDecl[Field](contract.declarations, FieldDeclTag)
+    private var txLookup: Map[String, Transaction] = indexDecl[Transaction](contract.declarations, TransactionDeclTag)
+    private var funLookup: Map[String, Func] = indexDecl[Func](contract.declarations, FuncDeclTag)
 
     def simpleType = JustContractType(name)
 
-    val fieldLookupRaw: Map[String, Field] = {
-        indexDecl[ParsableType, Field](contract.declarations, FieldDeclTag)
-    }
-
-    val txLookupRaw: Map[String, Transaction] = {
-        indexDecl[ParsableType, Transaction](contract.declarations, TransactionDeclTag)
-    }
-
-    val funLookupRaw: Map[String, Func] = {
-        indexDecl[ParsableType, Func](contract.declarations, FuncDeclTag)
-    }
 
     val stateLookup: Map[String, StateTable] = {
-        indexDecl[ParsableType, State](contract.declarations, StateDeclTag).mapValues(
+        indexDecl[State](contract.declarations, StateDeclTag).mapValues(
             (st: State) => new StateTable(st, this)
         )
     }
 
     val childContractLookup: Map[String, ContractTable] = {
-        indexDecl[ParsableType, Contract](contract.declarations, ContractDeclTag).mapValues(
+        indexDecl[Contract](contract.declarations, ContractDeclTag).mapValues(
             (ct: Contract) => new ContractTable(ct, symbolTable, this)
         )
     }
@@ -187,9 +142,6 @@ class ContractTable(
     def lookupField(name: String): Option[Field] = fieldLookup.get(name)
     def lookupTransaction(name: String): Option[Transaction] = txLookup.get(name)
     def lookupFunction(name: String): Option[Func] = funLookup.get(name)
-    def lookupFieldRaw(name: String): Option[Field] = fieldLookupRaw.get(name)
-    def lookupTransactionRaw(name: String): Option[Transaction] = txLookupRaw.get(name)
-    def lookupFunctionRaw(name: String): Option[Func] = funLookupRaw.get(name)
 
     def state(name: String): Option[StateTable] = stateLookup.get(name)
     def possibleStates: Set[String] = stateLookup.values.map(_.name).toSet
@@ -206,23 +158,16 @@ class ContractTable(
     }
 }
 
-class SymbolTable(astNodeRaw: Program) {
+class SymbolTable(program: Program) {
     var contractLookup: Map[String, ContractTable] = {
         var table = TreeMap[String, ContractTable]()
-        for (contract <- astNodeRaw.contracts) {
+        for (contract <- program.contracts) {
             table = table.updated(contract.name, new ContractTable(contract, this))
         }
         table
     }
 
-    def recordResolvedAST(ast: Program): Unit = {
-        resolvedASTNode = ast
-    }
-
-    private var resolvedASTNode: Program = _
-
-    def resolvedAST: Program = resolvedASTNode
-    def ast: Program = if (resolvedASTNode != null) resolvedASTNode else astNodeRaw
+    def ast: Program = program
 
     /* only retrieves top level contracts (i.e. not nested) */
     def contract: Function[String, Option[ContractTable]] = contractLookup.get

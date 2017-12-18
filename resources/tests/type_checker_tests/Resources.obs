@@ -1,0 +1,30 @@
+// This file tests ownership transfer and linearity.
+
+resource contract BogusMoney {
+	 // Error: constructor must return an owned reference
+	 BogusMoney() {
+	 }
+}
+
+resource contract Money {
+    owned Money() {
+
+    }
+}
+
+resource contract Wallet {
+    owned Money money;
+
+    owned Wallet (owned Money m) {
+        money = m;
+    }
+
+    transaction loseMoney (owned Money m) {
+        // Error: m is linear
+    }
+
+    transaction stealMoney (Money m) {
+        // Error: m is unowned, so it cannot be assigned to owned money
+        money = m;
+    }
+}

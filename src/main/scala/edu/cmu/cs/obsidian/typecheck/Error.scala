@@ -122,7 +122,7 @@ case class StateSpecificSharedError() extends Error {
     val msg: String = s"State-specific types are not safe for 'shared' references"
 }
 case class StateSpecificReadOnlyError() extends Error {
-    val msg: String = s"State-specific types are not safe for 'readonly' references"
+    val msg: String = s"State-specific types are not safe for 'readonlyState' references"
 }
 case class UnusedOwnershipError(name: String) extends Error {
     val msg: String = s"Variable '$name' holds ownership, but is unused at the end of its scope"
@@ -147,3 +147,12 @@ case class NoConstructorError(contractName: String) extends Error {
 case class NoParentError(cName: String) extends Error {
     val msg: String = s"Contract $cName has no parent contract"
 }
+
+case class ResourceContractConstructorError(contractName: String) extends Error {
+    val msg: String = s"Constructors in resource contract $contractName must return owned references."
+}
+
+case class OwnershipSubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
+    val msg: String = s"Can't transfer ownership to variable of type '$t2' from unowned type '$t1'."
+}
+

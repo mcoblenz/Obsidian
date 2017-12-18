@@ -1,4 +1,4 @@
-owned contract NodeMaybe {
+resource contract NodeMaybe {
     NodeMaybe(IntNode node) {
         ->NodeSome({ node = node });
     }
@@ -24,7 +24,7 @@ owned contract NodeMaybe {
     state NodeNone {}
 }
 
-owned contract IntNode {
+resource contract IntNode {
     IntNode(int elem, NodeMaybe next) {
         this.elem = elem;
         this.next = next;
@@ -78,7 +78,7 @@ owned contract IntNode {
     }
 }
 
-owned contract IntList {
+resource contract IntList {
 
     NodeMaybe first;
 

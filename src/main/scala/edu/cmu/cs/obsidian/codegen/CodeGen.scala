@@ -531,7 +531,7 @@ class CodeGen (val target: Target) {
          * This constructor will be used in unarchiving; e.g. to unarchive class C:
          *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
          */
-        if (!aContract.mod.contains(IsMain) && !hasEmptyConstructor(aContract)) {
+        if (!aContract.modifiers.contains(IsMain()) && !hasEmptyConstructor(aContract)) {
             newClass.constructor(JMod.PUBLIC)
         }
 
@@ -680,7 +680,7 @@ class CodeGen (val target: Target) {
                     generateSerialization(aContract, newClass, translationContext)
                 }
             case Server() =>
-                if (aContract.mod.contains(IsMain())) {
+                if (aContract.modifiers.contains(IsMain())) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
                     generateMainServerClassMethods(newClass, translationContext)
@@ -1372,38 +1372,33 @@ class CodeGen (val target: Target) {
                     newClass: JDefinedClass,
                     translationContext: TranslationContext,
                     aContract: Contract): Unit = {
-        (aContract.mod, declaration) match {
-
+        declaration match {
             /* the main contract has special generated code, so many functions are different */
-            case (Some(IsMain()), c: Constructor) =>
-                mainConstructor = Some(translateMainConstructor(c, newClass, translationContext))
-            case (Some(IsMain()), f: Field) =>
+            case (c: Constructor) =>
+                if (aContract.modifiers.contains(IsMain())) {
+                    mainConstructor = Some(translateMainConstructor(c, newClass, translationContext))
+                }
+                else {
+                    translateConstructor(c, newClass, translationContext)
+                }
+            case (f: Field) =>
                 translateFieldDecl(f, newClass)
-            case (Some(IsMain()), f: Func) =>
+            case (f: Func) =>
                 translateFuncDecl(f, newClass, translationContext)
-            case (Some(IsMain()), t: Transaction) =>
+            case (t: Transaction) =>
                 translateTransDecl(t, newClass, translationContext)
-                mainTransactions.add(t)
-            case (Some(IsMain()), s@State(_,_)) =>
+                if (aContract.modifiers.contains(IsMain())) {
+                    mainTransactions.add(t)
+                }
+            case (s@State(_, _)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
-            case (Some(IsMain()), c@Contract(_,_,_)) => translateInnerContract(c, newClass, translationContext)
-
-            /* Owned contracts and nested contracts are translated the same way */
-            case (_, c: Constructor) =>
-                translateConstructor(c, newClass, translationContext)
-            case (_, f: Field) =>
-                translateFieldDecl(f, newClass)
-            case (_, f: Func) =>
-                translateFuncDecl(f, newClass, translationContext)
-            case (_, t: Transaction) =>
-                translateTransDecl(t, newClass, translationContext)
-            case (_, s: State) =>
-                translateStateDecl(s, aContract, newClass, translationContext)
-            case (_, c: Contract) => translateInnerContract(c, newClass, translationContext)
-
-            case _ => () // TODO : type declarations
+            case (c@Contract(_, _, _)) => translateInnerContract(c, newClass, translationContext)
+            case t: TypeDecl =>
+                assert(false, "TODO")
+                ()
         }
     }
+
 
     private def resolveType(typ: ObsidianType): AbstractJType = {
         typ match {

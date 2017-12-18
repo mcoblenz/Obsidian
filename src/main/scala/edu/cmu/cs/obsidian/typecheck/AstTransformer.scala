@@ -31,15 +31,8 @@ object AstTransformer {
 
         val newProgram = Program(table.ast.imports, contracts)
 
-        /* to make this faster, we could just mutate the AST nodes instead of
-         * making the symbol table again entirely */
-        /*
         val newTable = new SymbolTable(newProgram)
-        newTable.recordResolvedAST(newProgram)
-        (new SymbolTable(newProgram), errorRecords)
-        */
-        table.recordResolvedAST(newProgram)
-        (table, errorRecords) // We transformed the program, so just use the old table too.
+        (newTable, errorRecords)
     }
 
     def transformContract(table: SymbolTable, cTable: ContractTable): (Contract, Seq[ErrorRecord]) = {
@@ -80,7 +73,7 @@ object AstTransformer {
 
         newDecls = newDecls.reverse
 
-        val newContract = Contract(cTable.contract.mod, cTable.contract.name, newDecls).setLoc(cTable.contract)
+        val newContract = Contract(cTable.contract.modifiers, cTable.contract.name, newDecls).setLoc(cTable.contract)
 
         (newContract, errors.reverse)
     }
@@ -545,7 +538,7 @@ object AstTransformer {
 
             /* the head must be a field */
 
-            val fieldLookup = lexicallyInsideOf.lookupFieldRaw(pathHead)
+            val fieldLookup = lexicallyInsideOf.lookupField(pathHead)
             if (fieldLookup.isEmpty) {
                 return Left(FieldUndefinedError(lexicallyInsideOf.simpleType, pathHead))
             }

@@ -4,7 +4,7 @@
 contract Sh/*ared*/ {
 }
 
-owned contract Ow/*ned*/ {
+resource contract Ow/*ned*/ {
 
 }
 

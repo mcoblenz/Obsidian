@@ -4,7 +4,6 @@ package edu.cmu.cs.obsidian.tests
 import org.junit.Assert.{assertTrue, fail}
 import org.junit.Test
 import org.scalatest.junit.JUnitSuite
-
 import edu.cmu.cs.obsidian.typecheck._
 import edu.cmu.cs.obsidian.parser._
 
@@ -296,7 +295,7 @@ class TypeCheckerTests extends JUnitSuite {
             // TODO: https://github.com/mcoblenz/Obsidian/issues/56
 //            (MergeIncompatibleError("o1",
 //                NonPrimitiveType(null, NoPathType(JustContractType("Ow")) ,Set(IsOwned())),
-//                NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsReadOnly()))), 16)
+//                NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsReadOnlyState()))), 16)
 //              ::
 //              (UnusedOwnershipError("o2"), 16)
 //              ::
@@ -305,7 +304,7 @@ class TypeCheckerTests extends JUnitSuite {
 // TODO: https://github.com/mcoblenz/Obsidian/issues/56
 //              (MergeIncompatibleError("o1",
 //                  NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsOwned())),
-//                  NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsReadOnly()))), 36)
+//                  NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsReadOnlyState()))), 36)
 //              ::
 //              (UnusedOwnershipError("o2"), 36)
 //              ::
@@ -449,6 +448,20 @@ class TypeCheckerTests extends JUnitSuite {
                 (VariableUndefinedError("foo", null), 27)
             ::
             Nil
+        )
+    }
+
+    @Test def resourcesTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Resources.obs",
+            (ResourceContractConstructorError("BogusMoney"), 5)
+                ::
+                (UnusedOwnershipError("m"), 22)
+                ::
+                (OwnershipSubtypingError(
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set()),
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set(IsOwned()))), 28)
+                ::
+                Nil
         )
     }
 }
