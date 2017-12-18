@@ -1,6 +1,6 @@
 language: scala
 scala:
-    - 2.11.9
+    - 2.12.4
 
 # This may be necessary depending on the tests we eventually run. For example,
 # the chaincode base server uses "java.util.Base64", which is only supported
