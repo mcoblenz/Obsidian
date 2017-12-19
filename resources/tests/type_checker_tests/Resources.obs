@@ -42,3 +42,27 @@ contract BadWallet {
     // Error: can't own a resource in a non-resource contract.
     owned Money money;
 }
+
+contract Disowning {
+	 transaction bogusDiscardMoney (Money m) {
+	 	     // Error: m is unowned
+	 	     disown m;
+	 }
+
+	 transaction discardMoney (owned Money m) {
+     	 	 disown m;
+
+     	 	 // Error: m is unowned
+     	 	 discardMoney(m);
+     }
+
+     transaction getMoney() returns owned Money {
+        return new Money();
+     }
+
+     transaction discardMoneyCall () {
+        disown getMoney();
+        Money m = disown getMoney(); // disown is an expression, not just a statement
+
+     }
+}

@@ -571,17 +571,35 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      checkArgs(e, s"constructor of $name", context, constrSpecs, This(), argTypes)
 
                  // TODO: https://github.com/mcoblenz/Obsidian/issues/63
-                 val simpleType = result match {
+                 val (simpleType, modifiers: Set[TypeModifier]) = result match {
                      // Even if the args didn't check, we can still output a type
-                     case None => JustContractType(name)
+                     case None => (JustContractType(name), Set.empty[TypeModifier])
                      case Some((constr, _)) =>
-                         simpleOf(contextPrime.contractTable, name, constr.endsInState)
+                         (simpleOf(contextPrime.contractTable, name, constr.endsInState), if (constr.isOwned) Set(IsOwned()) else Set())
                  }
 
                  val unpermissionedType = unpermissionedOf(simpleType, path)
 
-                 // TODO: https://github.com/mcoblenz/Obsidian/issues/52
-                 (NonPrimitiveType(contextPrime.contractTable, unpermissionedType, Set()), contextPrime)
+                 (NonPrimitiveType(contextPrime.contractTable, unpermissionedType, modifiers), contextPrime)
+             case Disown(e) =>
+                 // The expression "disown e" evaluates to an unowned value but also side-effects the context
+                 // so that e is no longer owned (if it is a variable).
+                 val (typ, contextPrime) = inferAndCheckExpr(decl, context, e)
+                 if (!typ.isOwned) {
+                    logError(e, DisownUnowningExpressionError(e))
+                 }
+
+                 val newTyp = typ match {
+                     case NonPrimitiveType(table, t, mods) => NonPrimitiveType(table, t, mods - IsOwned())
+                     case t => t
+                 }
+
+                 // If e is a variable, then we need to update the context to indicate that it's no longer owned.
+                 val finalContext = e match {
+                     case Variable(x) => contextPrime.updated(x, newTyp)
+                     case _ => contextPrime
+                 }
+                 (newTyp, finalContext)
          }
     }
 
@@ -1203,6 +1221,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 handleInvocation(contextPrime, name, receiver, args)
 
             // TODO maybe allow constructors as statements later, but it's not very important
+            case d@Disown (e) =>
+                val (typ, contextPrime) = inferAndCheckExpr(decl, context, d)
+                contextPrime
             /* expressions are statements, but we prune out expressions with no side effects */
             case _ =>
                 logError(s, NoEffectsError(s))

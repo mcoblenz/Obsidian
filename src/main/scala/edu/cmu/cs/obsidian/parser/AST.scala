@@ -45,7 +45,10 @@ sealed abstract class InvokableDeclaration() extends Declaration {
 }
 
 /* Expressions */
-case class Variable(name: String) extends Expression
+case class Variable(name: String) extends Expression {
+    override val toString = name
+}
+
 case class NumLiteral(value: Int) extends Expression
 case class StringLiteral(value: String) extends Expression
 case class TrueLiteral() extends Expression
@@ -69,6 +72,7 @@ case class Dereference(e: Expression, f: String) extends Expression
 case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
 case class Invocation(recipient: Expression, name: String, args: Seq[Expression]) extends Expression
 case class Construction(name: String, args: Seq[Expression]) extends Expression
+case class Disown(e: Expression) extends Expression
 
 /* statements and control flow constructs */
 case class VariableDecl(typ: ObsidianType, varName: String) extends Statement

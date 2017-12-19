@@ -209,7 +209,8 @@ object Parser extends Parsers {
         hasOpParser | nextParser
     }
 
-    private def parseExpr = parseAnd
+    private def parseExpr = parseDisown
+    private def parseDisown = parseUnary(DisownT(), Disown.apply, parseAnd)
     private def parseAnd = parseBinary(AndT(), Conjunction.apply, parseOr)
     private def parseOr = parseBinary(OrT(), Disjunction.apply, parseEq)
 

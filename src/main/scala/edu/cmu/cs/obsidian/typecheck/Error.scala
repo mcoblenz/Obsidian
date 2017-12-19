@@ -165,3 +165,7 @@ case class OwnershipSubtypingError(t1: ObsidianType, t2: ObsidianType) extends E
 case class NonResourceOwningResourceError(contractName: String, f: Field) extends Error {
     val msg: String = s"Non-resource contract '$contractName' cannot own resource field '${f.name}' of type '${f.typ}'."
 }
+
+case class DisownUnowningExpressionError(e: Expression) extends Error {
+    val msg: String = s"Can't disown expression that is not already owned: '$e'."
+}

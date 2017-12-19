@@ -45,6 +45,7 @@ case class AvailableT() extends Token { override def toString: String = "availab
 case class EndsT() extends Token { override def toString: String = "ends" }
 case class InT() extends Token { override def toString: String = "in" }
 case class ResourceT() extends Token { override def toString: String = "resource" }
+case class DisownT() extends Token { override def toString: String = "disown" }
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }

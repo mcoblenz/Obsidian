@@ -157,6 +157,8 @@ object AstTransformer {
                 i.copy(recipient = transformExpression(i.recipient), args = i.args.map(eArg => transformExpression(eArg))).setLoc(i)
             case c: Construction =>
                 c.copy(args = c.args.map(eArg => transformExpression(eArg))).setLoc(c)
+            case d@Disown(e) =>
+                Disown(transformExpression(e)).setLoc(d)
         }
     }
 

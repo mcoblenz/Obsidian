@@ -1548,6 +1548,7 @@ class CodeGen (val target: Target) {
             case Construction(name, args) =>
                 addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
+            case Disown(e) => recurse(e)
         }
     }
 
