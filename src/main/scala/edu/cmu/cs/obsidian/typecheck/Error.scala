@@ -9,9 +9,15 @@ abstract class Error {
     val msg: String
 }
 
-case class ErrorRecord (error: Error, pos: scala.util.parsing.input.Position) {
+case class ErrorRecord (error: Error, pos: scala.util.parsing.input.Position) extends Ordered[ErrorRecord] {
     def printMessage(): Unit = {
         println(s"At $pos: ${error.msg}")
+    }
+
+    def compare(that: ErrorRecord): Int = {
+        if (this.pos < that.pos) -1
+        else if (this.pos == that.pos) 0
+        else 1
     }
 }
 
@@ -153,6 +159,9 @@ case class ResourceContractConstructorError(contractName: String) extends Error 
 }
 
 case class OwnershipSubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
-    val msg: String = s"Can't transfer ownership to variable of type '$t2' from unowned type '$t1'."
+    val msg: String = s"Can't transfer ownership to type '$t2' from unowned type '$t1'."
 }
 
+case class NonResourceOwningResourceError(contractName: String, f: Field) extends Error {
+    val msg: String = s"Non-resource contract '$contractName' cannot own resource field '${f.name}' of type '${f.typ}'."
+}

@@ -1222,7 +1222,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         field.typ match {
             case typ: NonPrimitiveType =>
                 if (typ.isOwned) {
-                    // Nothing to do
+                    // Only resources can own other resources (since otherwise they might go out of scope improperly).
+                    val referencedContractIsResource = typ.table.contract.modifiers.contains(IsResource())
+                    if (referencedContractIsResource && !lexicallyInsideOf.contract.modifiers.contains(IsResource())) {
+                        logError(field, NonResourceOwningResourceError(lexicallyInsideOf.name, field))
+                    }
                 }
                 else if (typ.isReadOnlyState) {
                     val simpleType = typ.extractSimpleType.get
@@ -1435,8 +1439,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* [true] if no type errors, [false] otherwise */
     def checkProgramAndPrintErrors(): Boolean = {
         val errs = checkProgram()
+        val sortedErrors = errs.sorted
 
-        for (ErrorRecord(err, loc) <- errs) {
+        for (ErrorRecord(err, loc) <- sortedErrors) {
             val msg = err.msg
             println(s"At $loc: $msg")
         }
@@ -1450,6 +1455,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             checkContract(contract)
         }
 
-        errors.reverse
+        errors
     }
 }

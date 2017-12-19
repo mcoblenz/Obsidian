@@ -27,4 +27,18 @@ resource contract Wallet {
         // Error: m is unowned, so it cannot be assigned to owned money
         money = m;
     }
+
+    transaction returnMoney (owned Money m) returns owned Money {
+    	return m;
+    }
+
+    transaction failToReturnMoney (Money m) returns owned Money {
+        // Error: can't return unowned m when owned Money is required
+        return m;
+    }
+}
+
+contract BadWallet {
+    // Error: can't own a resource in a non-resource contract.
+    owned Money money;
 }

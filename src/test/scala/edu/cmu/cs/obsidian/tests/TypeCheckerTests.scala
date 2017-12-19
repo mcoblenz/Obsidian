@@ -461,6 +461,18 @@ class TypeCheckerTests extends JUnitSuite {
                     NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set()),
                     NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set(IsOwned()))), 28)
                 ::
+                (OwnershipSubtypingError(
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set()),
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set(IsOwned()))), 37)
+                ::
+                (NonResourceOwningResourceError("BadWallet",
+                    Field(false,
+                        NonPrimitiveType(null,
+                            NoPathType(JustContractType("Money")),
+                            Set(IsOwned())),
+                        "money",
+                        None)), 43)
+                ::
                 Nil
         )
     }
