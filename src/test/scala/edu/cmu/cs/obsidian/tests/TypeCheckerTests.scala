@@ -27,7 +27,7 @@ class TypeCheckerTests extends JUnitSuite {
         val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
 
         val checker = new Checker(globalTable)
-        val errs = checker.checkProgram() ++ transformErrors
+        val errs = (checker.checkProgram() ++ transformErrors).sorted
 
         val remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
         for (ErrorRecord(err, loc) <- errs) {
@@ -173,16 +173,16 @@ class TypeCheckerTests extends JUnitSuite {
               (UnreachableCodeError(), 22)
               ::
               (SubTypingError(
-                  NonPrimitiveType(null, NoPathType(JustContractType("C_Owned")), Set()),
-                  NonPrimitiveType(null, NoPathType(StateType("C_Owned", "S")), Set())),
+                  NonPrimitiveType(null, NoPathType(JustContractType("C_Owned")), Set(IsOwned())),
+                  NonPrimitiveType(null, NoPathType(StateType("C_Owned", "S")), Set(IsOwned()))),
                 28)
               ::
               (UnreachableCodeError(), 28)
               ::
-              (MustReturnError("t_ret_nonprimitive"), 30)
+              (MustReturnError("t_ret_nonprimitive"), 31)
               ::
               (SubTypingError(IntType(),
-                  NonPrimitiveType(null, NoPathType(JustContractType("C_Owned")), Set())), 32)
+                  NonPrimitiveType(null, NoPathType(JustContractType("C_Owned")), Set(IsOwned()))), 33)
               ::
               (MustReturnError("no_return"), 38)
               ::
@@ -472,6 +472,13 @@ class TypeCheckerTests extends JUnitSuite {
                             Set(IsOwned())),
                         "money",
                         None)), 43)
+                ::
+                (SubTypingError(
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set()),
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set(IsOwned()))),
+                    56)
+                ::
+                (DisownUnowningExpressionError(Variable("m")), 49)
                 ::
                 Nil
         )
