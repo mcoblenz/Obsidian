@@ -1,0 +1,23 @@
+// This test focuses on ownership of non-resource objects.
+
+contract Prescription {
+
+}
+
+// Very simple pharmacy — only holds one prescription.
+contract Pharmacy {
+    owned Prescription prescription;
+
+    transaction depositPrescription(owned Prescription p) {
+        prescription = p;
+    }
+
+    transaction stealPrescription(Prescription p) {
+        // Error: can't get ownership from non-owning reference.
+        prescription = p;
+    }
+
+    transaction dropPrescription(owned Prescription p) {
+        // OK, since Prescription is not a resource.
+    }
+}

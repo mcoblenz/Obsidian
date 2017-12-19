@@ -480,7 +480,19 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (DisownUnowningExpressionError(Variable("m")), 49)
                 ::
+                (UnusedOwnershipError("m"), 73)
+                ::
                 Nil
+        )
+    }
+
+    @Test def ownershipTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Ownership.obs",
+                (OwnershipSubtypingError(
+                    NonPrimitiveType(null, NoPathType(JustContractType("Prescription")), Set()),
+                    NonPrimitiveType(null, NoPathType(JustContractType("Prescription")), Set(IsOwned()))), 17)
+                ::
+            Nil
         )
     }
 }

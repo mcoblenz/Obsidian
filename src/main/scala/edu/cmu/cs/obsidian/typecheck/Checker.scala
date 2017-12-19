@@ -685,6 +685,21 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 checkStatement(decl, prevContext, s))
     }
 
+
+    // Checks for unused owned variables in the context, ignoring the ones listed as exceptions.
+    private def checkForUnusedOwnershipErrors(ast: AST, context: Context, exceptions: Set[String]) = {
+        for ((x, typ) <- context.underlyingVariableMap) {
+            if (!exceptions.contains(x)) {
+                typ match {
+                    case t: NonPrimitiveType =>
+                        val contract = t.table.contract
+                        if (t.isOwned && contract.isResource) logError(ast, UnusedOwnershipError(x))
+                    case _ => ()
+                }
+            }
+        }
+    }
+
     /* returns a context that is the same as [branchContext], except only with
      * those variables bound which [oldContext] actually assign a value to */
     private def pruneContext(ast: AST, branchContext: Context, oldContext: Context): Context = {
@@ -698,12 +713,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             newContext = newContext.updated(x, t)
         }
 
-        for (x <- branchContext.keys.toSet.diff(oldContext.keys.toSet)) {
-            branchContext(x) match {
-                case typ: NonPrimitiveType => if (typ.isOwned) logError(ast, UnusedOwnershipError(x))
-                case _ => ()
-            }
-        }
+        checkForUnusedOwnershipErrors(ast, branchContext, oldContext.keys.toSet)
 
         Context(newContext.underlyingVariableMap, isThrown = branchContext.isThrown)
     }
@@ -951,18 +961,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 decl match {
                     /* the tx/function must have no return type */
                     case tx: Transaction if tx.retType.isEmpty =>
-                        for ((x, t) <- context.underlyingVariableMap) {
-                            if (t.isOwned && x != "this") {
-                                logError(s, UnusedOwnershipError(x))
-                            }
-                        }
+                        checkForUnusedOwnershipErrors(s, context, Set("this"))
                         context.makeThrown
                     case f: Func if f.retType.isEmpty =>
-                        for ((x, t) <- context.underlyingVariableMap) {
-                            if (t.isOwned && x != "this") {
-                                logError(s, UnusedOwnershipError(x))
-                            }
-                        }
+                        checkForUnusedOwnershipErrors(s, context, Set("this"))
                         context.makeThrown
                     case _ =>
                         logError(s, MustReturnError(decl.name))
@@ -974,24 +976,32 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (tRet, tAst) = decl match {
                     /* must be no return type */
                     case tx: Transaction if tx.retType.isDefined =>
-                        for ((x, t) <- context.underlyingVariableMap) {
-                            if (t.isOwned && x != "this") {
+                        val variablesToExcludeFromOwnershipCheck =
+                            if (tx.retType.get.isOwned) {
                                 e match {
-                                    case Variable(xOther) if x == xOther => ()
-                                    case _ => logError(s, UnusedOwnershipError(x))
+                                    case Variable(xOther) => Set(xOther, "this")
+                                    case _ => Set("this")
                                 }
                             }
-                        }
+                            else {
+                                Set("this")
+                            }
+                        checkForUnusedOwnershipErrors(s, context, variablesToExcludeFromOwnershipCheck)
+
                         (tx.retType.get, tx.retType.get)
                     case f: Func if f.retType.isDefined =>
-                        for ((x, t) <- context.underlyingVariableMap) {
-                            if (t.isOwned && x != "this") {
+                        val variablesToExcludeFromOwnershipCheck =
+                            if (f.retType.get.isOwned) {
                                 e match {
-                                    case Variable(xOther) if x == xOther => ()
-                                    case _ => logError(s, UnusedOwnershipError(x))
+                                    case Variable(xOther) => Set(xOther, "this")
+                                    case _ => Set("this")
                                 }
                             }
-                        }
+                            else {
+                                Set("this")
+                            }
+                        checkForUnusedOwnershipErrors(s, context, variablesToExcludeFromOwnershipCheck)
+
                         (f.retType.get, f.retType.get)
                     case _ =>
                         logError(s, CannotReturnError(decl.name))
@@ -1291,13 +1301,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 NoPathType(simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState)), Set(IsOwned()))
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
-        if (!hasReturnStatementDontLog(tx.body)) {
-            for ((x, t) <- outputContext.underlyingVariableMap) {
-                if (t.isOwned && x != "this") {
-                    logError(tx, UnusedOwnershipError(x))
-                }
-            }
-        }
+        checkForUnusedOwnershipErrors(tx, outputContext, Set("this"))
 
         if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
             logError(tx.body.last, MustReturnError(tx.name))
@@ -1427,11 +1431,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             NonPrimitiveType(table, NoPathType(simpleOf(table, table.name, constr.endsInState)), Set(IsOwned()))
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
-        for ((x, t) <- outputContext.underlyingVariableMap) {
-            if (t.isInstanceOf[NonPrimitiveType] && t.asInstanceOf[NonPrimitiveType].modifiers.contains(IsOwned()) && x != "this") {
-                logError(constr, UnusedOwnershipError(x))
-            }
-        }
+        checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
 
         // if the contract contains states, its constructor must contain a state transition
         if (hasStates && !hasTransition(constr.body)) {

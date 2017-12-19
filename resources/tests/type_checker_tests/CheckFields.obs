@@ -14,7 +14,7 @@ resource contract C2 {
   state S {}
 }
 
-main contract C {
+main resource contract C {
     // bad because state specific information can change via other references
     C1.S f1;
     readonlyState C2.S f4;
@@ -22,8 +22,7 @@ main contract C {
 
     // okay
 
-// TODO: enable this line and make it owned
-//    C2.S f3;
+    owned C2.S f3;
 
     C1 f5;
     readonlyState C1 f6;
