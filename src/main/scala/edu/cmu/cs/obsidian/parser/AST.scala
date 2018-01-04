@@ -73,13 +73,16 @@ case class LocalInvocation(name: String, args: Seq[Expression]) extends Expressi
 case class Invocation(recipient: Expression, name: String, args: Seq[Expression]) extends Expression
 case class Construction(name: String, args: Seq[Expression]) extends Expression
 case class Disown(e: Expression) extends Expression
+case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression
 
 /* statements and control flow constructs */
 case class VariableDecl(typ: ObsidianType, varName: String) extends Statement
 case class VariableDeclWithInit(typ: ObsidianType, varName: String, e: Expression) extends Statement
 case class Return() extends Statement
 case class ReturnExpr(e: Expression) extends Statement
-case class Transition(newStateName: String, updates: Seq[(Variable, Expression)]) extends Statement
+
+// We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
+case class Transition(newStateName: String, updates: Option[Seq[(Variable, Expression)]]) extends Statement
 case class Assignment(assignTo: Expression, e: Expression) extends Statement
 case class Throw() extends Statement
 case class If(eCond: Expression, s: Seq[Statement]) extends Statement

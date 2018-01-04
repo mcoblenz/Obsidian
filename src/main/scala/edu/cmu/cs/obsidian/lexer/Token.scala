@@ -68,6 +68,7 @@ case class GtEqT() extends Token { override def toString: String = ">=" }
 case class LtEqT() extends Token { override def toString: String = "<=" }
 case class RightArrowT() extends Token { override def toString: String = "->" }
 case class BigRightArrowT() extends Token { override def toString: String = "=>" }
+case class ColonColonT() extends Token { override def toString: String = "::" }
 case class PlusT() extends Token { override def toString: String = "+" }
 case class StarT() extends Token { override def toString: String = "*" }
 case class ForwardSlashT() extends Token { override def toString: String = "/" }

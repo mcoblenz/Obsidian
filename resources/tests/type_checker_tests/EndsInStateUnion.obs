@@ -57,7 +57,10 @@ contract C3 {
     if (x > 3) {
       ->S2({f2 = 0});
     }
-      ->S2({f2 = 0});
+    else {
+      ->S1;
+    }
+    
     // Error: f2 may not be available.
     f2 = 3;
   }

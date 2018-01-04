@@ -595,7 +595,8 @@ class CodeGen (val target: Target) {
             stateEnumField = stateEnumField,
             txLookup = txLookup,
             funLookup = funLookup,
-            fieldLookup = fieldLookup
+            fieldLookup = fieldLookup,
+            pendingFieldAssignments = Set.empty
         )
 
         /* i.e. if this contract defines any type states */
@@ -1549,6 +1550,7 @@ class CodeGen (val target: Target) {
                 addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
+            case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
         }
     }
 
@@ -1712,6 +1714,10 @@ class CodeGen (val target: Target) {
         }
     }
 
+    private def stateInitializationVariableName(stateName: String, fieldName: String) = {
+        "__" + stateName + "__init__" + fieldName
+    }
+
     private def translateStatement(
                     body: JBlock,
                     statement: Statement,
@@ -1729,7 +1735,7 @@ class CodeGen (val target: Target) {
                 nextContext = localContext.updated(name, body.decl(resolveType(typ), name, translateExpr(e, translationContext, localContext)))
             case Return() => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
-            case Transition(newState, updates) =>
+            case Transition(newStateName, updates) =>
                 /* We must (in this order):
                  *     1) construct the new state's inner class,
                  *     2) assign the fields of the new inner class object,
@@ -1737,23 +1743,38 @@ class CodeGen (val target: Target) {
                  *     4) change the state enum.
                  */
                 /* construct a new instance of the inner contract */
-                val newStField = translationContext.states(newState).innerClassField
-                body.assign(newStField, JExpr._new(translationContext.states(newState).innerClass))
+                val newStateContext = translationContext.states(newStateName)
+
+                val newStField = newStateContext.innerClassField
+                body.assign(newStField, JExpr._new(translationContext.states(newStateName).innerClass))
 
                 /* assign fields in the update construct */
-                for ((f, e) <- updates) {
-                    body.assign(newStField.ref(f.name), translateExpr(e, translationContext, localContext))
+                updates match {
+                    case Some(u) =>
+                        for ((f, e) <- u) {
+                            body.assign(newStField.ref(f.name), translateExpr(e, translationContext, localContext))
+                        }
+                    case None =>
+                        // Fields should have been initialized individually, via S1::foo = bar.
                 }
 
+
                 /* assign conserved fields (implicit to programmer) */
-                body.invoke(conserveFieldsName).arg(translationContext.states(newState).enumVal)
+                body.invoke(conserveFieldsName).arg(newStateContext.enumVal)
 
                 /* nullify old state inner class field */
                 body.invoke(deleteOldStateName)
 
                 /* change the enum to reflect the new state */
-                body.assign(JExpr.ref(stateField), translationContext.getEnum(newState))
+                body.assign(JExpr.ref(stateField), translationContext.getEnum(newStateName))
 
+                // Assign according to the state initialization statements, e.g. S1::foo = bar.
+                // Do this after updating the current state because assignVariable may invoke setters.
+                for (fieldName <- translationContext.pendingFieldAssignments) {
+                    translationContext.assignVariable(fieldName, JExpr.ref(stateInitializationVariableName(newStateName, fieldName)), body)
+                }
+
+                // TODO: clear map
             case Assignment(Variable(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext)
@@ -1765,6 +1786,29 @@ class CodeGen (val target: Target) {
             }
             case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
+                assert(false, "TODO")
+            }
+            case Assignment(StateInitializer(stateName, fieldName), e) => {
+                val stateContextOption = translationContext.states.get(stateName._1)
+                assert(stateContextOption.isDefined)
+                val stateContext = stateContextOption.get
+
+                // Assign to a temporary variable.
+                val fieldInfo = translationContext.fieldLookup(fieldName._1)
+                val field: Field = fieldInfo match {
+                    case GlobalFieldInfo(decl) => decl
+                    case StateSpecificFieldInfo(declSeq, _, _) =>
+                        val state = stateContext.astState
+                        declSeq.find((p: (State, Field)) => p._1 == state).get._2
+                }
+
+                val tempVarType = resolveType(field.typ)
+
+                val tempVar = body.decl(tempVarType,
+                    stateInitializationVariableName(stateName._1, fieldName._1),
+                    translateExpr(e, translationContext, localContext))
+
+                translationContext.pendingFieldAssignments = translationContext.pendingFieldAssignments + fieldName._1
             }
 
             case Throw() =>

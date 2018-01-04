@@ -225,4 +225,8 @@ class ParserTests extends JUnitSuite {
     @Test def emptyBody() = {
         shouldSucceedFile("resources/tests/parser_tests/EmptyBody.obs")
     }
+
+    @Test def stateInitialization() = {
+        shouldSucceedFile("resources/tests/parser_tests/StateInitialization.obs")
+    }
 }

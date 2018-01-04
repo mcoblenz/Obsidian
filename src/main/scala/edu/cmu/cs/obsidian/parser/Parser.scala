@@ -121,8 +121,7 @@ object Parser extends Parsers {
 
         val parseTransition = RightArrowT() ~ parseId ~
                               opt(parseUpdate) ~! SemicolonT() ^^ {
-            case arrow ~ name ~ None ~ _ => Transition(name._1, List.empty).setLoc(arrow)
-            case arrow ~ name ~ Some(updates) ~ _ => Transition(name._1, updates).setLoc(arrow)
+            case arrow ~ name ~ updates ~ _ => Transition(name._1, updates).setLoc(arrow)
         }
 
         val parseVarDeclAssn =
@@ -273,10 +272,13 @@ object Parser extends Parsers {
 
         val parseVar = parseId ^^ { (id: Identifier) => Variable(id._1).setLoc(id) }
 
+        val parseStateInitializer = parseId ~ ColonColonT() ~! parseId ^^ {
+            case stateName ~ _ ~ fieldName => StateInitializer(stateName, fieldName)
+        }
+
         val parseNumLiteral = {
             accept("numeric literal", { case t@NumLiteralT(n) => NumLiteral(n).setLoc(t) })
         }
-
 
         val parseNew = {
             NewT() ~! parseId ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
@@ -297,7 +299,7 @@ object Parser extends Parsers {
 
         val simpleExpr: Parser[Expression] =
             parseThis | parseParent | parseNew | parseLocalInv |
-            parseLiterals | parseVar | parenExpr | fail
+            parseLiterals | parseStateInitializer | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }

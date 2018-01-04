@@ -159,6 +159,8 @@ object AstTransformer {
                 c.copy(args = c.args.map(eArg => transformExpression(eArg))).setLoc(c)
             case d@Disown(e) =>
                 Disown(transformExpression(e)).setLoc(d)
+            case s: StateInitializer => s.copy().setLoc(s)
+
         }
     }
 
@@ -283,11 +285,14 @@ object AstTransformer {
             case r@Return() => (r, context, Seq())
             case r@ReturnExpr(e) => (ReturnExpr(transformExpression(e)).setLoc(r), context, Seq())
             case t@Transition(newStateName, updates) =>
-                var transformedUpdates = List.empty[(Variable, Expression)]
-                for ((v, e) <- updates) {
-                    transformedUpdates = List((v, transformExpression(e))) ++ transformedUpdates
+                updates match {
+                    case None => (Transition(newStateName, updates).setLoc(t), context, Seq())
+                    case Some(u) =>
+                        val mapFun = (p: (Variable, Expression)) => (p._1, transformExpression(p._2))
+                        val transformedUpdates = u.map(mapFun)
+
+                        (Transition(newStateName, Some(transformedUpdates)).setLoc(t), context, Seq())
                 }
-                (Transition(newStateName, transformedUpdates).setLoc(t), context, Seq())
             case a@Assignment(assignTo, e) =>
                 (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())
             case t@Throw() => (t, context, Seq())

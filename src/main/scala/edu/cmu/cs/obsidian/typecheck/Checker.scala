@@ -2,12 +2,9 @@ package edu.cmu.cs.obsidian.typecheck
 
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.parser._
-import edu.cmu.cs.obsidian.typecheck._
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
-import scala.collection.Map
-import scala.util.parsing.input.Position
 
 
 
@@ -18,12 +15,21 @@ import scala.util.parsing.input.Position
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
  * In the formalism, we allow throw to result in any type: in the implementation, we don't know
- * immediately which type this needs to be in order for type checking to work */
-case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: Boolean) {
+ * immediately which type this needs to be in order for type checking to work
+ * transitionFieldsInitialized is a set of (state, field, AST) triples that are guaranteed to have been initialized.
+ * The AST is for error message generation.
+ */
+
+case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: Boolean, transitionFieldsInitialized: Set[(String, String, AST)]) {
     def keys: Iterable[String] = underlyingVariableMap.keys
 
     def updated(s: String, t: ObsidianType): Context =
-        Context(underlyingVariableMap.updated(s, t), isThrown)
+        Context(underlyingVariableMap.updated(s, t), isThrown, transitionFieldsInitialized)
+    def updatedWithInitialization(stateName: String, fieldName: String, ast: AST): Context =
+        Context(underlyingVariableMap, isThrown, transitionFieldsInitialized + ((stateName, fieldName, ast)))
+
+    def updatedWithoutAnyTransitionFieldsInitialized(): Context =
+        Context(underlyingVariableMap, isThrown, Set.empty)
 
     def get(s: String): Option[ObsidianType] = underlyingVariableMap.get(s)
 
@@ -43,6 +49,9 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
         }
         rawContext
     }
+
+    def fieldIsInitialized(stateName: String, fieldName: String): Boolean =
+        transitionFieldsInitialized.find((e) => e._1 == stateName && e._2 == fieldName).isDefined
 
     def makeThrown: Context = this.copy(isThrown = true)
 
@@ -600,6 +609,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case _ => contextPrime
                  }
                  (newTyp, finalContext)
+             case StateInitializer(stateName, fieldName) =>
+                 // A state initializer expression has its field's type.
+
+                 val stateOption = context.contractTable.state(stateName._1)
+                 val fieldType = stateOption match {
+                     case None => logError(e, StateUndefinedError(context.contractTable.name, stateName._1)); BottomType()
+                     case Some(stateTable) =>
+                         stateTable.lookupField(fieldName._1) match {
+                             case None => logError(e, FieldUndefinedError(stateTable.simpleType, fieldName._1)); BottomType()
+                             case Some(field) => field.typ
+                         }
+                 }
+
+                 (fieldType, context)
          }
     }
 
@@ -700,6 +723,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    private def checkForUnusedStateInitializers(context: Context) = {
+        for (remainingInitialization <- context.transitionFieldsInitialized) {
+            logError(remainingInitialization._3, InvalidStateFieldInitialization(remainingInitialization._1, remainingInitialization._2))
+        }
+    }
+
     /* returns a context that is the same as [branchContext], except only with
      * those variables bound which [oldContext] actually assign a value to */
     private def pruneContext(ast: AST, branchContext: Context, oldContext: Context): Context = {
@@ -715,7 +744,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         checkForUnusedOwnershipErrors(ast, branchContext, oldContext.keys.toSet)
 
-        Context(newContext.underlyingVariableMap, isThrown = branchContext.isThrown)
+        Context(newContext.underlyingVariableMap, isThrown = branchContext.isThrown, newContext.transitionFieldsInitialized)
     }
 
     private def mergeContext(
@@ -741,7 +770,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
-        Context(mergedMap, context1.isThrown)
+        Context(mergedMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized))
     }
 
     /* if [e] is of the form Variable(x), This(), or if [e] is a sequence of
@@ -827,7 +856,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 return Left((ast, CannotConvertPathError(head, e, unpermissionedType))::Nil)
                             case Right(trNew) => NonPrimitiveType(table, fixUnpermissionedType(context, trNew), mods)
                         }
-                    case b@BottomType() => assert(false); BottomType()
+                    case b@BottomType() => BottomType()
                     case u@UnresolvedNonprimitiveType(_, _) => assert(false); u
                 }
             })
@@ -1011,7 +1040,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 if (!tRet.isBottom) checkIsSubtype(s, t, tRet)
                 contextPrime.makeThrown
 
-            case Transition(newStateName, updates: Seq[(Variable, Expression)]) =>
+            case Transition(newStateName, updates: Option[Seq[(Variable, Expression)]]) =>
                 val thisTable = context.contractTable
 
                 if (thisTable.state(newStateName).isEmpty) {
@@ -1022,70 +1051,135 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val newStateTable = thisTable.state(newStateName).get
 
                 val oldType = context.thisType
-                val oldFields: Set[String] = oldType.extractSimpleType.get match {
+
+                // First we focus on the fields declared in states individually.
+                // oldFields is the set of fields declared in the old state, which are definitely going away.
+                // maybeOldFields is the set of fields from the old state that MAY be going away — 
+                //   we can't be sure when the current state is a union.
+                val (oldFields: Set[(String, ObsidianType)], maybeOldFields: Set[(String, ObsidianType)]) =
+                oldType.extractSimpleType.get match {
                     case JustContractType(contractName) =>
                         /* special case to allow transitioning during constructors */
                         if (decl.isInstanceOf[Constructor]) {
-                            TreeSet[String]()
+                            (Set[(String, ObsidianType)](), Set[(String, ObsidianType)]())
                         } else {
                             logError(s, TransitionError())
                             return context
                         }
                     case StateType(contractName, stateName) =>
-                        val ast = oldType.tableOpt.get.ast.asInstanceOf[State]
-                        ast.declarations
-                            .filter(_.isInstanceOf[Field])
-                            .map(_.asInstanceOf[Field].name).toSet
+                        val oldStateAST = oldType.tableOpt.get.ast.asInstanceOf[State]
+                        val oldFields = oldStateAST.declarations
+                            .filter(_.isInstanceOf[Field]) // fields in old state
+                            .map((decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ)).toSet
+                        (oldFields, oldFields)
                     case StateUnionType(contractName, stateNames) =>
 
                         // We don't have a statically-fixed set of old fields because we don't know statically
                         // which specific state we're in. We take a conservative approach:
                         // take the intersection to ensure that all fields might need to be initialized will be initialized.
 
-                        val allStateTables = stateNames.map((name: String) => thisTable.state(name).get)
-                        var allFieldSets: Set[Set[Declaration]] = allStateTables.map((t: StateTable) => t.ast.declarations.toSet)
-                        var allFieldNamesSets: Set[Set[String]] = allFieldSets.map((decls: Set[Declaration]) =>
-                                                                    decls.map((d: Declaration) => d.toString))
-                        if (allFieldSets.isEmpty) {
-                            Set.empty[String]
+                        val oldStateTables = stateNames.map((name: String) => thisTable.state(name).get)
+                        var oldFieldSets: Set[Set[Declaration]] = oldStateTables.map((t: StateTable) => t.ast.declarations.toSet)
+                        if (oldFieldSets.isEmpty) {
+                            (Set.empty[(String, ObsidianType)], Set.empty[(String, ObsidianType)])
                         }
                         else {
-                            allFieldNamesSets.tail.foldLeft(allFieldNamesSets.head) {
+                            val oldFieldNamesSets: Set[Set[(String, ObsidianType)]] = oldFieldSets.map(
+                                (decls: Set[Declaration]) => decls.map((d: Declaration) => (d.name, d.asInstanceOf[Field].typ))
+                            )
+
+                            (oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
                                 ((intersections, next) => intersections.intersect(next))
-                            }
+                            },
+                                oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
+                                    ((unions, next) => unions.union(next))
+                                })
 
                         }
                 }
 
 
-                val newFields = newStateTable.ast.declarations
+                val newStateFields = newStateTable.ast.declarations
                                 .filter(_.isInstanceOf[Field])
-                                .map(_.asInstanceOf[Field].name)
+                                .map((decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ))
+                val contractDeclarations = thisTable.contractTable.ast.asInstanceOf[Contract].declarations
+                val contractFieldDeclarationsAvailableInNewState: Seq[Declaration] =
+                    contractDeclarations.filter(
+                        (d: Declaration) => if (d.tag == FieldDeclTag) {
+                            val availableIn = d.asInstanceOf[Field].availableIn
+                            availableIn match {
+                                case None => false // We're not interested in fields that are available in all states because they were available in the old state too.
+                                case Some(stateIdentifiers) =>
+                                    val availableInStateNames = stateIdentifiers.map(_._1)
+                                    availableInStateNames.contains(newStateName)
+                            }
+                        }
+                        else {
+                            false
+                        }
+                    )
+                val fieldNamesInThisState = contractFieldDeclarationsAvailableInNewState.map(
+                    (decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ))
+                val newFields: Seq[(String, ObsidianType)] = newStateFields ++ fieldNamesInThisState
 
-                val toInitialize = newFields.toSet.diff(oldFields)
+                val toInitialize = newFields.toSet.diff(oldFields) // All the fields that must be initialized.
 
-                val updated = updates.map(_._1.name).toSet
-                val uninitialized = toInitialize.diff(updated)
-                val badInitializations = updated.diff(newFields.toSet)
-                if (uninitialized.nonEmpty) logError(s, TransitionUpdateError(uninitialized))
+                // We require that all the fields of the new state that don't exist in the current state be initialized.
+                // However, shared fields may be initialized too.
+
+                val updatedInTransition: Set[String] = updates match {
+                    case Some(u) => u.map(_._1.name).toSet
+                    case None => Set.empty
+                }
+                val testStateMatch = (updateInfo: (String, String, AST)) => updateInfo._1 == newStateName
+
+                val updatedViaAssignment: Set[String] = context.transitionFieldsInitialized.filter(testStateMatch).map(_._2)
+
+
+                val updatedViaAssignmentToWrongState = context.transitionFieldsInitialized.filterNot(testStateMatch)
+                for (invalidAssignment <- updatedViaAssignmentToWrongState) {
+                    logError(invalidAssignment._3, InvalidStateFieldInitialization(invalidAssignment._1, invalidAssignment._2))
+                }
+
+                val updated = updatedInTransition.union(updatedViaAssignment) // Fields updated by either assignment or transition initialization
+                val uninitialized = toInitialize.filterNot((p: (String, ObsidianType)) => updated.contains(p._1))
+
+                if (uninitialized.nonEmpty) logError(s, TransitionUpdateError(uninitialized.map(_._1)))
+
+                val badInitializations = updated.diff(newFields.map(_._1).toSet) // We don't allow updates to fields that don't exist in the target state.
                 for (s <- badInitializations) {
                     val err = FieldUndefinedError(newStateTable.simpleType, s)
-                    logError(updates.find(_._1.name == s).get._1, err)
+                    logError(updates.get.find(_._1.name == s).get._1, err)
                 }
 
                 var contextPrime = context
-                for ((Variable(f), e) <- updates) {
-                    if (newFields.contains(f)) {
-                        val fieldAST = newStateTable.lookupField(f).get
-                        val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e)
-                        contextPrime = contextPrime2
-                        checkIsSubtype(s, t, fieldAST.typ)
+                if (updates.isDefined) {
+                    for ((Variable(f), e) <- updates.get) {
+                        if (newFields.contains(f)) {
+                            val fieldAST = newStateTable.lookupField(f).get
+                            val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e)
+                            contextPrime = contextPrime2
+                            checkIsSubtype(s, t, fieldAST.typ)
+                        }
                     }
                 }
 
+                // Check for potentially-dropped resources.
+                val toCheckForDroppedResources = maybeOldFields.diff(newFields.toSet) // fields that we might currently have minus fields we're initializing now
+                for (oldField <- toCheckForDroppedResources) {
+                    val fieldType = oldField._2
+                    if (fieldType.isOwned && fieldType.isResourceReference) {
+                        logError(s, PotentiallyUnusedOwnershipError(oldField._1))
+                    }
+                }
+
+                val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType = StateType(thisTable.name, newStateName)
-                val newType = updatedSimpleType(context("this"), newSimpleType)
-                contextPrime.updated("this", newType)
+
+                val newType = NonPrimitiveType(newTypeTable, NoPathType(newSimpleType), oldType.extractModifiers)
+
+
+                contextPrime.updated("this", newType).updatedWithoutAnyTransitionFieldsInitialized()
 
             case Assignment(Variable(x), e: Expression) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
@@ -1129,13 +1223,34 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 checkIsSubtype(s, t, fieldAST.typ)
                 contextPrime2
 
+            case Assignment(StateInitializer(stateName, fieldName), e) =>
+                val (eTyp, contextPrime) = inferAndCheckExpr(decl, context, e)
+
+                val stateOption = context.contractTable.state(stateName._1)
+                val fieldType = stateOption match {
+                    case None => logError(s, StateUndefinedError(context.contractTable.name, stateName._1)); BottomType()
+                    case Some(stateTable) =>
+                        stateTable.lookupField(fieldName._1) match {
+                            case None => logError(s, FieldUndefinedError(stateTable.simpleType, fieldName._1)); BottomType()
+                            case Some(field) => field.typ
+                        }
+                }
+
+                checkIsSubtype(s, eTyp, fieldType)
+                if (fieldType == BottomType()) {
+                    contextPrime
+                }
+                else {
+                    contextPrime.updatedWithInitialization(stateName._1, fieldName._1, s)
+                }
+
             // assignment target is neither a variable nor a field
             case Assignment(_, e: Expression) =>
                 val (_, contextPrime) = inferAndCheckExpr(decl, context, e)
                 logError(s, AssignmentError())
                 contextPrime
 
-            case Throw() => Context(context.underlyingVariableMap, isThrown = true)
+            case Throw() => Context(context.underlyingVariableMap, isThrown = true, Set.empty)
 
             case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond)
@@ -1302,6 +1417,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
         checkForUnusedOwnershipErrors(tx, outputContext, Set("this"))
+        checkForUnusedStateInitializers(outputContext)
 
         if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
             logError(tx.body.last, MustReturnError(tx.name))
@@ -1353,7 +1469,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val thisType = NonPrimitiveType(table, thisUnpermissionedType, Set(IsOwned()))
 
         // Construct the context that the body should start with
-        var initContext = Context(new TreeMap[String, ObsidianType](), isThrown = false)
+        var initContext = Context(new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
         initContext = initContext.updated("this", thisType)
 
         // first create this context so we can resolve types
@@ -1402,7 +1518,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
-        var initContext = Context(new TreeMap[String, ObsidianType](), isThrown = false)
+        var initContext = Context(new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
 
         //should it be owned?
         val thisType = NonPrimitiveType(table, NoPathType(JustContractType(table.name)), Set(IsOwned()))
@@ -1432,6 +1548,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
+        checkForUnusedStateInitializers(outputContext)
 
         // if the contract contains states, its constructor must contain a state transition
         if (hasStates && !hasTransition(constr.body)) {
@@ -1455,19 +1572,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         if (table.constructors.isEmpty && table.stateLookup.nonEmpty) {
             logError(contract, NoConstructorError(contract.name))
         }
-    }
-
-    /* [true] if no type errors, [false] otherwise */
-    def checkProgramAndPrintErrors(): Boolean = {
-        val errs = checkProgram()
-        val sortedErrors = errs.sorted
-
-        for (ErrorRecord(err, loc) <- sortedErrors) {
-            val msg = err.msg
-            println(s"At $loc: $msg")
-        }
-
-        errs.isEmpty
     }
 
     /* just returns the errors from the program */

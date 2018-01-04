@@ -70,11 +70,15 @@ sealed trait ObsidianType extends HasLocation {
 
     val extractSimpleType: Option[SimpleType]
     val extractUnpermissionedType: Option[UnpermissionedType]
+    def extractModifiers: Set[TypeModifier] = Set.empty
 
     def isOwned = false
     def isShared = false
     def isReadOnlyState = false
     def isRemote = false
+    def isResourceReference = false
+
+
 }
 
 sealed trait PotentiallyUnresolvedType extends ObsidianType
@@ -123,10 +127,12 @@ case class NonPrimitiveType(tableOf: DeclarationTable,
 
     val extractSimpleType: Option[SimpleType] = Some(t.extractSimpleType)
     val extractUnpermissionedType: Option[UnpermissionedType] = Some(t)
+    override val extractModifiers = modifiers
 
     override def isOwned = modifiers.contains(IsOwned())
     override def isReadOnlyState = modifiers.contains(IsReadOnlyState())
     override def isRemote = modifiers.contains(IsRemote())
+    override def isResourceReference = tableOf.contract.isResource
 }
 
 

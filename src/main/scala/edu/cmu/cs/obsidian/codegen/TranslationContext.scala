@@ -13,7 +13,7 @@ case class StateContext(
     enumVal: JEnumConstant,
     /* the inner class has the fields and methods for the state */
     innerClass: JDefinedClass,
-    /* this the the field in the parent class (of type [innerClass]) that is
+    /* this is the field in the parent class (of type [innerClass]) that is
      * defined when the contract is in this particular state */
     innerClassField: JFieldVar
 )
@@ -59,7 +59,11 @@ case class TranslationContext(
      * maps the [tx/fun/field] name to useful data  */
     txLookup: Map[String, TransactionInfo],
     funLookup: Map[String, FuncInfo],
-    fieldLookup: Map[String, FieldInfo]
+    fieldLookup: Map[String, FieldInfo],
+
+    // When we encounter a state initializer, we generate an instance of the inner class and set up its fields as requested.
+    // At transition time, we make sure that all the fields have been initialized.
+    var pendingFieldAssignments: Set[String]
 ) {
     /* gets the enum if it exists, fails otherwise */
     def getEnum(stName: String): JEnumConstant = {

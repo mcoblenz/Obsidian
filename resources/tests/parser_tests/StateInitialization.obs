@@ -1,0 +1,23 @@
+main contract Test {
+    state S1 {
+        int x1;
+	int x2;
+    }
+
+    state S2 {
+        int x2;
+	int x3;
+    }
+
+    state S3 {}
+
+    int shared available in S1, S2;
+
+    Test()  ends in S1 {   
+    	S1::x1 = 42;
+	S1::shared = 44;
+
+	S1::x1 = 45;
+	shared = 2;
+    }
+}

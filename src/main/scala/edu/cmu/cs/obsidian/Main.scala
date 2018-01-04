@@ -270,17 +270,18 @@ object Main {
                 println()
             }
 
-            for (error <- transformErrors) {
+            val checker = new Checker(globalTable, options.typeCheckerDebug)
+            val typecheckingErrors = checker.checkProgram()
+
+            val allSortedErrors = (transformErrors ++ typecheckingErrors).sorted
+
+            for (error <- allSortedErrors) {
                 error.printMessage()
             }
 
-            val checker = new Checker(globalTable, options.typeCheckerDebug)
-            if (!checker.checkProgramAndPrintErrors() || !transformErrors.isEmpty) {
-                println("Typechecking failed.\n")
+            if (!allSortedErrors.isEmpty) {
                 return
             }
-
-
 
             val lastSlash = filename.lastIndexOf("/")
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)

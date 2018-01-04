@@ -110,7 +110,7 @@ case class TransitionError() extends Error {
 }
 case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
     val fieldNames: String = mustSupply.mkString(", ")
-    val msg: String = s"Must specify the following fields in the update clause: '$fieldNames'"
+    val msg: String = s"The following fields in the destination state may not be initialized: '$fieldNames'"
 }
 case class AssignmentError() extends Error {
     val msg: String = s"Assignment target must be a variable or a field"
@@ -133,6 +133,11 @@ case class StateSpecificReadOnlyError() extends Error {
 case class UnusedOwnershipError(name: String) extends Error {
     val msg: String = s"Variable '$name' holds ownership, but is unused at the end of its scope"
 }
+
+case class PotentiallyUnusedOwnershipError(name: String) extends Error {
+    val msg: String = s"Variable '$name' holds ownership, but may be unused at the end of its scope"
+}
+
 case class ConstructorNameError(contractName: String) extends Error {
     val msg: String = s"Invalid constructor name for contract '$contractName'"
 }
@@ -168,4 +173,8 @@ case class NonResourceOwningResourceError(contractName: String, f: Field) extend
 
 case class DisownUnowningExpressionError(e: Expression) extends Error {
     val msg: String = s"Can't disown expression that is not already owned: '$e'."
+}
+
+case class InvalidStateFieldInitialization(stateName: String, fieldName: String) extends Error {
+    val msg: String = s"Can't assign to field $fieldName without transitioning to its state, $stateName."
 }
