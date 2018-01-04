@@ -229,4 +229,8 @@ class ParserTests extends JUnitSuite {
     @Test def stateInitialization() = {
         shouldSucceedFile("resources/tests/parser_tests/StateInitialization.obs")
     }
+
+    @Test def unclosedContract() = {
+        shouldFailFile("resources/tests/parser_tests/UnclosedContract.obs")
+    }
 }

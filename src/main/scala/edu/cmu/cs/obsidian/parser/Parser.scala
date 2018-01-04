@@ -422,9 +422,14 @@ object Parser extends Parsers {
             case Success(result, _) => Right(result)
             case Failure(msg , _) => Left(s"FAILURE: $msg")
             case Error(msg , next) =>
-                val line = next.first.pos.line
-                val col = next.first.pos.column
-                Left(s"Error: $msg at $line:$col")
+                if (next.atEnd) {
+                    Left(s"Error: $msg at end of file")
+                }
+                else {
+                    val line = next.first.pos.line
+                    val col = next.first.pos.column
+                    Left(s"Error: $msg at $line:$col")
+                }
         }
     }
 
