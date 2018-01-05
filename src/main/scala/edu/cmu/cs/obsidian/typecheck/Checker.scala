@@ -1056,48 +1056,37 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // oldFields is the set of fields declared in the old state, which are definitely going away.
                 // maybeOldFields is the set of fields from the old state that MAY be going away — 
                 //   we can't be sure when the current state is a union.
-                val (oldFields: Set[(String, ObsidianType)], maybeOldFields: Set[(String, ObsidianType)]) =
-                oldType.extractSimpleType.get match {
-                    case JustContractType(contractName) =>
-                        /* special case to allow transitioning during constructors */
-                        if (decl.isInstanceOf[Constructor]) {
-                            (Set[(String, ObsidianType)](), Set[(String, ObsidianType)]())
-                        } else {
-                            logError(s, TransitionError())
-                            return context
-                        }
-                    case StateType(contractName, stateName) =>
-                        val oldStateAST = oldType.tableOpt.get.ast.asInstanceOf[State]
-                        val oldFields = oldStateAST.declarations
-                            .filter(_.isInstanceOf[Field]) // fields in old state
-                            .map((decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ)).toSet
-                        (oldFields, oldFields)
-                    case StateUnionType(contractName, stateNames) =>
 
-                        // We don't have a statically-fixed set of old fields because we don't know statically
-                        // which specific state we're in. We take a conservative approach:
-                        // take the intersection to ensure that all fields might need to be initialized will be initialized.
-
-                        val oldStateTables = stateNames.map((name: String) => thisTable.state(name).get)
-                        var oldFieldSets: Set[Set[Declaration]] = oldStateTables.map((t: StateTable) => t.ast.declarations.toSet)
-                        if (oldFieldSets.isEmpty) {
-                            (Set.empty[(String, ObsidianType)], Set.empty[(String, ObsidianType)])
-                        }
-                        else {
-                            val oldFieldNamesSets: Set[Set[(String, ObsidianType)]] = oldFieldSets.map(
-                                (decls: Set[Declaration]) => decls.map((d: Declaration) => (d.name, d.asInstanceOf[Field].typ))
-                            )
-
-                            (oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
-                                ((intersections, next) => intersections.intersect(next))
-                            },
-                                oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
-                                    ((unions, next) => unions.union(next))
-                                })
-
-                        }
+                val possibleCurrentStates = oldType.extractSimpleType.get match {
+                    case JustContractType(contractName) => thisTable.possibleStates
+                    case StateType(contractName, stateName) => Set(stateName)
+                    case StateUnionType(contractName, stateNames) => stateNames
                 }
 
+
+                val oldStateTables = possibleCurrentStates.map((name: String) => thisTable.state(name).get)
+                var oldFieldSets: Set[Set[Declaration]] = oldStateTables.map((t: StateTable) => t.ast.declarations.toSet)
+
+                val (oldFields: Set[(String, ObsidianType)], maybeOldFields: Set[(String, ObsidianType)]) =
+                // We don't have a statically-fixed set of old fields because we don't know statically
+                // which specific state we're in. We take a conservative approach:
+                // take the intersection to ensure that all fields might need to be initialized will be initialized.
+                    if (oldType.extractSimpleType.get.isInstanceOf[Constructor] || oldFieldSets.isEmpty) {
+                        (Set.empty[(String, ObsidianType)], Set.empty[(String, ObsidianType)])
+                    }
+                    else {
+                        val oldFieldNamesSets: Set[Set[(String, ObsidianType)]] = oldFieldSets.map(
+                            (decls: Set[Declaration]) => decls.map((d: Declaration) => (d.name, d.asInstanceOf[Field].typ))
+                        )
+
+                        (oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
+                            ((intersections, next) => intersections.intersect(next))
+                        },
+                            oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
+                                ((unions, next) => unions.union(next))
+                            })
+
+                    }
 
                 val newStateFields = newStateTable.ast.declarations
                                 .filter(_.isInstanceOf[Field])

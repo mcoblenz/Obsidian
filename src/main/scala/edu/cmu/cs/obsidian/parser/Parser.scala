@@ -382,7 +382,6 @@ object Parser extends Parsers {
         LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case isOwned ~ name ~ _ ~ args ~ _ ~ ensuresState ~ _ ~ body ~ _ =>
                 Constructor(name._1, isOwned.isDefined, args, ensuresState, body).setLoc(name)
-
         }
     }
 

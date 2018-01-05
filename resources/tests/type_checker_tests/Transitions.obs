@@ -1,0 +1,16 @@
+main contract Test {
+    Test() {
+        ->S2;
+    }
+
+    state S1 {
+        int x1;
+    }
+
+    state S2;
+
+    transaction foo() {
+        S1::x1 = 42;
+    	->S1;
+    }
+}

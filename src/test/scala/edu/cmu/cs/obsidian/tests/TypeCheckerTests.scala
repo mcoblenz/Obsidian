@@ -515,4 +515,10 @@ class TypeCheckerTests extends JUnitSuite {
                 Nil
         )
     }
+
+    @Test def transitionTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Transitions.obs",
+                Nil
+        )
+    }
 }
