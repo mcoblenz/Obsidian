@@ -869,7 +869,7 @@ class CodeGen (val target: Target) {
                             case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
                                 .staticInvoke("booleanToBytes").arg(txInvoke)
                             case StringType() => txInvoke.invoke("getBytes")
-                            case _ => txInvoke.invoke("archiveBytes")
+                            case _ => txInvoke.invoke("__archiveBytes")
                         }
                     )
                 } else {
