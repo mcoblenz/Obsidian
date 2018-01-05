@@ -13,4 +13,9 @@ main contract Test {
         S1::x1 = 42;
     	->S1;
     }
+
+    transaction bar() {
+        ->S2;
+    }
+
 }

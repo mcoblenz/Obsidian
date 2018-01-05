@@ -873,14 +873,12 @@ class CodeGen (val target: Target) {
                         }
                     )
                 } else {
-                    txInvoke = transCondBody.invoke(txMethName)
+                    txInvoke = stateCondBody.invoke(txMethName)
                 }
 
                 for (txArg <- txArgsList.reverse) {
                     txInvoke.arg(txArg)
                 }
-
-                stateCondBody._return(returnBytes)
 
             }
             /* If we aren't in any of the states were we can use this transaction, we throw an exception */
@@ -1689,6 +1687,9 @@ class CodeGen (val target: Target) {
         else {
             translateTransDeclInPossibleState(tx, newClass, translationContext)
         }
+
+        // Clear any pending field assignments between transactions.
+        translationContext.pendingFieldAssignments = Set.empty
     }
 
     /* these methods make shadowing possible */
@@ -1774,7 +1775,7 @@ class CodeGen (val target: Target) {
                     translationContext.assignVariable(fieldName, JExpr.ref(stateInitializationVariableName(newStateName, fieldName)), body)
                 }
 
-                // TODO: clear map
+                translationContext.pendingFieldAssignments = Set.empty
             case Assignment(Variable(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext)
