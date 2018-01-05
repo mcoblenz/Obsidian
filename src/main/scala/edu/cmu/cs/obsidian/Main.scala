@@ -266,7 +266,7 @@ object Main {
 
             if (options.printAST) {
                 println("Transformed AST:")
-                println(ast)
+                println(globalTable.ast)
                 println()
             }
 
@@ -288,11 +288,11 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(ast, protobufOuterClassName)
-                                else translateServerASTToJava(ast, protobufOuterClassName)
+            val javaModel = if (options.buildClient) translateClientASTToJava(globalTable.ast, protobufOuterClassName)
+                                else translateServerASTToJava(globalTable.ast, protobufOuterClassName)
             javaModel.build(srcDir.toFile)
 
-            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(ast, sourceFilename)
+            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(globalTable.ast, sourceFilename)
 
             // Each import results in a .proto file, which needs to be compiled.
             for (p <- protobufs) {
@@ -323,7 +323,7 @@ object Main {
 
 
             // invoke javac and make a jar from the result
-            val mainName = findMainContractName(ast)
+            val mainName = findMainContractName(globalTable.ast)
             val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
             if (options.verbose) {
                 println("javac exited with value " + javacExit)
