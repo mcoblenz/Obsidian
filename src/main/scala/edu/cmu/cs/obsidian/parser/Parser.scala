@@ -367,8 +367,12 @@ object Parser extends Parsers {
     }
 
     private def parseStateDecl = {
-        StateT() ~! parseId ~! LBraceT() ~! rep(parseDeclInState) ~! RBraceT() ^^ {
-            case st ~ name ~ _ ~ defs ~ _ => State(name._1, defs).setLoc(st)
+        StateT() ~! parseId ~! opt(LBraceT() ~! rep(parseDeclInState) ~! RBraceT()) ~ opt(SemicolonT()) ^^ {
+            case st ~ name ~ maybeDefs ~ _ =>
+                maybeDefs match {
+                    case None => State(name._1, Seq.empty).setLoc(st)
+                    case Some (_ ~ defs ~ _)  => State(name._1, defs).setLoc(st)
+                }
         }
     }
 
