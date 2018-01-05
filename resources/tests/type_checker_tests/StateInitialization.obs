@@ -1,0 +1,32 @@
+main contract Test {
+    state S1 {
+        int x1;
+	int x2;
+    }
+
+    state S2 {
+        int x2;
+	int x3;
+    }
+
+    state S3 {}
+
+    int shared available in S1, S2;
+
+    Test()  ends in S1 {   
+    	S1::x1 = 42;
+	S1::x2 = 43;
+	S1::shared = 44;
+
+	// Error: not transitioning to S2.
+	S2::x2 = 45;
+
+        ->S1;
+	->S3;
+	->S1; // Error: previous initializers are no longer in scope, so there are uninitialized fields now.
+
+	// Error: not transitioning to S1.
+	S1::x1 = 45;
+	shared = 2;
+    }
+}
