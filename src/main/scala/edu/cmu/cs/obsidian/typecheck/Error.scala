@@ -105,9 +105,7 @@ case class CannotReturnError(methName: String) extends Error {
 case class NotAValueError(methName: String) extends Error {
     val msg: String = s"'$methName' does not return anything, but is used here as a value"
 }
-case class TransitionError() extends Error {
-    val msg: String = s"'this' must be typed to a particular state in order to transition"
-}
+
 case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
     val fieldNames: String = mustSupply.mkString(", ")
     val msg: String = s"The following fields in the destination state may not be initialized: '$fieldNames'"
@@ -177,4 +175,8 @@ case class DisownUnowningExpressionError(e: Expression) extends Error {
 
 case class InvalidStateFieldInitialization(stateName: String, fieldName: String) extends Error {
     val msg: String = s"Can't assign to field $fieldName without transitioning to its state, $stateName."
+}
+
+case class InvalidOwnershipTransfer(e: Expression, typ: ObsidianType) extends Error {
+    val msg: String = s"Can't transfer ownership from non-owning expression $e of type $typ."
 }

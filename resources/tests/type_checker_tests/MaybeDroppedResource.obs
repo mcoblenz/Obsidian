@@ -1,0 +1,19 @@
+resource contract Money {}
+
+resource contract Wallet {
+	 owned Wallet() {
+	 	  ->Empty;
+	 }
+
+	 state Full {
+	       owned Money m;
+	 }
+
+	 state Empty {
+	 }
+
+	 transaction loseMoney() available in Full, Empty {
+	       // Error -- maybe losing Money!
+	       ->Empty;
+	 }
+}

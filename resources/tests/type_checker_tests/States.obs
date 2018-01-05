@@ -19,7 +19,6 @@ main contract C {
     }
 
     transaction b() {
-        // should fail: transitioning when we don't know the state
         ->S1;
     }
 

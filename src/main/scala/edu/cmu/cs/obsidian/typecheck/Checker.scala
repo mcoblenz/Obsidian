@@ -1071,7 +1071,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // We don't have a statically-fixed set of old fields because we don't know statically
                 // which specific state we're in. We take a conservative approach:
                 // take the intersection to ensure that all fields might need to be initialized will be initialized.
-                    if (oldType.extractSimpleType.get.isInstanceOf[Constructor] || oldFieldSets.isEmpty) {
+                    if (decl.isInstanceOf[Constructor] || oldFieldSets.isEmpty) {
                         (Set.empty[(String, ObsidianType)], Set.empty[(String, ObsidianType)])
                     }
                     else {

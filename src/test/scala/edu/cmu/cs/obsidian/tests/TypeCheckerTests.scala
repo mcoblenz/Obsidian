@@ -339,8 +339,6 @@ class TypeCheckerTests extends JUnitSuite {
                 (FieldUndefinedError(
                     StateType("C", "S1"), "x"), 18)
                 ::
-                (TransitionError(), 23)
-                ::
                 Nil
         )
     }
@@ -480,7 +478,13 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (DisownUnowningExpressionError(Variable("m")), 49)
                 ::
-                (UnusedOwnershipError("m"), 73)
+                (UnusedOwnershipError("bad"), 52)
+                ::
+                (OwnershipSubtypingError(
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set()),
+                    NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set(IsOwned()))), 59)
+                ::
+                (UnusedOwnershipError("m"), 76)
                 ::
                 Nil
         )

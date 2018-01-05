@@ -54,6 +54,9 @@ contract Disowning {
 
      	 	 // Error: m is unowned
      	 	 discardMoney(m);
+
+             // Error: m is unowned. Want to make sure we can't consume m twice.
+     	 	 owned Money bad = m;
      }
 
      transaction getMoney() returns owned Money {
