@@ -16,7 +16,7 @@ resource contract Wallet {
     owned Money money;
 
     owned Wallet (owned Money m) {
-        money = m;
+        money <- m;
     }
 
     transaction loseMoney (owned Money m) {
@@ -29,7 +29,7 @@ resource contract Wallet {
     }
 
     transaction returnMoney (owned Money m) returns owned Money {
-    	return m;
+    	return <-m;
     }
 
     transaction failToReturnMoney (Money m) returns owned Money {
@@ -66,7 +66,6 @@ contract Disowning {
      transaction discardMoneyCall () {
         disown getMoney();
         Money m = disown getMoney(); // disown is an expression, not just a statement
-
      }
 }
 

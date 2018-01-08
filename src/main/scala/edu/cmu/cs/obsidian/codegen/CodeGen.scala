@@ -1776,20 +1776,20 @@ class CodeGen (val target: Target) {
                 }
 
                 translationContext.pendingFieldAssignments = Set.empty
-            case Assignment(Variable(x), e) =>
+            case Assignment(Variable(x), e, transfersOwnership) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext)
             /* it's bad that this is a special case */
-            case Assignment(Dereference(This(), field), e) => {
+            case Assignment(Dereference(This(), field), e, transfersOwnership) => {
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
                 translationContext.assignVariable(field, newValue, body)
             }
-            case Assignment(Dereference(eDeref, field), e) => {
+            case Assignment(Dereference(eDeref, field), e, transfersOwnership) => {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
                 assert(false, "TODO")
             }
-            case Assignment(StateInitializer(stateName, fieldName), e) => {
+            case Assignment(StateInitializer(stateName, fieldName), e, transfersOwnership) => {
                 val stateContextOption = translationContext.states.get(stateName._1)
                 assert(stateContextOption.isDefined)
                 val stateContext = stateContextOption.get

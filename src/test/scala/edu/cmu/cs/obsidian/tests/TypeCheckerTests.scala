@@ -484,7 +484,7 @@ class TypeCheckerTests extends JUnitSuite {
                     NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set()),
                     NonPrimitiveType(null, NoPathType(JustContractType("Money")), Set(IsOwned()))), 59)
                 ::
-                (UnusedOwnershipError("m"), 76)
+                (UnusedOwnershipError("m"), 75)
                 ::
                 Nil
         )
@@ -492,9 +492,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
-            (OwnershipSubtypingError(
-                NonPrimitiveType(null, NoPathType(JustContractType("Prescription")), Set()),
-                NonPrimitiveType(null, NoPathType(JustContractType("Prescription")), Set(IsOwned()))), 17)
+            (InvalidOwnershipTransfer(Variable("p"), NonPrimitiveType(null, NoPathType(JustContractType("Prescription")), Set())), 17)
+                ::
+                (OwnershipSubtypingError(
+                    NonPrimitiveType(null, NoPathType(JustContractType("Prescription")), Set()),
+                    NonPrimitiveType(null, NoPathType(JustContractType("Prescription")), Set(IsOwned()))), 17)
                 ::
                 Nil
         )
@@ -515,6 +517,10 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def droppedResourcesTest(): Unit = {
         runTest("resources/tests/type_checker_tests/MaybeDroppedResource.obs",
             (PotentiallyUnusedOwnershipError("m"), 17)
+                ::
+                (NoEffectsError(OwnershipTransfer(Variable("m"))), 21)
+                ::
+                (UnusedExpressionOwnershipError(OwnershipTransfer(Variable("m"))), 21)
                 ::
                 Nil
         )

@@ -89,6 +89,7 @@ object Lexer extends RegexParsers {
     private def commaP = """,""".r ^^ (_ => CommaT())
     private def semicolonP = """;""".r ^^ (_ => SemicolonT())
     private def eqP = """=""".r ^^ (_ => EqT())
+    private def leftArrowP = """<-""".r ^^ (_ => LeftArrowT())
     private def notEqP = """!=""".r ^^ (_ => NotEqT())
     private def ltP = """<""".r ^^ (_ => LtT())
     private def gtP = """>""".r ^^ (_ => GtT())
@@ -107,7 +108,7 @@ object Lexer extends RegexParsers {
         lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
         /* order is important here because some tokens contain the others */
-        gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
+        gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | leftArrowP | ltP | gtP | eqP |
 
         plusP | starP | forwardSlashP | minusP | coloncolonP
     )

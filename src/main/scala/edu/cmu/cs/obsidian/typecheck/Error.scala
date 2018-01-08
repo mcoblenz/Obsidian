@@ -129,11 +129,15 @@ case class StateSpecificReadOnlyError() extends Error {
     val msg: String = s"State-specific types are not safe for 'readonlyState' references"
 }
 case class UnusedOwnershipError(name: String) extends Error {
-    val msg: String = s"Variable '$name' holds ownership, but is unused at the end of its scope"
+    val msg: String = s"Variable '$name' holds ownership, but is unused at the end of its scope."
+}
+
+case class UnusedExpressionOwnershipError(e: Expression) extends Error {
+    val msg: String = s"Expression '$e' holds ownership, but is unused at the end of its scope."
 }
 
 case class PotentiallyUnusedOwnershipError(name: String) extends Error {
-    val msg: String = s"Variable '$name' holds ownership, but may be unused at the end of its scope"
+    val msg: String = s"Variable '$name' holds ownership, but may be unused at the end of its scope."
 }
 
 case class ConstructorNameError(contractName: String) extends Error {

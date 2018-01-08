@@ -16,4 +16,8 @@ resource contract Wallet {
 	       // Error -- maybe losing Money!
 	       ->Empty;
 	 }
+
+	 transaction loseMoney(owned Money m) {
+	       <-m;
+	 }
 }
