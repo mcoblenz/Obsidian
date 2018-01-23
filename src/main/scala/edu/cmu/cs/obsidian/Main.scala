@@ -1,20 +1,17 @@
 package edu.cmu.cs.obsidian
 
-import java.nio.file.{Files, Path, Paths}
 import java.io.File
+import java.nio.file.{Files, Path, Paths}
 import java.util.Scanner
 
-import edu.cmu.cs.obsidian.lexer._
-import edu.cmu.cs.obsidian.parser._
-import edu.cmu.cs.obsidian.codegen._
-import edu.cmu.cs.obsidian.protobuf._
-import edu.cmu.cs.obsidian.util._
 import com.helger.jcodemodel.JCodeModel
-import edu.cmu.cs.obsidian.typecheck.{AstTransformer, Checker, ErrorRecord, VariableUndefinedError}
+import edu.cmu.cs.obsidian.codegen._
+import edu.cmu.cs.obsidian.parser._
+import edu.cmu.cs.obsidian.protobuf._
+import edu.cmu.cs.obsidian.typecheck.{AstTransformer, Checker}
+import edu.cmu.cs.obsidian.util._
 
 import scala.sys.process._
-import scala.util.parsing.input.NoPosition
-import scala.util.parsing.input.OffsetPosition
 
 case class CompilerOptions (outputPath: Option[String],
                             debugPath: Option[String],
@@ -142,7 +139,7 @@ object Main {
 
         val sourcePath = sourceDir.toString
         val classPath =
-            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.3.1.jar:lib/json-20160810.jar"
+            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.5.1.jar:lib/json-20160810.jar"
         val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
         val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
                                                        "-classpath", classPath,
