@@ -1,8 +1,12 @@
 package edu.cmu.cs.obsidian.typecheck
 
+import com.helger.jcodemodel.JPackage
+import edu.cmu.cs.obsidian.codegen.{Client, Server}
 import edu.cmu.cs.obsidian.parser._
-import scala.util.parsing.input.Position
+import edu.cmu.cs.obsidian.util.Util
 
+import scala.collection.Map
+import scala.util.parsing.input.Position
 import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
 
 /* The only purpose of this compilation phase at the moment is to disambiguate
@@ -19,17 +23,27 @@ object AstTransformer {
     type Context = Map[String, ObsidianType]
     val emptyContext = new TreeMap[String, ObsidianType]()
 
+    private def transformImport(imp: Import): Import = {
+        // TODO
+        imp
+    }
+
     def transformProgram(table: SymbolTable): (SymbolTable, Seq[ErrorRecord]) = {
         var errorRecords = List.empty[ErrorRecord]
         var contracts = List.empty[Contract]
 
+        val imports = table.ast.imports
+        val transformedImports = imports.map(transformImport)
+
         for ((contractName, contractTable) <- table.contractLookup) {
+
+
             val (newContract, errors) = transformContract(table, contractTable)
             errorRecords = errorRecords ++ errors
             contracts = contracts :+ newContract
         }
 
-        val newProgram = Program(table.ast.imports, contracts)
+        val newProgram = Program(transformedImports, contracts)
 
         val newTable = new SymbolTable(newProgram)
         (newTable, errorRecords)

@@ -123,11 +123,25 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
     }
 
     def lookupTransactionInThis(transactionName: String): Option[Transaction] = {
-        doLookup(transactionName, (transaction: String) => thisType.table.lookupTransaction(transaction))
+        lookupTransactionInType(thisType)(transactionName)
     }
 
     def lookupFunctionInThis(functionName: String): Option[Func] = {
-        doLookup(functionName, (function: String) => thisType.table.lookupFunction(function))
+        lookupFunctionInType(thisType)(functionName)
+    }
+
+    def lookupTransactionInType(typ: ObsidianType) (transactionName: String): Option[Transaction] = {
+        typ.tableOpt match {
+            case None => None
+            case Some (table) => doLookup(transactionName, (transaction: String) => table.lookupTransaction(transaction))
+        }
+    }
+
+    def lookupFunctionInType(typ: ObsidianType) (functionName: String): Option[Func] = {
+        typ.tableOpt match {
+            case None => None
+            case Some (table) => doLookup(functionName, (function: String) => table.lookupFunction(function))
+        }
     }
 }
 
@@ -930,24 +944,25 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 receiver: Expression,
                 args: Seq[Expression]): Context = {
             // Lookup the invocation
-            val txLookup = context.lookupTransactionInThis(name)
-            val funLookup = context.lookupFunctionInThis(name)
+            val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver)
+            val txLookup = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
+            val funLookup = contextAfterReceiver.lookupFunctionInType(receiverType)(name)
 
             val invokable: InvokableDeclaration = (txLookup, funLookup) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(context.thisType.extractSimpleType.get, name)
+                    val err = MethodUndefinedError(contextAfterReceiver.thisType.extractSimpleType.get, name)
                     logError(s, err)
-                    return context
+                    return contextAfterReceiver
                 case (_, Some(f)) => f
                 case (Some(t), _) => t
             }
 
             // check arguments
-            val (argTypes, contextPrime) = inferAndCheckExprs(decl, context, args)
+            val (argTypes, contextPrime) = inferAndCheckExprs(decl, contextAfterReceiver, args)
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
-                checkArgs(s, name, context, specList, receiver, argTypes) match {
+                checkArgs(s, name, contextAfterReceiver, specList, receiver, argTypes) match {
                     case None => return contextPrime
                     case Some(x) => x
                 }

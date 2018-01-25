@@ -126,17 +126,27 @@ class ContractTable(
 
     def name: String = this.contract.name
 
-    /* resolves a contract from the point of view of this contract. Two cases:
+    /* resolves a contract from the point of view of this contract. Three cases:
      * 1) [name] refers to a global contract and it's in the symbol table
      * 2) [name] refers to a child/nested contract of this contract
+     * 3) [name] refers to a contract declared in an import of this program.
      */
     def lookupContract(name: String): Option[ContractTable] = {
-        if (name == this.name) Some(this) else
-        (symbolTable.contract(name), childContract(name)) match {
-            case (_, Some(ct)) => Some(ct)
-            case (Some(ct), _) => Some(ct)
-            case _ => None
+        val localLookupResult =
+            if (name == this.name) Some(this) else
+                (symbolTable.contract(name), childContract(name)) match {
+                    case (_, Some(ct)) => Some(ct)
+                    case (Some(ct), _) => Some(ct)
+                    case _ => None
+                }
+        if (localLookupResult.isDefined) {
+            localLookupResult
         }
+        else {
+            // See if the name is defined in an import.
+            symbolTable.findNameInImports(name)
+        }
+
     }
 
     def lookupField(name: String): Option[Field] = fieldLookup.get(name)
@@ -167,8 +177,31 @@ class SymbolTable(program: Program) {
         table
     }
 
+    var importContractLookup: Map[String, ContractTable] = {
+        var table = TreeMap[String, ContractTable]()
+
+        for (imp <- ast.imports) {
+            // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
+            val filename = imp.name;
+
+            val importAST = Parser.parseFileAtPath(filename, printTokens = false)
+            val importSymbolTable = new SymbolTable(importAST)
+            // This symbol table may include many different contracts. Unpack them.
+            for ((contractName, contractTable) <- importSymbolTable.contractLookup) {
+                if (table.contains(contractName)) {
+                    // TODO: report error for duplicate contract
+                }
+                table = table.updated(contractName, contractTable)
+            }
+        }
+
+        table
+    }
+
     def ast: Program = program
 
     /* only retrieves top level contracts (i.e. not nested) */
     def contract: Function[String, Option[ContractTable]] = contractLookup.get
+
+    def findNameInImports(name: String) : Option[ContractTable] = importContractLookup.get(name)
 }
