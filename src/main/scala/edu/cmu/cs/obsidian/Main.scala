@@ -175,12 +175,12 @@ object Main {
         var exitCode:Int = 1
         exitCode = Seq("jar","-cmfe", manifest, outputJar.toString, entryClass, "-C", bytecode.toString, "edu").!
         if(exitCode == 0) {
-            val outputJarPath:String = "obs_output/"+mainName+"WithDependencies.jar"
-            val unmanagedJarsPath:String = s"obs_output/$mainName.jar"
+            val outputJarPath:String = "./"+mainName+"WithDependencies.jar"
+            val unmanagedJarsPath:String = mainName+".jar"
             val outputPathCommand:String = "set assemblyOutputPath in assembly := file(\""+outputJarPath+"\")"
             val unmanagedJarsCommand:String = "set unmanagedJars in Compile += file(\""+unmanagedJarsPath+"\")"
             val mainClassCommand:String = "set mainClass in assembly := Some(\""+entryClass+"\")"
-            exitCode = Seq("sbt","set scalacOptions += \"-feature\"",outputPathCommand, unmanagedJarsCommand,mainClassCommand, "assembly").!
+            exitCode = Seq("sbt","set scalacOptions += \"-feature\"",outputPathCommand, unmanagedJarsCommand,mainClassCommand, "package").!
         }
         exitCode
 
