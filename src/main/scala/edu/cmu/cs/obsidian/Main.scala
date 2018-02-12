@@ -172,19 +172,11 @@ object Main {
 
         val manifest = s"Obsidian Runtime/manifest.mf"
         val entryClass = s"edu.cmu.cs.obsidian.generated_code.$mainName"
-        var exitCode:Int = 1
-        exitCode = Seq("jar","-cmfe", manifest, outputJar.toString, entryClass, "-C", bytecode.toString, "edu").!
-        if(exitCode == 0) {
-            val outputJarPath:String = "./"+mainName+"WithDependencies.jar"
-            val unmanagedJarsPath:String = mainName+".jar"
-            val outputPathCommand:String = "set assemblyOutputPath in assembly := file(\""+outputJarPath+"\")"
-            val unmanagedJarsCommand:String = "set unmanagedJars in Compile += file(\""+unmanagedJarsPath+"\")"
-            val mainClassCommand:String = "set mainClass in assembly := Some(\""+entryClass+"\")"
-            exitCode = Seq("sbt","set scalacOptions += \"-feature\"",outputPathCommand, unmanagedJarsCommand,mainClassCommand, "package").!
-        }
-        exitCode
+        val jarCmd: Array[String] =
+            Array("jar", "-cvfme", mainName+".jar", manifest, entryClass, "-C", bytecode.toString, "edu")
+        val procJar = Runtime.getRuntime().exec(jarCmd)
 
-        /*if (printJavacOutput) {
+        if (printJavacOutput) {
             val compilerOutput = procJar.getErrorStream()
             val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
             val result = if (untilEOF.hasNext()) {
@@ -194,7 +186,10 @@ object Main {
             }
 
             print(result)
-        }*/
+        }
+
+        procJar.waitFor()
+        procJar.exitValue()
     }
 
     def recDelete(f: File): Unit = {
