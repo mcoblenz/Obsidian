@@ -3,9 +3,10 @@
   <component name="ScalaCompilerConfiguration">
     <option name="deprecationWarnings" value="true" />
     <option name="explainTypeErrors" value="true" />
-    <profile name="SBT 1" modules="obsidian">
+    <profile name="SBT 1" modules="">
       <option name="deprecationWarnings" value="true" />
       <option name="explainTypeErrors" value="true" />
     </profile>
+    <profile name="sbt 1" modules="obsidian" />
   </component>
 </project>
