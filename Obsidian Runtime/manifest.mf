@@ -1,1 +1,1 @@
-Class-Path: protobuf-java-3.5.1.jar json-20160810.jar
+Class-Path: lib/protobuf-java-3.5.1.jar lib/json-20160810.jar

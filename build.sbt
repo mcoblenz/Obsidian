@@ -23,3 +23,4 @@ assemblyExcludedJars in assembly := {
         _.data.getName == "jcodemodel-3.0.0-SNAPSHOT.jar"
     }
 }
+

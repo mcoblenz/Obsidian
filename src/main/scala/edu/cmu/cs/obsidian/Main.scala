@@ -169,8 +169,7 @@ object Main {
         val manifest = s"Obsidian Runtime/manifest.mf"
         val entryClass = s"edu.cmu.cs.obsidian.generated_code.$mainName"
         val jarCmd: Array[String] =
-            Array("jar", "-cmfe", manifest, outputJar.toString, entryClass, "-C",
-                  bytecode.toString, "edu")
+            Array("jar", "-cvfme", mainName+".jar", manifest, entryClass, "-C", bytecode.toString, "edu")
         val procJar = Runtime.getRuntime().exec(jarCmd)
         val compilerOutput = procJar.getErrorStream()
         val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
