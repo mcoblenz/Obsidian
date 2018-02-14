@@ -146,18 +146,14 @@ object Main {
                                                         srcFile.toString)
 
         val proc: java.lang.Process = Runtime.getRuntime().exec(compileCmd)
-
-        if (printJavacOutput) {
-            val compilerOutput = proc.getErrorStream()
-            val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
-            val result = if (untilEOF.hasNext()) {
-                untilEOF.next()
-            } else {
-                ""
-            }
-
-            print(result)
+        val compilerOutput = proc.getErrorStream()
+        val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
+        val result = if (untilEOF.hasNext()) {
+            untilEOF.next()
+        } else {
+            ""
         }
+        print(result)
 
         proc.waitFor()
         proc.exitValue()
@@ -176,18 +172,14 @@ object Main {
             Array("jar", "-cmfe", manifest, outputJar.toString, entryClass, "-C",
                   bytecode.toString, "edu")
         val procJar = Runtime.getRuntime().exec(jarCmd)
-
-        if (printJavacOutput) {
-            val compilerOutput = procJar.getErrorStream()
-            val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
-            val result = if (untilEOF.hasNext()) {
-                untilEOF.next()
-            } else {
-                ""
-            }
-
-            print(result)
+        val compilerOutput = procJar.getErrorStream()
+        val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
+        val result = if (untilEOF.hasNext()) {
+            untilEOF.next()
+        } else {
+            ""
         }
+        print(result)
 
         procJar.waitFor()
         procJar.exitValue()
