@@ -1,0 +1,8 @@
+main contract C {
+    state S1 {
+        function f() returns int { return x; }
+        function f(T x) { return x; }
+    }
+    transaction t() available in S1 available in S1 { return x; }
+    transaction t(T x) available in S1 { return x; }
+}
