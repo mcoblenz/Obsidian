@@ -346,10 +346,8 @@ object Parser extends Parsers {
     private def parseFuncDecl = { //also make changes here
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case f ~ name ~ _ ~ args ~ _ ~ Some(funcOptions) ~ _ ~ body ~ _ =>
+            case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
                 Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body).setLoc(f)
-            case _ ~ _ ~ _ ~ _ ~ _ ~ None ~ _ ~ _ ~ _ =>
-                throw new ParseException("Invalid function options")
         }
     }
 
@@ -386,11 +384,11 @@ object Parser extends Parsers {
     case class EndsInState (val identifiers: Set[Identifier])
 
 
-    private def parseTransDecl = {
+    private def parseTransDecl: Parser[Transaction] = {
         TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
         parseTransOptions ~! rep(parseEnsures) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case t ~ name ~ _ ~ args ~ _ ~ Some(transOptions) ~
-                 ensures ~ _ ~ body ~ _ =>
+            case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
+              ensures ~ _ ~ body ~ _ =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
@@ -398,50 +396,49 @@ object Parser extends Parsers {
 
                 Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
                     ensures, transOptions.endsInState, body).setLoc(t)
-            case _ ~ _ ~ _ ~ _ ~ _ ~ None ~ _ ~ _ ~ _ ~ _ =>
-                throw new ParseException("Invalid transaction options")
         }
     }
-
-    private def parseTransOptions: Parser[Option[TransOptions]] = {
-        rep(parseReturns | parseAvailableInAlt | parseEndsInStateAlt) ^^ { //use match to determine each
+    //keep returns first, take union of available ins and ends in
+    private def parseTransOptions: Parser[TransOptions] = {
+        opt(parseReturns) ~! rep(parseAvailableInAlt | parseEndsInStateAlt) ^^ { //use match to determine each
             //check for repeats
-            case optionsSeq =>
-                var options: Option[TransOptions] = Some(TransOptions(None, None, None))
+            case returns ~ optionsSeq =>
+                var options: TransOptions = TransOptions(returns, None, None)
                 for (option <- optionsSeq) {
                     val newOption = option match {
-                        case t: ObsidianType => TransOptions(Some(t), None, None)
                         case a: AvailableIn => TransOptions(None, Some(a.identifiers), None)
                         case e: EndsInState => TransOptions(None, None, Some(e.identifiers))
                     }
                     options = (newOption, options) match {
-                        case (TransOptions(None, None, e), Some(TransOptions(t, a, None))) =>
-                            Some(TransOptions(t, a, e))
-                        case (TransOptions(None, a, None), Some(TransOptions(t, None, e))) =>
-                            Some(TransOptions(t, a, e))
-                        case (TransOptions(t, None, None), Some(TransOptions(None, a, e))) =>
-                            Some(TransOptions(t, a, e))
-                        case _ => None
+                        case (TransOptions(None, Some(a), None), TransOptions(t, Some(a2), e)) =>
+                            TransOptions(t, Some(a ++ a2), e)
+                        case (TransOptions(None, None, Some(e)), TransOptions(t, a, Some(e2))) =>
+                            TransOptions(t, a, Some(e ++ e2))
+                        case (TransOptions(None, Some(a), None), TransOptions(t, None, e)) =>
+                            TransOptions(t, Some(a), e)
+                        case (TransOptions(None, None, Some(e)), TransOptions(t, a, None)) =>
+                            TransOptions(t, a, Some(e))
+                        case _ => options
                     }
                 }
                 options
         }
     }
 
-    private def parseFuncOptions: Parser[Option[FuncOptions]] = {
-        rep(parseReturns | parseAvailableInAlt) ^^ { //use match to determine each
+    //take union of availableIns
+    private def parseFuncOptions: Parser[FuncOptions] = {
+        opt(parseReturns) ~! rep(parseAvailableInAlt) ^^ { //use match to determine each
             //check for repeats
-            case optionsSeq =>
-                var options: Option[FuncOptions] = Some(FuncOptions(None, None))
+            case returns ~ optionsSeq =>
+                var options: FuncOptions = FuncOptions(returns, None)
                 for (option <- optionsSeq) {
                     val newOption = option match {
-                        case t: ObsidianType => FuncOptions(Some(t), None)
                         case a: AvailableIn => FuncOptions(None, Some(a.identifiers))
                     }
                     options = (newOption, options) match {
-                        case (FuncOptions(None, a), Some(FuncOptions(t, None))) => Some(FuncOptions(t, a))
-                        case (FuncOptions(t, None), Some(FuncOptions(None, a))) => Some(FuncOptions(t, a))
-                        case _ => None
+                        case (FuncOptions(None, a), FuncOptions(t, None)) => FuncOptions(t, a)
+                        case (FuncOptions(None, Some(a)), FuncOptions(t, Some(a2))) => FuncOptions(t, Some(a ++ a2))
+                        case _ => options
                     }
                 }
                 options

@@ -224,15 +224,27 @@ class ParserTests extends JUnitSuite {
             """
               | main contract C {
               |     state S1 {
-              |         function f() { return x; }
+              |         function f() returns int available in S1 { return x; }
               |         function f(T x) { return x; }
               |     }
               |     transaction t() returns int available in S1 { return x; }
-              |     transaction t(T x) available in S1 returns int { return x; }
+              |     transaction t(T x) available in S1 { return x; }
               | }
             """.stripMargin
         )
-        //shouldFailFile("resources/tests/parser_tests/AvailableInRepeats.obs")
+        shouldFail(
+            """
+              | main contract C {
+              |     state S1 {
+              |         function f() { return x; }
+              |         function f(T x) { return x; }
+              |     }
+              |     transaction t() available in S1 returns int { return x; }
+              |     transaction t(T x) returns int available in S1{ return x; }
+              | }
+            """.stripMargin
+        )
+        shouldSucceedFile("resources/tests/parser_tests/AvailableInRepeats.obs")
 
     }
 
