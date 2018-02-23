@@ -1,0 +1,23 @@
+main contract PrimitiveTypes {
+    string s;
+    int n;
+    bool b;
+
+    transaction setString (string newString) returns string {
+        string oldString = s;
+        s = newString;
+        return oldString;
+    }
+
+    transaction setBool (bool newBool) returns bool {
+        bool oldBool = b;
+        b = newBool;
+        return oldBool;
+    }
+
+    transaction setInt (int newInt) returns int {
+        int oldInt = n;
+        n = newInt;
+        return oldInt;
+    }
+}
