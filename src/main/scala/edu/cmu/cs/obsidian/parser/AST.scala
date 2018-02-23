@@ -129,7 +129,7 @@ case class Transaction(name: String,
                        retType: Option[ObsidianType],
                        availableIn: Option[Set[Identifier]],
                        ensures: Seq[Ensures],
-                          endsInState: Option[Set[Identifier]],
+                       endsInState: Option[Set[Identifier]],
                        body: Seq[Statement]) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 }

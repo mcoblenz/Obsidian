@@ -218,6 +218,14 @@ class ParserTests extends JUnitSuite {
             """.stripMargin)
     }
 
+    //test token ordering in transaction parsing
+    @Test def transactionTests() = {
+        shouldSucceedFile("resources/tests/parser_tests/ValidTransactions.obs")
+        shouldFail("resources/tests/parser_tests/BadTransactionOrdering.obs")
+        shouldSucceedFile("resources/tests/parser_tests/AvailableInRepeats.obs")
+
+    }
+
     @Test def invocationSpec() = {
         shouldSucceedFile("resources/tests/parser_tests/InvokableSpec.obs")
     }
