@@ -343,7 +343,7 @@ object Parser extends Parsers {
             case _ ~ s => EndsInState(s)
         }
 
-    private def parseFuncDecl = { //also make changes here
+    private def parseFuncDecl = { 
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
