@@ -1,6 +1,6 @@
 resource contract Money {}
 
-resource contract Wallet {
+main resource contract Wallet {
 	 owned Wallet() {
 	 	  ->Empty;
 	 }

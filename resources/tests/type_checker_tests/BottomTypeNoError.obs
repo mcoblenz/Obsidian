@@ -3,7 +3,7 @@
  * expression that has been given the type BottomType does not cause another
  * error (this would create potentially many errors when merely one problem,
  * like an typo in a type or variable name, is responsible) */
-contract C {
+main contract C {
     transaction t1() {
         // should fail: [d] will have BottomType because [D] doesn't exist
         D d = 5;

@@ -8,7 +8,7 @@ resource contract C_Owned {
   state S {}
 }
 
-contract C {
+main contract C {
     transaction t_no_ret() {
         // should fail: cannot return a value in a transaction with no return type
         return 3;

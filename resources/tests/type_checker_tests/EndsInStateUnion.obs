@@ -1,4 +1,4 @@
-contract C1 {
+main contract C1 {
 
     // error: constructor for 'C1' ends in S2, S3 instead of S1, S2
     C1(bool b) ends in S1, S2 {

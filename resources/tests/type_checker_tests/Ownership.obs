@@ -5,7 +5,7 @@ contract Prescription {
 }
 
 // Very simple pharmacy — only holds one prescription.
-contract Pharmacy {
+main contract Pharmacy {
     owned Prescription prescription;
 
     transaction depositPrescription(owned Prescription p) {
