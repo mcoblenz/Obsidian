@@ -218,32 +218,10 @@ class ParserTests extends JUnitSuite {
             """.stripMargin)
     }
 
-    //test token ordering in transaction and function parsing
+    //test token ordering in transaction parsing
     @Test def transactionTests() = {
-        shouldSucceed(
-            """
-              | main contract C {
-              |     state S1 {
-              |         function f() returns int available in S1 { return x; }
-              |         function f(T x) { return x; }
-              |     }
-              |     transaction t() returns int available in S1 { return x; }
-              |     transaction t(T x) available in S1 { return x; }
-              | }
-            """.stripMargin
-        )
-        shouldFail(
-            """
-              | main contract C {
-              |     state S1 {
-              |         function f() { return x; }
-              |         function f(T x) { return x; }
-              |     }
-              |     transaction t() available in S1 returns int { return x; }
-              |     transaction t(T x) returns int available in S1{ return x; }
-              | }
-            """.stripMargin
-        )
+        shouldSucceedFile("resources/tests/parser_tests/ValidTransactions.obs")
+        shouldFail("resources/tests/parser_tests/BadTransactionOrdering.obs")
         shouldSucceedFile("resources/tests/parser_tests/AvailableInRepeats.obs")
 
     }

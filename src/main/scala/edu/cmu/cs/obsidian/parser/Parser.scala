@@ -369,10 +369,6 @@ object Parser extends Parsers {
         }
     }
 
-    //make return/availablein/endsin order not matter
-    //could use | but then would need to check in case for which is which
-    // make additional thingy?
-
     case class TransOptions (val returnType : Option[ObsidianType],
                              val availableIn : Option[Set[Identifier]],
                              val endsInState : Option[Set[Identifier]])
@@ -412,10 +408,10 @@ object Parser extends Parsers {
                     options = (newOption, options) match {
                         case (TransOptions(None, Some(a), None), TransOptions(t, Some(a2), e)) =>
                             TransOptions(t, Some(a ++ a2), e)
-                        case (TransOptions(None, None, Some(e)), TransOptions(t, a, Some(e2))) =>
-                            TransOptions(t, a, Some(e ++ e2))
                         case (TransOptions(None, Some(a), None), TransOptions(t, None, e)) =>
                             TransOptions(t, Some(a), e)
+                        case (TransOptions(None, None, Some(e)), TransOptions(t, a, Some(e2))) =>
+                            TransOptions(t, a, Some(e ++ e2))
                         case (TransOptions(None, None, Some(e)), TransOptions(t, a, None)) =>
                             TransOptions(t, a, Some(e))
                         case _ => options
