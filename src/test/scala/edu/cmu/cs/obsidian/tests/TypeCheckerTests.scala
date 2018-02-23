@@ -531,4 +531,13 @@ class TypeCheckerTests extends JUnitSuite {
                 Nil
         )
     }
+
+
+    @Test def noMainContractTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/NoMainContract.obs",
+            (NoMainContractError(), 1)
+                ::
+                Nil
+        )
+    }
 }

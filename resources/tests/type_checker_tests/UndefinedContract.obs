@@ -1,4 +1,4 @@
-contract Thing {
+main contract Thing {
     // should fail
     OtherThing other;
     int x;

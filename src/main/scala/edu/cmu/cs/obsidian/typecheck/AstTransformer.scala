@@ -43,7 +43,7 @@ object AstTransformer {
             contracts = contracts :+ newContract
         }
 
-        val newProgram = Program(transformedImports, contracts)
+        val newProgram = Program(transformedImports, contracts).setLoc(table.ast)
 
         val newTable = new SymbolTable(newProgram)
         (newTable, errorRecords)

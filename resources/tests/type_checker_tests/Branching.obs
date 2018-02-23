@@ -8,7 +8,7 @@ resource contract Ow/*ned*/ {
 
 }
 
-contract C {
+main contract C {
     transaction t() {
         Ow o1 = new Ow();
         Sh s1 = new Sh();

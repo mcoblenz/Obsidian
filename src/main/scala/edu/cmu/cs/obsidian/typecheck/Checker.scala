@@ -1610,6 +1610,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     }
 
+    private def checkForMainContract(ast: Program) = {
+        val c: Option[Contract] = ast.contracts.find((c: Contract) =>
+            c.modifiers.contains(IsMain()))
+        if (c == None) logError(ast, NoMainContractError())
+
+    }
+
     private def checkContract(contract: Contract): Unit = {
         val table = globalTable.contract(contract.name).get
         for (decl <- contract.declarations) {
@@ -1627,8 +1634,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+
     /* just returns the errors from the program */
     def checkProgram(): Seq[ErrorRecord] = {
+        checkForMainContract(globalTable.ast)
+
         for (contract <- globalTable.ast.contracts) {
             checkContract(contract)
         }

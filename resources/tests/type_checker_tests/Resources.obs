@@ -1,6 +1,6 @@
 // This file tests ownership transfer and linearity.
 
-resource contract BogusMoney {
+main resource contract BogusMoney {
 	 // Error: constructor must return an owned reference
 	 BogusMoney() {
 	 }

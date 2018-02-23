@@ -21,6 +21,10 @@ case class ErrorRecord (error: Error, pos: scala.util.parsing.input.Position) ex
     }
 }
 
+case class NoMainContractError() extends Error {
+    val msg: String = "No main contract found."
+}
+
 case class SubTypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Found type '$t1', but expected something of type '$t2'"
 }
