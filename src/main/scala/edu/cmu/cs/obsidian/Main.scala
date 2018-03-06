@@ -304,6 +304,7 @@ object Main {
                     val exitCode = protocInvocation.!
                     if (exitCode != 0) {
                         println("`" + protocInvocation + "` exited abnormally: " + exitCode)
+                        return false
                     }
                 } catch {
                     case e: Throwable => println("Error running protoc: " + e)
