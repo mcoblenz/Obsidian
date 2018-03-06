@@ -24,7 +24,6 @@ case class CompilerOptions (outputPath: Option[String],
 
 object Main {
 
-
     val usage: String =
         """Usage: obsidian [options] file.obs
           |Options:
@@ -206,7 +205,9 @@ object Main {
             println(usage)
             sys.exit(0)
         }
-
+        compileProgram(args)
+    }
+    def compileProgram(args: Array[String]): Boolean = {
         val options = parseOptions(args.toList)
 
         val tmpPath: Path = options.debugPath match {
@@ -268,7 +269,7 @@ object Main {
             }
 
             if (!allSortedErrors.isEmpty) {
-                return
+                return false
             }
 
             val lastSlash = filename.lastIndexOf("/")
@@ -277,7 +278,7 @@ object Main {
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
             val javaModel = if (options.buildClient) translateClientASTToJava(globalTable.ast, protobufOuterClassName)
-                                else translateServerASTToJava(globalTable.ast, protobufOuterClassName)
+            else translateServerASTToJava(globalTable.ast, protobufOuterClassName)
             javaModel.build(srcDir.toFile)
 
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(globalTable.ast, sourceFilename)
@@ -303,6 +304,7 @@ object Main {
                     val exitCode = protocInvocation.!
                     if (exitCode != 0) {
                         println("`" + protocInvocation + "` exited abnormally: " + exitCode)
+                        return false
                     }
                 } catch {
                     case e: Throwable => println("Error running protoc: " + e)
@@ -323,13 +325,18 @@ object Main {
                     println("jar exited with value " + jarExit)
                 }
             }
+            else
+                return false
 
         } catch {
-            case e: Parser.ParseException => println(e.message)
+            case e:
+                Parser.ParseException => println (e.message);
+                return false
         }
 
         if (shouldDelete) {
             recDelete(tmpPath.toFile)
         }
+        return true
     }
 }
