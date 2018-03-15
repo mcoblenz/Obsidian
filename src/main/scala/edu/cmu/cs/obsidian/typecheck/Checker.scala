@@ -1540,12 +1540,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         None // todo
     }
 
+    private def checkStateFieldShadowing(lexicallyInsideOf: ContractTable, f: Field): Unit = {
+        val fieldInContract = lexicallyInsideOf.lookupField(f.name)
+        fieldInContract match {
+            case None => ()
+            case Some(_) => logError(f, ShadowingError())
+        }
+    }
+
     private def checkState(lexicallyInsideOf: ContractTable, state: State): Unit = {
         val table = lexicallyInsideOf.state(state.name).get
         for (decl <- state.declarations) {
             decl match {
                 case t: Transaction => checkTransaction(t, table) // Unsupported for now but leaving this here just in case.
-                case f: Field => checkField(f, table.contractTable)
+                case f: Field => {
+                    checkField(f, table.contractTable)
+                    checkStateFieldShadowing(lexicallyInsideOf, f)
+                }
                 case _ => () // TODO
             }
         }

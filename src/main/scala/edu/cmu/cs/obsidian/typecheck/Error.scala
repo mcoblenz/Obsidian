@@ -25,6 +25,10 @@ case class NoMainContractError() extends Error {
     val msg: String = "No main contract found."
 }
 
+case class ShadowingError() extends Error {
+    val msg: String = "Fields in states may not shadow fields in contracts."
+}
+
 case class SubTypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Found type '$t1', but expected something of type '$t2'"
 }
