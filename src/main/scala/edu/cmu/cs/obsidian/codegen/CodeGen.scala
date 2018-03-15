@@ -650,10 +650,11 @@ class CodeGen (val target: Target) {
                     aContract: Contract,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext) = {
-        generateInvokeConstructor(newClass)
-
         for (decl <- aContract.declarations) {
             translateDeclaration(decl, newClass, translationContext, aContract)
+            if (decl.isInstanceOf[Constructor]) {
+                generateInvokeConstructor(newClass)
+            }
         }
 
         translationContext
