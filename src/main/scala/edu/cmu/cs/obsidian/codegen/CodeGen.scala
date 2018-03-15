@@ -650,6 +650,7 @@ class CodeGen (val target: Target) {
                     aContract: Contract,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext) = {
+
         var generated: Boolean = false
 
         for (decl <- aContract.declarations) {
