@@ -650,6 +650,7 @@ class CodeGen (val target: Target) {
                     aContract: Contract,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext) = {
+        generateInvokeConstructor(newClass)
 
         for (decl <- aContract.declarations) {
             translateDeclaration(decl, newClass, translationContext, aContract)
@@ -1238,6 +1239,30 @@ class CodeGen (val target: Target) {
         }
     }
 
+    private def getFromArchiveMeth(contract: Contract,
+                                   state: State,
+                                   stateClass: JDefinedClass,
+                                   translationContext: TranslationContext,
+                                   archiveType: JDirectClass): JMethod = {
+
+        val fromArchiveMeth = stateClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
+        val archive = fromArchiveMeth.param(archiveType, "archive")
+        val fromArchiveBody = fromArchiveMeth.body()
+
+        // Call setters.
+        val declarations = state.declarations
+
+        /* this takes care of fields that are not specific to any particular state */
+        for (f <- declarations if f.isInstanceOf[Field]) {
+            val field: Field = f.asInstanceOf[Field]
+            val javaFieldVar = stateClass.fields().get(field.name)
+            generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, translationContext, contract)
+        }
+
+        return fromArchiveMeth
+    }
+
+
     private def generateStateArchiveInitializer(
                     contract: Contract,
                     state: State,
@@ -1249,9 +1274,7 @@ class CodeGen (val target: Target) {
         val archiveType = model.directClass(protobufClassName)
 
         /* [initFromArchive] setup */
-        val fromArchiveMeth = stateClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
-        val archive = fromArchiveMeth.param(archiveType, "archive")
-        val fromArchiveBody = fromArchiveMeth.body()
+        val fromArchiveMeth = getFromArchiveMeth(contract, state, stateClass, translationContext, archiveType)
 
         /* [__initFromArchiveBytes] declaration: this just parses the archive and
          * calls [initFromArchive] */
@@ -1268,19 +1291,7 @@ class CodeGen (val target: Target) {
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
 
 
-
         fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
-
-        // Call setters.
-        val declarations = state.declarations
-
-        /* this takes care of fields that are not specific to any particular state */
-        for (f <- declarations if f.isInstanceOf[Field]) {
-            val field: Field = f.asInstanceOf[Field]
-            val javaFieldVar = stateClass.fields().get(field.name)
-            generateFieldInitializer(field, javaFieldVar, fromArchiveBody, archive, translationContext, contract)
-        }
-
         fromBytesBody._return(JExpr._this())
     }
 
@@ -1566,6 +1577,15 @@ class CodeGen (val target: Target) {
         }
         generateStateArchiveInitializer(contract, state, stateClass, translationContext)
         generateStateArchiver(contract, state, stateClass, translationContext)
+    }
+
+    private def generateInvokeConstructor(newClass: JDefinedClass) = {
+
+        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, "invokeConstructor")
+        val name : String = "new_" + newClass.name()
+        val body = meth.body()
+        body.invokeThis(name)
+
     }
 
     /* the local context at the beginning of the method */
