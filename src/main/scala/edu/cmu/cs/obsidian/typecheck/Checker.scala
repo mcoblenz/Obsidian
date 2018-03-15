@@ -1544,7 +1544,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val fieldInContract = lexicallyInsideOf.lookupField(f.name)
         fieldInContract match {
             case None => ()
-            case Some(_) => logError(f, ShadowingError())
+            case Some(_) => logError(f, ShadowingError(f.name))
         }
     }
 
