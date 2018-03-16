@@ -544,7 +544,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def shadowingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ForbiddenShadowing.obs",
-            (ShadowingError(), 9)
+            (ShadowingError("x"), 9)
                 ::
                 Nil
         )
