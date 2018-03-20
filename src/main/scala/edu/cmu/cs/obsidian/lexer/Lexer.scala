@@ -23,6 +23,7 @@ object Lexer extends RegexParsers {
         case "if" => IfT()
         case "else" => ElseT()
         case "contract" => ContractT()
+        case "interface" => InterfaceT()
         case "transaction" => TransactionT()
         case "function" => FunctionT()
         case "type" => TypeT()

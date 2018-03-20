@@ -380,18 +380,32 @@ object Parser extends Parsers {
     case class EndsInState (val identifiers: Set[Identifier])
 
 
-    private def parseTransDecl: Parser[Transaction] = {
-        TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-        parseTransOptions ~! rep(parseEnsures) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
-              ensures ~ _ ~ body ~ _ =>
-                val nameString = name match {
-                    case MainT() => "main"
-                    case id => id.asInstanceOf[Identifier]._1
-                }
-
-                Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, transOptions.endsInState, body).setLoc(t)
+    private def parseTransDecl(isInterface:Boolean): Parser[Transaction] = {
+        if(!isInterface) {
+            TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+              parseTransOptions ~! rep(parseEnsures) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+                case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
+                  ensures ~ _ ~ body ~ _ =>
+                    val nameString = name match {
+                        case MainT() => "main"
+                        case id => id.asInstanceOf[Identifier]._1
+                    }
+                    Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
+                        ensures, transOptions.endsInState, body).setLoc(t)
+            }
+        }
+        else {
+            TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+              parseTransOptions ~! rep(parseEnsures) ~! SemicolonT() ^^ {
+                case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
+                  ensures ~ _=>
+                    val nameString = name match {
+                        case MainT() => "main"
+                        case id => id.asInstanceOf[Identifier]._1
+                    }
+                    Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
+                        ensures, transOptions.endsInState, Seq.empty[Statement]).setLoc(t)
+            }
         }
     }
     //keep returns first, take union of available ins and ends in
@@ -465,8 +479,9 @@ object Parser extends Parsers {
         parseStateDecl | parseConstructor | parseContractDecl | failure("declaration expected")
     }
 
-    private def parseDeclInContract: Parser[Declaration] = {
-        parseDeclInState | parseTransDecl
+    private def parseDeclInContract(isInterface:Boolean): Parser[Declaration] = {
+        if(isInterface) parseDeclInState | parseTransDecl(true)
+        else parseDeclInState | parseTransDecl(false)
     }
 
     private def parseContractModifier = {
@@ -477,8 +492,15 @@ object Parser extends Parsers {
 
     private def parseContractDecl = {
         rep(parseContractModifier) ~ ContractT() ~! parseId ~!
-            LBraceT() ~! rep(parseDeclInContract) ~! RBraceT() ^^ {
-            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod.toSet, name._1, defs).setLoc(ct)
+            LBraceT() ~! rep(parseDeclInContract(false)) ~! RBraceT() ^^ {
+            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod.toSet, name._1, defs, false).setLoc(ct)
+        }
+    }
+
+    private def parseInterfaceDecl = {
+        rep(parseContractModifier) ~ InterfaceT() ~! parseId ~!
+          LBraceT() ~! rep(parseDeclInContract(true)) ~! RBraceT() ^^ {
+            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod.toSet, name._1, defs, true).setLoc(ct)
         }
     }
 
@@ -489,7 +511,7 @@ object Parser extends Parsers {
     }
 
     private def parseProgram = {
-        phrase(rep(parseImport) ~ rep1(parseContractDecl)) ^^ {
+        phrase(rep(parseImport) ~ rep1(parseContractDecl | parseInterfaceDecl)) ^^ {
             case imports ~ contracts => Program(imports, contracts).setLoc(contracts.head)
         }
     }
@@ -498,7 +520,7 @@ object Parser extends Parsers {
         val reader = new TokenReader(tokens)
         parseProgram(reader) match {
             case Success(result, _) => Right(result)
-            case Failure(msg , _) => Left(s"FAILURE: $msg")
+            case Failure(msg , _) => Left(s"PARSER FAILURE: $msg")
             case Error(msg , next) =>
                 if (next.atEnd) {
                     Left(s"Error: $msg at end of file")

@@ -45,6 +45,7 @@ sealed abstract class InvokableDeclaration() extends Declaration {
 }
 
 /* Expressions */
+//Change Variable To Identifier : Some other name?
 case class Variable(name: String) extends Expression {
     override val toString = name
 }
@@ -147,7 +148,8 @@ case class Import(name: String) extends AST
 
 case class Contract(modifiers: Set[ContractModifier],
                     name: String,
-                    declarations: Seq[Declaration]) extends Declaration {
+                    declarations: Seq[Declaration],
+                    isInterface: Boolean) extends Declaration {
     val tag: DeclarationTag = ContractDeclTag
 
     val isResource = modifiers.contains(IsResource())
