@@ -1407,7 +1407,7 @@ class CodeGen (val target: Target) {
                 }
             case (s@State(_, _)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
-            case (c@Contract(_, _, _)) => translateInnerContract(c, newClass, translationContext)
+            case (c@Contract(_, _, _,_)) => translateInnerContract(c, newClass, translationContext)
             case t: TypeDecl =>
                 assert(false, "TODO")
                 ()
