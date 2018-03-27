@@ -131,7 +131,8 @@ case class Transaction(name: String,
                        availableIn: Option[Set[Identifier]],
                        ensures: Seq[Ensures],
                        endsInState: Option[Set[Identifier]],
-                       body: Seq[Statement]) extends InvokableDeclaration with IsAvailableInStates {
+                       body: Seq[Statement],
+                       isStatic:Boolean) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 }
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration {

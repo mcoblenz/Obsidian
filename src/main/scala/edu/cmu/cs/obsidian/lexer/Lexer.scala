@@ -25,6 +25,7 @@ object Lexer extends RegexParsers {
         case "contract" => ContractT()
         case "interface" => InterfaceT()
         case "transaction" => TransactionT()
+        case "static" => StaticT()
         case "function" => FunctionT()
         case "type" => TypeT()
         case "state" => StateT()

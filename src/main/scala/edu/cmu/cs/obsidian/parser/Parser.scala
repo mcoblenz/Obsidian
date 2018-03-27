@@ -389,16 +389,20 @@ object Parser extends Parsers {
     }
 
     private def parseTransDecl(isInterface:Boolean): Parser[Transaction] = {
-        TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+        TransactionT() ~! opt(StaticT()) ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
           parseTransOptions ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
-            case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
+            case t ~ static ~ name ~ _ ~ args ~ _ ~ transOptions ~
               ensures ~ body =>
+                val isStatic = static match {
+                    case None => false
+                    case Some(static) => true
+                }
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
                 }
                 Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, transOptions.endsInState, body).setLoc(t)
+                    ensures, transOptions.endsInState, body, isStatic).setLoc(t)
         }
     }
     //keep returns first, take union of available ins and ends in
