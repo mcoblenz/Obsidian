@@ -322,7 +322,6 @@ object Parser extends Parsers {
             }
         }
     }
-
     private def parseReturns = ReturnsT() ~! parseType ^^ {
         case _ ~ typ => typ
     }
@@ -380,32 +379,26 @@ object Parser extends Parsers {
     case class EndsInState (val identifiers: Set[Identifier])
 
 
-    private def parseTransDecl(isInterface:Boolean): Parser[Transaction] = {
-        if(!isInterface) {
-            TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-              parseTransOptions ~! rep(parseEnsures) ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-                case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
-                  ensures ~ _ ~ body ~ _ =>
-                    val nameString = name match {
-                        case MainT() => "main"
-                        case id => id.asInstanceOf[Identifier]._1
-                    }
-                    Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                        ensures, transOptions.endsInState, body).setLoc(t)
-            }
+    private def parseTransBody(isInterface:Boolean) =  {
+        if(isInterface) SemicolonT() ^^ {
+            case _ => Seq.empty[Statement]
         }
-        else {
-            TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-              parseTransOptions ~! rep(parseEnsures) ~! SemicolonT() ^^ {
-                case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
-                  ensures ~ _=>
-                    val nameString = name match {
-                        case MainT() => "main"
-                        case id => id.asInstanceOf[Identifier]._1
-                    }
-                    Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                        ensures, transOptions.endsInState, Seq.empty[Statement]).setLoc(t)
-            }
+        else LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case _ ~ body ~ _ => body
+        }
+    }
+
+    private def parseTransDecl(isInterface:Boolean): Parser[Transaction] = {
+        TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+          parseTransOptions ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
+            case t ~ name ~ _ ~ args ~ _ ~ transOptions ~
+              ensures ~ body =>
+                val nameString = name match {
+                    case MainT() => "main"
+                    case id => id.asInstanceOf[Identifier]._1
+                }
+                Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
+                    ensures, transOptions.endsInState, body).setLoc(t)
         }
     }
     //keep returns first, take union of available ins and ends in
@@ -523,7 +516,7 @@ object Parser extends Parsers {
             case Failure(msg , _) => Left(s"PARSER FAILURE: $msg")
             case Error(msg , next) =>
                 if (next.atEnd) {
-                    Left(s"Error: $msg at end of file")
+                    Left(s"Parser Error: $msg at end of file")
                 }
                 else {
                     val line = next.first.pos.line
