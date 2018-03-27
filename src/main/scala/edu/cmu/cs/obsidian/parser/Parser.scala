@@ -389,9 +389,9 @@ object Parser extends Parsers {
     }
 
     private def parseTransDecl(isInterface:Boolean): Parser[Transaction] = {
-        TransactionT() ~! opt(StaticT()) ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+        opt(StaticT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
           parseTransOptions ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
-            case t ~ static ~ name ~ _ ~ args ~ _ ~ transOptions ~
+            case static ~ t ~ name ~ _ ~ args ~ _ ~ transOptions ~
               ensures ~ body =>
                 val isStatic = static match {
                     case None => false
