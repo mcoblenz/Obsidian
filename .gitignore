@@ -39,3 +39,6 @@ project/plugins/project/
 .idea/uiDesigner.xml
 # IntelliJ
 /out/
+*.jar
+*.java
+*.proto

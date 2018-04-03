@@ -1527,7 +1527,7 @@ class CodeGen (val target: Target) {
         val recurse = (e: Expression) => translateExpr(e, translationContext, localContext)
 
         e match {
-            case Variable(x) => dereferenceVariable(x, translationContext, localContext)
+            case ReferenceIdentifier(x) => dereferenceVariable(x, translationContext, localContext)
             case NumLiteral(n) => model.directClass("java.math.BigInteger").
                                     staticInvoke("valueOf").arg(JExpr.lit(n))
             case StringLiteral(s) => JExpr.lit(s)
@@ -1801,7 +1801,7 @@ class CodeGen (val target: Target) {
                 }
 
                 translationContext.pendingFieldAssignments = Set.empty
-            case Assignment(Variable(x), e, transfersOwnership) =>
+            case Assignment(ReferenceIdentifier(x), e, transfersOwnership) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext)
             /* it's bad that this is a special case */
