@@ -466,8 +466,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          // TODO handle cases for e.g. if the field is owned
                          (t, context)
                      case (None, None) =>
-                         logError(e, VariableUndefinedError(x, context.thisType.toString))
-                         (BottomType(), context)
+                         val tableLookup = context.contractTable.lookupContract(x)
+                         if (!tableLookup.isEmpty) {
+                           val ctTableOfConstructed = tableLookup.get
+                           (StaticContractType(ctTableOfConstructed), context)
+                         }
+                         else
+                            (BottomType(), context)
                  }
              case OwnershipTransfer(e) =>
                  e match {

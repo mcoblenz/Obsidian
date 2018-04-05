@@ -1,0 +1,4 @@
+interface System {
+     static transaction print(string s);
+     static transaction println(string s);
+}

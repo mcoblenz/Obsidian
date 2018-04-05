@@ -1,3 +1,0 @@
-interface System {
-     static transaction print(String s);
-}

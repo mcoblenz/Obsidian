@@ -14,7 +14,6 @@ case class IsOwned() extends TypeModifier {
     override def toString: String = "owned"
 }
 
-
 /* [SimpleType] simply indicates a contract, and possibly a state or set of states: there
  * is neither a permission nor a path associated with the type */
 sealed trait SimpleType { val contractName: String }
@@ -166,5 +165,14 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeMo
     override val residualType: ObsidianType = this // Should never be invoked
     override val extractSimpleType: Option[SimpleType] = None
 
+    override val extractUnpermissionedType: Option[UnpermissionedType] = None
+}
+
+case class StaticContractType(table: DeclarationTable) extends ObsidianType {
+    override def toString: String = table.name
+    val isBottom: Boolean = false
+    val tableOpt: Option[DeclarationTable] = Some(table)
+    override val residualType: ObsidianType = this
+    override val extractSimpleType: Option[SimpleType] = Some(table.simpleType)
     override val extractUnpermissionedType: Option[UnpermissionedType] = None
 }

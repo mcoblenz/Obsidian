@@ -84,13 +84,17 @@ case class TranslationContext(
     }
 
     /* just like [assignVariable], but this dereferences a variable */
-    def dereferenceVariable(f: String): IJExpression = {
-        (currentStateName, fieldLookup(f)) match {
-            /* same note in [assignVariable] above applies here as well */
-            case (None, GlobalFieldInfo(_)) => JExpr._this().ref(f)
-            case (Some(_), GlobalFieldInfo(_)) => contractClass.staticRef("this").ref(f)
-            case (_, StateSpecificFieldInfo(_, getFunc, _)) => JExpr.invoke(getFunc)
+    def dereferenceVariable(f: String, model:JCodeModel): IJExpression = {
+        if(fieldLookup.keySet.contains(f)) {
+            (currentStateName, fieldLookup(f)) match {
+                /* same note in [assignVariable] above applies here as well */
+                case (None, GlobalFieldInfo(_)) => JExpr._this().ref(f)
+                case (Some(_), GlobalFieldInfo(_)) => contractClass.staticRef("this").ref(f)
+                case (_, StateSpecificFieldInfo(_, getFunc, _)) => JExpr.invoke(getFunc)
+            }
         }
+        else
+            model.directClass(f).staticRef("out")
     }
 
     /* does one of the below; checks first to see which one is possible */

@@ -21,15 +21,19 @@ object ProtobufGen {
 
         val protobufs: Seq[(Protobuf, String)] = program.imports.map ((imp: Import) => {
             // Each import results in a .proto file, which needs to be compiled.
-            val protobufOuterClassName = Util.protobufOuterClassNameForFilename(imp.name)
-            val protobufFilename = protobufOuterClassName + ".proto"
+            if(!imp.name.contains("/java-utilities/")) {
+                val protobufOuterClassName = Util.protobufOuterClassNameForFilename(imp.name)
+                val protobufFilename = protobufOuterClassName + ".proto"
 
-            // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
-            val filename = imp.name;
+                // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
+                val filename = imp.name;
 
-            val ast = Parser.parseFileAtPath(filename, printTokens = false)
-            val messages = ast.contracts.map(translateContract)
-            (new Protobuf(messages), filename)
+                val ast = Parser.parseFileAtPath(filename, printTokens = false)
+                val messages = ast.contracts.map(translateContract)
+                (new Protobuf(messages), filename)
+            }
+            else
+                (new Protobuf(Nil), "")
         })
 
         val messages = program.contracts.map(translateContract)

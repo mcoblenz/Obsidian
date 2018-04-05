@@ -287,27 +287,28 @@ object Main {
             for (p <- protobufs) {
                 val protobuf = p._1
                 val filename = p._2
+                if(filename.length() > 0) {
+                    val protobufOuterClassName = Util.protobufOuterClassNameForFilename(filename)
+                    val protobufFilename = protobufOuterClassName + ".proto"
 
-                val protobufOuterClassName = Util.protobufOuterClassNameForFilename(filename)
-                val protobufFilename = protobufOuterClassName + ".proto"
+                    val protobufPath = outputPath.resolve(protobufFilename)
 
-                val protobufPath = outputPath.resolve(protobufFilename)
-
-                protobuf.build(protobufPath.toFile, protobufOuterClassName)
+                    protobuf.build(protobufPath.toFile, protobufOuterClassName)
 
 
-                // Invoke protoc to compile from protobuf to Java.
-                val protocInvocation: String =
-                    "protoc --java_out=" + srcDir + " " + protobufPath.toString
+                    // Invoke protoc to compile from protobuf to Java.
+                    val protocInvocation: String =
+                        "protoc --java_out=" + srcDir + " " + protobufPath.toString
 
-                try {
-                    val exitCode = protocInvocation.!
-                    if (exitCode != 0) {
-                        println("`" + protocInvocation + "` exited abnormally: " + exitCode)
-                        return false
+                    try {
+                        val exitCode = protocInvocation.!
+                        if (exitCode != 0) {
+                            println("`" + protocInvocation + "` exited abnormally: " + exitCode)
+                            return false
+                        }
+                    } catch {
+                        case e: Throwable => println("Error running protoc: " + e)
                     }
-                } catch {
-                    case e: Throwable => println("Error running protoc: " + e)
                 }
             }
 
