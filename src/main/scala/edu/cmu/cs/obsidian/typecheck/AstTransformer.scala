@@ -87,7 +87,7 @@ object AstTransformer {
 
         newDecls = newDecls.reverse
 
-        val newContract = Contract(cTable.contract.modifiers, cTable.contract.name, newDecls).setLoc(cTable.contract)
+        val newContract = Contract(cTable.contract.modifiers, cTable.contract.name, newDecls, cTable.contract.isInterface).setLoc(cTable.contract)
 
         (newContract, errors.reverse)
     }
@@ -131,7 +131,7 @@ object AstTransformer {
 
     def transformExpression(e: Expression): Expression = {
         e match {
-            case v: Variable => v
+            case v: ReferenceIdentifier => v
             case n: NumLiteral => n
             case s: StringLiteral => s
             case t: TrueLiteral => TrueLiteral().setLoc(t)
@@ -304,7 +304,7 @@ object AstTransformer {
                 updates match {
                     case None => (Transition(newStateName, updates).setLoc(t), context, Seq())
                     case Some(u) =>
-                        val mapFun = (p: (Variable, Expression)) => (p._1, transformExpression(p._2))
+                        val mapFun = (p: (ReferenceIdentifier, Expression)) => (p._1, transformExpression(p._2))
                         val transformedUpdates = u.map(mapFun)
 
                         (Transition(newStateName, Some(transformedUpdates)).setLoc(t), context, Seq())

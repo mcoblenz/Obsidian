@@ -45,7 +45,7 @@ sealed abstract class InvokableDeclaration() extends Declaration {
 }
 
 /* Expressions */
-case class Variable(name: String) extends Expression {
+case class ReferenceIdentifier(name: String) extends Expression {
     override val toString = name
 }
 
@@ -83,7 +83,7 @@ case class Return() extends Statement
 case class ReturnExpr(e: Expression) extends Statement
 
 // We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
-case class Transition(newStateName: String, updates: Option[Seq[(Variable, Expression)]]) extends Statement
+case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) extends Statement
 case class Assignment(assignTo: Expression, e: Expression, transfersOwnership: Boolean) extends Statement
 case class Throw() extends Statement
 case class If(eCond: Expression, s: Seq[Statement]) extends Statement
@@ -130,7 +130,8 @@ case class Transaction(name: String,
                        availableIn: Option[Set[Identifier]],
                        ensures: Seq[Ensures],
                        endsInState: Option[Set[Identifier]],
-                       body: Seq[Statement]) extends InvokableDeclaration with IsAvailableInStates {
+                       body: Seq[Statement],
+                       isStatic:Boolean) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 }
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration {
@@ -147,7 +148,8 @@ case class Import(name: String) extends AST
 
 case class Contract(modifiers: Set[ContractModifier],
                     name: String,
-                    declarations: Seq[Declaration]) extends Declaration {
+                    declarations: Seq[Declaration],
+                    isInterface: Boolean) extends Declaration {
     val tag: DeclarationTag = ContractDeclTag
 
     val isResource = modifiers.contains(IsResource())

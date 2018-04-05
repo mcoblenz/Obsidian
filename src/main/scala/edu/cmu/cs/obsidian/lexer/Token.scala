@@ -9,9 +9,11 @@ sealed trait Token extends Positional
 
 /* keywords */
 case class ContractT() extends Token { override def toString: String = "contract" }
+case class InterfaceT() extends Token { override def toString: String = "interface" }
 case class IfT() extends Token { override def toString: String = "if" }
 case class ElseT() extends Token { override def toString: String = "else" }
 case class TransactionT() extends Token { override def toString: String = "transaction" }
+case class StaticT() extends Token { override def toString: String = "static" }
 case class FunctionT() extends Token { override def toString: String = "function" }
 case class TypeT() extends Token { override def toString: String = "type" }
 case class StateT() extends Token { override def toString: String = "state" }

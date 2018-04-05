@@ -453,7 +453,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
          e match {
-             case Variable(x) =>
+             case ReferenceIdentifier(x) =>
                  (context get x, context.lookupFieldTypeInThis(x)) match {
                      case (Some(t), _) =>
                          if (consumeOwnershipIfOwned) {
@@ -471,8 +471,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
              case OwnershipTransfer(e) =>
                  e match {
-                     case Variable(x) =>
-                         inferAndCheckExpr(decl, context, Variable(x), consumeOwnershipIfOwned = true)
+                     case ReferenceIdentifier(x) =>
+                         inferAndCheckExpr(decl, context, ReferenceIdentifier(x), consumeOwnershipIfOwned = true)
                      case _ =>
                          val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
                          if (!typ.isOwned) {
@@ -636,7 +636,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  // If e is a variable, then we need to update the context to indicate that it's no longer owned.
                  val finalContext = e match {
-                     case Variable(x) => contextPrime.updated(x, newTyp)
+                     case ReferenceIdentifier(x) => contextPrime.updated(x, newTyp)
                      case _ => contextPrime
                  }
                  (newTyp, finalContext)
@@ -804,12 +804,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         Context(mergedMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized))
     }
 
-    /* if [e] is of the form Variable(x), This(), or if [e] is a sequence of
-     * dereferences on Variable(x) or This(), [extractPath] extracts the list
+    /* if [e] is of the form ReferenceIdentifier(x), This(), or if [e] is a sequence of
+     * dereferences on ReferenceIdentifier(x) or This(), [extractPath] extracts the list
      * of identifiers on the path. If [e] isn't this form, returns None */
     private def extractPath(e: Expression): Option[Seq[String]] = {
         e match {
-            case Variable(x) => Some(x::Nil)
+            case ReferenceIdentifier(x) => Some(x::Nil)
             case This() => Some("this"::Nil)
             case Parent() => Some("this"::"parent"::Nil)
             case Dereference(ePrime, f) => extractPath(ePrime).map(_ ++ (f::Nil))
@@ -1040,7 +1040,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val variablesToExcludeFromOwnershipCheck =
                             if (tx.retType.get.isOwned) {
                                 e match {
-                                    case Variable(xOther) => Set(xOther, "this")
+                                    case ReferenceIdentifier(xOther) => Set(xOther, "this")
                                     case _ => Set("this")
                                 }
                             }
@@ -1054,7 +1054,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val variablesToExcludeFromOwnershipCheck =
                             if (f.retType.get.isOwned) {
                                 e match {
-                                    case Variable(xOther) => Set(xOther, "this")
+                                    case ReferenceIdentifier(xOther) => Set(xOther, "this")
                                     case _ => Set("this")
                                 }
                             }
@@ -1072,7 +1072,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 if (!tRet.isBottom) checkIsSubtype(s, t, tRet)
                 contextPrime.makeThrown
 
-            case Transition(newStateName, updates: Option[Seq[(Variable, Expression)]]) =>
+            case Transition(newStateName, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) =>
                 val thisTable = context.contractTable
 
                 if (thisTable.state(newStateName).isEmpty) {
@@ -1175,7 +1175,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 var contextPrime = context
                 if (updates.isDefined) {
-                    for ((Variable(f), e) <- updates.get) {
+                    for ((ReferenceIdentifier(f), e) <- updates.get) {
                         if (newFields.contains(f)) {
                             val fieldAST = newStateTable.lookupField(f).get
                             val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e)
@@ -1202,7 +1202,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 contextPrime.updated("this", newType).updatedWithoutAnyTransitionFieldsInitialized()
 
-            case Assignment(Variable(x), e: Expression, transfersOwnership) =>
+            case Assignment(ReferenceIdentifier(x), e: Expression, transfersOwnership) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = transfersOwnership)
 
                 // If we're going to transfer ownership, make sure we're starting with something owned.
@@ -1358,7 +1358,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             val newContextThisType =
                                 updatedUnpermissionedType(context("this"), newType.extractUnpermissionedType.get)
                             contextPrime.updated("this", newContextThisType)
-                        case Variable(x) => contextPrime.updated(x, newType)
+                        case ReferenceIdentifier(x) => contextPrime.updated(x, newType)
                         case _ => contextPrime
                     }
 
