@@ -1,5 +1,6 @@
 package edu.cmu.cs.obsidian.typecheck
 
+import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.parser._
 
 /* a type error: has a message (presented to the user).
@@ -25,8 +26,17 @@ case class NoMainContractError() extends Error {
     val msg: String = "No main contract found."
 }
 
-case class ShadowingError(name: String) extends Error {
-    val msg: String = s"Field '$name' in state shadows field of the same name in contract."
+case class ShadowingError(fieldName: String, stateName: String, prevLine: Int) extends Error {
+    val msg: String = s"Field '$fieldName' in '$stateName' also declared in contract at line $prevLine. Consider removing declaration in state."
+}
+case class SharedFieldNameError(fieldName: String, stateName: String, prevLine: Int) extends Error {
+    val msg: String = s"Field '$fieldName' previously declared in state '$stateName' at line $prevLine."
+}
+case class RepeatContractFields(fieldName: String, lineNum: Int, prevLine: Int) extends Error {
+    val msg: String = s"Field '$fieldName' previously declared at line $prevLine. Consider removing line $lineNum."
+}
+case class CombineAvailableIns(fieldName: String, states: String, prevLine: Int) extends Error {
+    val msg: String = s"Field '$fieldName' previously declared at line $prevLine. Did you mean '$fieldName available in $states'?"
 }
 
 case class SubTypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
