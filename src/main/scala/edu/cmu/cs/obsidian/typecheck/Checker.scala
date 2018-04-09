@@ -1540,12 +1540,58 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         None // todo
     }
 
-    private def checkStateFieldShadowing(lexicallyInsideOf: ContractTable, f: Field): Unit = {
+    private def checkStateFieldShadowing(lexicallyInsideOf: ContractTable, f: Field, s: State): Unit = {
+        //check if field also declared in contract
         val fieldInContract = lexicallyInsideOf.lookupField(f.name)
         fieldInContract match {
             case None => ()
-            case Some(_) => logError(f, ShadowingError(f.name))
+            case Some(field) => logError(f, ShadowingError(f.name, s.name, field.loc.line))
         }
+
+
+        //check if field is in another state too
+        val allStateNames: Set[String] = lexicallyInsideOf.possibleStates
+        var foundField: Boolean = false
+        for (stateName <- allStateNames) {
+            if (stateName != s.name) {
+                lexicallyInsideOf.state(stateName) match {
+                    case None => ()
+                    case Some(state: StateTable) => {
+                        for (decl <- state.ast.declarations) {
+                            decl match {
+                                case field: Field => {
+                                    if ((field.name == f.name) && (field.loc.line < f.loc.line) && (!foundField)) {
+                                        logError(f, SharedFieldNameError(field.name, stateName, field.loc.line))
+                                        foundField = true
+                                    }
+                                }
+                                case _ => ()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private def checkContractFieldRepeats(field: Field, contract: Contract): Unit = {
+        for (decl <- contract.declarations) {
+            decl match {
+                case f: Field => {
+                    if ((f.name == field.name) && (f.loc.line < field.loc.line)) {
+                        (field.availableIn, f.availableIn) match {
+                            case (None, _) => logError(field, RepeatContractFields(field.name, f.loc.line, f.loc.line))
+                            case (Some(_), None) => logError(field, RepeatContractFields(field.name, field.loc.line, f.loc.line))
+                            case (Some(states1), Some(states2)) => {
+                                logError(field, CombineAvailableIns(field.name, (states2 | states1).map(_._1).mkString(", "), f.loc.line))
+                            }
+                        }
+                    }
+                }
+                case _ => () //do nothing
+            }
+        }
+
     }
 
     private def checkState(lexicallyInsideOf: ContractTable, state: State): Unit = {
@@ -1555,7 +1601,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case t: Transaction => checkTransaction(t, table) // Unsupported for now but leaving this here just in case.
                 case f: Field => {
                     checkField(f, table.contractTable)
-                    checkStateFieldShadowing(lexicallyInsideOf, f)
+                    checkStateFieldShadowing(lexicallyInsideOf, f, state)
                 }
                 case _ => () // TODO
             }
@@ -1634,7 +1680,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             decl match {
                 case t: Transaction => checkTransaction(t, table)
                 case s: State => checkState(table, s)
-                case f: Field => checkField(f, table)
+                case f: Field => {
+                    checkField(f, table)
+                    checkContractFieldRepeats(f, contract)
+                }
                 case c: Constructor => checkConstructor(c, table, table.stateLookup.nonEmpty)
                 case _ => () // TODO
             }

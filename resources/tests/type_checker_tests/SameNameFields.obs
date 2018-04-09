@@ -1,0 +1,26 @@
+main contract C {
+
+    C(){
+        ->S1({x=1,shared=1,test=1});
+    }
+
+    state S1 {
+        int x;
+    }
+
+    state S2 {
+    }
+
+    state S3 {
+        int x;
+    }
+
+    int shared available in S1, S2;
+    int shared available in S3;
+
+    int test;
+    int test available in S1;
+
+    int x;
+
+}

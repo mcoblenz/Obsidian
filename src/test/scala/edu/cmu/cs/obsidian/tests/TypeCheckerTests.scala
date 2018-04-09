@@ -510,6 +510,8 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (InvalidStateFieldInitialization("S1", "x1"), 29)
                 ::
+                (SharedFieldNameError("x2", "S1", 4), 8)
+                ::
                 Nil
         )
     }
@@ -544,7 +546,24 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def shadowingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ForbiddenShadowing.obs",
-            (ShadowingError("x"), 9)
+            (ShadowingError("x", "S1", 2), 9)
+                ::
+                Nil
+        )
+    }
+
+
+    @Test def sameFieldNameTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/SameNameFields.obs",
+            (ShadowingError("x", "S1", 24), 8)
+                ::
+                (SharedFieldNameError("x", "S1", 8), 15)
+                ::
+                (ShadowingError("x", "S3", 24), 15)
+                ::
+                (CombineAvailableIns("shared", "S1, S2, S3", 18), 19)
+                ::
+                (RepeatContractFields("test", 22, 21), 22)
                 ::
                 Nil
         )
