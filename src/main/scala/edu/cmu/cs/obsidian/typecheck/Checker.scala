@@ -1575,14 +1575,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def checkContractFieldRepeats(field: Field, contract: Contract): Unit = {
-        //val table = globalTable.contract(contract.name).get
         for (decl <- contract.declarations) {
             decl match {
                 case f: Field => {
                     if ((f.name == field.name) && (f.loc.line < field.loc.line)) {
                         (field.availableIn, f.availableIn) match {
-                            case (None, None) => logError(field, RepeatContractFields(field.name, f.loc.line, f.loc.line))
-                            case (None, Some(_)) => logError(field, RepeatContractFields(field.name, f.loc.line, f.loc.line))
+                            case (None, _) => logError(field, RepeatContractFields(field.name, f.loc.line, f.loc.line))
                             case (Some(_), None) => logError(field, RepeatContractFields(field.name, field.loc.line, f.loc.line))
                             case (Some(states1), Some(states2)) => {
                                 logError(field, CombineAvailableIns(field.name, (states2 | states1).map(_._1).mkString(", "), f.loc.line))
