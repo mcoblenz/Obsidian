@@ -474,8 +474,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                            else
                                (BottomType(), context)
                          }
-                         else
-                            (BottomType(), context)
+                         else {
+                             logError(e, VariableUndefinedError(x, context.thisType.toString))
+                             (BottomType(), context)
+                         }
                  }
              case OwnershipTransfer(e) =>
                  e match {
