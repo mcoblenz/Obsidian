@@ -469,7 +469,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          val tableLookup = context.contractTable.lookupContract(x)
                          if (!tableLookup.isEmpty) {
                            val ctTableOfConstructed = tableLookup.get
-                           (StaticContractType(ctTableOfConstructed), context)
+                           if(ctTableOfConstructed.contract.isInterface)
+                                (InterfaceContractType(ctTableOfConstructed), context)
+                           else
+                               (BottomType(), context)
                          }
                          else
                             (BottomType(), context)
