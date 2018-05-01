@@ -192,3 +192,6 @@ case class InvalidStateFieldInitialization(stateName: String, fieldName: String)
 case class InvalidOwnershipTransfer(e: Expression, typ: ObsidianType) extends Error {
     val msg: String = s"Can't transfer ownership from non-owning expression $e of type $typ."
 }
+case class NonStaticAccessError(method: String, name:String) extends Error {
+    val msg: String = s"Cannot invoke a non-static transaction '$method' via a static reference '$name'"
+}
