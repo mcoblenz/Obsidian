@@ -466,8 +466,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          // TODO handle cases for e.g. if the field is owned
                          (t, context)
                      case (None, None) =>
-                         logError(e, VariableUndefinedError(x, context.thisType.toString))
-                         (BottomType(), context)
+                         val tableLookup = context.contractTable.lookupContract(x)
+                         if (!tableLookup.isEmpty) {
+                           (InterfaceContractType(tableLookup.get), context)
+                         }
+                         else {
+                             logError(e, VariableUndefinedError(x, context.thisType.toString))
+                             (BottomType(), context)
+                         }
                  }
              case OwnershipTransfer(e) =>
                  e match {
@@ -942,12 +948,17 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 context: Context,
                 name: String,
                 receiver: Expression,
-                args: Seq[Expression]): Context = {
+                args: Seq[Expression],
+                ensureStatic: Boolean): Context = {
             // Lookup the invocation
             val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver)
             val txLookup = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
             val funLookup = contextAfterReceiver.lookupFunctionInType(receiverType)(name)
-
+            if(ensureStatic && !txLookup.get.isStatic) {
+                val err = NonStaticAccessError(txLookup.get.name, receiver.toString)
+                logError(s, err)
+                return contextAfterReceiver
+            }
             val invokable: InvokableDeclaration = (txLookup, funLookup) match {
                 case (None, None) =>
                     val err = MethodUndefinedError(contextAfterReceiver.thisType.extractSimpleType.get, name)
@@ -1371,9 +1382,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 mergedContext
 
             case LocalInvocation(name, args: Seq[Expression]) =>
-                handleInvocation(context, name, This(), args)
+                handleInvocation(context, name, This(), args, false)
 
             case Invocation(receiver: Expression, name, args: Seq[Expression]) =>
+                var ensureStatic = false
                 val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver)
                 if (receiverType.isBottom) return contextPrime
                 receiverType match {
@@ -1381,12 +1393,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case IntType() | BoolType() | StringType() =>
                         logError(s, NonInvokeableError(receiverType))
                         return contextPrime
+                    case InterfaceContractType(receiverType) =>
+                        ensureStatic = true
                     case _ =>
                         if (receiverType.tableOpt.isEmpty)
                             return contextPrime
                 }
 
-                handleInvocation(contextPrime, name, receiver, args)
+                handleInvocation(contextPrime, name, receiver, args, ensureStatic)
 
             // TODO maybe allow constructors as statements later, but it's not very important
             case d@Disown (e) =>

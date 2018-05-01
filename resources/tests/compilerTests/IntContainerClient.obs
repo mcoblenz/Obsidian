@@ -1,9 +1,10 @@
-import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/utilities/System.obs"
+import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/java-utilities/System.obs"
 import "resources/tests/IntContainer.obs"
 
 main contract IntContainerClient {
     transaction main(remote IntContainer container) {
         int oldX = container.setX(3);
         container.setX(4);
+        System.print("setX : 4");
     }
 }
