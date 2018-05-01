@@ -65,6 +65,7 @@ case class TranslationContext(
     // At transition time, we make sure that all the fields have been initialized.
     var pendingFieldAssignments: Set[String]
 ) {
+    val StaticMemberReference = "out"
     /* gets the enum if it exists, fails otherwise */
     def getEnum(stName: String): JEnumConstant = {
         states.get(stName).get.enumVal
@@ -94,7 +95,7 @@ case class TranslationContext(
             }
         }
         else
-            model.directClass(f).staticRef("out")
+            model.directClass(f).staticRef(StaticMemberReference)
     }
 
     /* does one of the below; checks first to see which one is possible */
