@@ -131,6 +131,13 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
     }
 
     def lookupTransactionInType(typ: ObsidianType) (transactionName: String): Option[Transaction] = {
+       /* typ match {
+            case NonPrimitiveType(_,t,_) =>t.extractSimpleType.contractName
+            case _ =>
+        }*/
+
+
+
         typ.tableOpt match {
             case None => None
             case Some (table) => doLookup(transactionName, (transaction: String) => table.lookupTransaction(transaction))
@@ -395,7 +402,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     context.lookupTransactionInThis(name)
                 }
                 else {
-                    receiverType.tableOpt.get.lookupTransaction(name)
+                    receiverType.contractNameOpt match {
+                        case Some(contractName) => {
+                            val foundContract = globalTable.contractLookup.get(contractName)
+                            foundContract match {
+                                case Some(contractTable) => contractTable.lookupTransaction(name)
+                                case _ => None
+                            }
+                        }
+                        case None => None
+                    }
+                    //globalTable.contractLookup.get(receiverType.contractNameOpt).lookupTransaction(name)
+                    //receiverType.tableOpt.get.lookupTransaction(name)
                 }
             val foundFunction =
                 if (receiverType == context.thisType) {

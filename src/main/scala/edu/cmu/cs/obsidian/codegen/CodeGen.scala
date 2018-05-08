@@ -46,8 +46,8 @@ class CodeGen (val target: Target) {
     private def innerClassFieldName(stName: String): String = {
         "__state" + stName
     }
-    private def transactionFlagName(txName: String): String = {
-        "__" + txName + "__flag"
+    private def isInsideInvocationFlag(): JFieldRef = {
+        JExpr.ref("__isInsideInvocation")
     }
     private def transactionGetMethodName(txName: String, stOption: Option[String]): String = {
         stOption match {
@@ -674,7 +674,7 @@ class CodeGen (val target: Target) {
 
         val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
         translateContract(aContract, newClass, translationContext)
-        generateTxReentrantFlags(newClass, translationContext)
+        generateReentrantFlag(newClass, translationContext)
 
         target match {
             case Client(mainContract) =>
@@ -711,14 +711,11 @@ class CodeGen (val target: Target) {
         val _ = translateContract(aContract, newClass, newTranslationContext)
     }
 
-    /* this method generates a flag for each transaction of each contract in order to check
+    /* this method generates a flag for the contract in order to check
      * whether a reentrant call has been made.
      */
-    private def generateTxReentrantFlags(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
-        val txNames = translationContext.txLookup.keys
-        for (tx <- txNames) {
-            newClass.field(JMod.PUBLIC, model.BOOLEAN, transactionFlagName(tx), JExpr.lit(false))
-        }
+    private def generateReentrantFlag(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
+        newClass.field(JMod.PUBLIC, model.BOOLEAN, isInsideInvocationFlag().name(), JExpr.lit(false))
     }
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
@@ -1430,58 +1427,61 @@ class CodeGen (val target: Target) {
     private def resolveNonPrimitiveTypeToContract(typ: ObsidianType,
                                                   translationContext: TranslationContext,
                                                   containingContract: Contract): Option[Contract] = {
-        if (typ.tableOpt.isEmpty)
-            None
-        else {
-            val name = typ.tableOpt.get.contract.name
+        typ match {
+            case NonPrimitiveType(_,t,_) => {
+                val name = t.extractSimpleType.contractName
 
-            var typeComponents = name.split(".")
-            if (typeComponents.isEmpty) {
-                typeComponents = Array(name)
-            }
-            //val fullyQualifiedContainingContractName = translationContext.contractNameResolutionMap(containingContract)
-            //val containingContractComponents = fullyQualifiedContainingContractName.split(".")
+                //    val name = typ.tableOpt.get.contract.name
 
-            // Suppose the containing contract is A.B.C and we're looking up B. We want to find A.B unless there's A.B.C.B.
-            // We start our search with the innermost contract and ascend until we find a contract with the name we want.
+                var typeComponents = name.split(".")
+                if (typeComponents.isEmpty) {
+                    typeComponents = Array(name)
+                }
+                //val fullyQualifiedContainingContractName = translationContext.contractNameResolutionMap(containingContract)
+                //val containingContractComponents = fullyQualifiedContainingContractName.split(".")
 
-            // recursiveTypeLookup does the actual search.
-            def recursiveTypeLookup(containingContract: Contract, typeComponents: Seq[String]): Option[Contract] = {
+                // Suppose the containing contract is A.B.C and we're looking up B. We want to find A.B unless there's A.B.C.B.
+                // We start our search with the innermost contract and ascend until we find a contract with the name we want.
 
-                // matchContract looks for a contract WITHIN the given contract.
-                def matchContract(containingContract: Contract, typeComponents: Seq[String]): Option[Contract] = {
-                    if (typeComponents.length == 0) Some(containingContract)
+                // recursiveTypeLookup does the actual search.
+                def recursiveTypeLookup(containingContract: Contract, typeComponents: Seq[String]): Option[Contract] = {
+
+                    // matchContract looks for a contract WITHIN the given contract.
+                    def matchContract(containingContract: Contract, typeComponents: Seq[String]): Option[Contract] = {
+                        if (typeComponents.length == 0) Some(containingContract)
+                        else {
+                            val innerContracts = containingContract.declarations.filter((decl: Declaration) => decl.isInstanceOf[Contract])
+                            val innerContract = innerContracts.find((decl: Declaration) => decl.asInstanceOf[Contract].name.equals(typeComponents.head))
+                            if (innerContract.isDefined) matchContract(innerContract.get.asInstanceOf[Contract], typeComponents.tail)
+                            else None
+                        }
+                    }
+
+                    // Check to see if typeComponents are inside this contract. If not, recurse one level up.
+                    val matchedContract: Option[Contract] = matchContract(containingContract, typeComponents)
+
+                    val result = if (matchedContract.isDefined) matchedContract
                     else {
-                        val innerContracts = containingContract.declarations.filter((decl: Declaration) => decl.isInstanceOf[Contract])
-                        val innerContract = innerContracts.find((decl: Declaration) => decl.asInstanceOf[Contract].name.equals(typeComponents.head))
-                        if (innerContract.isDefined) matchContract(innerContract.get.asInstanceOf[Contract], typeComponents.tail)
+                        val outerContract = translationContext.getContainingContract(containingContract)
+                        if (outerContract.isDefined)
+                            recursiveTypeLookup(outerContract.get, typeComponents)
                         else None
                     }
+
+
+                    result
                 }
 
-                // Check to see if typeComponents are inside this contract. If not, recurse one level up.
-                val matchedContract: Option[Contract] = matchContract(containingContract, typeComponents)
-
-                val result = if (matchedContract.isDefined) matchedContract
+                val insideContractResult = recursiveTypeLookup(containingContract, typeComponents)
+                if (insideContractResult.isDefined)
+                    insideContractResult
                 else {
-                    val outerContract = translationContext.getContainingContract(containingContract)
-                    if (outerContract.isDefined)
-                        recursiveTypeLookup(outerContract.get, typeComponents)
-                    else None
+                    // Check for a top-level contract by this name.
+                    val foundPair = translationContext.contractNameResolutionMap.find((pair: (Contract, String)) => pair._2.equals(name))
+                    if (foundPair.isDefined) Some(foundPair.get._1) else None
                 }
-
-
-                result
             }
-
-            val insideContractResult = recursiveTypeLookup(containingContract, typeComponents)
-            if (insideContractResult.isDefined)
-                insideContractResult
-            else {
-                // Check for a top-level contract by this name.
-                val foundPair = translationContext.contractNameResolutionMap.find((pair: (Contract, String)) => pair._2.equals(name))
-                if (foundPair.isDefined) Some(foundPair.get._1) else None
-            }
+            case _ => None
         }
     }
 
@@ -1661,11 +1661,11 @@ class CodeGen (val target: Target) {
         val jTry = meth.body()._try()
 
         /* if the flag has already been set, that means there has been a reentrancy */
-        val jIf = jTry.body()._if(JExpr.ref(transactionFlagName(tx.name)))
+        val jIf = jTry.body()._if(isInsideInvocationFlag())
         jIf._then()._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException")))
 
         /* otherwise, we set the flag to true */
-        jIf._else().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(true))
+        jIf._else().assign(isInsideInvocationFlag(), JExpr.lit(true))
 
         target match {
             case Client(mainContract) =>
@@ -1687,7 +1687,7 @@ class CodeGen (val target: Target) {
         translateBody(jIf._else(), tx.body, translationContext, localContext)
 
         /* once the whole transaction has been executed, we set the flag back to false */
-        jTry._finally().assign(JExpr.ref(transactionFlagName(tx.name)), JExpr.lit(false))
+        jTry._finally().assign(isInsideInvocationFlag(), JExpr.lit(false))
 
         meth
     }

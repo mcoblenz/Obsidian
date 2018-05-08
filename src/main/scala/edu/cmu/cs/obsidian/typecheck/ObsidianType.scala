@@ -68,6 +68,7 @@ sealed trait ObsidianType extends HasLocation {
      * [residualType(t)] instead */
     val residualType: ObsidianType
 
+    val contractNameOpt: Option[String] = None
     val extractSimpleType: Option[SimpleType]
     val extractUnpermissionedType: Option[UnpermissionedType]
     def extractModifiers: Set[TypeModifier] = Set.empty
@@ -102,6 +103,8 @@ case class NonPrimitiveType(tableOf: DeclarationTable,
     val isBottom: Boolean = false
     def table: DeclarationTable = tableOf
     val tableOpt: Option[DeclarationTable] = Some(table)
+
+    override val contractNameOpt: Option[String] = Some(t.extractSimpleType.contractName)
 
     override def toString: String = {
         val modifiersString = modifiers.map(m => m.toString).mkString(" ")
