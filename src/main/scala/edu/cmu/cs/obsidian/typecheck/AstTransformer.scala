@@ -37,7 +37,6 @@ object AstTransformer {
 
         for ((contractName, contractTable) <- table.contractLookup) {
 
-
             val (newContract, errors) = transformContract(table, contractTable)
             errorRecords = errorRecords ++ errors
             contracts = contracts :+ newContract
@@ -293,11 +292,11 @@ object AstTransformer {
             case oldDecl@VariableDecl(typ, varName) =>
                 val newTypChoice = transformType(table, lexicallyInsideOf, context, typ, s.loc)
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc)
-                (oldDecl.copy(typ = newTyp).setLoc(oldDecl), context.updated(varName, typ), errors)
+                (oldDecl.copy(typ = newTyp).setLoc(oldDecl), context.updated(varName, newTyp), errors)
             case oldDecl@VariableDeclWithInit(typ, varName, e) =>
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc)
                 val newDecl = oldDecl.copy(typ = newTyp, e = transformExpression(e)).setLoc(oldDecl)
-                (newDecl, context.updated(varName, typ), errors)
+                (newDecl, context.updated(varName, newTyp), errors)
             case r@Return() => (r, context, Seq())
             case r@ReturnExpr(e) => (ReturnExpr(transformExpression(e)).setLoc(r), context, Seq())
             case t@Transition(newStateName, updates) =>
@@ -406,7 +405,7 @@ object AstTransformer {
                 case None => UnresolvedNonprimitiveType("this" +: t.identifiers, t.mods)
             }
         }
-        if (t.identifiers.length == 2) {
+        else if (t.identifiers.length == 2) {
             if (context contains t.identifiers.head) return t
 
             val cNamePossible = t.identifiers.head

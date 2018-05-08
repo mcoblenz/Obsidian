@@ -238,6 +238,8 @@ class TypeCheckerTests extends JUnitSuite {
                     StringType(),
                     IntType()), 33)
                 ::
+                (ContractUndefinedError("Bogus"), 36)
+                ::
                 Nil
         )
     }
