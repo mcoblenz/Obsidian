@@ -94,9 +94,9 @@ class CodeGen (val target: Target) {
             populateProtobufOuterClassNames(c, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
         }
 
-
         for (imp <- program.imports) {
-            translateImport(programPackage, imp, contractNameResolutionMap, protobufOuterClassNames)
+            if(!imp.name.contains("/java-utilities/"))
+                translateImport(programPackage, imp, contractNameResolutionMap, protobufOuterClassNames)
         }
 
         for (c <- program.contracts) {
@@ -1724,7 +1724,7 @@ class CodeGen (val target: Target) {
                                     localContext: Map[String, JVar]): IJExpression = {
         localContext.get(name) match {
             case Some(variable) => variable
-            case None => translationContext.dereferenceVariable(name)
+            case None => translationContext.dereferenceVariable(name,model)
         }
     }
 

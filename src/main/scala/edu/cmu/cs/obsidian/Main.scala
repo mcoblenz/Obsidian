@@ -287,7 +287,6 @@ object Main {
             for (p <- protobufs) {
                 val protobuf = p._1
                 val filename = p._2
-
                 val protobufOuterClassName = Util.protobufOuterClassNameForFilename(filename)
                 val protobufFilename = protobufOuterClassName + ".proto"
 
