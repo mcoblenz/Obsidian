@@ -1,0 +1,15 @@
+
+main contract Reentrant {
+
+    transaction t2(A a) returns int {
+        return a.t1();
+    }
+}
+
+contract A {
+
+    transaction t1() returns int {
+        Reentrant c = new Reentrant();
+        return c.t2(this);
+    }
+}

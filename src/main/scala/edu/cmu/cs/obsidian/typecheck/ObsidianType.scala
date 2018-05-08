@@ -60,13 +60,13 @@ case class PathType(path: Seq[String], ts: SimpleType) extends UnpermissionedTyp
 sealed trait ObsidianType extends HasLocation {
     // for tests
     val isBottom: Boolean
-    val tableOpt: Option[DeclarationTable]
 
     /* the permission system doesn't allow arbitrary aliasing of a reference
      * typed as [t]: aliasing forces one of the resulting types to be
      * [residualType(t)] instead */
     val residualType: ObsidianType
 
+    val contractNameOpt: Option[String] = None
     val extractSimpleType: Option[SimpleType]
     val extractUnpermissionedType: Option[UnpermissionedType]
     def extractModifiers: Set[TypeModifier] = Set.empty
@@ -86,7 +86,6 @@ sealed trait ResolvedType extends ObsidianType
 /* int, bool, or string */
 sealed trait PrimitiveType extends PotentiallyUnresolvedType with ResolvedType {
     val isBottom: Boolean = false
-    val tableOpt: Option[DeclarationTable] = None
     override val residualType: ObsidianType = this
     override val extractSimpleType: Option[SimpleType] = None
     override val extractUnpermissionedType: Option[UnpermissionedType] = None
@@ -100,7 +99,8 @@ case class NonPrimitiveType(tableOf: DeclarationTable,
                             modifiers: Set[TypeModifier]) extends ResolvedType {
     val isBottom: Boolean = false
     def table: DeclarationTable = tableOf
-    val tableOpt: Option[DeclarationTable] = Some(table)
+
+    override val contractNameOpt: Option[String] = Some(t.extractSimpleType.contractName)
 
     override def toString: String = {
         val modifiersString = modifiers.map(m => m.toString).mkString(" ")
@@ -148,7 +148,6 @@ case class StringType() extends PrimitiveType {
  * otherwise be inferred */
 case class BottomType() extends ResolvedType {
     val isBottom: Boolean = true
-    val tableOpt: Option[DeclarationTable] = None
     override val residualType: ObsidianType = this
     override val extractSimpleType: Option[SimpleType] = None
     override val extractUnpermissionedType: Option[UnpermissionedType] = None
@@ -157,7 +156,6 @@ case class BottomType() extends ResolvedType {
 // Only appears before running resolution, which happens right after parsing.
 case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeModifier]) extends PotentiallyUnresolvedType {
     val isBottom: Boolean = false
-    val tableOpt: Option[DeclarationTable] = None
 
     override def toString: String = mods.map(m => m.toString).mkString(" ") + " " + identifiers.mkString(".")
 
@@ -171,7 +169,6 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeMo
 case class InterfaceContractType(table: DeclarationTable) extends ObsidianType {
     override def toString: String = table.name
     val isBottom: Boolean = false
-    val tableOpt: Option[DeclarationTable] = Some(table)
     override val residualType: ObsidianType = this
     override val extractSimpleType: Option[SimpleType] = Some(table.simpleType)
     override val extractUnpermissionedType: Option[UnpermissionedType] = None
