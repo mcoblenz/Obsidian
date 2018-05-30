@@ -42,3 +42,4 @@ project/plugins/project/
 *.jar
 *.java
 *.proto
+.idea/libraries/
