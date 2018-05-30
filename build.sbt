@@ -3,7 +3,7 @@ name := "Obsidian"
 version := "1.0"
 
 // Obsidian must be built with a patch to the Scala compiler: https://github.com/hrhino/scala/commits/t10387
-scalaVersion := "2.12.5-bin-SNAPSHOT"
+scalaVersion := "2.12.6"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 
