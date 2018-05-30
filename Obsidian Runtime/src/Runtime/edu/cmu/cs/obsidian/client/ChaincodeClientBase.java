@@ -58,6 +58,14 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
             System.err.println("Error: failed to connect to " + addressString + ":" + port);
             System.exit(1);
         }
+        catch (java.lang.IllegalArgumentException e) {
+            if (port > 65535 || port < 0) {
+                System.err.println("Error: port value must be between 0 and 65535, inclusive");
+            } else {
+                System.err.println("Error: " + addressString + " isn't a valid address");
+            }
+            System.exit(1);
+        }
 
         try {
             // We need to invoke the client's main() transaction.
