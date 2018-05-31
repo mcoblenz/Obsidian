@@ -1435,8 +1435,6 @@ class CodeGen (val target: Target) {
                 if (typeComponents.isEmpty) {
                     typeComponents = Array(name)
                 }
-                //val fullyQualifiedContainingContractName = translationContext.contractNameResolutionMap(containingContract)
-                //val containingContractComponents = fullyQualifiedContainingContractName.split(".")
 
                 // Suppose the containing contract is A.B.C and we're looking up B. We want to find A.B unless there's A.B.C.B.
                 // We start our search with the innermost contract and ascend until we find a contract with the name we want.
@@ -1446,11 +1444,15 @@ class CodeGen (val target: Target) {
 
                     // matchContract looks for a contract WITHIN the given contract.
                     def matchContract(containingContract: Contract, typeComponents: Seq[String]): Option[Contract] = {
-                        if (typeComponents.length == 0) Some(containingContract)
+                        if (typeComponents.length == 0) {
+                            Some(containingContract)
+                        }
                         else {
                             val innerContracts = containingContract.declarations.filter((decl: Declaration) => decl.isInstanceOf[Contract])
                             val innerContract = innerContracts.find((decl: Declaration) => decl.asInstanceOf[Contract].name.equals(typeComponents.head))
-                            if (innerContract.isDefined) matchContract(innerContract.get.asInstanceOf[Contract], typeComponents.tail)
+                            if (innerContract.isDefined) {
+                                matchContract(innerContract.get.asInstanceOf[Contract], typeComponents.tail)
+                            }
                             else None
                         }
                     }

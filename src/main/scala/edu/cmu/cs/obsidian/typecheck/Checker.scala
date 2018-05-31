@@ -67,7 +67,8 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
     // Looks up fields, transactions, etc., checking to make sure they're available in all
     // possible current states of "this".
     private def doLookup[FoundType <: IsAvailableInStates](toFind: String,
-                                                           lookupFunction: (String => Option[FoundType])): Option[FoundType] = {
+                                                           lookupFunction: (String => Option[FoundType]),
+                                                           inType: ObsidianType): Option[FoundType] = {
         val foundOption: Option[FoundType] = lookupFunction(toFind)
         if (foundOption.isEmpty) {
             // The thing isn't defined on this contract or state.
@@ -76,7 +77,7 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
         else {
             val foundObject = foundOption.get
             // Make sure that no matter what state "this" is in, the field is available.
-            val isAvailable: Boolean = thisType.extractSimpleType match {
+            val isAvailable: Boolean = inType.extractSimpleType match {
                 case Some(StateUnionType(c, possibleStateNames)) =>
                     // Make sure the variable is available in all of the states we might be in.
                     // missingStateNames are the states that do NOT include the field we need.
@@ -112,15 +113,7 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
         }
     }
 
-    // The field has to be available in all possible states.
-    def lookupFieldTypeInThis(fieldName: String): Option[ObsidianType] = {
-        val foundField = doLookup(fieldName, (field: String) => thisType.table.lookupField(field))
 
-        foundField match {
-            case None => None
-            case Some(field) => Some(field.typ)
-        }
-    }
 
     def lookupTransactionInThis(transactionName: String): Option[Transaction] = {
         lookupTransactionInType(thisType)(transactionName)
@@ -128,6 +121,21 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
 
     def lookupFunctionInThis(functionName: String): Option[Func] = {
         lookupFunctionInType(thisType)(functionName)
+    }
+
+    def lookupFieldTypeInThis(fieldName: String): Option[ObsidianType] = {
+        lookupFieldTypeInType(thisType)(fieldName)
+    }
+
+        // The field has to be available in all possible states.
+    def lookupFieldTypeInType(typ: ObsidianType) (fieldName: String): Option[ObsidianType] = {
+       // XXX TODO! val typTable = contractTable.lookupContract()
+        val foundField = doLookup(fieldName, (field: String) => typ.table.lookupField(field), typ)
+
+        foundField match {
+            case None => None
+            case Some(field) => Some(field.typ)
+        }
     }
 
     def lookupTransactionInType(typ: ObsidianType) (transactionName: String): Option[Transaction] = {
@@ -361,7 +369,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         NonPrimitiveType(table, tr, mods)
     }
 
-
     //-------------------------------------------------------------------------
     // Checking definitions for language constructs begins here
 
@@ -401,36 +408,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     context.lookupTransactionInThis(name)
                 }
                 else {
-
-                    receiverType.contractNameOpt match {
-                        case Some(contractName) => {
-                            val foundContract = context.contractTable.lookupContract(contractName)
-                            foundContract match {
-                                case Some(contractTable) => contractTable.lookupTransaction(name)
-                                case _ => None
-                            }
-                        }
-                        case None => None
-                    }
+                    context.lookupTransactionInType(receiverType)(name)
                 }
             val foundFunction =
                 if (receiverType == context.thisType) {
                     context.lookupFunctionInThis(name)
                 }
                 else {
-
-                    receiverType.contractNameOpt match {
-                      case Some(contractName) => {
-                        val foundContract = context.contractTable.lookupContract(contractName)
-                        foundContract match {
-                          case Some(contractTable) => contractTable.lookupFunction(name)
-                          case _ => None
-                        }
-                      }
-                      case None => None
-                    }
+                    context.lookupFunctionInType(receiverType)(name)
                 }
-
 
             val invokable: InvokableDeclaration = (foundTransaction, foundFunction) match {
                 case (None, None) =>
@@ -579,26 +565,17 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      (BottomType(), c2)
                  }
 
-             case Dereference(eDeref: Expression, f) =>
+             case Dereference(eDeref: Expression, fieldName) =>
                  val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref)
 
-                 val derefTable = derefType match {
-                     case BottomType() => return (BottomType(), contextPrime)
-                     case IntType() | BoolType() | StringType() =>
-                         logError(e, DereferenceError(derefType))
-                         return (BottomType(), contextPrime)
-                     // [get] is safe because we ruled out all other options
-                     case _ => derefType.tableOpt.get
-                 }
-
-                 val fieldAST = derefTable.lookupField(f) match {
-                     case Some(ast) => ast
+                 val fieldType =  context.lookupFieldTypeInType(derefType)(fieldName) match {
+                     case Some(typ) => typ
                      case None =>
-                         logError(e, FieldUndefinedError(derefTable.simpleType, f))
+                         logError(e, FieldUndefinedError(derefType.extractSimpleType.get, fieldName))
                          return (BottomType(), contextPrime)
                  }
 
-                 (fieldAST.typ, contextPrime)
+                 (fieldType, contextPrime)
 
              case LocalInvocation(name, args: Seq[Expression]) =>
                  handleInvocation(context, context.thisType, name, This(), args)
@@ -607,18 +584,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver)
 
                  receiverType match {
-                     case BottomType() => return (BottomType(), contextPrime)
+                     case BottomType() => (BottomType(), contextPrime)
                      case IntType() | BoolType() | StringType() =>
                          logError(e, NonInvokeableError(receiverType))
                          return (BottomType(), contextPrime)
-                     // [get] is safe because [receiverType] must be non-primitive
-                     case _ =>
-                         if (!receiverType.tableOpt.isDefined)
-                             return (BottomType(), contextPrime)
-
+                     case  _ => handleInvocation(contextPrime, receiverType, name, receiver, args)
                  }
 
-                 handleInvocation(contextPrime, receiverType, name, receiver, args)
+
 
              case Construction(name, args: Seq[Expression]) =>
                  val tableLookup = context.contractTable.lookupContract(name)
@@ -1280,22 +1253,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                 }
 
-                val derefTable = derefType match {
-                    case BottomType() => return contextPrime2
-                    case IntType() | BoolType() | StringType() =>
-                        logError(s, DereferenceError(derefType))
-                        return contextPrime2
-                    case _ => derefType.tableOpt.get
-                }
-
-                val fieldAST = derefTable.lookupField(f) match {
+                val fieldType = context.lookupFieldTypeInType(derefType)(f) match {
                     case Some(ast) => ast
                     case None =>
-                        logError(s, FieldUndefinedError(derefTable.simpleType, f))
+                        logError(s, FieldUndefinedError(derefType.extractSimpleType.get, f))
                         return contextPrime2
                 }
 
-                checkIsSubtype(s, t, fieldAST.typ)
+                checkIsSubtype(s, t, fieldType)
                 contextPrime2
 
             case Assignment(StateInitializer(stateName, fieldName), e, transfersOwnership) =>
@@ -1364,20 +1329,29 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
-
-                t.tableOpt match {
-                    case Some(st: StateTable) => logError(st.ast, AlreadyKnowStateError(e, st.name))
-                    case Some(_) => ()
+                t.extractSimpleType match {
+                    case Some(s) => s match {
+                        case StateType(_, stateName) =>
+                            logError(e, AlreadyKnowStateError(e, stateName))
+                            return contextPrime
+                        case StateUnionType(_, _) => ()
+                        case JustContractType(_) => ()
+                    }
                     case None =>
                         logError(e, SwitchError(t))
                         return contextPrime
                 }
 
-                val contractTable = t.tableOpt.get.contractTable
+                val contractTable = context.contractTable.lookupContract(t.contractNameOpt.get) match {
+                    case Some(table) => table
+                    case None => logError(e, SwitchError(t))
+                        return contextPrime
+                }
 
                 var mergedContext = contextPrime
                 for (SwitchCase(sName, body) <- cases) {
                     val newType =
+
                         contractTable.state(sName) match {
                             case Some(stTable) =>
                                 val newSimple = StateType(contractTable.name, stTable.name)
@@ -1416,19 +1390,19 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 var ensureStatic = false
                 val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver)
                 if (receiverType.isBottom) return contextPrime
+
                 receiverType match {
-                    case BottomType() => return contextPrime
+                    case BottomType() => contextPrime
                     case IntType() | BoolType() | StringType() =>
                         logError(s, NonInvokeableError(receiverType))
-                        return contextPrime
+                        contextPrime
                     case InterfaceContractType(receiverType) =>
-                        ensureStatic = true
+                        handleInvocation(contextPrime, name, receiver, args, true)
                     case _ =>
-                        if (receiverType.tableOpt.isEmpty)
-                            return contextPrime
+                        handleInvocation(contextPrime, name, receiver, args, false)
                 }
 
-                handleInvocation(contextPrime, name, receiver, args, ensureStatic)
+
 
             // TODO maybe allow constructors as statements later, but it's not very important
             case d@Disown (e) =>

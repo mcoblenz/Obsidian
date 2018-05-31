@@ -31,6 +31,11 @@ main contract Invocation {
         int h = other.anotherMethod();
         // should fail: wrong arg type
         int i = other.otherMethod("a");
+
+        // should fail: Bogus undefined
+        Bogus b;
+        // should fail: Bogus undefined
+        int j = b.bogus();
     }
 
 }
