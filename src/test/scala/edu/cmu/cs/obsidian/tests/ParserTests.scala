@@ -184,13 +184,13 @@ class ParserTests extends JUnitSuite {
         shouldSucceed(
             """ main contract C { state S {
               | }
-              | transaction t(T x) available in S { ->S({x = y, y = x}); }
+              | transaction t(T x) available in S { ->S(x = y, y = x); }
               | }
             """.stripMargin)
         shouldSucceed(
             """ main contract C { state S {
               | }
-              | transaction t(T x) available in S { ->S({}); }
+              | transaction t(T x) available in S { ->S(); }
               | }
             """.stripMargin)
         shouldSucceed(
@@ -202,7 +202,7 @@ class ParserTests extends JUnitSuite {
         shouldSucceed(
             """ main contract C { state S {
               | }
-              |  transaction t(T x) available in S { ->S({x = y}); }
+              |  transaction t(T x) available in S { ->S(x = y); }
               | }
             """.stripMargin)
     }
