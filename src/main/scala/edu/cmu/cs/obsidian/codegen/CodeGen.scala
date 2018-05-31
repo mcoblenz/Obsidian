@@ -1431,8 +1431,6 @@ class CodeGen (val target: Target) {
             case NonPrimitiveType(_,t,_) => {
                 val name = t.extractSimpleType.contractName
 
-                //    val name = typ.tableOpt.get.contract.name
-
                 var typeComponents = name.split(".")
                 if (typeComponents.isEmpty) {
                     typeComponents = Array(name)
