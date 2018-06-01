@@ -1597,7 +1597,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     decl match {
                         case field: Field => {
                             if (field.name == arg.varName) {
-                                logError(t, ShadowingError(field.name, t.name, field.loc.line))
+                                logError(t, ArgShadowingError(field.name, t.name, field.loc.line))
                             }
                         }
                         case _ => ()
