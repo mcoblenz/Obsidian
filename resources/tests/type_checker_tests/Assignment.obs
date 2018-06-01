@@ -8,7 +8,7 @@ main contract C_Shared {
     int f1;
 
     C_Shared() {
-        ->S({f2 = f1});
+        ->S(f2 = f1);
     }
 
     state S { int f2; }
