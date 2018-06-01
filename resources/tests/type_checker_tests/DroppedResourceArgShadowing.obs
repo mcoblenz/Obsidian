@@ -17,7 +17,7 @@ main resource contract Wallet {
 	       ->Empty;
 	 }
 
-	 transaction loseMoney(owned Money n) {
-	       <-n;
+	 transaction loseMoney(owned Money m) {
+	       <-m;
 	 }
 }
