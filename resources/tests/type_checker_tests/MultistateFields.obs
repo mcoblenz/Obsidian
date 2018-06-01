@@ -4,7 +4,7 @@ main contract MultistateFields {
   state S3 {}
 
   MultistateFields() {
-    ->S1({foo = 0});
+    ->S1(foo = 0);
   }
 
   int foo available in S1, S2;

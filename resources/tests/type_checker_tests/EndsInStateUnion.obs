@@ -55,7 +55,7 @@ contract C3 {
 
   transaction toUnknownState(int x) available in S1 ends in S1, S2 {
     if (x > 3) {
-      ->S2({f2 = 0});
+      ->S2(f2 = 0);
     }
     else {
       ->S1;

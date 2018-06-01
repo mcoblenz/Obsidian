@@ -2,7 +2,7 @@ main contract C2 {
     int x;
 
     C2(){
-        ->S1({x=1});
+        ->S1(x=1);
     }
 
     state S1 {

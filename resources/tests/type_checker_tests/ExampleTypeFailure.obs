@@ -1,6 +1,6 @@
 contract C {
     C(string s) {
-        ->HasString({s = s});
+        ->HasString(s = s);
     }
 
     state HasString {

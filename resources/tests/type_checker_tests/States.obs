@@ -13,9 +13,9 @@ main contract C {
         ->S2;
         // should fail: no such state
         ->S3;
-        ->S2({x = 2});
+        ->S2(x = 2);
         // should fail: no such field x
-        ->S1({x = 1});
+        ->S1(x = 1);
     }
 
     transaction b() {
