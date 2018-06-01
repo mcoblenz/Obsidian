@@ -113,9 +113,8 @@ object Parser extends Parsers {
             val oneUpdate = parseId ~! EqT() ~! parseExpr ^^ {
                 case f ~ _ ~ e => (ReferenceIdentifier(f._1).setLoc(f), e)
             }
-            LParenT() ~ LBraceT() ~ repsep(oneUpdate, CommaT()) ~
-                RBraceT() ~ RParenT() ^^ {
-                case _ ~ _ ~ updates ~ _ ~ _ => updates
+            LParenT() ~ repsep(oneUpdate, CommaT()) ~ RParenT() ^^ {
+                case _ ~ updates ~ _ => updates
             }
         }
 

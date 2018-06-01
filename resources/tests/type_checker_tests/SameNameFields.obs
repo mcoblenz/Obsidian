@@ -1,7 +1,7 @@
 main contract C {
 
     C(){
-        ->S1({x=1,shared=1,test=1});
+        ->S1(x=1,shared=1,test=1);
     }
 
     state S1 {

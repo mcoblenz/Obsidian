@@ -10,7 +10,7 @@
 main contract States {
 
     States() {
-        ->S1({x = 0, z = 0});
+        ->S1(x = 0, z = 0);
     }
 
     state S1 {
@@ -28,7 +28,7 @@ main contract States {
     }
 
     transaction toS2() available in S1 {
-        ->S2({y = x});
+        ->S2(y = x);
     }
 
     transaction getX() returns int available in S1 {
@@ -41,7 +41,7 @@ main contract States {
     }
 
     transaction toS1() available in S2 {
-        ->S1({x = y});
+        ->S1(x = y);
     }
 
     transaction getY() returns int available in S2 {
@@ -68,10 +68,10 @@ main contract States {
     transaction flipStates(int x, int y) {
         switch this {
             case S1 {
-                ->S2({y = y});
+                ->S2(y = y);
             }
             case S2 {
-                ->S1({x = x});
+                ->S1(x = x);
             }
         }
     }
