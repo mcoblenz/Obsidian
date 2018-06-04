@@ -499,7 +499,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case (None, None) =>
                          val tableLookup = context.contractTable.lookupContract(x)
                          if (!tableLookup.isEmpty) {
-                           (InterfaceContractType(tableLookup.get), context)
+                             val contractTable = tableLookup.get
+                             (InterfaceContractType(contractTable.name, contractTable.simpleType), context)
                          }
                          else {
                              logError(e, VariableUndefinedError(x, context.thisType.toString))
@@ -1430,7 +1431,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case IntType() | BoolType() | StringType() =>
                         logError(s, NonInvokeableError(receiverType))
                         contextPrime
-                    case InterfaceContractType(receiverType) =>
+                    case InterfaceContractType(name, simpleType) =>
                         handleInvocation(contextPrime, name, receiver, args, true)
                     case _ =>
                         handleInvocation(contextPrime, name, receiver, args, false)

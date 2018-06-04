@@ -167,10 +167,10 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeMo
     override val extractUnpermissionedType: Option[UnpermissionedType] = None
 }
 
-case class InterfaceContractType(table: DeclarationTable) extends ObsidianType {
-    override def toString: String = table.name
+case class InterfaceContractType(name: String, simpleType: SimpleType) extends ObsidianType {
+    override def toString: String = name
     val isBottom: Boolean = false
     override val residualType: ObsidianType = this
-    override val extractSimpleType: Option[SimpleType] = Some(table.simpleType)
+    override val extractSimpleType: Option[SimpleType] = Some(simpleType)
     override val extractUnpermissionedType: Option[UnpermissionedType] = None
 }
