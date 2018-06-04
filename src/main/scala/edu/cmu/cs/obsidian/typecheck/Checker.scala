@@ -66,51 +66,95 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
 
     // Looks up fields, transactions, etc., checking to make sure they're available in all
     // possible current states of "this".
-    private def doLookup[FoundType <: IsAvailableInStates](toFind: String,
-                                                           lookupFunction: (String => Option[FoundType]),
+    private def doLookup[FoundType <: IsAvailableInStates](lookupFunction: (DeclarationTable => Option[FoundType]),
                                                            inType: ObsidianType): Option[FoundType] = {
-        val foundOption: Option[FoundType] = lookupFunction(toFind)
-        if (foundOption.isEmpty) {
-            // The thing isn't defined on this contract or state.
-            None
+        if (inType.isBottom) {
+            return None
         }
-        else {
-            val foundObject = foundOption.get
-            // Make sure that no matter what state "this" is in, the field is available.
-            val isAvailable: Boolean = inType.extractSimpleType match {
-                case Some(StateUnionType(c, possibleStateNames)) =>
-                    // Make sure the variable is available in all of the states we might be in.
-                    // missingStateNames are the states that do NOT include the field we need.
-                    val availableInStatesOpt = foundObject.availableIn
-                    if (availableInStatesOpt.isEmpty) {
-                        // The field is available in all states, so no matter what states we might be in, we're okay.
-                        true
-                    }
-                    else {
-                        val availableInStates = availableInStatesOpt.get.map(_._1)
-                        val missingStateNames = possibleStateNames.filterNot((possibleStateName: String) =>
-                            availableInStates.contains(possibleStateName))
-                        missingStateNames.isEmpty
-                    }
 
-                case Some(JustContractType(contractName)) =>
-                    // Make sure the variable is available in every state of the contract.\
-                    foundObject.availableIn == None
-                case Some(StateType(contractName, stateName)) =>
-                    // The variable has to be available because we knew what state "this" was in at lookup time.
-                    true
-                case None =>
-                    // Somehow this is a primitive type?
-                    assert(false, "this has invalid type")
-                    true
-            }
-            if (isAvailable) {
-                Some(foundObject)
-            }
-            else {
-                None
-            }
+        val foundOpt: Option[FoundType] = inType.extractSimpleType match {
+            case None => None
+            case Some(simpleType) =>
+                // Look up the type in the current scope, NOT with lookupFunction.
+                val contractTableOpt = contractTable.lookupContract(simpleType.contractName)
+                if (contractTableOpt.isEmpty) {
+                    return None
+                }
+
+                // Look inside the contract.
+                val insideContractResult = contractTableOpt.flatMap(lookupFunction)
+
+                val possibleCurrentStateNames: Iterable[String] = simpleType match {
+                    case JustContractType(contractName) => contractTableOpt.get.stateLookup.values.map((s: StateTable) => s.name)
+
+                    case StateUnionType(contractName, stateNames) =>
+                        stateNames
+
+                    case StateType(contractName, stateName) =>
+                        Set(stateName)
+                }
+
+                // It's weird that the way we find the available state names depends on the current state; this is an artifact
+                // of the fact that lookup for things defined in exactly one state is different from lookup for things defined in more than one state
+                // (or the whole contract).
+                val availableInStateNames: Iterable[String] = {
+                    simpleType match {
+                        case JustContractType(contractName) =>
+                            if (insideContractResult.isDefined) {
+                                insideContractResult.get.availableIn match {
+                                    case None => // This identifier is available in all states of the contract.
+                                        contractTableOpt.get.stateLookup.map(_._1)
+                                    case Some(identifiers) => identifiers.map(_._1)
+                                }
+                            }
+                            else {
+                                Set()
+                            }
+                        case StateUnionType(contractName, stateNames) =>
+                            if (insideContractResult.isDefined) {
+                                insideContractResult.get.availableIn match {
+                                    case None => // This identifier is available in all states of the contract.
+                                        contractTableOpt.get.stateLookup.map(_._1)
+                                    case Some(identifiers) => identifiers.map(_._1)
+                                }
+                            }
+                            else {
+                                Set()
+                            }
+                        case StateType(contractName, stateName) =>
+                            val stateTableOpt = contractTableOpt.get.stateLookup.get(stateName)
+                            stateTableOpt match {
+                                case None => Set() // failed to find the state we are supposedly in
+                                case Some(stateTable) => lookupFunction(stateTable) match {
+                                    case None => Set(); // Didn't find the identifier in the current state
+                                    case Some(obj) => Set(stateName)
+                                }
+                            }
+                    }
+                }
+
+                val isAvailable = possibleCurrentStateNames.toSet.subsetOf(availableInStateNames.toSet)
+                if (isAvailable) {
+                    simpleType match {
+                        case JustContractType(contractName) => insideContractResult
+
+                        case StateUnionType(contractName, stateNames) => insideContractResult
+
+                        case StateType(contractName, stateName) =>
+                            val stateTableOpt = contractTableOpt.get.stateLookup.get(stateName)
+                            stateTableOpt match {
+                                case None => None // State is not defined
+                                case Some(stateTable) => lookupFunction(stateTable)
+                            }
+                    }
+                }
+                else {
+                    None
+                }
         }
+
+        foundOpt
+
     }
 
 
@@ -129,77 +173,18 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
 
         // The field has to be available in all possible states.
     def lookupFieldTypeInType(typ: ObsidianType) (fieldName: String): Option[ObsidianType] = {
-        if (typ.isBottom) {
-            return Some(BottomType())
-        }
-
-        val foundFieldOpt: Option[Field] = typ.extractSimpleType match {
-            case None => None
-            case Some(simpleType) =>
-                val contractTableOpt = contractTable.lookupContract(simpleType.contractName)
-                if (contractTableOpt.isEmpty) {
-                    return None
-                }
-                val contractFieldLookupResult = contractTableOpt.flatMap(_.lookupField(fieldName))
-
-                simpleType match {
-                    case JustContractType (contractName) => contractFieldLookupResult
-
-                    case StateUnionType(contractName, stateNames) =>
-                        contractFieldLookupResult match {
-                            case None => None // It's not available in more than one state.
-                            case Some(field) => // Make sure it's available in all possible states.
-                                val availableInStates = field.availableIn
-                                availableInStates match {
-                                    case None => Some(field) // available in all states.
-                                    case Some(identifiers) =>
-                                        val availableInStates = identifiers.map(_._1)
-                                        val missingStateNames = stateNames.filterNot((possibleStateName: String) =>
-                                            availableInStates.contains(possibleStateName))
-                                        if (missingStateNames.isEmpty) {
-                                            Some(field) // It's available in all possible states.
-                                        }
-                                        else {
-                                            None
-                                        }
-
-                                }
-                        }
-
-                    case StateType(contractName, stateName) =>
-                        val stateTableOpt = contractTableOpt.get.stateLookup.get(stateName)
-                        stateTableOpt match {
-                            case None => None // State is not defined
-                            case Some(stateTable) => stateTable.lookupField(fieldName)
-                        }
-                }
-        }
-
-
-        foundFieldOpt match {
+        doLookup((declTable: DeclarationTable) => declTable.lookupField(fieldName), typ) match {
             case None => None
             case Some(field) => Some(field.typ)
         }
     }
 
     def lookupTransactionInType(typ: ObsidianType) (transactionName: String): Option[Transaction] = {
-        typ match {
-            case NonPrimitiveType(_,t,_) => contractTable.lookupContract(t.extractSimpleType.contractName) match {
-              case Some(c) => c.lookupTransaction(transactionName)
-              case _ => None
-            }
-            case _ => None
-        }
+        doLookup((declTable: DeclarationTable) => declTable.lookupTransaction(transactionName), typ)
     }
 
     def lookupFunctionInType(typ: ObsidianType) (functionName: String): Option[Func] = {
-        typ match {
-          case NonPrimitiveType(_,t,_) => contractTable.lookupContract(t.extractSimpleType.contractName) match {
-            case Some(c) => c.lookupFunction(functionName)
-            case _ => None
-          }
-          case _ => None
-        }
+        doLookup((declTable: DeclarationTable) => declTable.lookupFunction(functionName), typ)
     }
 }
 
@@ -611,6 +596,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
              case Dereference(eDeref: Expression, fieldName) =>
                  val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref)
+                 if (derefType.isBottom) {
+                     return (BottomType(), contextPrime)
+                 }
 
                  val fieldType =  context.lookupFieldTypeInType(derefType)(fieldName) match {
                      case Some(typ) => typ

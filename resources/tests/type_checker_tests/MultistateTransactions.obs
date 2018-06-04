@@ -1,0 +1,39 @@
+main contract MultistateTransactions {
+  state S1 {}
+  state S2 {}
+  state S3 {}
+
+  MultistateTransactions() {
+    ->S1({});
+  }
+
+  transaction foo() available in S1, S2 {
+  }
+
+  transaction validFooCall() available in S1 {
+    foo();
+  }
+
+  transaction validFooCall2() available in S1, S2 {
+     foo();
+  }
+
+  transaction validFooCall3() available in S2 {
+     foo();
+  }
+
+  transaction invalidFooCall() available in S3 {
+     // Error: foo() not available in S3
+     foo();
+  }
+
+  transaction invalidFooCall2() available in S2, S3 {
+     // Error: foo() not available in S3
+     foo();
+  }
+
+  transaction invalidFooCall3() {
+     // Error: foo() not available in S3
+     foo();
+  }
+}
