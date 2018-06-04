@@ -1417,7 +1417,9 @@ class CodeGen (val target: Target) {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
-            case n@NonPrimitiveType(_, unpermissionedType, mods) => if (n.isRemote) model.ref(classNameForStub(n.table.name)) else model.ref(n.table.name)
+            case n@NonPrimitiveType(_, unpermissionedType, mods) =>
+                val contractName = unpermissionedType.extractSimpleType.contractName
+                if (n.isRemote) model.ref(classNameForStub(contractName)) else model.ref(contractName)
             case _ => model.VOID // TODO: translate PDTs
         }
     }

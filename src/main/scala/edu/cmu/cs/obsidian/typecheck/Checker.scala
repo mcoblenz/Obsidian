@@ -8,11 +8,6 @@ import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
 
 
 
-/* Either a raw type or a primitive type. This class of types is important because
- * they can be translated purely syntactically from AST types (i.e. no resolving of
- * path/contract/state names is required */
-
-
 /* We define a custom type to store a special flag for if a context in after a "throw".
  * In the formalism, we allow throw to result in any type: in the implementation, we don't know
  * immediately which type this needs to be in order for type checking to work
@@ -20,16 +15,16 @@ import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
  * The AST is for error message generation.
  */
 
-case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: Boolean, transitionFieldsInitialized: Set[(String, String, AST)]) {
+case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, ObsidianType], isThrown: Boolean, transitionFieldsInitialized: Set[(String, String, AST)]) {
     def keys: Iterable[String] = underlyingVariableMap.keys
 
     def updated(s: String, t: ObsidianType): Context =
-        Context(underlyingVariableMap.updated(s, t), isThrown, transitionFieldsInitialized)
+        Context(contractTable, underlyingVariableMap.updated(s, t), isThrown, transitionFieldsInitialized)
     def updatedWithInitialization(stateName: String, fieldName: String, ast: AST): Context =
-        Context(underlyingVariableMap, isThrown, transitionFieldsInitialized + ((stateName, fieldName, ast)))
+        Context(contractTable, underlyingVariableMap, isThrown, transitionFieldsInitialized + ((stateName, fieldName, ast)))
 
     def updatedWithoutAnyTransitionFieldsInitialized(): Context =
-        Context(underlyingVariableMap, isThrown, Set.empty)
+        Context(contractTable, underlyingVariableMap, isThrown, Set.empty)
 
     def get(s: String): Option[ObsidianType] = underlyingVariableMap.get(s)
 
@@ -41,7 +36,7 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
             t match {
                 case BottomType() => ()
                 case u@UnresolvedNonprimitiveType(identifiers, mods) => rawContext = rawContext.updated(x, u)
-                case np@NonPrimitiveType(table, typ, mods) => rawContext.updated(x, np)
+                case np@NonPrimitiveType(typ, mods) => rawContext.updated(x, np)
                 case prim@IntType() => rawContext = rawContext.updated(x, prim)
                 case prim@StringType() => rawContext = rawContext.updated(x, prim)
                 case prim@BoolType() => rawContext = rawContext.updated(x, prim)
@@ -55,14 +50,9 @@ case class Context(underlyingVariableMap: Map[String, ObsidianType], isThrown: B
 
     def makeThrown: Context = this.copy(isThrown = true)
 
-
-    @deprecated("todo", "todo")
-    def tableOfThis: DeclarationTable = this ("this").asInstanceOf[NonPrimitiveType].table
-
-    def contractTable: ContractTable = thisType.table.contractTable
-
     def thisType: NonPrimitiveType = get("this").get.asInstanceOf[NonPrimitiveType]
 
+    def contractTable: ContractTable = table.contractTable
 
     // Looks up fields, transactions, etc., checking to make sure they're available in all
     // possible current states of "this".
@@ -226,14 +216,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     private def updatedSimpleType(t: ObsidianType, newSimple: SimpleType): ObsidianType = {
         t match {
-            case NonPrimitiveType(table, typ, mods) => NonPrimitiveType(table, updatedSimpleType(typ, newSimple), mods)
+            case NonPrimitiveType(typ, mods) => NonPrimitiveType(updatedSimpleType(typ, newSimple), mods)
             case ts => ts
         }
     }
 
     private def updatedUnpermissionedType(t: ObsidianType, newRaw: UnpermissionedType): ObsidianType = {
         t match {
-            case NonPrimitiveType(table, typ, mods) => NonPrimitiveType(table, newRaw, mods)
+            case NonPrimitiveType(typ, mods) => NonPrimitiveType(newRaw, mods)
             case ts => ts
         }
     }
@@ -264,7 +254,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (IntType(), IntType()) => None
             case (BoolType(), BoolType()) => None
             case (StringType(), StringType()) => None
-            case (NonPrimitiveType(_, typ1, mods1), NonPrimitiveType(_, typ2, mods2)) =>
+            case (NonPrimitiveType(typ1, mods1), NonPrimitiveType(typ2, mods2)) =>
                 val mainSubtype = (typ1, typ2) match {
                     case (NoPathType(ts1), NoPathType(ts2)) => isSimpleSubtype(ts1, ts2)
                     case (PathType(p1, ts1), PathType(p2, ts2)) if p1 == p2 =>
@@ -374,8 +364,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (IntType(), IntType()) => Some(IntType())
             case (BoolType(), BoolType()) => Some(BoolType())
             case (StringType(), StringType()) => Some(StringType())
-            case (NonPrimitiveType(table, typ1, mods1), NonPrimitiveType(_, typ2, mods2)) => assert(mods1 == mods2);
-                unpermissionedUpperBound(typ1, typ2).flatMap(s => Some(NonPrimitiveType(table, s, mods1)))
+            case (NonPrimitiveType(typ1, mods1), NonPrimitiveType(typ2, mods2)) => assert(mods1 == mods2);
+                unpermissionedUpperBound(typ1, typ2).flatMap(s => Some(NonPrimitiveType(s, mods1)))
             case _ => None
         }
     }
@@ -384,7 +374,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* assumes that [t] is not a primitive type */
     private def extractModifiers(t: ObsidianType): Set[TypeModifier] = {
         t match {
-            case typ@NonPrimitiveType(_, _, mods) => mods
+            case typ@NonPrimitiveType(_, mods) => mods
             case _ => Set.empty[TypeModifier]
         }
     }
@@ -395,7 +385,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                tr: UnpermissionedType,
                                table: DeclarationTable,
                                mods: Set[TypeModifier]): ObsidianType = {
-        NonPrimitiveType(table, tr, mods)
+        NonPrimitiveType(tr, mods)
     }
 
     //-------------------------------------------------------------------------
@@ -661,7 +651,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  val unpermissionedType = unpermissionedOf(simpleType, path)
 
-                 (NonPrimitiveType(contextPrime.contractTable, unpermissionedType, modifiers), contextPrime)
+                 (NonPrimitiveType(unpermissionedType, modifiers), contextPrime)
              case Disown(e) =>
                  // The expression "disown e" evaluates to an unowned value but also side-effects the context
                  // so that e is no longer owned (if it is a variable).
@@ -671,7 +661,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
 
                  val newTyp = typ match {
-                     case NonPrimitiveType(table, t, mods) => NonPrimitiveType(table, t, mods - IsOwned())
+                     case NonPrimitiveType(t, mods) => NonPrimitiveType(t, mods - IsOwned())
                      case t => t
                  }
 
@@ -787,8 +777,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             if (!exceptions.contains(x)) {
                 typ match {
                     case t: NonPrimitiveType =>
-                        val contract = t.table.contract
-                        if (t.isOwned && contract.isResource) logError(ast, UnusedOwnershipError(x))
+                        if (t.isOwned && t.isResourceReference(context.contractTable)) logError(ast, UnusedOwnershipError(x))
                     case _ => ()
                 }
             }
@@ -804,6 +793,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* returns a context that is the same as [branchContext], except only with
      * those variables bound which [oldContext] actually assign a value to */
     private def pruneContext(ast: AST, branchContext: Context, oldContext: Context): Context = {
+        assert(branchContext.contractTable == oldContext.contractTable)
         var newContext = oldContext
 
         for (x <- oldContext.keys) {
@@ -816,7 +806,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         checkForUnusedOwnershipErrors(ast, branchContext, oldContext.keys.toSet)
 
-        Context(newContext.underlyingVariableMap, isThrown = branchContext.isThrown, newContext.transitionFieldsInitialized)
+        Context(oldContext.contractTable, newContext.underlyingVariableMap, isThrown = branchContext.isThrown, newContext.transitionFieldsInitialized)
     }
 
     private def mergeContext(
@@ -825,6 +815,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             context2: Context): Context = {
         /* If we're merging with a context from a "throw", just take the other context
         * emit no errors */
+        assert(context1.contractTable == context2.contractTable)
+
         if (context1.isThrown && !context2.isThrown) return context2
         if (!context1.isThrown && context2.isThrown) return context1
 
@@ -842,7 +834,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
-        Context(mergedMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized))
+        Context(context1.contractTable, mergedMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized))
     }
 
     /* if [e] is of the form ReferenceIdentifier(x), This(), or if [e] is a sequence of
@@ -922,11 +914,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val specCallerPoV: Seq[ObsidianType] = spec.map(arg => {
                 arg.typ match {
                     case prim: PrimitiveType => prim
-                    case np@NonPrimitiveType(table, unpermissionedType, mods) =>
+                    case np@NonPrimitiveType(unpermissionedType, mods) =>
                         toCallerPoV(calleeToCaller, unpermissionedType) match {
                             case Left((head, e)) =>
                                 return Left((ast, CannotConvertPathError(head, e, unpermissionedType))::Nil)
-                            case Right(trNew) => NonPrimitiveType(table, fixUnpermissionedType(context, trNew), mods)
+                            case Right(trNew) => NonPrimitiveType(fixUnpermissionedType(context, trNew), mods)
                         }
                     case b@BottomType() => BottomType()
                     case u@UnresolvedNonprimitiveType(_, _) => assert(false); u
@@ -1020,7 +1012,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             if (retOpt.isDefined) {
                 retOpt.get match {
                     // TODO: Is this check actually necessary?
-                    case nonprimitiveType@NonPrimitiveType(_, unpermissionedType, _) =>
+                    case nonprimitiveType@NonPrimitiveType(unpermissionedType, _) =>
                         val unpermissionedTypeOurPoV = toCallerPoV(calleeToCaller, unpermissionedType)
                         if (unpermissionedTypeOurPoV.isLeft) {
                             val (first, badExpr) = unpermissionedTypeOurPoV.left.get
@@ -1046,7 +1038,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case VariableDeclWithInit(typ: ObsidianType, name, e: Expression) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
                 val tDecl = typ match {
-                    case NonPrimitiveType(table, unpermissionedType, mods) =>
+                    case NonPrimitiveType(unpermissionedType, mods) =>
                         val simpleType = unpermissionedType.extractSimpleType
                         val contractName = simpleType.contractName
 
@@ -1237,7 +1229,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val toCheckForDroppedResources = maybeOldFields.diff(newFields.toSet) // fields that we might currently have minus fields we're initializing now
                 for (oldField <- toCheckForDroppedResources) {
                     val fieldType = oldField._2
-                    if (fieldType.isOwned && fieldType.isResourceReference) {
+                    if (fieldType.isResourceReference(thisTable) && fieldType.isOwned) {
                         logError(s, PotentiallyUnusedOwnershipError(oldField._1))
                     }
                 }
@@ -1245,7 +1237,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType = StateType(thisTable.name, newStateName)
 
-                val newType = NonPrimitiveType(newTypeTable, NoPathType(newSimpleType), oldType.extractModifiers)
+                val newType = NonPrimitiveType(NoPathType(newSimpleType), oldType.extractModifiers)
 
 
                 contextPrime.updated("this", newType).updatedWithoutAnyTransitionFieldsInitialized()
@@ -1339,7 +1331,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 logError(s, AssignmentError())
                 contextPrime
 
-            case Throw() => Context(context.underlyingVariableMap, isThrown = true, Set.empty)
+            case Throw() => Context(context.contractTable, context.underlyingVariableMap, isThrown = true, Set.empty)
 
             case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond)
@@ -1477,8 +1469,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case typ: NonPrimitiveType =>
                 if (typ.isOwned) {
                     // Only resources can own other resources (since otherwise they might go out of scope improperly).
-                    val referencedContractIsResource = typ.table.contract.modifiers.contains(IsResource())
-                    if (referencedContractIsResource && !lexicallyInsideOf.contract.modifiers.contains(IsResource())) {
+                    if (typ.isResourceReference(lexicallyInsideOf) && !lexicallyInsideOf.contract.modifiers.contains(IsResource())) {
                         logError(field, NonResourceOwningResourceError(lexicallyInsideOf.name, field))
                     }
                 }
@@ -1520,8 +1511,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val expectedType =
-            NonPrimitiveType(lexicallyInsideOf,
-                NoPathType(simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState)), Set(IsOwned()))
+            NonPrimitiveType(NoPathType(simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState)), Set(IsOwned()))
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
         checkForUnusedStateInitializers(outputContext)
@@ -1577,10 +1567,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case StateType(_, stateName) => lexicallyInsideOf.contractTable.state(stateName).get
             case _ => lexicallyInsideOf
         }
-        val thisType = NonPrimitiveType(table, thisUnpermissionedType, Set(IsOwned()))
+        val thisType = NonPrimitiveType(thisUnpermissionedType, Set(IsOwned()))
 
         // Construct the context that the body should start with
-        var initContext = Context(new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
+        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
         initContext = initContext.updated("this", thisType)
 
         // first create this context so we can resolve types
@@ -1686,10 +1676,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
-        var initContext = Context(new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
+        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
 
         //should it be owned?
-        val thisType = NonPrimitiveType(table, NoPathType(JustContractType(table.name)), Set(IsOwned()))
+        val thisType = NonPrimitiveType(NoPathType(JustContractType(table.name)), Set(IsOwned()))
 
         initContext = initContext.updated("this", thisType)
 
@@ -1712,7 +1702,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val expectedThisType =
-            NonPrimitiveType(table, NoPathType(simpleOf(table, table.name, constr.endsInState)), Set(IsOwned()))
+            NonPrimitiveType(NoPathType(simpleOf(table, table.name, constr.endsInState)), Set(IsOwned()))
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
