@@ -31,7 +31,7 @@ case class ShadowingError(fieldName: String, stateName: String, prevLine: Int) e
 }
 
 case class ArgShadowingError(arg: String, transactionName: String, prevLine: Int) extends Error {
-    val msg: String = s"The transaction parameter '$arg' in '$transactionName' also declared in contract at line $prevLine. Consider changing the transaction parameter."
+    val msg: String = s"The transaction parameter '$arg' in '$transactionName' is also declared in contract at line $prevLine. Consider changing the transaction parameter."
 }
 
 case class SharedFieldNameError(fieldName: String, stateName: String, prevLine: Int) extends Error {
