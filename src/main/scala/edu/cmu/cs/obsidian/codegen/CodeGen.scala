@@ -655,10 +655,17 @@ class CodeGen (val target: Target) {
 
         for (decl <- aContract.declarations) {
             translateDeclaration(decl, newClass, translationContext, aContract)
-            if (decl.isInstanceOf[Constructor] && (!generated)) {
+            if (decl.isInstanceOf[Constructor] && (!generated) && aContract.modifiers.contains(IsMain())) {
                 generateInvokeConstructor(newClass)
                 generated = true
             }
+        }
+
+        /* If the main contract didn't already have a new_X() method with zero parameters,
+         * add one that sets all the fields to default values, so invokeConstructor()
+         * has something to call. */
+        if (!hasEmptyConstructor(aContract) && aContract.modifiers.contains(IsMain())) {
+            generateDefaultConstructor(newClass, translationContext, aContract)
         }
 
         translationContext
@@ -1640,6 +1647,32 @@ class CodeGen (val target: Target) {
         translateBody(meth.body(), c.body, translationContext, localContext)
 
         meth
+    }
+
+    private def generateDefaultConstructor(
+                                            newClass: JDefinedClass,
+                                            translationContext: TranslationContext,
+                                            aContract: Contract) {
+        val name = "new_" + newClass.name()
+
+        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
+
+        val body: JBlock = meth.body()
+
+        for (decl <- aContract.declarations) {
+            decl match {
+                /* Initialize all fields to suitable default values. */
+                case f: Field =>
+                    val initializer = fieldInitializerForType(f.typ)
+                    if (initializer.isDefined) {
+                        body.assign(newClass.fields get f.name, initializer.get)
+                    } else {
+                        /* Set them to null for now, they'll get re-set soon after. */
+                        body.assign(newClass.fields get f.name, JExpr._null)
+                    }
+                case _ => /* nothing */
+            }
+        }
     }
 
     private def translateTransDeclInPossibleState (
