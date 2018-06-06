@@ -531,7 +531,7 @@ class CodeGen (val target: Target) {
          * This constructor will be used in unarchiving; e.g. to unarchive class C:
          *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
          */
-        if (!aContract.modifiers.contains(IsMain()) && !hasEmptyConstructor(aContract)) {
+        if (!aContract.isMain && !hasEmptyConstructor(aContract)) {
             newClass.constructor(JMod.PUBLIC)
         }
 
@@ -655,7 +655,7 @@ class CodeGen (val target: Target) {
 
         for (decl <- aContract.declarations) {
             translateDeclaration(decl, newClass, translationContext, aContract)
-            if (decl.isInstanceOf[Constructor] && (!generated) && aContract.modifiers.contains(IsMain())) {
+            if (decl.isInstanceOf[Constructor] && (!generated) && aContract.isMain) {
                 generateInvokeConstructor(newClass)
                 generated = true
             }
@@ -664,7 +664,7 @@ class CodeGen (val target: Target) {
         /* If the main contract didn't already have a new_X() method with zero parameters,
          * add one that sets all the fields to default values, so invokeConstructor()
          * has something to call. */
-        if (!hasEmptyConstructor(aContract) && aContract.modifiers.contains(IsMain())) {
+        if (!hasEmptyConstructor(aContract) && aContract.isMain) {
             generateDefaultConstructor(newClass, translationContext, aContract)
         }
 
@@ -694,7 +694,7 @@ class CodeGen (val target: Target) {
                     generateSerialization(aContract, newClass, translationContext)
                 }
             case Server() =>
-                if (aContract.modifiers.contains(IsMain())) {
+                if (aContract.isMain) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
                     generateMainServerClassMethods(newClass, translationContext)
@@ -1394,7 +1394,7 @@ class CodeGen (val target: Target) {
         declaration match {
             /* the main contract has special generated code, so many functions are different */
             case (c: Constructor) =>
-                if (aContract.modifiers.contains(IsMain())) {
+                if (aContract.isMain) {
                     mainConstructor = Some(translateMainConstructor(c, newClass, translationContext))
                 }
                 else {
@@ -1406,7 +1406,7 @@ class CodeGen (val target: Target) {
                 translateFuncDecl(f, newClass, translationContext)
             case (t: Transaction) =>
                 translateTransDecl(t, newClass, translationContext)
-                if (aContract.modifiers.contains(IsMain())) {
+                if (aContract.isMain) {
                     mainTransactions.add(t)
                 }
             case (s@State(_, _)) =>
