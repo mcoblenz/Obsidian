@@ -1,0 +1,11 @@
+main contract C { C() {->S(x=0, y=0); }
+
+state S {
+    int x;
+    int y;
+ }
+
+ transaction t(C x) available in S
+ { ->S(x = y, y = x); }
+
+}

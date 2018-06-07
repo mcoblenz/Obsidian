@@ -29,6 +29,11 @@ case class NoMainContractError() extends Error {
 case class ShadowingError(fieldName: String, stateName: String, prevLine: Int) extends Error {
     val msg: String = s"Field '$fieldName' in '$stateName' also declared in contract at line $prevLine. Consider removing declaration in state."
 }
+
+case class ArgShadowingError(arg: String, transactionName: String, prevLine: Int) extends Error {
+    val msg: String = s"The transaction parameter '$arg' in '$transactionName' is also declared in contract at line $prevLine. Consider changing the transaction parameter."
+}
+
 case class SharedFieldNameError(fieldName: String, stateName: String, prevLine: Int) extends Error {
     val msg: String = s"Field '$fieldName' previously declared in state '$stateName' at line $prevLine."
 }

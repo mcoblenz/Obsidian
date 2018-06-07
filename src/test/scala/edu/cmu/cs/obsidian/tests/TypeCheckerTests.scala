@@ -520,9 +520,9 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/MaybeDroppedResource.obs",
             (PotentiallyUnusedOwnershipError("m"), 17)
                 ::
-                (NoEffectsError(OwnershipTransfer(ReferenceIdentifier("m"))), 21)
+                (NoEffectsError(OwnershipTransfer(ReferenceIdentifier("n"))), 21)
                 ::
-                (UnusedExpressionOwnershipError(OwnershipTransfer(ReferenceIdentifier("m"))), 21)
+                (UnusedExpressionOwnershipError(OwnershipTransfer(ReferenceIdentifier("n"))), 21)
                 ::
                 Nil
         )
@@ -569,6 +569,13 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
 
+    @Test def argShadowingTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/ArgumentShadowing.obs",
+            (ArgShadowingError("x", "t", 4), 8)
+              ::
+              Nil
+        )
+    }
 
 
 }

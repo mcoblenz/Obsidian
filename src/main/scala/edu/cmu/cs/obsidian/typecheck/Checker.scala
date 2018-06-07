@@ -1582,6 +1582,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             initContext = initContext.updated(arg.varName, arg.typ)
         }
 
+        checkTransactionArgShadowing(startStates, tx)
         checkTransactionInState(tx, lexicallyInsideOf, initContext)
     }
 
@@ -1617,6 +1618,24 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 case _ => ()
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    private def checkTransactionArgShadowing(states: Set[StateTable], t: Transaction): Unit = {
+        for (arg <- t.args) {
+            // the possible states the transaction could start in
+            for (state <- states) {
+                for (decl <- state.ast.declarations) {
+                    decl match {
+                        case field: Field => {
+                            if (field.name == arg.varName) {
+                                logError(t, ArgShadowingError(field.name, t.name, field.loc.line))
+                            }
+                        }
+                        case _ => ()
                     }
                 }
             }
