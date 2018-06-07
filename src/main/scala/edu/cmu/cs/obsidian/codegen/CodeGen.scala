@@ -1076,7 +1076,7 @@ class CodeGen (val target: Target) {
                 val setInvocation = nonNullBody.invoke(builderVar, setterName)
                 setInvocation.arg(fieldVar)
             }
-            case n@NonPrimitiveType(_, _, _) => handleNonPrimitive(field.name, n)
+            case n@NonPrimitiveType(_, _) => handleNonPrimitive(field.name, n)
             case _ => () // TODO handle other types
         }
     }
@@ -1235,7 +1235,7 @@ class CodeGen (val target: Target) {
                 val getCall = archive.invoke(getterName)
                 ifNonempty._then().assign(fieldVar, getCall)
             }
-            case n@NonPrimitiveType(_, unpermissionedType, _) => handleNonPrimitive(field.name, n)
+            case n@NonPrimitiveType(unpermissionedType, _) => handleNonPrimitive(field.name, n)
             case u: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
         }
@@ -1417,7 +1417,9 @@ class CodeGen (val target: Target) {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
-            case n@NonPrimitiveType(_, unpermissionedType, mods) => if (n.isRemote) model.ref(classNameForStub(n.table.name)) else model.ref(n.table.name)
+            case n@NonPrimitiveType(unpermissionedType, mods) =>
+                val contractName = unpermissionedType.extractSimpleType.contractName
+                if (n.isRemote) model.ref(classNameForStub(contractName)) else model.ref(contractName)
             case _ => model.VOID // TODO: translate PDTs
         }
     }
@@ -1428,7 +1430,7 @@ class CodeGen (val target: Target) {
                                                   translationContext: TranslationContext,
                                                   containingContract: Contract): Option[Contract] = {
         typ match {
-            case NonPrimitiveType(_,t,_) => {
+            case NonPrimitiveType(t,_) => {
                 val name = t.extractSimpleType.contractName
 
                 var typeComponents = name.split(".")

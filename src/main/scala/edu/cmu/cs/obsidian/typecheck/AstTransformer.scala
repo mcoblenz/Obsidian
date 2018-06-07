@@ -365,7 +365,7 @@ object AstTransformer {
                 result match {
                     case Left(err) => (BottomType().setLoc(t), List(ErrorRecord(err, pos)))
                     case Right((unpermissionedType, declTable)) =>
-                        (NonPrimitiveType(declTable, unpermissionedType, nonPrim.mods).setLoc(t), List.empty)
+                        (NonPrimitiveType(unpermissionedType, nonPrim.mods).setLoc(t), List.empty)
                 }
             case b@BottomType() => (b, List.empty)
             case np: NonPrimitiveType => (np, List.empty)
