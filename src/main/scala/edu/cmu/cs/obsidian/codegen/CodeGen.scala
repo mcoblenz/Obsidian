@@ -531,7 +531,7 @@ class CodeGen (val target: Target) {
          * This constructor will be used in unarchiving; e.g. to unarchive class C:
          *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
          */
-        if (!aContract.modifiers.contains(IsMain()) && !hasEmptyConstructor(aContract)) {
+        if (!aContract.isMain && !hasEmptyConstructor(aContract)) {
             newClass.constructor(JMod.PUBLIC)
         }
 
@@ -655,10 +655,17 @@ class CodeGen (val target: Target) {
 
         for (decl <- aContract.declarations) {
             translateDeclaration(decl, newClass, translationContext, aContract)
-            if (decl.isInstanceOf[Constructor] && (!generated)) {
+            if (decl.isInstanceOf[Constructor] && (!generated) && aContract.isMain) {
                 generateInvokeConstructor(newClass)
                 generated = true
             }
+        }
+
+        /* If the main contract didn't already have a new_X() method with zero parameters,
+         * add one that sets all the fields to default values, so invokeConstructor()
+         * has something to call. */
+        if (!hasEmptyConstructor(aContract) && aContract.isMain) {
+            generateDefaultConstructor(newClass, translationContext, aContract)
         }
 
         translationContext
@@ -687,7 +694,7 @@ class CodeGen (val target: Target) {
                     generateSerialization(aContract, newClass, translationContext)
                 }
             case Server() =>
-                if (aContract.modifiers.contains(IsMain())) {
+                if (aContract.isMain) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
                     generateMainServerClassMethods(newClass, translationContext)
@@ -1387,7 +1394,7 @@ class CodeGen (val target: Target) {
         declaration match {
             /* the main contract has special generated code, so many functions are different */
             case (c: Constructor) =>
-                if (aContract.modifiers.contains(IsMain())) {
+                if (aContract.isMain) {
                     mainConstructor = Some(translateMainConstructor(c, newClass, translationContext))
                 }
                 else {
@@ -1399,7 +1406,7 @@ class CodeGen (val target: Target) {
                 translateFuncDecl(f, newClass, translationContext)
             case (t: Transaction) =>
                 translateTransDecl(t, newClass, translationContext)
-                if (aContract.modifiers.contains(IsMain())) {
+                if (aContract.isMain) {
                     mainTransactions.add(t)
                 }
             case (s@State(_, _)) =>
@@ -1640,6 +1647,32 @@ class CodeGen (val target: Target) {
         translateBody(meth.body(), c.body, translationContext, localContext)
 
         meth
+    }
+
+    private def generateDefaultConstructor(
+                                            newClass: JDefinedClass,
+                                            translationContext: TranslationContext,
+                                            aContract: Contract) {
+        val name = "new_" + newClass.name()
+
+        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
+
+        val body: JBlock = meth.body()
+
+        for (decl <- aContract.declarations) {
+            decl match {
+                /* Initialize all fields to suitable default values. */
+                case f: Field =>
+                    val initializer = fieldInitializerForType(f.typ)
+                    if (initializer.isDefined) {
+                        body.assign(newClass.fields get f.name, initializer.get)
+                    } else {
+                        /* Set them to null for now, they'll get re-set soon after. */
+                        body.assign(newClass.fields get f.name, JExpr._null)
+                    }
+                case _ => /* nothing */
+            }
+        }
     }
 
     private def translateTransDeclInPossibleState (

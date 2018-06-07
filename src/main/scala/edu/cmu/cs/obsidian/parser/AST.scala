@@ -153,6 +153,7 @@ case class Contract(modifiers: Set[ContractModifier],
     val tag: DeclarationTag = ContractDeclTag
 
     val isResource = modifiers.contains(IsResource())
+    val isMain = modifiers.contains(IsMain())
 }
 
 /* Program */
