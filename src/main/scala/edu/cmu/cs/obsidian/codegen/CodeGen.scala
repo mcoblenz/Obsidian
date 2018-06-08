@@ -1633,31 +1633,8 @@ class CodeGen (val target: Target) {
 
     /* the local context at the beginning of the method */
 
-    /* The java constructor in the main contract runs every transaction.
-     * The obsidian constructor only runs when the contract is deployed.
+    /* The obsidian constructor only runs when the contract is deployed.
      * Thus, the obsidian constructor must be placed in a distinct method. */
-    private def translateMainConstructor(
-                                            c: Constructor,
-                                            newClass: JDefinedClass,
-                                            translationContext: TranslationContext) : JMethod = {
-        val name = "new_" + newClass.name()
-
-        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
-
-        /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDecl) =>
-                (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
-            )
-
-        /* construct the local context from this list */
-        val localContext: immutable.Map[String, JVar] = argList.toMap
-
-        /* add body */
-        translateBody(meth.body(), c.body, translationContext, localContext)
-
-        meth
-    }
-
     private def translateConstructor(
                                         c: Constructor,
                                         newClass: JDefinedClass,
