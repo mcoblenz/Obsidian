@@ -180,6 +180,10 @@ case class NoConstructorError(contractName: String) extends Error {
     val msg: String = s"Contract '$contractName' must have a constructor since it contains states"
 }
 
+case class MultipleConstructorsError(contractName: String) extends Error {
+    val msg: String = s"Main contract '$contractName' must only contain one constructor."
+}
+
 case class NoParentError(cName: String) extends Error {
     val msg: String = s"Contract $cName has no parent contract"
 }

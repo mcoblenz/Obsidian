@@ -577,5 +577,13 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
 
+    @Test def multipleConstructorsTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/MultipleConstructors.obs",
+            (MultipleConstructorsError("C"), 1)
+              ::
+              Nil
+        )
+    }
+
 
 }

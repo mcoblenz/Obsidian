@@ -1,0 +1,14 @@
+main contract C {
+    int x;
+    int y;
+
+    C(int first) {
+        x = first;
+        y = 0;
+    }
+
+    C(int first, int second) {
+        x = first;
+        y = second;
+    }
+}
