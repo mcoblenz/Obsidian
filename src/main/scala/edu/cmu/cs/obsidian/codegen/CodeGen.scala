@@ -1191,7 +1191,7 @@ class CodeGen (val target: Target) {
 
         def handleNonPrimitive(name: String, n: ObsidianType): Unit = {
             // foo = new Foo(); foo.initFromArchive(archive.getFoo());
-            val javaFieldTypeName = javaFieldType.fullName()
+            // val javaFieldTypeName = javaFieldType.fullName()
             val contract = resolveNonPrimitiveTypeToContract(n, translationContext, inContract)
             if (contract.isEmpty) {
                 println("Error: unresolved contract name " + name)
@@ -1242,8 +1242,9 @@ class CodeGen (val target: Target) {
                 val getCall = archive.invoke(getterName)
                 ifNonempty._then().assign(fieldVar, getCall)
             }
-            case n@NonPrimitiveType(unpermissionedType, _) => handleNonPrimitive(field.name, n)
-            case u: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
+            case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
+            case _: InterfaceContractType => assert(false, "Cannot generate field initializer for interface type.")
+            case _: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
         }
     }
