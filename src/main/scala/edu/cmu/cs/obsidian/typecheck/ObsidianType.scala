@@ -172,5 +172,5 @@ case class InterfaceContractType(name: String, simpleType: SimpleType) extends O
     val isBottom: Boolean = false
     override val residualType: ObsidianType = this
     override val extractSimpleType: Option[SimpleType] = Some(simpleType)
-    override val extractUnpermissionedType: Option[UnpermissionedType] = None
+    override val extractUnpermissionedType: Option[UnpermissionedType] = Some(NoPathType(simpleType))
 }

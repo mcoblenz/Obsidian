@@ -1203,7 +1203,7 @@ class CodeGen (val target: Target) {
 
                 // TODO
                 /* generate another method that takes the actual archive type
-             * so we don't have to uselessly convert to bytes here */
+                 * so we don't have to uselessly convert to bytes here */
                 body.assign(fieldVar, JExpr._new(javaFieldType))
                 val init = body.invoke(fieldVar, "initFromArchive")
                 init.arg(archive.invoke(getterNameForField(javaFieldName)))

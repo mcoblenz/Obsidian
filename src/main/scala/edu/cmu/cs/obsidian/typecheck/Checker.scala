@@ -30,21 +30,6 @@ case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, O
 
     def apply(s: String): ObsidianType = underlyingVariableMap(s)
 
-    def unresolvedContext: Map[String, PotentiallyUnresolvedType] = {
-        var rawContext = TreeMap[String, PotentiallyUnresolvedType]()
-        for ((x, t) <- underlyingVariableMap) {
-            t match {
-                case BottomType() => ()
-                case u@UnresolvedNonprimitiveType(identifiers, mods) => rawContext = rawContext.updated(x, u)
-                case np@NonPrimitiveType(typ, mods) => rawContext.updated(x, np)
-                case prim@IntType() => rawContext = rawContext.updated(x, prim)
-                case prim@StringType() => rawContext = rawContext.updated(x, prim)
-                case prim@BoolType() => rawContext = rawContext.updated(x, prim)
-            }
-        }
-        rawContext
-    }
-
     def fieldIsInitialized(stateName: String, fieldName: String): Boolean =
         transitionFieldsInitialized.find((e) => e._1 == stateName && e._2 == fieldName).isDefined
 
@@ -468,6 +453,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val retTypeCalleePoV: UnpermissionedType = astType match {
                 case prim: PrimitiveType => return (prim, contextPrime)
                 case np: NonPrimitiveType => np.extractUnpermissionedType.get
+                case ict: InterfaceContractType => ict.extractUnpermissionedType.get
                 case u: UnresolvedNonprimitiveType =>
                     assert(false); NoPathType(JustContractType("ERROR"))
                 case b: BottomType => assert(false); NoPathType(JustContractType("ERROR"))
