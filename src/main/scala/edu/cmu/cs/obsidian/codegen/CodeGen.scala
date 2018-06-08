@@ -3,6 +3,7 @@ package edu.cmu.cs.obsidian.codegen
 import CodeGen._
 import edu.cmu.cs.obsidian.parser._
 import com.helger.jcodemodel._
+import edu.cmu.cs.obsidian.parser
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.util._
 import edu.cmu.cs.obsidian.typecheck._
@@ -733,21 +734,17 @@ class CodeGen (val target: Target) {
         generateRunMethod(newClass, translationContext, stubType)
 
         // need to gather the types of the main contract constructor in order to correctly deserialize arguments
-        var constructorTypes: List[ObsidianType] = List.empty
-        for (decl <- translationContext.contract.declarations) {
-          decl match {
-            case const: Constructor => {
-              for (arg <- const.args) {
-                  constructorTypes = arg.typ :: constructorTypes
-              }
+        // find the first declaration that is a constructor
+        val constructor: Option[Declaration] = translationContext.contract.declarations.find(decl => decl.isInstanceOf[Constructor])
+        // gather the types of its arguments
+        val constructorTypes: Seq[ObsidianType] =
+            constructor match {
+                case Some(constr: Constructor) => constr.args.map(a => a.typ)
+                case None => List.empty
             }
-            case _ => ()
-          }
-
-        }
 
         /* init method */
-        generateInitMethod(newClass, stubType, constructorTypes.reverse)
+        generateInitMethod(newClass, stubType, constructorTypes)
 
         /* query method */
         val queryMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "query")
@@ -771,7 +768,7 @@ class CodeGen (val target: Target) {
     private def generateInitMethod(
                     newClass: JDefinedClass,
                     stubType: AbstractJClass,
-                    types: List[ObsidianType]): Unit = {
+                    types: Seq[ObsidianType]): Unit = {
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
         initMeth.param(stubType, "stub")
         val runArgs = initMeth.param(model.BYTE.array().array(), "args")
