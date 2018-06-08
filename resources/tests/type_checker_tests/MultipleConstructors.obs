@@ -1,3 +1,5 @@
+// testing for main contracts to only have one constructor
+
 main contract C {
     int x;
     int y;
@@ -6,7 +8,7 @@ main contract C {
         x = first;
         y = 0;
     }
-
+    // error: main contracts should have one constructor
     C(int first, int second) {
         x = first;
         y = second;
