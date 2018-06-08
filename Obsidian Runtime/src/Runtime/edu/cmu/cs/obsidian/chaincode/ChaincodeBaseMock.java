@@ -280,7 +280,8 @@ public abstract class ChaincodeBaseMock {
     }
 
     // Must be overridden in generated class.
-    public abstract byte[] init(ChaincodeStubMock stub, byte[][] args);
+    public abstract byte[] init(ChaincodeStubMock stub, byte[][] args)
+            throws InvalidProtocolBufferException;
     public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException, BadTransactionException;
     public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;

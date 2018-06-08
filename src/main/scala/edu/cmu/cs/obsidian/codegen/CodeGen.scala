@@ -732,8 +732,22 @@ class CodeGen (val target: Target) {
         /* run method */
         generateRunMethod(newClass, translationContext, stubType)
 
+        // need to gather the types of the main contract constructor in order to correctly deserialize arguments
+        var constructorTypes: List[ObsidianType] = List.empty
+        for (decl <- translationContext.contract.declarations) {
+          decl match {
+            case const: Constructor => {
+              for (arg <- const.args) {
+                  constructorTypes = arg.typ :: constructorTypes
+              }
+            }
+            case _ => ()
+          }
+
+        }
+
         /* init method */
-        generateInitMethod(newClass, stubType)
+        generateInitMethod(newClass, stubType, constructorTypes.reverse)
 
         /* query method */
         val queryMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "query")
@@ -756,14 +770,34 @@ class CodeGen (val target: Target) {
 
     private def generateInitMethod(
                     newClass: JDefinedClass,
-                    stubType: AbstractJClass): Unit = {
+                    stubType: AbstractJClass,
+                    types: List[ObsidianType]): Unit = {
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
         initMeth.param(stubType, "stub")
-        initMeth.param(model.BYTE.array().array(), "args")
+        val runArgs = initMeth.param(model.BYTE.array().array(), "args")
 
-        mainConstructor.foreach(c => initMeth.body().invoke(c))
+        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+        initMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
 
-        initMeth.body()._return(JExpr.newArray(model.BYTE, 0));
+        // have to check that the args parameter has the correct number of arguments
+        val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
+        initMeth.body()._if(cond)._then()._throw(JExpr._new(exceptionType).arg("Incorrect number of arguments to constructor."))
+
+        mainConstructor.foreach(c =>  {
+            val errorBlock: JBlock = new JBlock()
+            val invocation: JInvocation = initMeth.body().invoke(c)
+
+            var runArgsIndex = 0
+
+            for (t <- types) {
+                val deserializedArg: IJExpression = unmarshallExpr(runArgs.component(runArgsIndex),t,errorBlock)
+                invocation.arg(deserializedArg)
+                runArgsIndex += 1
+            }
+
+        })
+
+        initMeth.body()._return(JExpr.newArray(model.BYTE, 0))
     }
 
     private def generateRunMethod(
@@ -1394,12 +1428,7 @@ class CodeGen (val target: Target) {
         declaration match {
             /* the main contract has special generated code, so many functions are different */
             case (c: Constructor) =>
-                if (aContract.isMain) {
-                    mainConstructor = Some(translateMainConstructor(c, newClass, translationContext))
-                }
-                else {
-                    translateConstructor(c, newClass, translationContext)
-                }
+                translateConstructor(c, newClass, translationContext, aContract)
             case (f: Field) =>
                 translateFieldDecl(f, newClass)
             case (f: Func) =>
@@ -1632,8 +1661,20 @@ class CodeGen (val target: Target) {
     private def translateConstructor(
                                         c: Constructor,
                                         newClass: JDefinedClass,
-                                        translationContext: TranslationContext) : JMethod = {
-        val meth: JMethod = newClass.constructor(JMod.PUBLIC)
+                                        translationContext: TranslationContext,
+                                        aContract: Contract) : JMethod = {
+
+        // by default, make it a constructor
+        var meth: JMethod = newClass.constructor(JMod.PUBLIC)
+
+        // however, if it is a main contract, create a new_ method
+        if (aContract.isMain) {
+            val name = "new_" + newClass.name()
+
+            meth = newClass.method(JMod.PRIVATE, model.VOID, name)
+
+            mainConstructor = Some(meth)
+        }
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDecl) =>
