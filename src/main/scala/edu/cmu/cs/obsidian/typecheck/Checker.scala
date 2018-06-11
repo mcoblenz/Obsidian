@@ -1760,6 +1760,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         if (table.constructors.isEmpty && table.stateLookup.nonEmpty) {
             logError(contract, NoConstructorError(contract.name))
         }
+
+        if (table.constructors.length > 1 && contract.modifiers.contains(IsMain())) {
+            logError(contract, MultipleConstructorsError(contract.name))
+        }
     }
 
 

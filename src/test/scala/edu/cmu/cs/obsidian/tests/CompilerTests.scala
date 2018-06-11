@@ -48,4 +48,11 @@ class CompilerTests extends JUnitSuite {
     result = Main.compileProgram(inputArgs)
     assertTrue(result)
   }
+
+  @Test def constructorWithArgs(): Unit = {
+    var result = true
+    val inputArgs: Array[String] = Array("--dump-debug", "obs_output", "resources/tests/compilerTests/ConstructorWithArgs.obs")
+    result = Main.compileProgram(inputArgs)
+    assertTrue(result)
+  }
 }

@@ -1,0 +1,19 @@
+contract A {}
+
+main contract C {
+    int a;
+    A b;
+
+    C(int x, A y) {
+        a = x;
+        b = y;
+        ->S1;
+    }
+
+    state S1 {}
+
+    state S {
+        int x;
+    }
+
+}
