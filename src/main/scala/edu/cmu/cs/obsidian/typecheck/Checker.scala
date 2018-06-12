@@ -901,13 +901,19 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val specCallerPoV: Seq[ObsidianType] = spec.map(arg => {
                 arg.typ match {
                     case prim: PrimitiveType => prim
-                    case np@NonPrimitiveType(unpermissionedType, mods) =>
+                    case NonPrimitiveType(unpermissionedType, mods) =>
                         toCallerPoV(calleeToCaller, unpermissionedType) match {
                             case Left((head, e)) =>
                                 return Left((ast, CannotConvertPathError(head, e, unpermissionedType))::Nil)
                             case Right(trNew) => NonPrimitiveType(fixUnpermissionedType(context, trNew), mods)
                         }
-                    case b@BottomType() => BottomType()
+                    case ict: InterfaceContractType =>
+                        toCallerPoV(calleeToCaller, ict.extractUnpermissionedType.get) match {
+                            case Left((head, e)) =>
+                                return Left((ast, CannotConvertPathError(head, e, ict.extractUnpermissionedType.get))::Nil)
+                            case Right(trNew) => InterfaceContractType(ict.name, fixUnpermissionedType(context, trNew).extractSimpleType)
+                        }
+                    case BottomType() => BottomType()
                     case u@UnresolvedNonprimitiveType(_, _) => assert(false); u
                 }
             })
