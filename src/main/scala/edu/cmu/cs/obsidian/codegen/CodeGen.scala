@@ -1709,10 +1709,10 @@ class CodeGen (val target: Target) {
 
         availableIn match {
             case Some(states) => {
-                var cond: IJExpression = JExpr.FALSE
+                var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
                 for (st <- states) {
-                    cond = JOp.cor(JExpr.invoke(getStateMeth).ne(translationContext.getEnum(st._1)), cond)
+                    cond = JOp.cand(JExpr.invoke(getStateMeth).ne(translationContext.getEnum(st._1)), cond)
                 }
 
                 meth.body()._if(cond)
