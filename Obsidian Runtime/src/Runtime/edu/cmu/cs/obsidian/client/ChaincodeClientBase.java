@@ -11,7 +11,7 @@ import java.net.Socket;
 public abstract class ChaincodeClientBase extends ChaincodeClientStub {
 
     public abstract void invokeClientMain()
-            throws java.io.IOException, ChaincodeClientAbortTransactionException, edu.cmu.cs.obsidian.chaincode.ReentrancyException;
+            throws java.io.IOException, ChaincodeClientAbortTransactionException, edu.cmu.cs.obsidian.chaincode.ReentrancyException, edu.cmu.cs.obsidian.chaincode.BadTransactionException;
 
 
     public void delegatedMain (String args[]) {
@@ -83,6 +83,9 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
         }
         catch (edu.cmu.cs.obsidian.chaincode.ReentrancyException e) {
             System.err.println("Error: Reentrant call made");
+        }
+        catch (edu.cmu.cs.obsidian.chaincode.BadTransactionException e) {
+            System.err.println("Error: call to main failed " + e);
         }
     }
 }
