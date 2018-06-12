@@ -1690,12 +1690,11 @@ class CodeGen (val target: Target) {
         }
     }
 
-    private def translateTransDeclInPossibleState (
-                                                      tx: Transaction,
-                                                      newClass: JDefinedClass,
-                                                      translationContext: TranslationContext
-                                                  ): JMethod = {
-
+    private def translateTransDecl(
+                    tx: Transaction,
+                    newClass: JDefinedClass,
+                    translationContext: TranslationContext): JMethod = {
+        // Put all transactions at the top level, for now.
         val javaRetType = tx.retType match {
             case Some(typ) => resolveType(typ)
             case None => model.VOID
@@ -1703,6 +1702,24 @@ class CodeGen (val target: Target) {
 
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, tx.name)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
+
+        // Dynamically check the state
+        val availableIn: Option[Set[Identifier]] = tx.availableIn
+
+        availableIn match {
+            case Some(states) => {
+                var cond: IJExpression = JExpr.TRUE
+                // check if the current state is in any of the possible states
+                for (st <- states) {
+                    cond = JOp.cand(JExpr.invoke(getStateMeth).ne(translationContext.getEnum(st._1)), cond)
+                }
+
+                meth.body()._if(cond)
+                   ._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+            }
+            case None => ()
+        }
 
         /* We put the method body in a try block, and set the tx flag to false in a finally
          * block. Thus, even if a transaction is thrown, or there is a return statement,
@@ -1739,32 +1756,10 @@ class CodeGen (val target: Target) {
         /* once the whole transaction has been executed, we set the flag back to false */
         jTry._finally().assign(isInsideInvocationFlag(), JExpr.lit(false))
 
-        meth
-    }
-
-    private def translateTransDecl(
-                    tx: Transaction,
-                    newClass: JDefinedClass,
-                    translationContext: TranslationContext): Unit = {
-        // Does this transaction need to go in a set of states? If so, put it at the top level as if it's available in all states.
-        val availableIn: Option[Set[Identifier]] = tx.availableIn
-        if (availableIn.isDefined && availableIn.get.size == 1) {
-            for (inState <- availableIn.get) {
-                val inStateName = inState._1
-                val inStateContext: StateContext = translationContext.states(inStateName)
-                val inStateClass = inStateContext.innerClass
-
-                /* we change one thing: the currently translated state */
-                val newTranslationContext = translationContext.copy(currentStateName = Some(inStateName))
-                translateTransDeclInPossibleState(tx, inStateClass, newTranslationContext)
-            }
-        }
-        else {
-            translateTransDeclInPossibleState(tx, newClass, translationContext)
-        }
-
         // Clear any pending field assignments between transactions.
         translationContext.pendingFieldAssignments = Set.empty
+
+        meth
     }
 
     /* these methods make shadowing possible */
