@@ -1431,7 +1431,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case IntType() | BoolType() | StringType() =>
                         logError(s, NonInvokeableError(receiverType))
                         contextPrime
-                    case InterfaceContractType(name, simpleType) =>
+                    case InterfaceContractType(_, simpleType) =>
                         handleInvocation(contextPrime, name, receiver, args, true)
                     case _ =>
                         handleInvocation(contextPrime, name, receiver, args, false)
