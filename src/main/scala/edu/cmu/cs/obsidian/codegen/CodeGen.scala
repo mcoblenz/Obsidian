@@ -690,7 +690,7 @@ class CodeGen (val target: Target) {
         target match {
             case Client(mainContract) =>
                 if (aContract == mainContract) {
-                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
+                    newClass._extends(model.directClass("org.hyperledger.fabric.shim.ChaincodeBase"))
                     generateClientMainMethod(newClass)
                     generateInvokeClientMainMethod(aContract, newClass)
                 }
@@ -730,8 +730,8 @@ class CodeGen (val target: Target) {
     }
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
-        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
-        val stubType = model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
+        newClass._extends(model.directClass("org.hyperledger.fabric.shim.ChaincodeBase"))
+        val stubType = model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
 
         /* run method */
         generateRunMethod(newClass, translationContext, stubType)

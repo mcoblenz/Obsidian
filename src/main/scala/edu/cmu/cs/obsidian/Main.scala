@@ -138,7 +138,7 @@ object Main {
 
         val sourcePath = sourceDir.toString
         val classPath =
-            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.5.1.jar:lib/json-20160810.jar"
+            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.5.1.jar:lib/json-20160810.jar:lib/shim-client-1.0.jar"
         val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
         val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
                                                        "-classpath", classPath,
