@@ -1,0 +1,12 @@
+main contract Bank {
+    Money mon;
+
+    Bank() {
+
+    }
+}
+
+// some sort of money
+resource contract Money {
+    owned Money() {}
+}

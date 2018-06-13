@@ -1,0 +1,63 @@
+// import "resources/case_studies/Insurance/Bid.obs"
+
+
+// TODO : Imports and collections
+
+main resource contract Insurance {
+    owned Money mon;
+
+    owned Insurance(owned Money m) {
+        mon <- m;
+    }
+
+    // TODO : Calculate Bid(s) using some needed information, for now just int
+    transaction requestBids(int x) returns Bid {
+        return new Bid(x + 4);
+    }
+
+}
+
+// some sort of money
+resource contract Money {
+    owned Money() {}
+}
+
+// bids (already defined)
+contract Bid {
+    int cost;
+
+    Bid(int c) {
+        cost = c;
+        // unavailable by default
+        ->Unavailable;
+    }
+
+    // available for consideration from client
+    state Available {
+        int timeAvailable;
+    }
+
+    // expires after a certain amount of time
+    state Unavailable {}
+
+    // client buys it
+    state Sold {}
+
+    transaction makeAvailable(int time) available in Unavailable
+                                        ends in Available {
+        ->Available(timeAvailable = time);
+    }
+
+    transaction isUnavailable() available in Available
+                                ends in Available, Unavailable {
+        if (timeAvailable < 0) {
+                ->Unavailable;
+        }
+    }
+
+    transaction buy() available in Available
+                      ends in Sold {
+        ->Sold;
+    }
+
+}
