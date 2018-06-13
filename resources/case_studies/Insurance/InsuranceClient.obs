@@ -1,0 +1,10 @@
+import "resources/case_studies/Insurance/InsuranceService.obs"
+import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/java-utilities/System.obs"
+
+main contract InsuranceClient {
+	transaction main(remote InsuranceService i) {
+         Bid b = i.requestBids(3);
+         System.print("bid : 3");
+	}
+}
+
