@@ -1222,7 +1222,6 @@ class CodeGen (val target: Target) {
 
         def handleNonPrimitive(name: String, n: ObsidianType): Unit = {
             // foo = new Foo(); foo.initFromArchive(archive.getFoo());
-            val javaFieldTypeName = javaFieldType.fullName()
             val contract = resolveNonPrimitiveTypeToContract(n, translationContext, inContract)
             if (contract.isEmpty) {
                 println("Error: unresolved contract name " + name)
@@ -1234,7 +1233,7 @@ class CodeGen (val target: Target) {
 
                 // TODO
                 /* generate another method that takes the actual archive type
-             * so we don't have to uselessly convert to bytes here */
+                 * so we don't have to uselessly convert to bytes here */
                 body.assign(fieldVar, JExpr._new(javaFieldType))
                 val init = body.invoke(fieldVar, "initFromArchive")
                 init.arg(archive.invoke(getterNameForField(javaFieldName)))
@@ -1273,8 +1272,9 @@ class CodeGen (val target: Target) {
                 val getCall = archive.invoke(getterName)
                 ifNonempty._then().assign(fieldVar, getCall)
             }
-            case n@NonPrimitiveType(unpermissionedType, _) => handleNonPrimitive(field.name, n)
-            case u: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
+            case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
+            case _: InterfaceContractType => assert(false, "Cannot generate field initializer for interface type.")
+            case _: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
         }
     }
@@ -1599,6 +1599,7 @@ class CodeGen (val target: Target) {
                 addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
+            case OwnershipTransfer(_) => assert(false, "OwnershipTransfer may be removed in the future."); JExpr._null()
             case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
         }
     }

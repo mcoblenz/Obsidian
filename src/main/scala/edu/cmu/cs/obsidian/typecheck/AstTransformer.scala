@@ -357,16 +357,17 @@ object AstTransformer {
             case t@BoolType() => (t, List.empty[ErrorRecord])
             case t@IntType() => (t, List.empty[ErrorRecord])
             case t@StringType() => (t, List.empty[ErrorRecord])
-            case nonPrim@UnresolvedNonprimitiveType(mods, ids) =>
+            case nonPrim@UnresolvedNonprimitiveType(_, _) =>
                 val tCanonified: UnresolvedNonprimitiveType = canonifyParsableType(table, context, nonPrim)
                 val result: TraverseResult = resolveNonPrimitiveTypeContext(table, lexicallyInsideOf, tCanonified,
                                                             new TreeSet(), context, pos)
 
                 result match {
                     case Left(err) => (BottomType().setLoc(t), List(ErrorRecord(err, pos)))
-                    case Right((unpermissionedType, declTable)) =>
+                    case Right((unpermissionedType, _)) =>
                         (NonPrimitiveType(unpermissionedType, nonPrim.mods).setLoc(t), List.empty)
                 }
+            case i@InterfaceContractType(_, _) => (i, List.empty)
             case b@BottomType() => (b, List.empty)
             case np: NonPrimitiveType => (np, List.empty)
         }
