@@ -126,7 +126,10 @@ class CodeGen (val target: Target) {
         // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
         val filename = imp.name;
 
-        val ast = Parser.parseFileAtPath(filename, printTokens = false)
+        val parsedAst = Parser.parseFileAtPath(filename, printTokens = false)
+        val table = new SymbolTable(parsedAst)
+        val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
+        val ast = globalTable.ast
 
         target match {
             case Client(_) =>
@@ -968,6 +971,7 @@ class CodeGen (val target: Target) {
         val method = newClass.method(JMod.PUBLIC, model.VOID, "invokeClientMain")
         method._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
 
         val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
                                                                   .asInstanceOf[Option[Transaction]]

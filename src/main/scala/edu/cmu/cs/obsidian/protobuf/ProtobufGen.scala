@@ -29,7 +29,11 @@ object ProtobufGen {
             // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
             val filename = imp.name;
 
-            val ast = Parser.parseFileAtPath(filename, printTokens = false)
+            val parsedAst = Parser.parseFileAtPath(filename, printTokens = false)
+            val table = new SymbolTable(parsedAst)
+            val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
+            val ast = globalTable.ast
+
             val messages = ast.contracts.map(translateContract)
             (new Protobuf(messages), filename)
         })
