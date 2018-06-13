@@ -1191,7 +1191,6 @@ class CodeGen (val target: Target) {
 
         def handleNonPrimitive(name: String, n: ObsidianType): Unit = {
             // foo = new Foo(); foo.initFromArchive(archive.getFoo());
-            // val javaFieldTypeName = javaFieldType.fullName()
             val contract = resolveNonPrimitiveTypeToContract(n, translationContext, inContract)
             if (contract.isEmpty) {
                 println("Error: unresolved contract name " + name)
