@@ -22,7 +22,7 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
-        if (function != "init") {
+        if (!function.equals("init")) {
             return newErrorResponse("Unknown initialization function " + function);
         }
         try {
@@ -59,31 +59,9 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
     private void invokeConstructor() {}; //to be overidden in generated code
 
     public void delegatedMain(String args[]) {
-        if (args.length != 2) {
-            java.net.URL jar = null;
-            Class currentClass = new Object() { }.getClass().getEnclosingClass();
-            java.security.CodeSource src = currentClass.getProtectionDomain().getCodeSource();
-            if (src != null) {
-                jar = src.getLocation();
-            }
-
-            System.err.println(
-                    "Usage: 'java -jar " + jar + " <path> <port>' where\n" +
-                            "<path> is the path to the chaincode archive\n" +
-                            "<port> is a port number to listen for transactions on"
-            );
-            System.exit(1);
-        }
-
         /* archive path */
         String archivePathString = args[0];
         java.nio.file.Path archivePath = java.nio.file.Paths.get(archivePathString);
-
-        /* port */
-        int port = Integer.parseInt(args[1]);
-
-        /* TODO: add an option to turn this on/off */
-        boolean printDebug = true;
 
         try {
             byte[] bytes = java.nio.file.Files.readAllBytes(archivePath);
