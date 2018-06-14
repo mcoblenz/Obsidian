@@ -690,7 +690,7 @@ class CodeGen (val target: Target) {
         target match {
             case Client(mainContract) =>
                 if (aContract == mainContract) {
-                    newClass._extends(model.directClass("org.hyperledger.fabric.shim.ChaincodeBase"))
+                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianChaincodeBase"))
                     generateClientMainMethod(newClass)
                     generateInvokeClientMainMethod(aContract, newClass)
                 }
@@ -730,7 +730,7 @@ class CodeGen (val target: Target) {
     }
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
-        newClass._extends(model.directClass("org.hyperledger.fabric.shim.ChaincodeBase"))
+        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianChaincodeBase"))
         val stubType = model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
 
         /* run method */
@@ -931,6 +931,19 @@ class CodeGen (val target: Target) {
             }
         }
       runMeth.body()._return(returnBytes)
+    }
+
+    private def generateInvokeMethod(
+                          newClass: JDefinedClass,
+                          translationContext: TranslationContext,
+                          stubType: AbstractJClass) = {
+        // Generate method that
+        val invokeMeth = newClass.method(JMod.PUBLIC, model.BYTE.array(), "invoke")
+        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+        invokeMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
+        invokeMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+        invokeMeth.param(stubType, "stub")
+        invokeMeth.param(model.ref("String").array(), "args")
     }
 
     private def generateServerMainMethod(newClass: JDefinedClass) = {
