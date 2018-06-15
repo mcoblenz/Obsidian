@@ -28,6 +28,7 @@
           <root url="jar://$MODULE_DIR$/../../lib/jcodemodel-3.0.0-SNAPSHOT.jar!/" />
           <root url="jar://$MODULE_DIR$/../../lib/json-20160810.jar!/" />
           <root url="jar://$MODULE_DIR$/../../lib/protobuf-java-3.5.1.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../lib/shim-client-1.0.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
