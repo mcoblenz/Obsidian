@@ -23,26 +23,19 @@ object AstTransformer {
     type Context = Map[String, ObsidianType]
     val emptyContext = new TreeMap[String, ObsidianType]()
 
-    private def transformImport(imp: Import): Import = {
-        // TODO
-        imp
-    }
-
     def transformProgram(table: SymbolTable): (SymbolTable, Seq[ErrorRecord]) = {
         var errorRecords = List.empty[ErrorRecord]
         var contracts = List.empty[Contract]
+        assert(table.ast.imports.isEmpty, "Imports should be empty after processing.")
 
-        val imports = table.ast.imports
-        val transformedImports = imports.map(transformImport)
 
         for ((contractName, contractTable) <- table.contractLookup) {
-
             val (newContract, errors) = transformContract(table, contractTable)
             errorRecords = errorRecords ++ errors
             contracts = contracts :+ newContract
         }
 
-        val newProgram = Program(transformedImports, contracts).setLoc(table.ast)
+        val newProgram = Program(Seq.empty, contracts).setLoc(table.ast)
 
         val newTable = new SymbolTable(newProgram)
         (newTable, errorRecords)
