@@ -143,6 +143,7 @@ case class Ensures(expr: Expression) extends AST
 sealed abstract trait ContractModifier extends HasLocation
 case class IsResource() extends ContractModifier
 case class IsMain() extends ContractModifier
+case class IsImport() extends ContractModifier
 
 case class Import(name: String) extends AST
 
@@ -154,6 +155,7 @@ case class Contract(modifiers: Set[ContractModifier],
 
     val isResource = modifiers.contains(IsResource())
     val isMain = modifiers.contains(IsMain())
+    val isImport = modifiers.contains(IsImport())
 }
 
 /* Program */
