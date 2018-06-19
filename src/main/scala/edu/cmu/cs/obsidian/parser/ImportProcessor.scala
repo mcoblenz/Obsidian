@@ -20,23 +20,23 @@ object ImportProcessor {
         Program(Seq.empty, allContracts)
     }
 
-    def processImport(imp: String, seen: Seq[Import], contractNames: Seq[String]) : Either[String, Seq[Contract]] = {
-        val importedProgram = Parser.parseFileAtPath(imp, printTokens = false)
+    def processImport(importPath: String, seen: Seq[Import], contractNames: Seq[String]) : Either[String, Seq[Contract]] = {
+        val importedProgram = Parser.parseFileAtPath(importPath, printTokens = false)
 
         var contracts = filterTags(importedProgram.contracts)
 
         importedProgram.contracts.foreach(c => {
             if (contractNames.contains(c.name)) {
-                return Left("Repeat contract " + c.name + " in " + imp)
+                return Left("Repeat contract " + c.name + " in " + importPath)
             }
         })
 
-        val updatedSeen = seen :+ Import(imp)
+        val updatedSeen = seen :+ Import(importPath)
         val updatedContractNames = contractNames ++ importedProgram.contracts.map(_.name)
 
         importedProgram.imports.foreach(i => {
             if (seen.contains(i)) {
-                return Left("Cyclical import " + i + " from " + imp)
+                return Left("Cyclical import " + i + " from " + importPath)
             }
 
             val cs = processImport(i.name, updatedSeen, updatedContractNames)
