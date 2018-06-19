@@ -22,7 +22,7 @@ object ProtobufGen {
 
         val messages = program.contracts.map(translateContract)
 
-        val result: Seq[(Protobuf, String)] = (new Protobuf(messages), sourceFilename) +: Seq.empty
+        val result: Seq[(Protobuf, String)] = Seq((new Protobuf(messages), sourceFilename))
         result
     }
 
