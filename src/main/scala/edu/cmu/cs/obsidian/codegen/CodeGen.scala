@@ -98,7 +98,7 @@ class CodeGen (val target: Target) {
         }
 
         for (c <- program.contracts) {
-            // TODO : generate code for interfaces
+            // TODO : generate code for interfaces (issue #117)
             if(!c.isInterface) {
                 translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
 
