@@ -45,6 +45,10 @@ jar {
     manifest {
         attributes 'Implementation-Title': 'Generated code',
                    'Implementation-Version': version,
-                   'Class-Path': configurations.compile.collect { it.getName() } .join(' ') + " .."
+                   'Class-Path': configurations.compile.collect { it.getName() } .join(' ') + " .",
+                   'Main-Class': "edu.cmu.cs.obsidian.generated_code.$main"
+    }
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
     }
 }
