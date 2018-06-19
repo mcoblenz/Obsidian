@@ -141,11 +141,8 @@ class ContractTable(
                 }
         if (localLookupResult.isDefined) {
             localLookupResult
-        }
-        else {
-            // See if the name is defined in an import.
-            symbolTable.findNameInImports(name)
-        }
+        } // otherwise nothing was found
+        else None
 
     }
 
@@ -177,31 +174,8 @@ class SymbolTable(program: Program) {
         table
     }
 
-    var importContractLookup: Map[String, ContractTable] = {
-        var table = TreeMap[String, ContractTable]()
-
-        for (imp <- ast.imports) {
-            // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
-            val filename = imp.name;
-
-            val importAST = Parser.parseFileAtPath(filename, printTokens = false)
-            val importSymbolTable = new SymbolTable(importAST)
-            // This symbol table may include many different contracts. Unpack them.
-            for ((contractName, contractTable) <- importSymbolTable.contractLookup) {
-                if (table.contains(contractName)) {
-                    // TODO: report error for duplicate contract
-                }
-                table = table.updated(contractName, contractTable)
-            }
-        }
-
-        table
-    }
-
     def ast: Program = program
 
     /* only retrieves top level contracts (i.e. not nested) */
     def contract: Function[String, Option[ContractTable]] = contractLookup.get
-
-    def findNameInImports(name: String) : Option[ContractTable] = importContractLookup.get(name)
 }

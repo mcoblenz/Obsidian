@@ -88,20 +88,24 @@ class CodeGen (val target: Target) {
                                           protobufOuterClassName: String,
                                           programPackage: JPackage): JCodeModel =
     {
-        // TODO: refactor this to support imports properly
         val contractNameResolutionMap: Map[Contract, String] = TranslationContext.contractNameResolutionMapForProgram(program)
         val protobufOuterClassNames = mutable.HashMap.empty[String, String]
+
+        assert(program.imports.isEmpty, "Imports should be empty after processing.")
+
         for (c <- program.contracts) {
             populateProtobufOuterClassNames(c, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
         }
 
-        for (imp <- program.imports) {
-            if(!imp.name.contains("/java-utilities/"))
-                translateImport(programPackage, imp, contractNameResolutionMap, protobufOuterClassNames)
-        }
-
         for (c <- program.contracts) {
-            translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+            // TODO : generate code for interfaces (issue #117)
+            if(!c.isInterface) {
+                translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+
+                if (c.isImport) {
+                    translateStubContract(c, programPackage)
+                }
+            }
         }
         model
     }
@@ -116,40 +120,6 @@ class CodeGen (val target: Target) {
             }
         }
         return false
-    }
-
-
-    private def translateImport(programPackage: JPackage,
-                                imp: Import,
-                                contractNameResolutionMap: Map[Contract, String],
-                                protobufOuterClassNames: Map[String, String]): Unit = {
-        // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
-        val filename = imp.name;
-
-        val parsedAst = Parser.parseFileAtPath(filename, printTokens = false)
-        val table = new SymbolTable(parsedAst)
-        val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
-        val ast = globalTable.ast
-
-        target match {
-            case Client(_) =>
-                val program = translateProgramInPackage(ast, Util.protobufOuterClassNameForFilename(filename), programPackage)
-                val stub = translateStubProgram(ast, programPackage, contractNameResolutionMap, protobufOuterClassNames)
-
-            case Server() => assert(false, "imports not yet supported in servers") // TODO
-        }
-    }
-
-    private def translateStubProgram(program: Program,
-                                     programPackage: JPackage,
-                                     contractNameResolutionMap: Map[Contract, String],
-                                     protobufOuterClassNames: Map[String, String]): Unit = {
-        // TODO: support imports in programs to be translated as stubs
-        assert(program.imports.isEmpty, "imports in imported contracts are not yet supported");
-
-        for (contract <- program.contracts) {
-            translateStubContract(contract, programPackage)
-        }
     }
 
     private def classNameForStub(contractName: String) = {
@@ -738,12 +708,12 @@ class CodeGen (val target: Target) {
 
         // need to gather the types of the main contract constructor in order to correctly deserialize arguments
         // find the first declaration that is a constructor
-        val constructor: Option[Declaration] = translationContext.contract.declarations.find(decl => decl.isInstanceOf[Constructor])
+        val constructor: Option[Declaration] = translationContext.contract.declarations.find(_.isInstanceOf[Constructor])
         // gather the types of its arguments
         val constructorTypes: Seq[ObsidianType] =
             constructor match {
-                case Some(constr: Constructor) => constr.args.map(a => a.typ)
-                case None => List.empty
+                case Some(constr: Constructor) => constr.args.map(_.typ)
+                case _ => List.empty
             }
 
         /* init method */

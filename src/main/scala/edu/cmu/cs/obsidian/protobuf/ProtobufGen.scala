@@ -14,33 +14,15 @@ class Unimplemented extends Exception {}
   * Unlike the JCodeModel class hierarchy, this class does code generation in a functional style.
   */
 object ProtobufGen {
-    val UtilitiesPath = "/java-utilities/";
 
     // Programs translate to lists of messages (one per contract).
     def translateProgram(program: Program, sourceFilename: String): Seq[(Protobuf, String)] = {
         val protobuf = new Protobuf(Nil)
-        print(program.imports)
-        val importList = program.imports.filter(!_.name.contains(UtilitiesPath))
-        val protobufs: Seq[(Protobuf, String)] = importList.map ((imp: Import) => {
-            // Each import results in a .proto file, which needs to be compiled.
-            val protobufOuterClassName = Util.protobufOuterClassNameForFilename(imp.name)
-            val protobufFilename = protobufOuterClassName + ".proto"
-
-            // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
-            val filename = imp.name;
-
-            val parsedAst = Parser.parseFileAtPath(filename, printTokens = false)
-            val table = new SymbolTable(parsedAst)
-            val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
-            val ast = globalTable.ast
-
-            val messages = ast.contracts.map(translateContract)
-            (new Protobuf(messages), filename)
-        })
+        assert(program.imports.isEmpty, "Imports should be empty after processing.")
 
         val messages = program.contracts.map(translateContract)
 
-        val result = protobufs :+ ((new Protobuf(messages), sourceFilename))
+        val result: Seq[(Protobuf, String)] = Seq((new Protobuf(messages), sourceFilename))
         result
     }
 

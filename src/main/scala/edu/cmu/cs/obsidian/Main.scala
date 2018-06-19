@@ -250,7 +250,9 @@ object Main {
                 println()
             }
 
-            val table = new SymbolTable(ast)
+            val importsProcessedAst = ImportProcessor.processImports(filename, ast)
+
+            val table = new SymbolTable(importsProcessedAst)
             val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
 
             if (options.printAST) {
