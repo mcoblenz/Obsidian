@@ -708,12 +708,12 @@ class CodeGen (val target: Target) {
 
         // need to gather the types of the main contract constructor in order to correctly deserialize arguments
         // find the first declaration that is a constructor
-        val constructor: Option[Declaration] = translationContext.contract.declarations.find(decl => decl.isInstanceOf[Constructor])
+        val constructor: Option[Declaration] = translationContext.contract.declarations.find(_.isInstanceOf[Constructor])
         // gather the types of its arguments
         val constructorTypes: Seq[ObsidianType] =
             constructor match {
-                case Some(constr: Constructor) => constr.args.map(a => a.typ)
-                case None => List.empty
+                case Some(constr: Constructor) => constr.args.map(_.typ)
+                case _ => List.empty
             }
 
         /* init method */
