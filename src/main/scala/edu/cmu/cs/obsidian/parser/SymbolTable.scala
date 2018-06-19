@@ -91,7 +91,7 @@ class StateTable(
 
 class ContractTable(
         val contract: Contract,
-        var symbolTable: SymbolTable,
+        symbolTable: SymbolTable,
         parentContract: Option[ContractTable]) extends DeclarationTable {
     assert (contract != null)
 
