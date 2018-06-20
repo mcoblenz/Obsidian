@@ -105,6 +105,8 @@ class ContractTable(
     private var txLookup: Map[String, Transaction] = indexDecl[Transaction](contract.declarations, TransactionDeclTag)
     private var funLookup: Map[String, Func] = indexDecl[Func](contract.declarations, FuncDeclTag)
 
+    val allFields: Set[Field] = fieldLookup.values.toSet
+
     def simpleType = JustContractType(name)
 
 

@@ -12,6 +12,7 @@ main contract C_Shared {
     }
 
     state S { int f2; }
+    state T {}
 }
 
 contract C {

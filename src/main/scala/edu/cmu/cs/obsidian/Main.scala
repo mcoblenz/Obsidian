@@ -251,8 +251,9 @@ object Main {
             }
 
             val importsProcessedAst = ImportProcessor.processImports(filename, ast)
+            val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
-            val table = new SymbolTable(importsProcessedAst)
+            val table = new SymbolTable(fieldsLiftedAst)
             val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
 
             if (options.printAST) {

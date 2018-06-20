@@ -62,49 +62,23 @@ case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, O
                 val possibleCurrentStateNames: Iterable[String] = simpleType match {
                     case JustContractType(contractName) => contractTableOpt.get.stateLookup.values.map((s: StateTable) => s.name)
 
-                    case StateUnionType(contractName, stateNames) =>
+                    case StateType(contractName, stateNames) =>
                         stateNames
-
-                    case StateType(contractName, stateName) =>
-                        Set(stateName)
                 }
 
                 // It's weird that the way we find the available state names depends on the current state; this is an artifact
                 // of the fact that lookup for things defined in exactly one state is different from lookup for things defined in more than one state
                 // (or the whole contract).
                 val availableInStateNames: Iterable[String] = {
-                    simpleType match {
-                        case JustContractType(contractName) =>
-                            if (insideContractResult.isDefined) {
-                                insideContractResult.get.availableIn match {
-                                    case None => // This identifier is available in all states of the contract.
-                                        contractTableOpt.get.stateLookup.map(_._1)
-                                    case Some(identifiers) => identifiers.map(_._1)
-                                }
-                            }
-                            else {
-                                Set()
-                            }
-                        case StateUnionType(contractName, stateNames) =>
-                            if (insideContractResult.isDefined) {
-                                insideContractResult.get.availableIn match {
-                                    case None => // This identifier is available in all states of the contract.
-                                        contractTableOpt.get.stateLookup.map(_._1)
-                                    case Some(identifiers) => identifiers.map(_._1)
-                                }
-                            }
-                            else {
-                                Set()
-                            }
-                        case StateType(contractName, stateName) =>
-                            val stateTableOpt = contractTableOpt.get.stateLookup.get(stateName)
-                            stateTableOpt match {
-                                case None => Set() // failed to find the state we are supposedly in
-                                case Some(stateTable) => lookupFunction(stateTable) match {
-                                    case None => Set(); // Didn't find the identifier in the current state
-                                    case Some(obj) => Set(stateName)
-                                }
-                            }
+                    if (insideContractResult.isDefined) {
+                        insideContractResult.get.availableIn match {
+                            case None => // This identifier is available in all states of the contract.
+                                contractTableOpt.get.stateLookup.map(_._1)
+                            case Some(identifiers) => identifiers.map(_._1)
+                        }
+                    }
+                    else {
+                        Set()
                     }
                 }
 
@@ -112,15 +86,7 @@ case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, O
                 if (isAvailable) {
                     simpleType match {
                         case JustContractType(contractName) => insideContractResult
-
-                        case StateUnionType(contractName, stateNames) => insideContractResult
-
-                        case StateType(contractName, stateName) =>
-                            val stateTableOpt = contractTableOpt.get.stateLookup.get(stateName)
-                            stateTableOpt match {
-                                case None => None // State is not defined
-                                case Some(stateTable) => lookupFunction(stateTable)
-                            }
+                        case StateType(contractName, stateNames) => insideContractResult
                     }
                 }
                 else {
@@ -220,13 +186,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def isSimpleSubtype(t1: SimpleType, t2: SimpleType): Boolean = {
         (t1, t2) match {
             case (JustContractType(c1), JustContractType(c2)) => c1 == c2
-            case (StateType(c1, s1), StateType(c2, s2)) => c1 == c2 && s1 == s2
-            case (StateType(c1, _), JustContractType(c2)) => c1 == c2
-            case (StateType(c1, s), StateUnionType(c2, ss)) =>
-                c1 == c2 && (ss contains s)
-            case (StateUnionType(c1, ss1), StateUnionType(c2, ss2)) =>
+            case (StateType(c1, ss1), StateType(c2, ss2)) =>
                 c1 == c2 && ss1.subsetOf(ss2)
-            case (StateUnionType(c, ss1), JustContractType(c2)) =>
+            case (StateType(c, ss1), JustContractType(c2)) =>
                 c == c2
             case _ => false
         }
@@ -279,11 +241,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def simpleOfWithStateNames(cName: String, states: Option[Set[String]]): SimpleType = {
         states match {
             case None => JustContractType(cName)
-            case Some(ss) => if (ss.size > 1) {
-                StateUnionType(cName, ss)
-            } else {
-                StateType(cName, ss.head)
-            }
+            case Some(ss) =>
+                StateType(cName, ss)
         }
     }
 
@@ -319,15 +278,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         (t1, t2) match {
             case (_, JustContractType(_)) => Some(t2)
             case (JustContractType(_), _) => Some(t1)
-            case (StateType(c, s1), StateType(_, s2)) =>
-                if (s1 == s2) Some(StateType(c, s1))
-                else handleStateUnion(TreeSet[String]() + s1, TreeSet[String]() + s2)
-            case (StateUnionType(_, ss1), StateUnionType(_, ss2)) =>
+            case (StateType(_, ss1), StateType(_, ss2)) =>
                 handleStateUnion(ss1, ss2)
-            case (StateUnionType(_, ss), StateType(_, s)) =>
-                handleStateUnion(ss, TreeSet[String]() + s)
-            case (StateType(_, s), StateUnionType(_, ss)) =>
-                handleStateUnion(ss, TreeSet[String]() + s)
             case _ => None
         }
     }
@@ -1124,13 +1076,26 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val possibleCurrentStates = oldType.extractSimpleType.get match {
                     case JustContractType(contractName) => thisTable.possibleStates
-                    case StateType(contractName, stateName) => Set(stateName)
-                    case StateUnionType(contractName, stateNames) => stateNames
+                    case StateType(contractName, stateNames) => stateNames
                 }
 
 
-                val oldStateTables = possibleCurrentStates.map((name: String) => thisTable.state(name).get)
-                var oldFieldSets: Set[Set[Declaration]] = oldStateTables.map((t: StateTable) => t.ast.declarations.toSet)
+//                val oldStateTables = possibleCurrentStates.map((name: String) => thisTable.state(name).get)
+//                var oldFieldSets: Set[Set[Declaration]] = oldStateTables.map((t: StateTable) => t.ast.declarations.toSet)
+
+                // For each state that we might be in, compute the set of fields that could be available.
+                val allContractFields = thisTable.allFields
+                val oldFieldSets: Set[Set[Field]] = possibleCurrentStates.map((stateName: String) =>
+                    // Take this state name and find all fields that are applicable.
+                    allContractFields.filter((f: Field) =>
+                        if (f.availableIn.isEmpty) {
+                            // available in all states
+                            true
+                        }
+                        else {
+                            f.availableIn.get.map(_._1).contains(stateName)
+                        }
+                ))
 
                 val (oldFields: Set[(String, ObsidianType)], maybeOldFields: Set[(String, ObsidianType)]) =
                 // We don't have a statically-fixed set of old fields because we don't know statically
@@ -1141,7 +1106,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                     else {
                         val oldFieldNamesSets: Set[Set[(String, ObsidianType)]] = oldFieldSets.map(
-                            (decls: Set[Declaration]) => decls.map((d: Declaration) => (d.name, d.asInstanceOf[Field].typ))
+                            (decls: Set[Field]) => decls.map((d: Field) => (d.name, d.typ))
                         )
 
                         (oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
@@ -1172,9 +1137,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             false
                         }
                     )
-                val fieldNamesInThisState = contractFieldDeclarationsAvailableInNewState.map(
+                val fieldNamesInNewState = contractFieldDeclarationsAvailableInNewState.map(
                     (decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ))
-                val newFields: Seq[(String, ObsidianType)] = newStateFields ++ fieldNamesInThisState
+                val newFields: Seq[(String, ObsidianType)] = newStateFields ++ fieldNamesInNewState
 
                 val toInitialize = newFields.toSet.diff(oldFields) // All the fields that must be initialized.
 
@@ -1358,10 +1323,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
                 t.extractSimpleType match {
                     case Some(s) => s match {
-                        case StateType(_, stateName) =>
-                            logError(e, AlreadyKnowStateError(e, stateName))
-                            return contextPrime
-                        case StateUnionType(_, _) => ()
+                        case StateType(_, stateNames) => ()
                         case JustContractType(_) => ()
                     }
                     case None =>
@@ -1454,7 +1416,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         def checkNonStateSpecific(simple: SimpleType, err: Error): Unit = {
             simple match {
                 case JustContractType(_) => ()
-                case StateType(_,_) | StateUnionType(_,_) =>
+                case StateType(_,_) =>
                     logError(field, err)
             }
         }
@@ -1557,7 +1519,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         // TODO: consider path case. Previously it was something like:
         // PathType("this"::"parent"::Nil, lexicallyInsideOf.simpleType)
         val table = simpleType match {
-            case StateType(_, stateName) => lexicallyInsideOf.contractTable.state(stateName).get
+            case StateType(_, stateNames) =>
+                if (stateNames.size == 1) {
+                    val stateName = stateNames.head
+                    lexicallyInsideOf.contractTable.state(stateName).get
+                }
+                else {
+                    lexicallyInsideOf
+                }
             case _ => lexicallyInsideOf
         }
         val thisType = NonPrimitiveType(thisUnpermissionedType, Set(IsOwned()))
@@ -1618,17 +1587,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     private def checkTransactionArgShadowing(states: Set[StateTable], t: Transaction): Unit = {
         for (arg <- t.args) {
+
             // the possible states the transaction could start in
             for (state <- states) {
-                for (decl <- state.ast.declarations) {
-                    decl match {
-                        case field: Field => {
-                            if (field.name == arg.varName) {
-                                logError(t, ArgShadowingError(field.name, t.name, field.loc.line))
-                            }
-                        }
-                        case _ => ()
-                    }
+                val fieldOpt = state.lookupField(arg.varName)
+                if (fieldOpt.isDefined) {
+                    logError(t, ArgShadowingError(fieldOpt.get.name, t.name, fieldOpt.get.loc.line))
                 }
             }
         }
