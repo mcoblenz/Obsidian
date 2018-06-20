@@ -67,8 +67,7 @@ case class DifferentTypeError(e1: Expression, t1: ObsidianType, e2: Expression, 
 case class FieldUndefinedError(fieldOf: SimpleType, fName: String) extends Error {
     val msg: String = fieldOf match {
         case JustContractType(cName) => s"Field '$fName' is not defined in contract '$cName'"
-        case StateUnionType(cName, _) => s"Field '$fName' is not defined in contract '$cName'"
-        case StateType(cName, sName) => s"Field '$fName' is not defined in state '$sName' of contract '$cName'"
+        case StateType(cName, stateNames) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
     }
 }
 case class RecursiveFieldTypeError(cName: String, fName: String) extends Error {
@@ -93,10 +92,8 @@ case class MethodUndefinedError(receiver: SimpleType, name: String) extends Erro
     val msg: String = receiver match {
         case JustContractType(cName) =>
             s"No transaction or function with name '$name' was found in contract '$cName'"
-        case StateUnionType(cName, _) =>
-            s"No transaction or function with name '$name' was found in contract '$cName'"
-        case StateType(cName, sName) =>
-            s"No transaction or function with name '$name' was found in state '$sName' of contract '$cName'"
+        case StateType(cName, sNames) =>
+            s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"
     }
 }
 case class StateUndefinedError(cName: String, sName: String) extends Error {
@@ -136,9 +133,10 @@ case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
 case class AssignmentError() extends Error {
     val msg: String = s"Assignment target must be a variable or a field"
 }
-case class AlreadyKnowStateError(e: Expression, sName: String) extends Error {
-    val msg: String = s"'$e' is already known to be in state '$sName': a dynamic check is not needed"
-}
+//case class AlreadyKnowStateError(e: Expression, sName: String) extends Error {
+//    val msg: String = s"'$e' is already known to be in state '$sName': a dynamic check is not needed"
+//}
+
 case class LeakReturnValueError(methName: String) extends Error {
     val msg: String = s"Invocation of '$methName' leaks ownership of return value"
 }

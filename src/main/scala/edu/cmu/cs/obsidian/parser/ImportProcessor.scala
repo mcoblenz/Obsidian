@@ -17,7 +17,7 @@ object ImportProcessor {
             }
         })
 
-        Program(Seq.empty, allContracts)
+        Program(Seq.empty, allContracts).setLoc(ast)
     }
 
     def processImport(importPath: String, seen: Seq[Import], contractNames: Seq[String]) : Either[String, Seq[Contract]] = {

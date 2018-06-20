@@ -5,7 +5,6 @@ main contract Test {
     }
 
     state S2 {
-        int x2;
         int x3;
     }
 
@@ -19,7 +18,7 @@ main contract Test {
         S1::shared = 44;
 
         // Error: not transitioning to S2.
-        S2::x2 = 45;
+        S2::x3 = 45;
 
         ->S1;
         ->S3;
