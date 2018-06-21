@@ -1425,7 +1425,7 @@ class CodeGen (val target: Target) {
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
             case n@NonPrimitiveType(unpermissionedType, mods) =>
-                val contractName = unpermissionedType.extractSimpleType.contractName
+                val contractName = unpermissionedType.contractName
                 if (n.isRemote) model.ref(classNameForStub(contractName)) else model.ref(contractName)
             case _ => model.VOID // TODO: translate PDTs
         }
@@ -1438,7 +1438,7 @@ class CodeGen (val target: Target) {
                                                   containingContract: Contract): Option[Contract] = {
         typ match {
             case NonPrimitiveType(t,_) => {
-                val name = t.extractSimpleType.contractName
+                val name = t.contractName
 
                 var typeComponents = name.split(".")
                 if (typeComponents.isEmpty) {

@@ -175,7 +175,7 @@ object AstTransformer {
     def startContext(lexicallyInsideOf: DeclarationTable, args: Seq[VariableDecl]): Context = {
         var startContext = emptyContext
 
-        val simpleType =  NoPathType(JustContractType(lexicallyInsideOf.name))
+        val simpleType =  JustContractType(lexicallyInsideOf.name)
         val contractType = UnresolvedNonprimitiveType(List("this"), Set())
         startContext = startContext.updated("this", contractType)
 
@@ -351,8 +351,8 @@ object AstTransformer {
             case t@IntType() => (t, List.empty[ErrorRecord])
             case t@StringType() => (t, List.empty[ErrorRecord])
             case nonPrim@UnresolvedNonprimitiveType(_, _) =>
-                val tCanonified: UnresolvedNonprimitiveType = canonifyParsableType(table, context, nonPrim)
-                val result: TraverseResult = resolveNonPrimitiveTypeContext(table, lexicallyInsideOf, tCanonified,
+                //val tCanonified: UnresolvedNonprimitiveType = canonifyParsableType(table, context, nonPrim)
+                val result: TraverseResult = resolveNonPrimitiveTypeContext(table, lexicallyInsideOf, nonPrim,
                                                             new TreeSet(), context, pos)
 
                 result match {
@@ -374,56 +374,56 @@ object AstTransformer {
         }
     }
 
-    type TraverseResult = Either[Error, (UnpermissionedType, DeclarationTable)]
+    type TraverseResult = Either[Error, (SimpleType, DeclarationTable)]
+//
+//    private def appendToPath(
+//            f: String,
+//            result: TraverseResult): TraverseResult = {
+//        result match {
+//            case Left(_) => result
+//            case Right((PathType(path, ts), table)) =>
+//                Right((PathType(f +: path, ts), table))
+//            case Right((ts, table)) =>
+//                Right((PathType(f::Nil, ts), table))
+//        }
+//    }
 
-    private def appendToPath(
-            f: String,
-            result: TraverseResult): TraverseResult = {
-        result match {
-            case Left(_) => result
-            case Right((PathType(path, ts), table)) =>
-                Right((PathType(f +: path, ts), table))
-            case Right((NoPathType(ts), table)) =>
-                Right((PathType(f::Nil, ts), table))
-        }
-    }
+//    private def canonifyParsableType(
+//            table: SymbolTable,
+//            context: Context,
+//            t: UnresolvedNonprimitiveType): UnresolvedNonprimitiveType = {
+//        if (t.identifiers.length == 1) {
+//            val cName = t.identifiers.head
+//            table.contract(cName) match {
+//                case Some(ct) => t
+//                case None => UnresolvedNonprimitiveType("this" +: t.identifiers, t.mods)
+//            }
+//        }
+//        else if (t.identifiers.length == 2) {
+//            if (context contains t.identifiers.head) return t
+//
+//            val cNamePossible = t.identifiers.head
+//            val sNamePossible = t.identifiers.tail.head
+//
+//            // see if this interpretation of the type works
+//            table.contract(cNamePossible) match {
+//                case Some(ct) =>
+//                    ct.state(sNamePossible) match {
+//                        case Some(st) => return t
+//                        case None => ()
+//                    }
+//                case None => ()
+//            }
+//
+//            UnresolvedNonprimitiveType("this" +: t.identifiers, t.mods)
+//
+//        } else {
+//            if (context contains t.identifiers.head) t
+//            else UnresolvedNonprimitiveType("this" +: t.identifiers, t.mods)
+//        }
+//    }
 
-    private def canonifyParsableType(
-            table: SymbolTable,
-            context: Context,
-            t: UnresolvedNonprimitiveType): UnresolvedNonprimitiveType = {
-        if (t.identifiers.length == 1) {
-            val cName = t.identifiers.head
-            table.contract(cName) match {
-                case Some(ct) => t
-                case None => UnresolvedNonprimitiveType("this" +: t.identifiers, t.mods)
-            }
-        }
-        else if (t.identifiers.length == 2) {
-            if (context contains t.identifiers.head) return t
-
-            val cNamePossible = t.identifiers.head
-            val sNamePossible = t.identifiers.tail.head
-
-            // see if this interpretation of the type works
-            table.contract(cNamePossible) match {
-                case Some(ct) =>
-                    ct.state(sNamePossible) match {
-                        case Some(st) => return t
-                        case None => ()
-                    }
-                case None => ()
-            }
-
-            UnresolvedNonprimitiveType("this" +: t.identifiers, t.mods)
-
-        } else {
-            if (context contains t.identifiers.head) t
-            else UnresolvedNonprimitiveType("this" +: t.identifiers, t.mods)
-        }
-    }
-
-    /* [resolveUnpermissionedType] returns either an error that was reached while checking
+    /* [resolveSimpleType] returns either an error that was reached while checking
      * (if [tr] could not be traversed), or the declaration table of the type,
      * as well as new unpermissioned type: this return value is only different from [tr]
      * if [tr] starts with an implicit "this" (in this case, "this" is added) */
@@ -440,23 +440,25 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = NoPathType(JustContractType(cName))
+                    val tRaw = JustContractType(cName)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }
         }
         else {
+
+
             val pathHead = t.identifiers.head
             val pathRest = t.identifiers.tail
 
-            if (pathHead == "this") {
-                val tNew = UnresolvedNonprimitiveType(pathRest, t.mods)
-                val emptySet = new HashSet[(DeclarationTable, String)]()
-                val result =
-                    resolveNonPrimitiveTypeNoContext(table, lexicallyInsideOf, tNew, emptySet, pos)
-                appendToPath("this", result)
-                return result
-            }
+//            if (pathHead == "this") {
+//                val tNew = UnresolvedNonprimitiveType(pathRest, t.mods)
+//                val emptySet = new HashSet[(DeclarationTable, String)]()
+//                val result =
+//                    resolveNonPrimitiveTypeNoContext(table, lexicallyInsideOf, tNew, emptySet, pos)
+//                appendToPath("this", result)
+//                return result
+//            }
 
             if (t.identifiers.length == 2) {
                 val cNamePossible = pathHead
@@ -467,7 +469,7 @@ object AstTransformer {
                     case Some(ct) =>
                         ct.state(sNamePossible) match {
                             case Some(st) =>
-                                val tr = NoPathType(StateType(cNamePossible, sNamePossible))
+                                val tr = StateType(cNamePossible, sNamePossible)
                                 return Right((tr, st))
                             case None => ()
                         }
@@ -475,33 +477,37 @@ object AstTransformer {
                 }
             }
 
-            /* the head must be a variable */
+            return Left(DereferenceError(t))
 
-            if (visitedLocalVars contains pathHead) {
-                Left(RecursiveVariableTypeError(pathHead))
-            }
-            val newVisited = visitedLocalVars + pathHead
-
-            val pathHeadType: UnresolvedNonprimitiveType = context(pathHead) match {
-                case trNext: UnresolvedNonprimitiveType => trNext
-                case prim =>
-                    val (primType, errors) = transformType(table, lexicallyInsideOf, context, prim, pos)
-                     return Left(DereferenceError(t))
-            }
-
-            val newInsideOf =
-                resolveNonPrimitiveTypeContext(table, lexicallyInsideOf, pathHeadType,
-                                               newVisited, context, pos) match {
-                    case l@Left(_) => return l
-                    case Right(travData) => travData._2
-                }
-
-            val tNew = UnresolvedNonprimitiveType(pathRest, t.mods)
-
-            val emptySet = new HashSet[(DeclarationTable, String)]()
-            val result = resolveNonPrimitiveTypeNoContext(table, newInsideOf, tNew, emptySet, pos)
-
-            appendToPath(pathHead, result)
+            // Path types are deprecated for now.
+//
+//            /* the head must be a variable */
+//
+//            if (visitedLocalVars contains pathHead) {
+//                Left(RecursiveVariableTypeError(pathHead))
+//            }
+//            val newVisited = visitedLocalVars + pathHead
+//
+//            val pathHeadType: UnresolvedNonprimitiveType = context(pathHead) match {
+//                case trNext: UnresolvedNonprimitiveType => trNext
+//                case prim =>
+//                    val (primType, errors) = transformType(table, lexicallyInsideOf, context, prim, pos)
+//                     return Left(DereferenceError(t))
+//            }
+//
+//            val newInsideOf =
+//                resolveNonPrimitiveTypeContext(table, lexicallyInsideOf, pathHeadType,
+//                                               newVisited, context, pos) match {
+//                    case l@Left(_) => return l
+//                    case Right(travData) => travData._2
+//                }
+//
+//            val tNew = UnresolvedNonprimitiveType(pathRest, t.mods)
+//
+//            val emptySet = new HashSet[(DeclarationTable, String)]()
+//            val result = resolveNonPrimitiveTypeNoContext(table, newInsideOf, tNew, emptySet, pos)
+//
+//            appendToPath(pathHead, result)
         }
     }
 
@@ -516,7 +522,7 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = NoPathType(JustContractType(cName))
+                    val tRaw = JustContractType(cName)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }
@@ -524,16 +530,16 @@ object AstTransformer {
             val pathHead = t.identifiers.head
             val pathRest = t.identifiers.tail
 
-            if (pathHead == "parent") {
-                if (lexicallyInsideOf.contractTable.hasParent) {
-                    val tNew = t.copy(identifiers = pathRest)
-                    val newInsideOf = lexicallyInsideOf.contractTable.parent.get
-                    val result = resolveNonPrimitiveTypeNoContext(table, newInsideOf, tNew, visitedFields, pos)
-                    appendToPath("parent", result)
-                } else {
-                    Left(NoParentError(lexicallyInsideOf.contract.name))
-                }
-            }
+//            if (pathHead == "parent") {
+//                if (lexicallyInsideOf.contractTable.hasParent) {
+//                    val tNew = t.copy(identifiers = pathRest)
+//                    val newInsideOf = lexicallyInsideOf.contractTable.parent.get
+//                    val result = resolveNonPrimitiveTypeNoContext(table, newInsideOf, tNew, visitedFields, pos)
+//                    appendToPath("parent", result)
+//                } else {
+//                    Left(NoParentError(lexicallyInsideOf.contract.name))
+//                }
+//            }
 
             if (t.identifiers.length == 2) {
                 val cNamePossible = pathHead
@@ -544,7 +550,7 @@ object AstTransformer {
                     case Some(ct) =>
                         ct.state(sNamePossible) match {
                             case Some(st) =>
-                                val tr = NoPathType(StateType(cNamePossible, sNamePossible))
+                                val tr = StateType(cNamePossible, sNamePossible)
                                 return Right((tr, st))
                             case None => ()
                         }
@@ -554,43 +560,46 @@ object AstTransformer {
 
             /* the head must be a field */
 
-            val fieldLookup = lexicallyInsideOf.lookupField(pathHead)
-            if (fieldLookup.isEmpty) {
-                return Left(FieldUndefinedError(lexicallyInsideOf.simpleType, pathHead))
-            }
+            // Path types are deprecated for now.
+            Left(DereferenceError(t))
 
-            val field = fieldLookup.get
-
-            // paths must consist entirely of [const] fields
-            if (!field.isConst) {
-                return Left(FieldNotConstError(lexicallyInsideOf.name, pathHead))
-            }
-
-            if (visitedFields contains (lexicallyInsideOf, pathHead)) {
-                return Left(RecursiveFieldTypeError(lexicallyInsideOf.name, pathHead))
-            }
-
-            val nonPrim = field.typ match {
-                case tNonPrim: UnresolvedNonprimitiveType => tNonPrim
-                case prim =>
-                    val (tRes, errors) = transformType(table, lexicallyInsideOf, new TreeMap(), prim, pos)
-                    return Left(DereferenceError(t))
-            }
-
-            val newVisited = visitedFields.+((lexicallyInsideOf, pathHead))
-
-            val traverseField =
-                resolveNonPrimitiveTypeNoContext(table, lexicallyInsideOf, nonPrim, newVisited, pos)
-
-            val newInsideOf = traverseField match {
-                case Left(err) => return Left(err)
-                case Right(res) => res._2
-            }
-
-            val tNew = t.copy(identifiers = pathRest)
-
-            val result = resolveNonPrimitiveTypeNoContext(table, lexicallyInsideOf, tNew, newVisited, pos)
-            appendToPath(pathHead, result)
+//            val fieldLookup = lexicallyInsideOf.lookupField(pathHead)
+//            if (fieldLookup.isEmpty) {
+//                return Left(FieldUndefinedError(lexicallyInsideOf.simpleType, pathHead))
+//            }
+//
+//            val field = fieldLookup.get
+//
+//            // paths must consist entirely of [const] fields
+//            if (!field.isConst) {
+//                return Left(FieldNotConstError(lexicallyInsideOf.name, pathHead))
+//            }
+//
+//            if (visitedFields contains (lexicallyInsideOf, pathHead)) {
+//                return Left(RecursiveFieldTypeError(lexicallyInsideOf.name, pathHead))
+//            }
+//
+//            val nonPrim = field.typ match {
+//                case tNonPrim: UnresolvedNonprimitiveType => tNonPrim
+//                case prim =>
+//                    val (tRes, errors) = transformType(table, lexicallyInsideOf, new TreeMap(), prim, pos)
+//                    return Left(DereferenceError(t))
+//            }
+//
+//            val newVisited = visitedFields.+((lexicallyInsideOf, pathHead))
+//
+//            val traverseField =
+//                resolveNonPrimitiveTypeNoContext(table, lexicallyInsideOf, nonPrim, newVisited, pos)
+//
+//            val newInsideOf = traverseField match {
+//                case Left(err) => return Left(err)
+//                case Right(res) => res._2
+//            }
+//
+//            val tNew = t.copy(identifiers = pathRest)
+//
+//            val result = resolveNonPrimitiveTypeNoContext(table, lexicallyInsideOf, tNew, newVisited, pos)
+//            appendToPath(pathHead, result)
         }
     }
 

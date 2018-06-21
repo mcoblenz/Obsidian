@@ -144,8 +144,8 @@ class TypeCheckerTests extends JUnitSuite {
             (SubTypingError(BoolType(), IntType()), 26)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("C_Owned")), Set()),
-                    NonPrimitiveType(NoPathType(JustContractType("C_Shared")), Set())),
+                    NonPrimitiveType(JustContractType("C_Owned"), Set()),
+                    NonPrimitiveType(JustContractType("C_Shared"), Set())),
                     29)
                 ::
                 (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 32)
@@ -153,8 +153,8 @@ class TypeCheckerTests extends JUnitSuite {
                 (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 34)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("C_Shared")), Set()),
-                    NonPrimitiveType(NoPathType(StateType("C_Shared", "S")), Set())),
+                    NonPrimitiveType(JustContractType("C_Shared"), Set()),
+                    NonPrimitiveType(StateType("C_Shared", "S"), Set())),
                     37)
                 ::
                 (VariableUndefinedError("j", null), 42)
@@ -176,8 +176,8 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnreachableCodeError(), 22)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("C_Owned")), Set(IsOwned())),
-                    NonPrimitiveType(NoPathType(StateType("C_Owned", "S")), Set(IsOwned()))),
+                    NonPrimitiveType(JustContractType("C_Owned"), Set(IsOwned())),
+                    NonPrimitiveType(StateType("C_Owned", "S"), Set(IsOwned()))),
                     28)
                 ::
                 (UnreachableCodeError(), 28)
@@ -185,7 +185,7 @@ class TypeCheckerTests extends JUnitSuite {
                 (MustReturnError("t_ret_nonprimitive"), 31)
                 ::
                 (SubTypingError(IntType(),
-                    NonPrimitiveType(NoPathType(JustContractType("C_Owned")), Set(IsOwned()))), 33)
+                    NonPrimitiveType(JustContractType("C_Owned"), Set(IsOwned()))), 33)
                 ::
                 (MustReturnError("no_return"), 38)
                 ::
@@ -299,8 +299,8 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             // TODO: https://github.com/mcoblenz/Obsidian/issues/56
             //            (MergeIncompatibleError("o1",
-            //                NonPrimitiveType(null, NoPathType(JustContractType("Ow")) ,Set(IsOwned())),
-            //                NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsReadOnlyState()))), 16)
+            //                NonPrimitiveType(null, JustContractType("Ow") ,Set(IsOwned())),
+            //                NonPrimitiveType(null, JustContractType("Ow"), Set(IsReadOnlyState()))), 16)
             //              ::
             //              (UnusedOwnershipError("o2"), 16)
             //              ::
@@ -308,8 +308,8 @@ class TypeCheckerTests extends JUnitSuite {
             //              ::
             // TODO: https://github.com/mcoblenz/Obsidian/issues/56
             //              (MergeIncompatibleError("o1",
-            //                  NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsOwned())),
-            //                  NonPrimitiveType(null, NoPathType(JustContractType("Ow")), Set(IsReadOnlyState()))), 36)
+            //                  NonPrimitiveType(null, JustContractType("Ow"), Set(IsOwned())),
+            //                  NonPrimitiveType(null, JustContractType("Ow"), Set(IsReadOnlyState()))), 36)
             //              ::
             //              (UnusedOwnershipError("o2"), 36)
             //              ::
@@ -402,13 +402,13 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def endsInStateTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInState.obs",
             (SubTypingError(
-                NonPrimitiveType(NoPathType(StateType("C", "S1")), Set(IsOwned())),
-                NonPrimitiveType(NoPathType(StateType("C", "S2")), Set(IsOwned()))), 3
+                NonPrimitiveType(StateType("C", "S1"), Set(IsOwned())),
+                NonPrimitiveType(StateType("C", "S2"), Set(IsOwned()))), 3
             )
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(StateType("C", "S2")), Set(IsOwned())),
-                    NonPrimitiveType(NoPathType(StateType("C", "S1")), Set(IsOwned()))), 8
+                    NonPrimitiveType(StateType("C", "S2"), Set(IsOwned())),
+                    NonPrimitiveType(StateType("C", "S1"), Set(IsOwned()))), 8
                 )
                 ::
                 Nil
@@ -418,20 +418,20 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def endsInStateUnionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
             (SubTypingError(
-                NonPrimitiveType(NoPathType(StateType("C1", Set("S2", "S3"))), Set(IsOwned())),
-                NonPrimitiveType(NoPathType(StateType("C1", Set("S1", "S2"))), Set(IsOwned()))), 4
+                NonPrimitiveType(StateType("C1", Set("S2", "S3")), Set(IsOwned())),
+                NonPrimitiveType(StateType("C1", Set("S1", "S2")), Set(IsOwned()))), 4
             )
                 ::
                 (StateUndefinedError("C1", "OtherState"), 13)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(StateType("C1", Set("S1", "S2"))), Set(IsOwned())),
-                    NonPrimitiveType(NoPathType(StateType("C1", Set("S1", "S3"))), Set(IsOwned()))), 19
+                    NonPrimitiveType(StateType("C1", Set("S1", "S2")), Set(IsOwned())),
+                    NonPrimitiveType(StateType("C1", Set("S1", "S3")), Set(IsOwned()))), 19
                 )
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(StateType("C2", Set("S1", "S2"))), Set(IsOwned())),
-                    NonPrimitiveType(NoPathType(StateType("C2", "S1")), Set(IsOwned()))), 33
+                    NonPrimitiveType(StateType("C2", Set("S1", "S2")), Set(IsOwned())),
+                    NonPrimitiveType(StateType("C2", "S1"), Set(IsOwned()))), 33
                 )
                 ::
                 (
@@ -461,22 +461,22 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedOwnershipError("m"), 22)
                 ::
                 (OwnershipSubtypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set()),
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set(IsOwned()))), 28)
+                    NonPrimitiveType(JustContractType("Money"), Set()),
+                    NonPrimitiveType(JustContractType("Money"), Set(IsOwned()))), 28)
                 ::
                 (OwnershipSubtypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set()),
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set(IsOwned()))), 37)
+                    NonPrimitiveType(JustContractType("Money"), Set()),
+                    NonPrimitiveType(JustContractType("Money"), Set(IsOwned()))), 37)
                 ::
                 (NonResourceOwningResourceError("BadWallet",
                     Field(false,
-                        NonPrimitiveType(NoPathType(JustContractType("Money")), Set(IsOwned())),
+                        NonPrimitiveType(JustContractType("Money"), Set(IsOwned())),
                         "money",
                         None)), 43)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set()),
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set(IsOwned()))),
+                    NonPrimitiveType(JustContractType("Money"), Set()),
+                    NonPrimitiveType(JustContractType("Money"), Set(IsOwned()))),
                     56)
                 ::
                 (DisownUnowningExpressionError(ReferenceIdentifier("m")), 49)
@@ -484,8 +484,8 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedOwnershipError("bad"), 52)
                 ::
                 (OwnershipSubtypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set()),
-                    NonPrimitiveType(NoPathType(JustContractType("Money")), Set(IsOwned()))), 59)
+                    NonPrimitiveType(JustContractType("Money"), Set()),
+                    NonPrimitiveType(JustContractType("Money"), Set(IsOwned()))), 59)
                 ::
                 (UnusedOwnershipError("m"), 75)
                 ::
@@ -495,11 +495,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
-            (InvalidOwnershipTransfer(ReferenceIdentifier("p"), NonPrimitiveType(NoPathType(JustContractType("Prescription")), Set())), 17)
+            (InvalidOwnershipTransfer(ReferenceIdentifier("p"), NonPrimitiveType(JustContractType("Prescription"), Set())), 17)
                 ::
                 (OwnershipSubtypingError(
-                    NonPrimitiveType(NoPathType(JustContractType("Prescription")), Set()),
-                    NonPrimitiveType(NoPathType(JustContractType("Prescription")), Set(IsOwned()))), 17)
+                    NonPrimitiveType(JustContractType("Prescription"), Set()),
+                    NonPrimitiveType(JustContractType("Prescription"), Set(IsOwned()))), 17)
                 ::
                 Nil
         )

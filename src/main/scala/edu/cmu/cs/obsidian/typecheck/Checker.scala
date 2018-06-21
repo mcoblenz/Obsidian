@@ -158,23 +158,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* [updated] functions replace one instance of a smaller component type for
      * another instance within the same larger type */
 
-    private def updatedSimpleType(t: UnpermissionedType, newSimple: SimpleType): UnpermissionedType = {
-        t match {
-            case NoPathType(_) => NoPathType(newSimple)
-            case PathType(p, _) => PathType(p, newSimple)
-        }
-    }
-
     private def updatedSimpleType(t: ObsidianType, newSimple: SimpleType): ObsidianType = {
         t match {
-            case NonPrimitiveType(typ, mods) => NonPrimitiveType(updatedSimpleType(typ, newSimple), mods)
-            case ts => ts
-        }
-    }
-
-    private def updatedUnpermissionedType(t: ObsidianType, newRaw: UnpermissionedType): ObsidianType = {
-        t match {
-            case NonPrimitiveType(typ, mods) => NonPrimitiveType(newRaw, mods)
+            case NonPrimitiveType(typ, mods) => NonPrimitiveType(newSimple, mods)
             case ts => ts
         }
     }
@@ -203,9 +189,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (StringType(), StringType()) => None
             case (NonPrimitiveType(typ1, mods1), NonPrimitiveType(typ2, mods2)) =>
                 val mainSubtype = (typ1, typ2) match {
-                    case (NoPathType(ts1), NoPathType(ts2)) => isSimpleSubtype(ts1, ts2)
-                    case (PathType(p1, ts1), PathType(p2, ts2)) if p1 == p2 =>
-                        isSimpleSubtype(ts1, ts2)
+                    case (ts1, ts2) => isSimpleSubtype(ts1, ts2)
                     case _ => false
                 }
 
@@ -255,11 +239,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         simpleOfWithStateNames(cName, stateNames)
     }
 
-    private def unpermissionedOf(simple: SimpleType, path: Option[Seq[String]]): UnpermissionedType = {
-        path match {
-            case None => NoPathType(simple)
-            case Some(p) => PathType(p, simple)
-        }
+    private def unpermissionedOf(simple: SimpleType, path: Option[Seq[String]]): SimpleType = {
+        simple
     }
 
     //-------------------------------------------------------------------------
@@ -285,13 +266,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def unpermissionedUpperBound(
-                                 t1: UnpermissionedType,
-                                 t2: UnpermissionedType): Option[UnpermissionedType] = {
+                                 t1: SimpleType,
+                                 t2: SimpleType): Option[SimpleType] = {
         (t1, t2) match {
-            case (NoPathType(ts1), NoPathType(ts2)) =>
-                simpleUpperBound(ts1, ts2).map(NoPathType)
-            case (PathType(p1, ts1), PathType(p2, ts2)) if p1 == p2 =>
-                simpleUpperBound(ts1, ts2).map(PathType(p1, _))
+            case (ts1, ts2) =>
+                simpleUpperBound(ts1, ts2)
             case _ => None
         }
     }
@@ -319,7 +298,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* adds the modifier from [t] to [tr], assuming that [table] is the
      * symbol table of the type [tr] */
     private def addModifiers(
-                               tr: UnpermissionedType,
+                               tr: SimpleType,
                                table: DeclarationTable,
                                mods: Set[TypeModifier]): ObsidianType = {
         NonPrimitiveType(tr, mods)
@@ -402,13 +381,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val spec = correctInvokable.args
 
             val astType = correctInvokable.retType.get
-            val retTypeCalleePoV: UnpermissionedType = astType match {
+            val retTypeCalleePoV: SimpleType = astType match {
                 case prim: PrimitiveType => return (prim, contextPrime)
-                case np: NonPrimitiveType => np.extractUnpermissionedType.get
-                case ict: InterfaceContractType => ict.extractUnpermissionedType.get
+                case np: NonPrimitiveType => np.extractSimpleType.get
+                case ict: InterfaceContractType => ict.extractSimpleType.get
                 case u: UnresolvedNonprimitiveType =>
-                    assert(false); NoPathType(JustContractType("ERROR"))
-                case b: BottomType => assert(false); NoPathType(JustContractType("ERROR"))
+                    assert(false); JustContractType("ERROR")
+                case b: BottomType => assert(false); JustContractType("ERROR")
             }
 
             toCallerPoV(calleeToCaller, retTypeCalleePoV) match {
@@ -475,7 +454,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      val tr = if (parentTable.hasParent) {
                          PathType("this"::"parent"::"parent"::Nil, ts)
                      } else {
-                         NoPathType(ts)
+                         ts
                      }
 
                      (addModifiers(tr, parentTable, Set()), context)
@@ -793,32 +772,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
      * otherwise [Right(t)] where [t] is the type from the perspective of the caller */
     private def toCallerPoV(
             calleeToCaller: Map[String, Expression],
-            tr: UnpermissionedType): Either[(String, Expression), UnpermissionedType] = {
-        tr match {
-            case PathType(p, ts) =>
-                extractPath(calleeToCaller(p.head)) match {
-                    case Some(newPath) => Right(PathType(newPath ++ p.tail, ts))
-                    case None => Left(p.head, calleeToCaller(p.head))
-                }
-            case NoPathType(_) => Right(tr)
-        }
+            tr: SimpleType): Either[(String, Expression), SimpleType] = {
+        Right(tr)
     }
 
     /* removes unnecessary instances of "parent" from a type: e.g. if [x : y.T1],
      * then the type [x.parent.T2] is converted to [y.T2] */
-    private def fixUnpermissionedType(context: Context, tr: UnpermissionedType): UnpermissionedType = {
+    private def fixSimpleType(context: Context, tr: SimpleType): SimpleType = {
         tr match {
-            case PathType(inContext +: "parent" +: rest, ts) if inContext != "this" =>
-                context.get(inContext) match {
-                    case Some(t) =>
-                        t.extractUnpermissionedType match {
-                            /* shouldn't happen, but can be reported later */
-                            case Some(PathType(newPath, _)) => PathType(newPath ++ rest, ts)
-                            case _ => tr
-                        }
-                    /* shouldn't happen, but can be reported later */
-                    case _ => tr
-                }
             case _ => tr
         }
     }
@@ -857,13 +818,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         toCallerPoV(calleeToCaller, unpermissionedType) match {
                             case Left((head, e)) =>
                                 return Left((ast, CannotConvertPathError(head, e, unpermissionedType))::Nil)
-                            case Right(trNew) => NonPrimitiveType(fixUnpermissionedType(context, trNew), mods)
+                            case Right(trNew) => NonPrimitiveType(fixSimpleType(context, trNew), mods)
                         }
                     case ict: InterfaceContractType =>
-                        toCallerPoV(calleeToCaller, ict.extractUnpermissionedType.get) match {
+                        toCallerPoV(calleeToCaller, ict.extractSimpleType.get) match {
                             case Left((head, e)) =>
-                                return Left((ast, CannotConvertPathError(head, e, ict.extractUnpermissionedType.get))::Nil)
-                            case Right(trNew) => InterfaceContractType(ict.name, fixUnpermissionedType(context, trNew).extractSimpleType)
+                                return Left((ast, CannotConvertPathError(head, e, ict.extractSimpleType.get))::Nil)
+                            case Right(trNew) => InterfaceContractType(ict.name, fixSimpleType(context, trNew))
                         }
                     case BottomType() => BottomType()
                     case u@UnresolvedNonprimitiveType(_, _) => assert(false); u
@@ -983,8 +944,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case VariableDeclWithInit(typ: ObsidianType, name, e: Expression) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
                 val tDecl = typ match {
-                    case NonPrimitiveType(unpermissionedType, mods) =>
-                        val simpleType = unpermissionedType.extractSimpleType
+                    case NonPrimitiveType(simpleType, mods) =>
                         val contractName = simpleType.contractName
 
                         val tableLookup = context.contractTable.lookupContract(contractName)
@@ -1195,7 +1155,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType = StateType(thisTable.name, newStateName)
 
-                val newType = NonPrimitiveType(NoPathType(newSimpleType), oldType.extractModifiers)
+                val newType = NonPrimitiveType(newSimpleType, oldType.extractModifiers)
 
 
                 contextPrime.updated("this", newType).updatedWithoutAnyTransitionFieldsInitialized()
@@ -1339,7 +1299,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 var mergedContext = contextPrime
                 for (SwitchCase(sName, body) <- cases) {
-                    val newType =
+                    val newType: ObsidianType =
 
                         contractTable.state(sName) match {
                             case Some(stTable) =>
@@ -1358,7 +1318,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                              * so we want "this" in the context to have the old permission of
                              * "this" with the new state information in the unpermissioned type */
                             val newContextThisType =
-                                updatedUnpermissionedType(context("this"), newType.extractUnpermissionedType.get)
+                                updatedSimpleType(context("this"), newType.extractSimpleType.get)
                             contextPrime.updated("this", newContextThisType)
                         case ReferenceIdentifier(x) => contextPrime.updated(x, newType)
                         case _ => contextPrime
@@ -1466,7 +1426,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val expectedType =
-            NonPrimitiveType(NoPathType(simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState)), Set(IsOwned()))
+            NonPrimitiveType(simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState), Set(IsOwned()))
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
         checkForUnusedStateInitializers(outputContext)
@@ -1514,7 +1474,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             None
         }
         val simpleType = simpleOfWithStateNames(lexicallyInsideOf.contract.name, stateNames)
-        val thisUnpermissionedType = NoPathType(simpleType)
+        val thisSimpleType = simpleType
 
         // TODO: consider path case. Previously it was something like:
         // PathType("this"::"parent"::Nil, lexicallyInsideOf.simpleType)
@@ -1529,7 +1489,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             case _ => lexicallyInsideOf
         }
-        val thisType = NonPrimitiveType(thisUnpermissionedType, Set(IsOwned()))
+        val thisType = NonPrimitiveType(thisSimpleType, Set(IsOwned()))
 
         // Construct the context that the body should start with
         var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
@@ -1655,7 +1615,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
 
         //should it be owned?
-        val thisType = NonPrimitiveType(NoPathType(JustContractType(table.name)), Set(IsOwned()))
+        val thisType = NonPrimitiveType(JustContractType(table.name), Set(IsOwned()))
 
         initContext = initContext.updated("this", thisType)
 
@@ -1678,7 +1638,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val expectedThisType =
-            NonPrimitiveType(NoPathType(simpleOf(table, table.name, constr.endsInState)), Set(IsOwned()))
+            NonPrimitiveType((simpleOf(table, table.name, constr.endsInState)), Set(IsOwned()))
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))

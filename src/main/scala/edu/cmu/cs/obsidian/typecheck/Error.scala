@@ -164,7 +164,7 @@ case class PotentiallyUnusedOwnershipError(name: String) extends Error {
 case class ConstructorNameError(contractName: String) extends Error {
     val msg: String = s"Invalid constructor name for contract '$contractName'"
 }
-case class CannotConvertPathError(badPart: String, expr: Expression, typ: UnpermissionedType) extends Error {
+case class CannotConvertPathError(badPart: String, expr: Expression, typ: SimpleType) extends Error {
     val msg: String = s"Cannot convert path in type '$typ': '$badPart' is equivalent to" +
         s"a non-variable expression '$expr'"
 }
