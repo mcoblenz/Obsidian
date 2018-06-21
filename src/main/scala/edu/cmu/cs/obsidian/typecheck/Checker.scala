@@ -130,10 +130,6 @@ case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, O
 }
 
 class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
-    /* only stores [PotentiallyUnresolvedType]s; all types in the context can thus be
-     * resolved purely syntactically */
-    type UnresolvedContext = Map[String, PotentiallyUnresolvedType]
-
     val errors = new collection.mutable.ArrayStack[ErrorRecord]()
 
     /* an error is associated with an AST node to indicate where the error took place */
@@ -1281,17 +1277,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
-                t.extractSimpleType match {
-                    case Some(s) => s match {
-                        case StateType(_, stateNames) => ()
-                        case JustContractType(_) => ()
-                    }
+
+                val contractName = t.extractSimpleType match {
+                    case Some(s) =>
+                        s.contractName
                     case None =>
                         logError(e, SwitchError(t))
                         return contextPrime
                 }
 
-                val contractTable = context.contractTable.lookupContract(t.contractNameOpt.get) match {
+                val contractTable = context.contractTable.lookupContract(contractName) match {
                     case Some(table) => table
                     case None => logError(e, SwitchError(t))
                         return contextPrime

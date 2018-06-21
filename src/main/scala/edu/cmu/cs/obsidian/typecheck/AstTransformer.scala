@@ -345,7 +345,7 @@ object AstTransformer {
             pos: Position): (ObsidianType, List[ErrorRecord]) = {
 
         // We should only be transforming potentially-unresolved types, but we can't specify that statically because ASTs are used for resolved types too.
-        assert(t.isInstanceOf[PotentiallyUnresolvedType]);
+
         t match {
             case t@BoolType() => (t, List.empty[ErrorRecord])
             case t@IntType() => (t, List.empty[ErrorRecord])
