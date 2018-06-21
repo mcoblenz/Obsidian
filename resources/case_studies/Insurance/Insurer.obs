@@ -1,0 +1,30 @@
+import "resources/case_studies/Insurance/BidTokenPair.obs"
+import "resources/case_studies/Insurance/Bank.obs"
+//import "resources/case_studies/Insurance/Money.obs"
+
+
+// TODO : Collections
+
+main contract Insurer {
+    //TODO: owned Money mon;
+    Bank bank;
+
+    Insurer() {}
+
+    transaction addBank(Bank b) {
+        bank = b;
+    }
+
+    // TODO : Calculate Bid(s) using some needed information, for now just int
+    transaction requestBids(int x) returns owned BidTokenPair {
+        int cost = x + 4;
+        // TODO : Proper timing
+        int timeAvailable = 100;
+        // TODO : give Money to Bank for Token
+        owned Token t = bank.buyToken();
+        owned Bid b = new Bid(cost, timeAvailable);
+
+        return new BidTokenPair(<-b,<-t);
+    }
+
+}

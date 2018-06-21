@@ -1,10 +1,10 @@
-main contract Bid {
+main resource contract Bid {
     int cost;
 
-    Bid(int c) {
+    owned Bid(int c, int time) {
         cost = c;
-        // unavailable by default
-        ->Unavailable;
+        // Available by default
+        ->Available(timeAvailable = time);
     }
 
     // available for consideration from client
@@ -13,26 +13,31 @@ main contract Bid {
     }
 
     // expires after a certain amount of time
-    state Unavailable {}
+    state Expired {}
 
     // client buys it
     state Sold {}
 
-    transaction makeAvailable(int time) available in Unavailable
+    transaction makeAvailable(int time) available in Expired
                                         ends in Available {
         ->Available(timeAvailable = time);
     }
 
-    transaction isUnavailable() available in Available
-                                ends in Available, Unavailable {
+    // TODO: Proper timing
+    transaction hasExpired() available in Available
+                                ends in Available, Expired {
         if (timeAvailable < 0) {
-                ->Unavailable;
+                ->Expired;
         }
     }
 
     transaction buy() available in Available
                       ends in Sold {
         ->Sold;
+    }
+
+    transaction getCost() returns int {
+        return cost;
     }
 
 }

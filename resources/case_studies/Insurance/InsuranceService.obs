@@ -1,89 +1,43 @@
-main contract InsuranceService {
-    Insurance i;
-    Bank b;
+import "resources/case_studies/Insurance/Insurer.obs"
 
-    // TODO : information to calculate bids, Collection of Bid
-    // needs to ensure: money in escrow, bids are signed
-    transaction requestBids(int x) returns Bid {
-        return i.requestBids(x);
+main resource contract InsuranceService {
+    // TODO: Collection of Insurer, Token
+    // TODO: Keys of trusted banks
+    Insurer ins;
+    owned Token tokens;
+
+    owned InsuranceService() {}
+
+
+    transaction addInsurer(Insurer insurer) {
+        ins = insurer;
     }
 
-}
-
-
-// COPIED
-
-// import "resources/case_studies/Insurance/Bid.obs"
-
-
-// TODO : Imports and collections
-
-resource contract Insurance {
-    owned Money mon;
-
-    owned Insurance(owned Money m) {
-        mon <- m;
-    }
-
-    // TODO : Calculate Bid(s) using some needed information, for now just int
-    transaction requestBids(int x) returns Bid {
-        return new Bid(x + 4);
-    }
-
-}
-
-resource contract Bank {
-    owned Money mon;
-
-    owned Bank(owned Money m) {
-        mon <- m;
-    }
-}
-
-
-
-// some sort of money
-resource contract Money {
-    owned Money() {}
-}
-
-// bids (already defined)
-contract Bid {
-    int cost;
-
-    Bid(int c) {
-        cost = c;
-        // unavailable by default
-        ->Unavailable;
-    }
-
-    // available for consideration from client
-    state Available {
-        int timeAvailable;
-    }
-
-    // expires after a certain amount of time
-    state Unavailable {}
-
-    // client buys it
-    state Sold {}
-
-    transaction makeAvailable(int time) available in Unavailable
-                                        ends in Available {
-        ->Available(timeAvailable = time);
-    }
-
-    transaction isUnavailable() available in Available
-                                ends in Available, Unavailable {
-        if (timeAvailable < 0) {
-                ->Unavailable;
+    transaction addBankToInsurer(Bank bank) {
+        // TODO: check that bank key is in trusted keys
+        if (true) {
+            ins.addBank(bank);
         }
     }
 
-    transaction buy() available in Available
-                      ends in Sold {
-        ->Sold;
+    // TODO: information to calculate bids, Collection of Bid and Token
+    transaction requestBids(int x) returns owned Bid {
+        BidTokenPair bidAndTokens = <-ins.requestBids(x);
+
+        // TODO: add Tokens from bidAndTokens to Tokens
+        // TODO: how to keep track of tokens for each client?
+        tokens <- bidAndTokens.getToken();
+        owned Bid bid = <-bidAndTokens.getBid();
+
+        return <-bid;
+    }
+
+    transaction buyBid(owned Bid bid, Token token) returns owned Bid {
+        // TODO: collect all tokens together (ones given by insurer and insuree)
+        // TODO: switch bid states with bid.buy();
+        return <-bid;
     }
 
 }
+
 
