@@ -358,7 +358,7 @@ object AstTransformer {
                 result match {
                     case Left(err) => (BottomType().setLoc(t), List(ErrorRecord(err, pos)))
                     case Right((unpermissionedType, _)) =>
-                        (NonPrimitiveType(unpermissionedType, nonPrim.mods).setLoc(t), List.empty)
+                        (unpermissionedType, nonPrim.mods).setLoc(t), List.empty)
                 }
             case i@InterfaceContractType(_, _) => (i, List.empty)
             case b@BottomType() => (b, List.empty)

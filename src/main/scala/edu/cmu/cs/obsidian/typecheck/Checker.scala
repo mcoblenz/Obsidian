@@ -154,7 +154,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* [updated] functions replace one instance of a smaller component type for
      * another instance within the same larger type */
 
-    private def updatedSimpleType(t: ObsidianType, newSimple: SimpleType): ObsidianType = {
+    private def updatedSimplupdatedSimpleTypeeType(t: ObsidianType, newSimple: SimpleType): ObsidianType = {
+        newSimple
         t match {
             case NonPrimitiveType(typ, mods) => NonPrimitiveType(newSimple, mods)
             case ts => ts
@@ -165,40 +166,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* Subtyping definitions */
 
     /* true iff [t1 <: t2] */
-    private def isSimpleSubtype(t1: SimpleType, t2: SimpleType): Boolean = {
-        (t1, t2) match {
-            case (JustContractType(c1), JustContractType(c2)) => c1 == c2
-            case (StateType(c1, ss1), StateType(c2, ss2)) =>
-                c1 == c2 && ss1.subsetOf(ss2)
-            case (StateType(c, ss1), JustContractType(c2)) =>
-                c == c2
-            case _ => false
-        }
-    }
-
-    /* true iff [t1 <: t2] */
     private def isSubtype(t1: ObsidianType, t2: ObsidianType): Option[Error] = {
         (t1, t2) match {
             case (BottomType(), _) => None
             case (IntType(), IntType()) => None
             case (BoolType(), BoolType()) => None
             case (StringType(), StringType()) => None
-            case (NonPrimitiveType(typ1, mods1), NonPrimitiveType(typ2, mods2)) =>
-                val mainSubtype = (typ1, typ2) match {
-                    case (ts1, ts2) => isSimpleSubtype(ts1, ts2)
+            case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
+                val mainSubtype: Boolean = (np1, np2) match {
+                    case (JustContractType(c1), JustContractType(c2)) => c1 == c2
+                    case (StateType(c1, ss1), StateType(c2, ss2)) =>
+                        c1 == c2 && ss1.subsetOf(ss2)
+                    case (StateType(c, ss1), JustContractType(c2)) =>
+                        c == c2
                     case _ => false
                 }
-
-                // For now, just make sure we don't get ownership from an expression that doesn't have it.
-                val modifierSubtype = if (mods2.contains(IsOwned())) {
-                    mods1.contains(IsOwned())
-                }
-                else {
-                    true
-                }
-
                 if (!mainSubtype) Some(SubTypingError(t1, t2))
-                else if (!modifierSubtype) Some(OwnershipSubtypingError(t1, t2))
+                // TODO: make sure this is unnecessary: else if (!modifierSubtype) Some(OwnershipSubtypingError(t1, t2))
                 else None
             case _ => Some(SubTypingError(t1, t2))
         }
@@ -218,7 +202,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* Helper functions to easily make new types */
 
     /* Determines what sort of simple type should be used, given a set a possible states */
-    private def simpleOfWithStateNames(cName: String, states: Option[Set[String]]): SimpleType = {
+    private def simpleOfWithStateNames(cName: String, states: Option[Set[String]]): NonPrimitiveType = {
         states match {
             case None => JustContractType(cName)
             case Some(ss) =>
@@ -227,7 +211,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     // Usually we have the identifiers available, so this is the main entry point.
-    private def simpleOf(lexicallyInsideOf: DeclarationTable, cName: String, states: Option[Set[Identifier]]): SimpleType = {
+    private def simpleOf(lexicallyInsideOf: DeclarationTable, cName: String, states: Option[Set[Identifier]]): NonPrimitiveType = {
         val stateNames = states match {
             case None => None
             case Some(ss) => Some(ss.map(_._1))
@@ -235,18 +219,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         simpleOfWithStateNames(cName, stateNames)
     }
 
-    private def unpermissionedOf(simple: SimpleType, path: Option[Seq[String]]): SimpleType = {
-        simple
-    }
 
     //-------------------------------------------------------------------------
     /* the upper bound U of two types T1 and T2 is a type such that
      * subtypeOf(T1, U) and subtypeOf(t2, U). Such a type doesn't always exist. */
 
-    private def simpleUpperBound(
-            t1: SimpleType,
-            t2: SimpleType): Option[SimpleType] = {
-        def handleStateUnion(ss1: Set[String], ss2: Set[String]): Option[SimpleType] = {
+    private def nonPrimitiveUpperBound(
+            t1: NonPrimitiveType,
+            t2: NonPrimitiveType): Option[NonPrimitiveType] = {
+        def handleStateUnion(ss1: Set[String], ss2: Set[String]): Option[NonPrimitiveType] = {
             val c = t1.contractName
             val unionStates = ss1.union(ss2)
             Some(simpleOfWithStateNames(c, Some(unionStates)))
@@ -261,35 +242,17 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def unpermissionedUpperBound(
-                                 t1: SimpleType,
-                                 t2: SimpleType): Option[SimpleType] = {
-        (t1, t2) match {
-            case (ts1, ts2) =>
-                simpleUpperBound(ts1, ts2)
-            case _ => None
-        }
-    }
-
     private def upperBound(t1: ObsidianType, t2: ObsidianType): Option[ObsidianType] = {
         (t1, t2) match {
             case (IntType(), IntType()) => Some(IntType())
             case (BoolType(), BoolType()) => Some(BoolType())
             case (StringType(), StringType()) => Some(StringType())
-            case (NonPrimitiveType(typ1, mods1), NonPrimitiveType(typ2, mods2)) => assert(mods1 == mods2);
-                unpermissionedUpperBound(typ1, typ2).flatMap(s => Some(NonPrimitiveType(s, mods1)))
+            case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
+                nonPrimitiveUpperBound(np1, np2).flatMap(s => Some(s))
             case _ => None
         }
     }
 
-
-    /* assumes that [t] is not a primitive type */
-    private def extractModifiers(t: ObsidianType): Set[TypeModifier] = {
-        t match {
-            case typ@NonPrimitiveType(_, mods) => mods
-            case _ => Set.empty[TypeModifier]
-        }
-    }
 
     /* adds the modifier from [t] to [tr], assuming that [table] is the
      * symbol table of the type [tr] */
@@ -377,23 +340,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val spec = correctInvokable.args
 
             val astType = correctInvokable.retType.get
-            val retTypeCalleePoV: SimpleType = astType match {
-                case prim: PrimitiveType => return (prim, contextPrime)
-                case np: NonPrimitiveType => np.extractSimpleType.get
-                case ict: InterfaceContractType => ict.extractSimpleType.get
-                case u: UnresolvedNonprimitiveType =>
-                    assert(false); JustContractType("ERROR")
-                case b: BottomType => assert(false); JustContractType("ERROR")
-            }
 
-            toCallerPoV(calleeToCaller, retTypeCalleePoV) match {
-                case Right(retTypeCallerPoV) =>
-                    (astType, contextPrime)
-                case Left((first, badExpr)) =>
-                    val err = CannotConvertPathError(first, badExpr, retTypeCalleePoV)
-                    logError(e, err)
-                    (BottomType(), contextPrime)
-            }
+            (astType, contextPrime)
+
         }
 
          e match {
@@ -542,9 +491,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  val ctTableOfConstructed = tableLookup.get
 
-                 var path: Option[Seq[String]] = null
-                 if (ctTableOfConstructed.hasParent) path = Some("this"::Nil)
-                 else path = None
 
                  val (argTypes, contextPrime) = inferAndCheckExprs(decl, context, args)
                  val constrSpecs = ctTableOfConstructed
@@ -563,9 +509,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          (simpleOf(contextPrime.contractTable, name, constr.endsInState), if (constr.isOwned) Set(IsOwned()) else Set())
                  }
 
-                 val unpermissionedType = unpermissionedOf(simpleType, path)
-
-                 (NonPrimitiveType(unpermissionedType, modifiers), contextPrime)
+                 (simpleType, contextPrime)
              case Disown(e) =>
                  // The expression "disown e" evaluates to an unowned value but also side-effects the context
                  // so that e is no longer owned (if it is a variable).
@@ -575,7 +519,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
 
                  val newTyp = typ match {
-                     case NonPrimitiveType(t, mods) => NonPrimitiveType(t, mods - IsOwned())
+                     case n: NonPrimitiveType => n.residualType
                      case t => t
                  }
 
@@ -1151,7 +1095,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType = StateType(thisTable.name, newStateName)
 
-                val newType = NonPrimitiveType(newSimpleType, oldType.extractModifiers)
+                val mods: Set[TypeModifier] =
+                    oldType match {
+                        case NonPrimitiveType(_, mods) => mods
+                        case _ => Set[TypeModifier]()
+                    }
+                val newType = NonPrimitiveType(newSimpleType, mods)
 
 
                 contextPrime.updated("this", newType).updatedWithoutAnyTransitionFieldsInitialized()
@@ -1298,12 +1247,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                         contractTable.state(sName) match {
                             case Some(stTable) =>
-                                val newSimple = StateType(contractTable.name, stTable.name)
-                                updatedSimpleType(t, newSimple)
+                                StateType(contractTable.name, stTable.name)
                             case None =>
                                 logError(s, StateUndefinedError(contractTable.name, sName))
-                                val newSimple = JustContractType(contractTable.name)
-                                updatedSimpleType(t, newSimple)
+                                JustContractType(contractTable.name)
                         }
 
                     /* special case to allow types to change in the context if we match on a variable */
@@ -1313,7 +1260,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                              * so we want "this" in the context to have the old permission of
                              * "this" with the new state information in the unpermissioned type */
                             val newContextThisType =
-                                updatedSimpleType(context("this"), newType.extractSimpleType.get)
+                                newType // is this right?
                             contextPrime.updated("this", newContextThisType)
                         case ReferenceIdentifier(x) => contextPrime.updated(x, newType)
                         case _ => contextPrime
