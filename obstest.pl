@@ -61,23 +61,9 @@ sub do_test {
     # Run the client and servers and connect them up appropriately.
     my $output = run_test($client, \@servernames, \%servers);
 
-    # Compare expected output to test output by writing them out to files
-    # and running 'diff'.
-    open my $file1, ">", "test-output";
-    print {$file1} $output;
-
-    open my $file2, ">", "expected-output";
-    print {$file2} $props{expected};
-
-    my $diff = `diff test-output expected-output`;
-
-    # Delete the temporary files.
-    close $file1;
-    close $file2;
-
-    unlink 'test-output', 'expected-output';
-
     # Check if there was any difference.
+    my $diff = output_diff($output, $props{expected});
+
     if (length $diff > 0) {
         print $diff;
         die "Output wasn't what we expected.\n";
@@ -152,20 +138,12 @@ sub run_test {
     my @servernames = @{shift @_};
     my %servers = %{shift @_};
 
-    # Figure out what the names of the JAR files will probably be.
-    # Replace file extensions with '.jar', capitalize the filename,
-    # and remove preceding directories.
+    # Figure out names of JARs produced by compiler.
     my %jars;
     for my $key (@servernames) {
-        $jars{$key} = $servers{$key};
-        $jars{$key} =~ s{/?([^/]+/)+}{}; # strip leading directories
-        $jars{$key} =~ s{\.[^\.]+$}{.jar}; # change file extension
-        $jars{$key} = ucfirst $jars{$key};
+        $jars{$key} = jarname($servers{$key});
     }
-    my $clientjar = $client;
-    $clientjar =~ s{/?([^/]+/)+}{};
-    $clientjar =~ s{\.[^\.]+$}{.jar};
-    $clientjar = ucfirst $clientjar;
+    my $clientjar = jarname($client);
 
     # Fork a new process to run each non-client file.
     my @pids;
@@ -178,10 +156,10 @@ sub run_test {
         } else {
             # Start the server in child process.
             print "java -jar $jars{$key} localhost $port\n";
-            if (not $verbose) {
-                # Hide output from server process.
-                open STDOUT, ">", "/dev/null" or die "$!";
-            }
+
+            # Hide output from server process unless we're in verbose mode.
+            open STDOUT, ">", "/dev/null" or die "$!" unless $verbose;
+
             exec 'java', '-jar', $jars{$key}, 'localhost', $port;
         }
     }
@@ -208,4 +186,37 @@ sub run_test {
     sleep 1; # wait for processes to shut down
 
     return $output;
+}
+
+sub jarname {
+    # Figure out what the names of the JAR files will probably be.
+    # Replace file extensions with '.jar', capitalize the filename,
+    # and remove preceding directories.
+    my $name = shift;
+    $name =~ s{/?([^/]+/)+}{}; # strip leading directories
+    $name =~ s{\.[^\.]+$}{.jar}; # replace file extension with .jar
+    $name = ucfirst $name; # capitalize first letter
+    return $name;
+}
+
+sub output_diff {
+    my ($output, $expected) = @_;
+
+    # Compare expected output to test output by writing them out to files
+    # and running 'diff'.
+    open my $file1, ">", "test-output";
+    print {$file1} $output;
+
+    open my $file2, ">", "expected-output";
+    print {$file2} $expected;
+
+    my $diff = `diff test-output expected-output`;
+
+    # Delete the temporary files.
+    close $file1;
+    close $file2;
+
+    unlink 'test-output', 'expected-output';
+
+    return $diff;
 }
