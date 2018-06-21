@@ -1,27 +1,54 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 
+my $usage = qq{usage: $0 [-v] files
+    -v: verbose -- show output from sbt and other commands\n};
+
+if (!@ARGV) {
+    die $usage;
+}
+
+# Check if the first argument was '-v'.
+my $verbose = 0;
+if ($ARGV[0] eq "-v") {
+    $verbose = 1;
+    shift @ARGV;
+}
+
+my $passed_tests = 0;
+my $total = $#ARGV+1;
+
+# Test each file passed in on command line.
 for my $filename (@ARGV) {
     print "$filename\n";
+    # catch any errors thrown during the test.
     eval {
         do_test($filename);
     }; if ($@) {
-        print "Error testing $filename: $@";
+        print "Test $filename failed: $@";
+    } else {
+        print "Test $filename passed!\n";
+        $passed_tests ++;
     }
 }
+
+print "Passed $passed_tests out of $total tests.\n";
 
 sub do_test {
     my $filename = shift;
 
     # Parse test file.
     my ($namesref, $serversref, $propsref) = parse_obstest($filename);
+    # (unpack returned data structures into real variables. Perl)
     my @servernames = @$namesref;
     my %servers = %$serversref;
     my %props = %$propsref;
 
     die "Must specify a file to designate as the client.\n" unless exists $servers{client};
 
+    # Since we process client differently, we split it into its own thing.
     my $client = $servers{client};
     delete $servers{client};
 
@@ -34,7 +61,8 @@ sub do_test {
     # Run the client and servers and connect them up appropriately.
     my $output = run_test($client, \@servernames, \%servers);
 
-    # Compare expected output to test output.
+    # Compare expected output to test output by writing them out to files
+    # and running 'diff'.
     open my $file1, ">", "test-output";
     print {$file1} $output;
 
@@ -43,15 +71,16 @@ sub do_test {
 
     my $diff = `diff test-output expected-output`;
 
+    # Delete the temporary files.
     close $file1;
     close $file2;
 
     unlink 'test-output', 'expected-output';
 
+    # Check if there was any difference.
     if (length $diff > 0) {
         print $diff;
-    } else {
-        print "No difference from expected output!\n";
+        die "Output wasn't what we expected.\n";
     }
 }
 
@@ -61,22 +90,23 @@ sub parse_obstest {
     open my $testfile, "<", $filename or die "Cannot open $filename: $!\n";
 
     # Parse list of files.
-    my %servers;
+    my %files;
     # Perl hashes are unordered, but order is important here, so we need to
     # keep track of it ourselves.
-    my @servernames;
+    my @filenames;
 
     # Get path to obs files relative to testfile.
     my $dir = $filename;
     $dir =~ s{/[^/]*$}{/}; # strip off everything following last slash in filename
     while (my $line = <$testfile>) {
+        # Strip trailing newline, and leading and trailing whitespace
         chomp $line;
         $line =~ s/^ +//;
         $line =~ s/ +$//;
         if ($line =~ /(.+): ?(.+)/) {
             # If the line has a colon in it, parse as a key/value pair.
-            $servers{$1} = $dir . $2;
-            push @servernames, $1 unless $1 eq 'client';
+            $files{$1} = $dir . $2;
+            push @filenames, $1 unless $1 eq 'client';
         } elsif ($line eq '***') {
             # When we reach a line that's just '***', we break out of this loop
             # and put everything else as expected output.
@@ -89,17 +119,17 @@ sub parse_obstest {
     # Special properties we're storing
     my %props = (expected => '');
 
+    # Read the rest of the file as 'expected output.'
     while (my $line = <$testfile>) {
-        # Read the rest of the file.
         $props{expected} .= $line;
     }
 
-    for my $k (@servernames) {
-        printf "%10s => %s\n", $k, $servers{$k};
+    for my $k (@filenames) {
+        printf "%10s => %s\n", $k, $files{$k};
     }
-    printf "    client => $servers{client}\n";
+    printf "    client => $files{client}\n";
 
-    return \@servernames, \%servers, \%props;
+    return \@filenames, \%files, \%props;
 }
 
 sub compile {
@@ -109,6 +139,7 @@ sub compile {
                  .qq( --output-path obs_output $file");
     print "$compile\n";
     my $result = `$compile`;
+    print $result if $verbose;
 
     # I am unsure how to figure out if we succeeded or not -- sbt says 'success' a lot
     # when it doesn't succeed, and it doesn't seem to do anything w/ return codes.
@@ -117,32 +148,41 @@ sub compile {
 }
 
 sub run_test {
-    my ($client, $namesref, $serversref) = @_;
-    my @servernames = @$namesref;
-    my %servers = %$serversref;
-    # Replace file extensions with '.jar',
+    my $client = shift;
+    my @servernames = @{shift @_};
+    my %servers = %{shift @_};
+
+    # Figure out what the names of the JAR files will probably be.
+    # Replace file extensions with '.jar', capitalize the filename,
     # and remove preceding directories.
     my %jars;
     for my $key (@servernames) {
         $jars{$key} = $servers{$key};
         $jars{$key} =~ s{/?([^/]+/)+}{}; # strip leading directories
         $jars{$key} =~ s{\.[^\.]+$}{.jar}; # change file extension
+        $jars{$key} = ucfirst $jars{$key};
     }
     my $clientjar = $client;
     $clientjar =~ s{/?([^/]+/)+}{};
     $clientjar =~ s{\.[^\.]+$}{.jar};
+    $clientjar = ucfirst $clientjar;
 
     # Fork a new process to run each non-client file.
     my @pids;
     my $port = 5566;
     for my $key (@servernames) {
         if (my $child = fork) {
+            # Keep track of the PID of the child process.
             push @pids, $child;
             $port ++;
         } else {
-            # Start the server
-            print("java -jar $jars{$key} localhost $port\n");
-            exec('java', '-jar', $jars{$key}, 'localhost', $port);
+            # Start the server in child process.
+            print "java -jar $jars{$key} localhost $port\n";
+            if (not $verbose) {
+                # Hide output from server process.
+                open STDOUT, ">", "/dev/null" or die "$!";
+            }
+            exec 'java', '-jar', $jars{$key}, 'localhost', $port;
         }
     }
 
@@ -159,6 +199,10 @@ sub run_test {
     }
     print $cmd, "\n";
     $output = `$cmd`;
+    if ($verbose) {
+        print "Client output:\n";
+        print $output;
+    }
 
     kill 'HUP', @pids;
     sleep 1; # wait for processes to shut down
