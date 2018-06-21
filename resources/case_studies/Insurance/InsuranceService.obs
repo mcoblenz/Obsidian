@@ -32,8 +32,9 @@ main resource contract InsuranceService {
         return <-bid;
     }
 
-    transaction buyBid(owned Bid bid, Token token) returns owned Bid {
-        // TODO: collect all tokens together (ones given by insurer and insuree)
+    transaction buyBid(owned Bid bid, owned Token token) returns owned Bid {
+        // TODO: collect all tokens together (ones given by insurer and insuree) (for now just disown)
+        disown token;
         // TODO: switch bid states with bid.buy();
         return <-bid;
     }

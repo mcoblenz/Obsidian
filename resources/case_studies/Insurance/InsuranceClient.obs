@@ -11,7 +11,7 @@ main contract InsuranceClient {
 	     is.addInsurer(ins);
 	     is.addBankToInsurer(bank);
 
-	     Token token = bank.buyToken();
+	     owned Token token = bank.buyToken();
 	     owned Bid bid = <-is.requestBids(3);
 
          // test
@@ -19,7 +19,7 @@ main contract InsuranceClient {
              System.print("bid : 7");
          }
 
-         owned Bid soldBid = is.buyBid(<-bid, token);
+         owned Bid soldBid = is.buyBid(<-bid, <-token);
 
          // to pass typechecker
          disown soldBid;
