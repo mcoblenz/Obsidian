@@ -201,6 +201,8 @@ object Main {
 
     // For input foo.obs, we generate foo.proto, from which we generate FooOuterClass.java.
     //    We also generate a jar at the specified directory, containing the generated classes.
+    // The compiler returns an exit status of 0 if everything went well, 1 if there was an error
+    //    compiling the contract, or 2 if it failed to parse the command-line options.
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
             println(usage)
