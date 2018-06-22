@@ -40,6 +40,9 @@ print "Passed $passed_tests out of $total tests.\n";
 
 if (@failed_tests) {
     print "Failed: ", (join ", ", @failed_tests), "\n";
+    exit 1;
+} else {
+    exit 0;
 }
 
 sub do_test {
