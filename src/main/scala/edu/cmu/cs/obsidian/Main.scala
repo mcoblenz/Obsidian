@@ -73,7 +73,7 @@ object Main {
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
                         println("Unknown option " + option)
-                        sys.exit(0)
+                        sys.exit(2)
                     }
                     else if (option.endsWith(".obs")) {
                         // This is an input file.
@@ -82,7 +82,7 @@ object Main {
                     }
                     else {
                         println("Unknown argument " + option)
-                        sys.exit(0)
+                        sys.exit(2)
                     }
             }
         }
@@ -91,11 +91,12 @@ object Main {
 
         if (inputFiles.isEmpty) {
             println("Must pass at least one file")
-            sys.exit(0)
+            sys.exit(2)
         }
 
         if (inputFiles.length > 1) {
             println("For now: contracts can only consist of a single file")
+            sys.exit(2)
         }
 
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
@@ -205,7 +206,12 @@ object Main {
             println(usage)
             sys.exit(0)
         }
-        compileProgram(args)
+        val compileSuccess = compileProgram(args)
+        if (compileSuccess) {
+            sys.exit(0)
+        } else {
+            sys.exit(1)
+        }
     }
     def compileProgram(args: Array[String]): Boolean = {
         val options = parseOptions(args.toList)

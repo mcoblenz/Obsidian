@@ -6,6 +6,10 @@ scalaVersion := "2.12.6"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 
+/* Allow passing return code through SBT without
+ * SBT throwing an exception. */
+trapExit := false
+
 /* testing dependencies */
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.1" % "test"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
