@@ -17,6 +17,7 @@ if ($ARGV[0] eq "-v") {
     shift @ARGV;
 }
 
+my @failed_tests;
 my $passed_tests = 0;
 my $total = $#ARGV+1;
 
@@ -28,6 +29,7 @@ for my $filename (@ARGV) {
         do_test($filename);
     }; if ($@) {
         print "Test $filename failed: $@";
+        push @failed_tests, $filename;
     } else {
         print "Test $filename passed!\n";
         $passed_tests ++;
@@ -35,6 +37,10 @@ for my $filename (@ARGV) {
 }
 
 print "Passed $passed_tests out of $total tests.\n";
+
+if (@failed_tests) {
+    print "Failed: ", (join ", ", @failed_tests), "\n";
+}
 
 sub do_test {
     my $filename = shift;
@@ -66,7 +72,7 @@ sub do_test {
     my $diff = output_diff($output, $props{expected});
 
     if (length $diff > 0) {
-        die "Output wasn't what we expected: $diff";
+        die "Output wasn't what we expected:\n$diff\n";
     }
 }
 
