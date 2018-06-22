@@ -1247,7 +1247,6 @@ class CodeGen (val target: Target) {
                 ifNonempty._then().assign(fieldVar, getCall)
             }
             case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
-            case _: InterfaceContractType => assert(false, "Cannot generate field initializer for interface type.")
             case _: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
         }

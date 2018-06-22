@@ -60,9 +60,10 @@ case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, O
 
                 val possibleCurrentStateNames: Iterable[String] = np match {
                     case ContractReferenceType(contractName, _) => contractTableOpt.get.stateLookup.values.map((s: StateTable) => s.name)
-
                     case StateType(contractName, stateNames) =>
                         stateNames
+                    case InterfaceContractType(name, interfaceInnerType) =>
+                        contractTableOpt.get.stateLookup.values.map((s: StateTable) => s.name)
                 }
 
                 // It's weird that the way we find the available state names depends on the current state; this is an artifact
@@ -83,10 +84,7 @@ case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, O
 
                 val isAvailable = possibleCurrentStateNames.toSet.subsetOf(availableInStateNames.toSet)
                 if (isAvailable) {
-                    np match {
-                        case ContractReferenceType(contractName, _) => insideContractResult
-                        case StateType(contractName, stateNames) => insideContractResult
-                    }
+                    insideContractResult
                 }
                 else {
                     None
@@ -268,7 +266,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         def handleInvocation(
                 context: Context,
-                receiverType: ObsidianType,
+                receiverType: NonPrimitiveType,
                 name: String,
                 receiver: Expression,
                 args: Seq[Expression]): (ObsidianType, Context) = {
@@ -291,7 +289,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             val invokable: InvokableDeclaration = (foundTransaction, foundFunction) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(receiverType.extractNonPrimitiveType.get, name)
+                    val err = MethodUndefinedError(receiverType, name)
                     logError(e, err)
                     return (BottomType(), context)
                 case (_, Some(f)) => f
@@ -434,10 +432,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val fieldType =  context.lookupFieldTypeInType(derefType)(fieldName) match {
                      case Some(typ) => typ
                      case None =>
-                         derefType.extractNonPrimitiveType match {
-                             case Some(t) => logError(e, FieldUndefinedError(derefType.extractNonPrimitiveType.get, fieldName))
+                         derefType match {
+                             case np: NonPrimitiveType =>
+                                 logError(e, FieldUndefinedError(derefType.extractNonPrimitiveType.get, fieldName))
                                  return (BottomType(), contextPrime)
-                             case None => logError(e, DereferenceError(derefType))
+                             case _ => logError(e, DereferenceError(derefType))
                                  return (BottomType(), contextPrime)
                          }
                  }
@@ -455,8 +454,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case IntType() | BoolType() | StringType() =>
                          logError(e, NonInvokeableError(receiverType))
                          return (BottomType(), contextPrime)
-                     case np: NonPrimitiveType => handleInvocation(contextPrime, receiverType, name, receiver, args)
-                     case interface: InterfaceContractType => handleInvocation(contextPrime, receiverType, name, receiver, args)
+                     case np: NonPrimitiveType => handleInvocation(contextPrime, np, name, receiver, args)
                      case u: UnresolvedNonprimitiveType => assert(false, "Should have resolved unresolved types already"); return (BottomType(), contextPrime)
                  }
 
@@ -740,12 +738,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 return Left((ast, CannotConvertPathError(head, e, np))::Nil)
                             case Right(trNew) => fixSimpleType(context, trNew)
                         }
-                    case ict: InterfaceContractType =>
-                        toCallerPoV(calleeToCaller, ict.extractNonPrimitiveType.get) match {
-                            case Left((head, e)) =>
-                                return Left((ast, CannotConvertPathError(head, e, ict.extractNonPrimitiveType.get))::Nil)
-                            case Right(trNew) => InterfaceContractType(ict.name, fixSimpleType(context, trNew))
-                        }
                     case BottomType() => BottomType()
                     case u@UnresolvedNonprimitiveType(_, _, _) => assert(false); u
                 }
@@ -956,6 +948,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val possibleCurrentStates = oldType.extractNonPrimitiveType.get match {
                     case ContractReferenceType(contractName, _) => thisTable.possibleStates
+                    case InterfaceContractType(contractName, _) => thisTable.possibleStates
                     case StateType(contractName, stateNames) => stateNames
                 }
 

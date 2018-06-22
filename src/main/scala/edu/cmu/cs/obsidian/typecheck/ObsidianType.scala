@@ -86,8 +86,6 @@ sealed trait ObsidianType extends HasLocation {
     val extractNonPrimitiveType: Option[NonPrimitiveType]
 
     def isOwned = false
-    def isShared = false
-    def isReadOnlyState = false
     def isRemote = false
 
     def isResourceReference(contextContractTable: ContractTable) = false
@@ -177,9 +175,11 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeMo
     override val extractNonPrimitiveType: Option[NonPrimitiveType] = None
 }
 
-case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends ObsidianType {
+case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
-    val isBottom: Boolean = false
-    override val residualType: ObsidianType = this
+    override val isBottom: Boolean = false
+    override val residualType: NonPrimitiveType = this
     override val extractNonPrimitiveType: Option[NonPrimitiveType] = Some(simpleType)
+    override val modifiers: Set[TypeModifier] = Set()
+    override val contractName: String = name
 }
