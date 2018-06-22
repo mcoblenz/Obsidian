@@ -206,8 +206,7 @@ object Main {
             println(usage)
             sys.exit(0)
         }
-        val compileSuccess = compileProgram(args)
-        if (compileSuccess) {
+        if (compileProgram(args)) {
             sys.exit(0)
         } else {
             sys.exit(1)
