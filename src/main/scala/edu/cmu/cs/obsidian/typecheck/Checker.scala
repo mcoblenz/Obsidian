@@ -161,11 +161,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (StringType(), StringType()) => None
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 val mainSubtype: Boolean = (np1, np2) match {
-                    case (ContractReferenceType(c1, _), ContractReferenceType(c2, _)) => c1 == c2
+                    case (ContractReferenceType(c1, c1p), ContractReferenceType(c2, c2p)) =>
+                        c1 == c2 &&
+                            ((c1p == c2p) ||
+                                (c1p == Shared() && c2p == Unowned()) ||
+                                (c1p == Owned() && c2p == Unowned())
+                                )
                     case (StateType(c1, ss1), StateType(c2, ss2)) =>
                         c1 == c2 && ss1.subsetOf(ss2)
-                    case (StateType(c, ss1), ContractReferenceType(c2, _)) =>
-                        c2 == ContractType(c)
+                    case (StateType(c, ss1), ContractReferenceType(c2, c2p)) =>
+                        c2 == ContractType(c) && c2p == Unowned()
                     case _ => false
                 }
                 if (!mainSubtype) Some(SubTypingError(t1, t2))

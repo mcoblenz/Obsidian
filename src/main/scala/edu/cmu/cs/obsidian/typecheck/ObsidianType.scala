@@ -22,11 +22,21 @@ case class Unowned() extends Permission
 // Type of references to contracts.
 case class ContractReferenceType(contractType: ContractType, permission: Permission) extends NonPrimitiveType {
     override def toString: String = contractName
+
     val contractName: String = contractType.contractName
 
     val modifiers: Set[TypeModifier] = Set()
 
     override def isOwned = permission == Owned()
+
+    override val residualType: NonPrimitiveType = {
+        if (permission == Owned()) {
+            this.copy(permission = Unowned()).setLoc(this)
+        }
+        else {
+            this
+        }
+    }
 }
 
 
