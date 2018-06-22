@@ -74,7 +74,16 @@ object Parser extends Parsers {
                         case Some(idents) =>
                             val pathStrings = List(identString) ++ idents.map(ident => ident._1)
                             UnresolvedNonprimitiveType(pathStrings, mods.toSet, Shared()).setLoc(position)
-                        case None => UnresolvedNonprimitiveType(List(identString), mods.toSet, Shared()).setLoc(position)
+                        case None =>
+                            val permission =
+                                if (mods.contains(IsOwned())) {
+                                    Owned()
+                                }
+                                else {
+                                    Shared()
+                                }
+
+                            UnresolvedNonprimitiveType(List(identString), mods.toSet, permission).setLoc(position)
                     }
 
                 }

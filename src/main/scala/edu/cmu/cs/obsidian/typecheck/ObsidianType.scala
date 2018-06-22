@@ -25,6 +25,8 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
     val contractName: String = contractType.contractName
 
     val modifiers: Set[TypeModifier] = Set()
+
+    override def isOwned = permission == Owned()
 }
 
 
@@ -53,6 +55,8 @@ case class StateType(contractName: String, stateNames: Set[String]) extends NonP
     override def toString: String = contractName + "." + "(" + orOfStates + ")"
 
     val modifiers: Set[TypeModifier] = Set()
+
+    override def isOwned = true
 }
 
 object StateType {

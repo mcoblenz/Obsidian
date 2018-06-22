@@ -143,12 +143,7 @@ case class LeakReturnValueError(methName: String) extends Error {
 case class NoEffectsError(s: Statement) extends Error {
     val msg: String = s"Statement '$s' has no side-effects"
 }
-case class StateSpecificSharedError() extends Error {
-    val msg: String = s"State-specific types are not safe for 'shared' references"
-}
-case class StateSpecificReadOnlyError() extends Error {
-    val msg: String = s"State-specific types are not safe for 'readonlyState' references"
-}
+
 case class UnusedOwnershipError(name: String) extends Error {
     val msg: String = s"Variable '$name' holds ownership, but is unused at the end of its scope."
 }

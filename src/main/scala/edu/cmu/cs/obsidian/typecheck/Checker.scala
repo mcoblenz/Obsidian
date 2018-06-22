@@ -1286,14 +1286,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def checkField(field: Field, lexicallyInsideOf: ContractTable): Unit = {
-        // TODO: this non-state-specific check should be elsewhere, since it applies to all non-owned variables (not just fields).
-        def checkNonStateSpecific(simple: NonPrimitiveType, err: Error): Unit = {
-            simple match {
-                case ContractReferenceType(_, _) => ()
-                case StateType(_,_) =>
-                    logError(field, err)
-            }
-        }
         field.typ match {
             case typ: NonPrimitiveType =>
                 if (typ.isOwned) {
@@ -1302,13 +1294,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         logError(field, NonResourceOwningResourceError(lexicallyInsideOf.name, field))
                     }
                 }
-                else if (typ.isReadOnlyState) {
-                    checkNonStateSpecific(typ, StateSpecificReadOnlyError())
-                }
-                else {
-                    checkNonStateSpecific(typ, StateSpecificSharedError())
-                }
-            case _ => None
+            case _ => ()
         }
     }
 

@@ -129,12 +129,6 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def fieldsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/CheckFields.obs",
-            (StateSpecificSharedError(), 19)
-                ::
-                (StateSpecificReadOnlyError(), 20)
-                ::
-                (StateSpecificReadOnlyError(), 21)
-                ::
                 Nil
         )
     }

@@ -15,11 +15,6 @@ resource contract C2 {
 }
 
 main resource contract C {
-    // bad because state specific information can change via other references
-    C1.S f1;
-    readonlyState C2.S f4;
-    readonlyState C1.S f2;
-
     // okay
 
     owned C2.S f3;
