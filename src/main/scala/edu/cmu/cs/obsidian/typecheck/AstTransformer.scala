@@ -175,7 +175,7 @@ object AstTransformer {
     def startContext(lexicallyInsideOf: DeclarationTable, args: Seq[VariableDecl]): Context = {
         var startContext = emptyContext
 
-        val simpleType =  JustContractType(lexicallyInsideOf.name)
+        val simpleType =  ContractReferenceType(lexicallyInsideOf.name)
         val contractType = UnresolvedNonprimitiveType(List("this"), Set())
         startContext = startContext.updated("this", contractType)
 
@@ -358,7 +358,7 @@ object AstTransformer {
                 result match {
                     case Left(err) => (BottomType().setLoc(t), List(ErrorRecord(err, pos)))
                     case Right((unpermissionedType, _)) =>
-                        (unpermissionedType, nonPrim.mods).setLoc(t), List.empty)
+                        (unpermissionedType.setLoc(t), List.empty)
                 }
             case i@InterfaceContractType(_, _) => (i, List.empty)
             case b@BottomType() => (b, List.empty)
@@ -374,7 +374,7 @@ object AstTransformer {
         }
     }
 
-    type TraverseResult = Either[Error, (SimpleType, DeclarationTable)]
+    type TraverseResult = Either[Error, (NonPrimitiveType, DeclarationTable)]
 //
 //    private def appendToPath(
 //            f: String,
@@ -440,7 +440,7 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = JustContractType(cName)
+                    val tRaw = ContractReferenceType(cName)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }
@@ -522,7 +522,7 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = JustContractType(cName)
+                    val tRaw = ContractReferenceType(cName)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }

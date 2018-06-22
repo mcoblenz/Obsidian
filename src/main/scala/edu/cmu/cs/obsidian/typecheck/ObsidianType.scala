@@ -14,18 +14,32 @@ case class IsOwned() extends TypeModifier {
     override def toString: String = "owned"
 }
 
-// [SimpleType] simply indicates a contract, and possibly a state or set of states.
-// Modifiers are allowed only on ObsidianType objects.
-sealed trait SimpleType { val contractName: String }
+trait Permission
+case class Shared() extends Permission
+case class Owned() extends Permission
+case class Unowned() extends Permission
 
-case class JustContractType(contractName: String) extends NonPrimitiveType {
+// Type of references to contracts.
+case class ContractReferenceType(contractType: ContractType, permission: Permission) extends NonPrimitiveType {
     override def toString: String = contractName
+    val contractName: String = contractType.contractName
 
     val modifiers: Set[TypeModifier] = Set()
 }
+
+// Type of actual contracts. This is ALMOST NEVER the right class; it is specially for actual contracts.
+// Almost everywhere will use ContractReferenceType. This intentionally does not extend ObsidianType
+// because it is not available in the language itself (for now).
+case class ContractType(contractName: String) {
+    override def toString: String = contractName
+}
+
 /* Invariant: [stateNames] is missing at least one of the states of the
- * contract (i.e. it is more specific than [JustContractType(contractName)],
- * but has at least 2 distinct states */
+ * contract (i.e. it is more specific than [ContractReferenceType(contractName)],
+ * but has at least 2 distinct states
+ *
+ * StateType is always owned.
+ * */
 case class StateType(contractName: String, stateNames: Set[String]) extends NonPrimitiveType {
     def this(contractName: String, stateName: String) = {
         this(contractName, Set(stateName))
@@ -45,12 +59,12 @@ object StateType {
 
 
 /* a path starts with either a local variable or "this", but "this" can sometimes be omitted */
-//case class PathType(path: Seq[String], ts: SimpleType) extends SimpleType {
+//case class PathType(path: Seq[String], ts: NonPrimitiveType) extends NonPrimitiveType {
 //    private def pathAsString = path.foldLeft("")(
 //        (prev: String, pathNode: String) => prev + pathNode + "."
 //    )
 //    override def toString: String = pathAsString + ts.toString
-//    override val extractSimpleType: SimpleType = ts
+//    override val extractSimpleType: NonPrimitiveType = ts
 //}
 
 /* Invariant for permissioned types: any path that occurs in the type makes "this" explicit */
@@ -63,7 +77,7 @@ sealed trait ObsidianType extends HasLocation {
      * [residualType(t)] instead */
     val residualType: ObsidianType
 
-    val extractSimpleType: Option[SimpleType]
+    val extractSimpleType: Option[NonPrimitiveType]
 
     def isOwned = false
     def isShared = false
@@ -78,7 +92,7 @@ sealed trait ObsidianType extends HasLocation {
 sealed trait PrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
     override val residualType: ObsidianType = this
-    override val extractSimpleType: Option[SimpleType] = None
+    override val extractSimpleType: Option[NonPrimitiveType] = None
 }
 
 /* all permissioned types are associated with their corresponding symbol table
@@ -115,7 +129,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
     //    else this
     val residualType = this
 
-    val extractSimpleType: Option[SimpleType] = None // TODO: REMOVE THIS
+    val extractSimpleType: Option[NonPrimitiveType] = None // TODO: REMOVE THIS
 
     //override def isOwned = modifiers.contains(IsOwned())
     //override def isReadOnlyState = modifiers.contains(IsReadOnlyState())
@@ -142,7 +156,7 @@ case class StringType() extends PrimitiveType {
 case class BottomType() extends ObsidianType {
     val isBottom: Boolean = true
     override val residualType: ObsidianType = this
-    override val extractSimpleType: Option[SimpleType] = None
+    override val extractSimpleType: Option[NonPrimitiveType] = None
 }
 
 // Only appears before running resolution, which happens right after parsing.
@@ -154,12 +168,12 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeMo
 
 
     override val residualType: ObsidianType = this // Should never be invoked
-    override val extractSimpleType: Option[SimpleType] = None
+    override val extractSimpleType: Option[NonPrimitiveType] = None
 }
 
-case class InterfaceContractType(name: String, simpleType: SimpleType) extends ObsidianType {
+case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends ObsidianType {
     override def toString: String = name
     val isBottom: Boolean = false
     override val residualType: ObsidianType = this
-    override val extractSimpleType: Option[SimpleType] = Some(simpleType)
+    override val extractSimpleType: Option[NonPrimitiveType] = Some(simpleType)
 }

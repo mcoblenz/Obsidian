@@ -64,9 +64,9 @@ case class DifferentTypeError(e1: Expression, t1: ObsidianType, e2: Expression, 
     val msg: String = s"Expression '$e1' has type '$t1', and expression '$e2' has type '$t2'," +
         s"but these expressions must have the same type"
 }
-case class FieldUndefinedError(fieldOf: SimpleType, fName: String) extends Error {
+case class FieldUndefinedError(fieldOf: NonPrimitiveType, fName: String) extends Error {
     val msg: String = fieldOf match {
-        case JustContractType(cName) => s"Field '$fName' is not defined in contract '$cName'"
+        case ContractReferenceType(cName, _) => s"Field '$fName' is not defined in contract '$cName'"
         case StateType(cName, stateNames) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
     }
 }
@@ -88,9 +88,9 @@ case class DereferenceError(typ: ObsidianType) extends Error {
 case class SwitchError(typ: ObsidianType) extends Error {
     val msg: String = s"Type '$typ' cannot be switched on"
 }
-case class MethodUndefinedError(receiver: SimpleType, name: String) extends Error {
+case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extends Error {
     val msg: String = receiver match {
-        case JustContractType(cName) =>
+        case ContractReferenceType(cName, _) =>
             s"No transaction or function with name '$name' was found in contract '$cName'"
         case StateType(cName, sNames) =>
             s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"
@@ -164,7 +164,7 @@ case class PotentiallyUnusedOwnershipError(name: String) extends Error {
 case class ConstructorNameError(contractName: String) extends Error {
     val msg: String = s"Invalid constructor name for contract '$contractName'"
 }
-case class CannotConvertPathError(badPart: String, expr: Expression, typ: SimpleType) extends Error {
+case class CannotConvertPathError(badPart: String, expr: Expression, typ: NonPrimitiveType) extends Error {
     val msg: String = s"Cannot convert path in type '$typ': '$badPart' is equivalent to" +
         s"a non-variable expression '$expr'"
 }
