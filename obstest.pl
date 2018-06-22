@@ -66,8 +66,7 @@ sub do_test {
     my $diff = output_diff($output, $props{expected});
 
     if (length $diff > 0) {
-        print $diff;
-        die "Output wasn't what we expected.\n";
+        die "Output wasn't what we expected: $diff";
     }
 }
 
