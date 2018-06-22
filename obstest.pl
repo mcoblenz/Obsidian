@@ -48,7 +48,8 @@ sub do_test {
 
     die "Must specify a file to designate as the client.\n" unless exists $servers{client};
 
-    # Since we process client differently, we split it into its own thing.
+    # Since we process client differently, we take its filename out of the general list
+    # of servers and put it into its own variable.
     my $client = $servers{client};
     delete $servers{client};
 
@@ -164,7 +165,6 @@ sub run_test {
         }
     }
 
-    my $output;
     # Wait for the server to start...
     sleep 1;
     # Connect to the server(s)
@@ -175,11 +175,12 @@ sub run_test {
         $cmd .= "localhost $port ";
         $port ++;
     }
+
     print $cmd, "\n";
-    $output = `$cmd`;
+    my $output = `$cmd`;
+
     if ($verbose) {
-        print "Client output:\n";
-        print $output;
+        print "Client output:\n", $output;
     }
 
     kill 'HUP', @pids;
