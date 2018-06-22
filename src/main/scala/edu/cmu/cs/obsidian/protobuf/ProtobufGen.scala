@@ -79,7 +79,7 @@ object ProtobufGen {
             case np: NonPrimitiveType => ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(np.toString), f.name)
             case ict@InterfaceContractType(name, simpleType) => assert(false, "Can't serialize object of interface type."); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
             case BottomType() => assert(false, "Bottom type should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
-            case u@UnresolvedNonprimitiveType(_, _ ) => assert(false, "Unresolved types should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
+            case u@UnresolvedNonprimitiveType(_, _, _) => assert(false, "Unresolved types should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
         }
     }
 

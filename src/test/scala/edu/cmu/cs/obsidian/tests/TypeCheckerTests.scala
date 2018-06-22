@@ -144,16 +144,16 @@ class TypeCheckerTests extends JUnitSuite {
             (SubTypingError(BoolType(), IntType()), 26)
                 ::
                 (SubTypingError(
-                    ContractReferenceType("C_Owned"),
-                    ContractReferenceType("C_Shared")),
+                    ContractReferenceType(ContractType("C_Owned"), Owned()),
+                    ContractReferenceType(ContractType("C_Shared"), Shared())),
                     29)
                 ::
-                (FieldUndefinedError(ContractReferenceType("C_Shared"), "f2"), 32)
+                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared"), Shared()), "f2"), 32)
                 ::
-                (FieldUndefinedError(ContractReferenceType("C_Shared"), "f3"), 34)
+                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared"), Shared()), "f3"), 34)
                 ::
                 (SubTypingError(
-                    ContractReferenceType("C_Shared"),
+                    ContractReferenceType(ContractType("C_Shared"), Owned()),
                     StateType("C_Shared", "S")),
                     37)
                 ::
@@ -176,8 +176,8 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnreachableCodeError(), 22)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(ContractReferenceType("C_Owned"), Set(IsOwned())),
-                    NonPrimitiveType(StateType("C_Owned", "S"), Set(IsOwned()))),
+                    ContractReferenceType(ContractType("C_Owned"), Owned()),
+                    StateType("C_Owned", "S")),
                     28)
                 ::
                 (UnreachableCodeError(), 28)
@@ -185,7 +185,7 @@ class TypeCheckerTests extends JUnitSuite {
                 (MustReturnError("t_ret_nonprimitive"), 31)
                 ::
                 (SubTypingError(IntType(),
-                    NonPrimitiveType(ContractReferenceType("C_Owned"), Set(IsOwned()))), 33)
+                    ContractReferenceType(ContractType("C_Owned"), Owned())), 33)
                 ::
                 (MustReturnError("no_return"), 38)
                 ::
@@ -228,13 +228,13 @@ class TypeCheckerTests extends JUnitSuite {
                     IntType()), 21)
                 ::
                 (MethodUndefinedError(
-                    ContractReferenceType("Invocation"),
+                    ContractReferenceType(ContractType("Invocation"), Shared()),
                     "otherMethod"), 23)
                 ::
                 (NonInvokeableError(IntType()), 25)
                 ::
                 (MethodUndefinedError(
-                    ContractReferenceType("OtherContract"),
+                    ContractReferenceType(ContractType("OtherContract"), Shared()),
                     "anotherMethod"), 31)
                 ::
                 (SubTypingError(
@@ -249,7 +249,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def dereferenceTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Dereference.obs",
-            (FieldUndefinedError(ContractReferenceType("Thing"), "w"), 23)
+            (FieldUndefinedError(ContractReferenceType(ContractType("Thing"), Shared()), "w"), 23)
                 ::
                 (DereferenceError(StringType()), 25)
                 ::
@@ -402,13 +402,13 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def endsInStateTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInState.obs",
             (SubTypingError(
-                NonPrimitiveType(StateType("C", "S1"), Set(IsOwned())),
-                NonPrimitiveType(StateType("C", "S2"), Set(IsOwned()))), 3
+                StateType("C", "S1"),
+                StateType("C", "S2")), 3
             )
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(StateType("C", "S2"), Set(IsOwned())),
-                    NonPrimitiveType(StateType("C", "S1"), Set(IsOwned()))), 8
+                    StateType("C", "S2"),
+                    StateType("C", "S1")), 8
                 )
                 ::
                 Nil
@@ -418,20 +418,20 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def endsInStateUnionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
             (SubTypingError(
-                NonPrimitiveType(StateType("C1", Set("S2", "S3")), Set(IsOwned())),
-                NonPrimitiveType(StateType("C1", Set("S1", "S2")), Set(IsOwned()))), 4
+                StateType("C1", Set("S2", "S3")),
+                StateType("C1", Set("S1", "S2"))), 4
             )
                 ::
                 (StateUndefinedError("C1", "OtherState"), 13)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(StateType("C1", Set("S1", "S2")), Set(IsOwned())),
-                    NonPrimitiveType(StateType("C1", Set("S1", "S3")), Set(IsOwned()))), 19
+                    StateType("C1", Set("S1", "S2")),
+                    StateType("C1", Set("S1", "S3"))), 19
                 )
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(StateType("C2", Set("S1", "S2")), Set(IsOwned())),
-                    NonPrimitiveType(StateType("C2", "S1"), Set(IsOwned()))), 33
+                    StateType("C2", Set("S1", "S2")),
+                    StateType("C2", "S1")), 33
                 )
                 ::
                 (
@@ -461,22 +461,22 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedOwnershipError("m"), 22)
                 ::
                 (OwnershipSubtypingError(
-                    ContractReferenceType("Money"),
-                    NonPrimitiveType(ContractReferenceType("Money"), Set(IsOwned()))), 28)
+                    ContractReferenceType(ContractType("Money"), Shared()),
+                    ContractReferenceType(ContractType("Money"), Owned())), 28)
                 ::
                 (OwnershipSubtypingError(
-                    ContractReferenceType("Money"),
-                    NonPrimitiveType(ContractReferenceType("Money"), Set(IsOwned()))), 37)
+                    ContractReferenceType(ContractType("Money"), Shared()),
+                    ContractReferenceType(ContractType("Money"), Owned())), 37)
                 ::
                 (NonResourceOwningResourceError("BadWallet",
                     Field(false,
-                        NonPrimitiveType(ContractReferenceType("Money"), Set(IsOwned())),
+                        ContractReferenceType(ContractType("Money"), Owned()),
                         "money",
                         None)), 43)
                 ::
                 (SubTypingError(
-                    ContractReferenceType("Money"),
-                    NonPrimitiveType(ContractReferenceType("Money"), Set(IsOwned()))),
+                    ContractReferenceType(ContractType("Money"), Shared()),
+                    ContractReferenceType(ContractType("Money"), Owned())),
                     56)
                 ::
                 (DisownUnowningExpressionError(ReferenceIdentifier("m")), 49)
@@ -484,8 +484,8 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedOwnershipError("bad"), 52)
                 ::
                 (OwnershipSubtypingError(
-                    ContractReferenceType("Money"),
-                    NonPrimitiveType(ContractReferenceType("Money"), Set(IsOwned()))), 59)
+                    ContractReferenceType(ContractType("Money"), Owned()),
+                    ContractReferenceType(ContractType("Money"), Owned())), 59)
                 ::
                 (UnusedOwnershipError("m"), 75)
                 ::
@@ -495,11 +495,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
-            (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType("Prescription")), 17)
+            (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Shared())), 17)
                 ::
                 (OwnershipSubtypingError(
-                    ContractReferenceType("Prescription"),
-                    NonPrimitiveType(ContractReferenceType("Prescription"), Set(IsOwned()))), 17)
+                    ContractReferenceType(ContractType("Prescription"), Shared()),
+                    ContractReferenceType(ContractType("Prescription"), Owned())), 17)
                 ::
                 Nil
         )

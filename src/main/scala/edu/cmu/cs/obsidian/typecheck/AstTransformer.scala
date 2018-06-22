@@ -116,7 +116,7 @@ object AstTransformer {
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             f: Field): (Field, Seq[ErrorRecord]) = {
-        val context = startContext(lexicallyInsideOf, List.empty)
+        val context = startContext(lexicallyInsideOf, List.empty, Owned()) // Permission of this is irrelevant when transforming fields
         val (newType, errors) = transformType(table, lexicallyInsideOf, context, f.typ, f.loc)
         (f.copy(typ = newType).setLoc(f), errors)
     }
@@ -172,11 +172,11 @@ object AstTransformer {
         }
     }
 
-    def startContext(lexicallyInsideOf: DeclarationTable, args: Seq[VariableDecl]): Context = {
+    def startContext(lexicallyInsideOf: DeclarationTable, args: Seq[VariableDecl], thisPermission: Permission): Context = {
         var startContext = emptyContext
 
-        val simpleType =  ContractReferenceType(lexicallyInsideOf.name)
-        val contractType = UnresolvedNonprimitiveType(List("this"), Set())
+        val simpleType =  ContractReferenceType(lexicallyInsideOf.contractType, thisPermission)
+        val contractType = UnresolvedNonprimitiveType(List("this"), Set(), thisPermission)
         startContext = startContext.updated("this", contractType)
 
         for (a <- args) {
@@ -188,10 +188,11 @@ object AstTransformer {
     def transformArgs(
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
-            args: Seq[VariableDecl]): (Seq[VariableDecl], Seq[ErrorRecord]) = {
+            args: Seq[VariableDecl],
+            thisPermission: Permission): (Seq[VariableDecl], Seq[ErrorRecord]) = {
         var errors = List.empty[ErrorRecord]
         var newArgs: Seq[VariableDecl] = Nil
-        val context = startContext(lexicallyInsideOf, args)
+        val context = startContext(lexicallyInsideOf, args, thisPermission)
         for (a <- args) {
             val (transformedType, newErrors) = transformType(table, lexicallyInsideOf, context - a.varName, a.typ, a.loc)
             errors = errors ++ newErrors
@@ -206,10 +207,10 @@ object AstTransformer {
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             t: Transaction): (Transaction, Seq[ErrorRecord]) = {
-        val context = startContext(lexicallyInsideOf, t.args)
+        val context = startContext(lexicallyInsideOf, t.args, t.thisPermission)
 
 
-        var (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args)
+        var (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args, t.thisPermission)
 
         val newEnsures = t.ensures.map(en => en.copy(expr = transformExpression(en.expr)))
 
@@ -230,8 +231,9 @@ object AstTransformer {
             lexicallyInsideOf: DeclarationTable,
             c: Constructor): (Constructor, Seq[ErrorRecord]) = {
 
-        val (newArgs, argsTransformErrors) = transformArgs(table, lexicallyInsideOf, c.args)
-        val context = startContext(lexicallyInsideOf, c.args)
+        // Constructors always own "this".
+        val (newArgs, argsTransformErrors) = transformArgs(table, lexicallyInsideOf, c.args, Owned())
+        val context = startContext(lexicallyInsideOf, c.args, Owned())
         var (newBody, _, bodyTransformErrors) = transformBody(table, lexicallyInsideOf, context, c.body)
         val errors = argsTransformErrors ++ bodyTransformErrors
 
@@ -243,8 +245,8 @@ object AstTransformer {
             lexicallyInsideOf: DeclarationTable,
             f: Func): (Func, Seq[ErrorRecord]) = {
 
-        val (newArgs, argTransformErrors) = transformArgs(table, lexicallyInsideOf, f.args)
-        val context = startContext(lexicallyInsideOf, f.args)
+        val (newArgs, argTransformErrors) = transformArgs(table, lexicallyInsideOf, f.args, f.thisPermission)
+        val context = startContext(lexicallyInsideOf, f.args, f.thisPermission)
         val newRetType = f.retType.map(transformType(table, lexicallyInsideOf, context, _, f.loc))
         var errors = List.empty[ErrorRecord]
         val (transformedRetType, retTypeErrors) = newRetType match {
@@ -350,7 +352,7 @@ object AstTransformer {
             case t@BoolType() => (t, List.empty[ErrorRecord])
             case t@IntType() => (t, List.empty[ErrorRecord])
             case t@StringType() => (t, List.empty[ErrorRecord])
-            case nonPrim@UnresolvedNonprimitiveType(_, _) =>
+            case nonPrim@UnresolvedNonprimitiveType(_, _, _) =>
                 //val tCanonified: UnresolvedNonprimitiveType = canonifyParsableType(table, context, nonPrim)
                 val result: TraverseResult = resolveNonPrimitiveTypeContext(table, lexicallyInsideOf, nonPrim,
                                                             new TreeSet(), context, pos)
@@ -440,7 +442,7 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = ContractReferenceType(cName)
+                    val tRaw = ContractReferenceType(ct.contractType, t.permission)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }
@@ -522,7 +524,7 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = ContractReferenceType(cName)
+                    val tRaw = ContractReferenceType(ct.contractType, t.permission)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }

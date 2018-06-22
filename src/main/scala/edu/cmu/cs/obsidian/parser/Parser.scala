@@ -73,8 +73,8 @@ object Parser extends Parsers {
                     path match {
                         case Some(idents) =>
                             val pathStrings = List(identString) ++ idents.map(ident => ident._1)
-                            UnresolvedNonprimitiveType(pathStrings, mods.toSet).setLoc(position)
-                        case None => UnresolvedNonprimitiveType(List(identString), mods.toSet).setLoc(position)
+                            UnresolvedNonprimitiveType(pathStrings, mods.toSet, Shared()).setLoc(position)
+                        case None => UnresolvedNonprimitiveType(List(identString), mods.toSet, Shared()).setLoc(position)
                     }
 
                 }
@@ -345,7 +345,7 @@ object Parser extends Parsers {
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
-                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body).setLoc(f)
+                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body, Unowned()).setLoc(f)
         }
     }
 
@@ -401,7 +401,7 @@ object Parser extends Parsers {
                     case id => id.asInstanceOf[Identifier]._1
                 }
                 Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, transOptions.endsInState, body, isStatic).setLoc(t)
+                    ensures, transOptions.endsInState, body, isStatic, Shared(), Shared()).setLoc(t)
         }
     }
     //keep returns first, take union of available ins and ends in

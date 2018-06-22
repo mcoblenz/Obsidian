@@ -167,7 +167,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case (StateType(c1, ss1), StateType(c2, ss2)) =>
                         c1 == c2 && ss1.subsetOf(ss2)
                     case (StateType(c, ss1), ContractReferenceType(c2, _)) =>
-                        c == c2
+                        c2 == ContractType(c)
                     case _ => false
                 }
                 if (!mainSubtype) Some(SubTypingError(t1, t2))
@@ -191,21 +191,22 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* Helper functions to easily make new types */
 
     /* Determines what sort of simple type should be used, given a set a possible states */
-    private def simpleOfWithStateNames(cName: String, states: Option[Set[String]]): NonPrimitiveType = {
+    // TODO: refactor this when we support specifying permissions on "this" for transactions
+    private def simpleOfWithStateNames(cName: String, states: Option[Set[String]], permission: Permission): NonPrimitiveType = {
         states match {
-            case None => ContractReferenceType(cName)
+            case None => ContractReferenceType(ContractType(cName), permission)
             case Some(ss) =>
                 StateType(cName, ss)
         }
     }
 
     // Usually we have the identifiers available, so this is the main entry point.
-    private def simpleOf(lexicallyInsideOf: DeclarationTable, cName: String, states: Option[Set[Identifier]]): NonPrimitiveType = {
+    private def simpleOf(lexicallyInsideOf: DeclarationTable, cName: String, states: Option[Set[Identifier]], permission: Permission): NonPrimitiveType = {
         val stateNames = states match {
             case None => None
             case Some(ss) => Some(ss.map(_._1))
         }
-        simpleOfWithStateNames(cName, stateNames)
+        simpleOfWithStateNames(cName, stateNames, permission)
     }
 
 
@@ -216,17 +217,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def nonPrimitiveUpperBound(
             t1: NonPrimitiveType,
             t2: NonPrimitiveType): Option[NonPrimitiveType] = {
-        def handleStateUnion(ss1: Set[String], ss2: Set[String]): Option[NonPrimitiveType] = {
-            val c = t1.contractName
-            val unionStates = ss1.union(ss2)
-            Some(simpleOfWithStateNames(c, Some(unionStates)))
-        }
         if (t1.contractName != t2.contractName) return None
         (t1, t2) match {
             case (_, ContractReferenceType(_, _)) => Some(t2)
             case (ContractReferenceType(_, _), _) => Some(t1)
             case (StateType(_, ss1), StateType(_, ss2)) =>
-                handleStateUnion(ss1, ss2)
+                val c = t1.contractName
+                val unionStates = ss1.union(ss2)
+                Some(simpleOfWithStateNames(c, Some(unionStates), Owned()))
             case _ => None
         }
     }
@@ -293,7 +291,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             val invokable: InvokableDeclaration = (foundTransaction, foundFunction) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(receiverType.extractSimpleType.get, name)
+                    val err = MethodUndefinedError(receiverType.extractNonPrimitiveType.get, name)
                     logError(e, err)
                     return (BottomType(), context)
                 case (_, Some(f)) => f
@@ -436,8 +434,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val fieldType =  context.lookupFieldTypeInType(derefType)(fieldName) match {
                      case Some(typ) => typ
                      case None =>
-                         derefType.extractSimpleType match {
-                             case Some(t) => logError(e, FieldUndefinedError(derefType.extractSimpleType.get, fieldName))
+                         derefType.extractNonPrimitiveType match {
+                             case Some(t) => logError(e, FieldUndefinedError(derefType.extractNonPrimitiveType.get, fieldName))
                                  return (BottomType(), contextPrime)
                              case None => logError(e, DereferenceError(derefType))
                                  return (BottomType(), contextPrime)
@@ -457,7 +455,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case IntType() | BoolType() | StringType() =>
                          logError(e, NonInvokeableError(receiverType))
                          return (BottomType(), contextPrime)
-                     case  _ => handleInvocation(contextPrime, receiverType, name, receiver, args)
+                     case np: NonPrimitiveType => handleInvocation(contextPrime, receiverType, name, receiver, args)
+                     case interface: InterfaceContractType => handleInvocation(contextPrime, receiverType, name, receiver, args)
+                     case u: UnresolvedNonprimitiveType => assert(false, "Should have resolved unresolved types already"); return (BottomType(), contextPrime)
                  }
 
 
@@ -482,11 +482,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      checkArgs(e, s"constructor of $name", context, constrSpecs, This(), argTypes)
 
                  // TODO: https://github.com/mcoblenz/Obsidian/issues/63
-                 val (simpleType, modifiers: Set[TypeModifier]) = result match {
+                 val simpleType = result match {
                      // Even if the args didn't check, we can still output a type
-                     case None => (ContractReferenceType(name), Set.empty[TypeModifier])
+                     case None => ContractReferenceType(ctTableOfConstructed.contractType, Owned())
                      case Some((constr, _)) =>
-                         (simpleOf(contextPrime.contractTable, name, constr.endsInState), if (constr.isOwned) Set(IsOwned()) else Set())
+                         simpleOf(contextPrime.contractTable, name, constr.endsInState, Owned())
                  }
 
                  (simpleType, contextPrime)
@@ -741,13 +741,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case Right(trNew) => fixSimpleType(context, trNew)
                         }
                     case ict: InterfaceContractType =>
-                        toCallerPoV(calleeToCaller, ict.extractSimpleType.get) match {
+                        toCallerPoV(calleeToCaller, ict.extractNonPrimitiveType.get) match {
                             case Left((head, e)) =>
-                                return Left((ast, CannotConvertPathError(head, e, ict.extractSimpleType.get))::Nil)
+                                return Left((ast, CannotConvertPathError(head, e, ict.extractNonPrimitiveType.get))::Nil)
                             case Right(trNew) => InterfaceContractType(ict.name, fixSimpleType(context, trNew))
                         }
                     case BottomType() => BottomType()
-                    case u@UnresolvedNonprimitiveType(_, _) => assert(false); u
+                    case u@UnresolvedNonprimitiveType(_, _, _) => assert(false); u
                 }
             })
 
@@ -814,7 +814,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
             val invokable: InvokableDeclaration = (txLookup, funLookup) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(contextAfterReceiver.thisType.extractSimpleType.get, name)
+                    val err = MethodUndefinedError(contextAfterReceiver.thisType.extractNonPrimitiveType.get, name)
                     logError(s, err)
                     return contextAfterReceiver
                 case (_, Some(f)) => f
@@ -954,7 +954,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // maybeOldFields is the set of fields from the old state that MAY be going away — 
                 //   we can't be sure when the current state is a union.
 
-                val possibleCurrentStates = oldType.extractSimpleType.get match {
+                val possibleCurrentStates = oldType.extractNonPrimitiveType.get match {
                     case ContractReferenceType(contractName, _) => thisTable.possibleStates
                     case StateType(contractName, stateNames) => stateNames
                 }
@@ -1125,7 +1125,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val fieldType = context.lookupFieldTypeInType(derefType)(f) match {
                     case Some(ast) => ast
                     case None =>
-                        logError(s, FieldUndefinedError(derefType.extractSimpleType.get, f))
+                        logError(s, FieldUndefinedError(derefType.extractNonPrimitiveType.get, f))
                         return contextPrime2
                 }
 
@@ -1199,7 +1199,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
 
-                val contractName = t.extractSimpleType match {
+                val contractName = t.extractNonPrimitiveType match {
                     case Some(s) =>
                         s.contractName
                     case None =>
@@ -1222,7 +1222,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 StateType(contractTable.name, stTable.name)
                             case None =>
                                 logError(s, StateUndefinedError(contractTable.name, sName))
-                                ContractReferenceType(contractTable.name)
+                                ContractReferenceType(contractTable.contractType, Owned())
                         }
 
                     /* special case to allow types to change in the context if we match on a variable */
@@ -1303,12 +1303,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                 }
                 else if (typ.isReadOnlyState) {
-                    val simpleType = typ.extractSimpleType.get
-                    checkNonStateSpecific(simpleType, StateSpecificReadOnlyError())
+                    checkNonStateSpecific(typ, StateSpecificReadOnlyError())
                 }
                 else {
-                    val simpleType = typ.extractSimpleType.get
-                    checkNonStateSpecific(simpleType, StateSpecificSharedError())
+                    checkNonStateSpecific(typ, StateSpecificSharedError())
                 }
             case _ => None
         }
@@ -1339,8 +1337,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
+        // TODO: make the permission depend on the transaction's specification
         val expectedType =
-            simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState)
+            simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState, tx.thisFinalPermission)
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
         checkForUnusedStateInitializers(outputContext)
@@ -1387,12 +1386,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         else {
             None
         }
-        val simpleType = simpleOfWithStateNames(lexicallyInsideOf.contract.name, stateNames)
-        val thisSimpleType = simpleType
+        val thisType = simpleOfWithStateNames(lexicallyInsideOf.contract.name, stateNames, tx.thisPermission)
 
         // TODO: consider path case. Previously it was something like:
         // PathType("this"::"parent"::Nil, lexicallyInsideOf.simpleType)
-        val table = simpleType match {
+        val table = thisType match {
             case StateType(_, stateNames) =>
                 if (stateNames.size == 1) {
                     val stateName = stateNames.head
@@ -1403,7 +1401,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             case _ => lexicallyInsideOf
         }
-        val thisType = thisSimpleType // TODO: make this owned?
 
         // Construct the context that the body should start with
         var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
@@ -1528,8 +1525,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
         var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
 
-        // TODO: make this owned?
-        val thisType = ContractReferenceType(table.name)
+        val thisType = ContractReferenceType(table.contractType, Owned())
 
         initContext = initContext.updated("this", thisType)
 
@@ -1552,7 +1548,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // TODO: make this owned?
-        val expectedThisType = simpleOf(table, table.name, constr.endsInState)
+        val expectedThisType = simpleOf(table, table.name, constr.endsInState, Owned())
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
