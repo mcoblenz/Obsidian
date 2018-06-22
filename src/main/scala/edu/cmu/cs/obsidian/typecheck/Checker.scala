@@ -434,7 +434,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case None =>
                          derefType match {
                              case np: NonPrimitiveType =>
-                                 logError(e, FieldUndefinedError(derefType.extractNonPrimitiveType.get, fieldName))
+                                 logError(e, FieldUndefinedError(np, fieldName))
                                  return (BottomType(), contextPrime)
                              case _ => logError(e, DereferenceError(derefType))
                                  return (BottomType(), contextPrime)
@@ -806,7 +806,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
             val invokable: InvokableDeclaration = (txLookup, funLookup) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(contextAfterReceiver.thisType.extractNonPrimitiveType.get, name)
+                    val err = MethodUndefinedError(contextAfterReceiver.thisType, name)
                     logError(s, err)
                     return contextAfterReceiver
                 case (_, Some(f)) => f
@@ -946,15 +946,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // maybeOldFields is the set of fields from the old state that MAY be going away — 
                 //   we can't be sure when the current state is a union.
 
-                val possibleCurrentStates = oldType.extractNonPrimitiveType.get match {
-                    case ContractReferenceType(contractName, _) => thisTable.possibleStates
-                    case InterfaceContractType(contractName, _) => thisTable.possibleStates
-                    case StateType(contractName, stateNames) => stateNames
+                val possibleCurrentStates = oldType match {
+                    case ContractReferenceType(_, _) => thisTable.possibleStates
+                    case InterfaceContractType(_, _) => thisTable.possibleStates
+                    case StateType(_, stateNames) => stateNames
                 }
-
-
-//                val oldStateTables = possibleCurrentStates.map((name: String) => thisTable.state(name).get)
-//                var oldFieldSets: Set[Set[Declaration]] = oldStateTables.map((t: StateTable) => t.ast.declarations.toSet)
 
                 // For each state that we might be in, compute the set of fields that could be available.
                 val allContractFields = thisTable.allFields
@@ -1113,17 +1109,22 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                 }
 
+                derefType match {
+                    case np: NonPrimitiveType =>
+                        val fieldType = context.lookupFieldTypeInType(derefType)(f) match {
+                            case Some(ast) => ast
+                            case None =>
+                                logError(s, FieldUndefinedError(np, f))
+                                return contextPrime2
+                        }
 
-
-                val fieldType = context.lookupFieldTypeInType(derefType)(f) match {
-                    case Some(ast) => ast
-                    case None =>
-                        logError(s, FieldUndefinedError(derefType.extractNonPrimitiveType.get, f))
-                        return contextPrime2
+                        checkIsSubtype(s, t, fieldType)
+                        contextPrime2
+                    case _ => logError(s, DereferenceError(derefType))
+                        contextPrime2
                 }
 
-                checkIsSubtype(s, t, fieldType)
-                contextPrime2
+
 
             case Assignment(StateInitializer(stateName, fieldName), e, transfersOwnership) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = transfersOwnership)
@@ -1192,10 +1193,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
 
-                val contractName = t.extractNonPrimitiveType match {
-                    case Some(s) =>
-                        s.contractName
-                    case None =>
+                val contractName = t match {
+                    case np: NonPrimitiveType =>
+                        np.contractName
+                    case _ =>
                         logError(e, SwitchError(t))
                         return contextPrime
                 }

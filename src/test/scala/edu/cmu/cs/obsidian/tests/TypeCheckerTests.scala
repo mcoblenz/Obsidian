@@ -155,6 +155,8 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (AssignmentError(), 44)
                 ::
+                (DereferenceError(IntType()), 47)
+                ::
                 Nil
         )
     }

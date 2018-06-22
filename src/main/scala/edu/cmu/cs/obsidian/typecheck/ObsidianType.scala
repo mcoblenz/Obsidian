@@ -83,8 +83,6 @@ sealed trait ObsidianType extends HasLocation {
      * [residualType(t)] instead */
     val residualType: ObsidianType
 
-    val extractNonPrimitiveType: Option[NonPrimitiveType]
-
     def isOwned = false
     def isRemote = false
 
@@ -96,7 +94,6 @@ sealed trait ObsidianType extends HasLocation {
 sealed trait PrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
     override val residualType: ObsidianType = this
-    override val extractNonPrimitiveType: Option[NonPrimitiveType] = None
 }
 
 /* all permissioned types are associated with their corresponding symbol table
@@ -133,8 +130,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
     //    else this
     val residualType = this
 
-    val extractNonPrimitiveType: Option[NonPrimitiveType] = Some(this)
-
     //override def isOwned = modifiers.contains(IsOwned())
     //override def isReadOnlyState = modifiers.contains(IsReadOnlyState())
     //override def isRemote = modifiers.contains(IsRemote())
@@ -160,7 +155,6 @@ case class StringType() extends PrimitiveType {
 case class BottomType() extends ObsidianType {
     val isBottom: Boolean = true
     override val residualType: ObsidianType = this
-    override val extractNonPrimitiveType: Option[NonPrimitiveType] = None
 }
 
 // Only appears before running resolution, which happens right after parsing.
@@ -172,14 +166,12 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeMo
 
 
     override val residualType: ObsidianType = this // Should never be invoked
-    override val extractNonPrimitiveType: Option[NonPrimitiveType] = None
 }
 
 case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
     override val isBottom: Boolean = false
     override val residualType: NonPrimitiveType = this
-    override val extractNonPrimitiveType: Option[NonPrimitiveType] = Some(simpleType)
     override val modifiers: Set[TypeModifier] = Set()
     override val contractName: String = name
 }

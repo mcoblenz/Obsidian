@@ -42,5 +42,8 @@ contract C {
         j = 2;
         // should fail: assignment to non-assignable expression
         3 = 5;
+
+	// should fail: 2 is not a reference type and cannot have fields.
+	2.f = 3;
     }
 }
