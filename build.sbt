@@ -6,6 +6,8 @@ scalaVersion := "2.12.6"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 
+/* Don't throw TrapExitSecurityException, and return
+ * proper status code when doing "sbt run". */
 trapExit := false
 
 /* testing dependencies */
@@ -25,3 +27,7 @@ assemblyExcludedJars in assembly := {
     }
 }
 
+// don't get confused about multiple META-INF/MANIFEST.MF
+assemblyMergeStrategy in assembly := {
+    case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+}
