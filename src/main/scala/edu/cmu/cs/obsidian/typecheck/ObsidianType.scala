@@ -25,8 +25,6 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
 
     val contractName: String = contractType.contractName
 
-    val modifiers: Set[TypeModifier] = Set()
-
     override def isOwned = permission == Owned()
 
     override val residualType: NonPrimitiveType = {
@@ -64,7 +62,7 @@ case class StateType(contractName: String, stateNames: Set[String]) extends NonP
     )
     override def toString: String = contractName + "." + "(" + orOfStates + ")"
 
-    val modifiers: Set[TypeModifier] = Set()
+    override val permission = Owned()
 
     override def isOwned = true
 }
@@ -112,7 +110,7 @@ sealed trait PrimitiveType extends ObsidianType {
 sealed trait NonPrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
 
-    val modifiers: Set[TypeModifier]
+    val permission: Permission
 
     val contractName: String
 
@@ -182,6 +180,6 @@ case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) ext
     override def toString: String = name
     override val isBottom: Boolean = false
     override val residualType: NonPrimitiveType = this
-    override val modifiers: Set[TypeModifier] = Set()
     override val contractName: String = name
+    override val permission: Permission = simpleType.permission
 }

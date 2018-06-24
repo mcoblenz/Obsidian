@@ -148,6 +148,26 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    //--------------------------------------------------------------------------
+    // Splitting
+
+    private def canSplit(t1: ObsidianType, t2: ObsidianType, t3: ObsidianType, contextContractTable: ContractTable): Boolean = {
+        t1 match {
+            case np1: NonPrimitiveType =>
+                t2 match {
+                    case np2: NonPrimitiveType =>
+                        t3 match {
+                            case np3: NonPrimitiveType =>
+                                (np3.permission == Unowned()) ||
+                                  (np1.permission == Shared() && np2.permission == Shared() && np3.permission == Shared()) ||
+                                  (np1.permission == Owned() && np2.permission == Shared() && np3.permission == Shared() && !np1.isResourceReference(contextContractTable))
+                            case _ => false // can't split non-reference types
+                        }
+                    case _ => false // can't split non-reference types
+                }
+            case _ => false // can't split non-reference types
+        }
+    }
 
     //-------------------------------------------------------------------------
     /* Subtyping definitions */
@@ -165,12 +185,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         c1 == c2 &&
                             ((c1p == c2p) ||
                                 (c1p == Shared() && c2p == Unowned()) ||
-                                (c1p == Owned() && c2p == Unowned())
+                                (c1p == Owned())
                                 )
                     case (StateType(c1, ss1), StateType(c2, ss2)) =>
                         c1 == c2 && ss1.subsetOf(ss2)
                     case (StateType(c, ss1), ContractReferenceType(c2, c2p)) =>
-                        c2 == ContractType(c) && c2p == Unowned()
+                        c2 == ContractType(c)
                     case _ => false
                 }
                 if (!mainSubtype) Some(SubTypingError(t1, t2))
