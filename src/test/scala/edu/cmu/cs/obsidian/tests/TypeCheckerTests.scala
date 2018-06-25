@@ -23,7 +23,10 @@ class TypeCheckerTests extends JUnitSuite {
                 fail(s"Failed with parser message $errMsg")
         }
 
-        val table = new SymbolTable(prog)
+        val importsProcessedAst = ImportProcessor.processImports(file, prog)
+        val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
+
+        val table = new SymbolTable(fieldsLiftedAst)
         val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
 
         val checker = new Checker(globalTable)
@@ -138,25 +141,25 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
-            (SubTypingError(BoolType(), IntType()), 25)
+            (SubTypingError(BoolType(), IntType()), 26)
                 ::
                 (SubTypingError(
                     NonPrimitiveType(NoPathType(JustContractType("C_Owned")), Set()),
                     NonPrimitiveType(NoPathType(JustContractType("C_Shared")), Set())),
-                    28)
+                    29)
                 ::
-                (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 31)
+                (FieldUndefinedError(JustContractType("C_Shared"), "f2"), 32)
                 ::
-                (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 33)
+                (FieldUndefinedError(JustContractType("C_Shared"), "f3"), 34)
                 ::
                 (SubTypingError(
                     NonPrimitiveType(NoPathType(JustContractType("C_Shared")), Set()),
                     NonPrimitiveType(NoPathType(StateType("C_Shared", "S")), Set())),
-                    36)
+                    37)
                 ::
-                (VariableUndefinedError("j", null), 41)
+                (VariableUndefinedError("j", null), 42)
                 ::
-                (AssignmentError(), 43)
+                (AssignmentError(), 44)
                 ::
                 Nil
         )
@@ -415,19 +418,19 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def endsInStateUnionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
             (SubTypingError(
-                NonPrimitiveType(NoPathType(StateUnionType("C1", Set("S2", "S3"))), Set(IsOwned())),
-                NonPrimitiveType(NoPathType(StateUnionType("C1", Set("S1", "S2"))), Set(IsOwned()))), 4
+                NonPrimitiveType(NoPathType(StateType("C1", Set("S2", "S3"))), Set(IsOwned())),
+                NonPrimitiveType(NoPathType(StateType("C1", Set("S1", "S2"))), Set(IsOwned()))), 4
             )
                 ::
                 (StateUndefinedError("C1", "OtherState"), 13)
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(StateUnionType("C1", Set("S1", "S2"))), Set(IsOwned())),
-                    NonPrimitiveType(NoPathType(StateUnionType("C1", Set("S1", "S3"))), Set(IsOwned()))), 19
+                    NonPrimitiveType(NoPathType(StateType("C1", Set("S1", "S2"))), Set(IsOwned())),
+                    NonPrimitiveType(NoPathType(StateType("C1", Set("S1", "S3"))), Set(IsOwned()))), 19
                 )
                 ::
                 (SubTypingError(
-                    NonPrimitiveType(NoPathType(StateUnionType("C2", Set("S1", "S2"))), Set(IsOwned())),
+                    NonPrimitiveType(NoPathType(StateType("C2", Set("S1", "S2"))), Set(IsOwned())),
                     NonPrimitiveType(NoPathType(StateType("C2", "S1")), Set(IsOwned()))), 33
                 )
                 ::
@@ -504,13 +507,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def stateInitializationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/StateInitialization.obs",
-            (InvalidStateFieldInitialization("S2", "x2"), 22)
+            (InvalidStateFieldInitialization("S2", "x3"), 21)
                 ::
-                (TransitionUpdateError(Set("x1", "x2", "shared")), 26)
+                (TransitionUpdateError(Set("x1", "x2", "shared")), 25)
                 ::
-                (InvalidStateFieldInitialization("S1", "x1"), 29)
-                ::
-                (SharedFieldNameError("x2", "S1", 4), 8)
+                (InvalidStateFieldInitialization("S1", "x1"), 28)
                 ::
                 Nil
         )
@@ -546,26 +547,28 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def shadowingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ForbiddenShadowing.obs",
-            (ShadowingError("x", "S1", 2), 9)
-                ::
-                Nil
+                (RepeatContractFields("x", 9, 2), 9)
+                    ::
+                    Nil
         )
     }
 
 
     @Test def sameFieldNameTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SameNameFields.obs",
-            (ShadowingError("x", "S1", 24), 8)
-                ::
-                (SharedFieldNameError("x", "S1", 8), 15)
-                ::
-                (ShadowingError("x", "S3", 24), 15)
-                ::
-                (CombineAvailableIns("shared", "S1, S2, S3", 18), 19)
-                ::
-                (RepeatContractFields("test", 22, 21), 22)
-                ::
-                Nil
+            (
+                (CombineAvailableIns("x", "S1, S3", 8), 15)
+                    ::
+                    (CombineAvailableIns("shared", "S1, S2, S3", 18), 19)
+                    ::
+                    (RepeatContractFields("test", 22, 21), 22)
+                    ::
+                    (RepeatContractFields("x", 15, 15), 24)
+                    ::
+                    (RepeatContractFields("x", 8, 8), 24)
+                    ::
+                    Nil
+                )
         )
     }
 

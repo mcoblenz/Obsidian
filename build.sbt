@@ -6,8 +6,9 @@ scalaVersion := "2.12.6"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 
-/* Don't throw TrapExitSecurityException, and return
- * proper status code when doing "sbt run". */
+/* Don't throw TrapExitSecurityException.
+ * Also, allow passing return code through SBT without
+ * SBT throwing an exception. */
 trapExit := false
 
 /* testing dependencies */

@@ -24,15 +24,19 @@ case class JustContractType(contractName: String) extends SimpleType {
 /* Invariant: [stateNames] is missing at least one of the states of the
  * contract (i.e. it is more specific than [JustContractType(contractName)],
  * but has at least 2 distinct states */
-case class StateUnionType(contractName: String, stateNames: Set[String]) extends SimpleType {
+case class StateType(contractName: String, stateNames: Set[String]) extends SimpleType {
+    def this(contractName: String, stateName: String) = {
+        this(contractName, Set(stateName))
+    }
+
     private def orOfStates: String = stateNames.toSeq.tail.foldLeft(stateNames.head)(
         (prev: String, sName: String) => prev + " | " + sName
     )
     override def toString: String = contractName + "." + "(" + orOfStates + ")"
 }
 
-case class StateType(contractName: String, stateName: String) extends SimpleType {
-    override def toString: String = contractName + "." + stateName
+object StateType {
+    def apply(contractName: String, stateName: String): StateType = new StateType(contractName, Set(stateName))
 }
 
 
