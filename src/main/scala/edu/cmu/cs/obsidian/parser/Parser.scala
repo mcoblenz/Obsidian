@@ -26,7 +26,8 @@ E1 ::= ( E ) | n | x | true | false
  */
 
 object Parser extends Parsers {
-    class ParseException (val message : String) extends Exception {
+
+    class ParseException(val message: String) extends Exception {
 
     }
 
@@ -62,24 +63,60 @@ object Parser extends Parsers {
             }
         }
 
-        val parseNonPrimitive: Parser[UnresolvedNonprimitiveType] =
-            rep(parseTypeModifier) ~ (parseId | ThisT() | ParentT()) ~ opt(parseDotPath) ^^ {
-                case mods ~ id ~ path => {
-                    val (identString, position: Position) = id match {
-                        case t: Token => (t.toString, t.pos)
-                        // For obscure type erasure reasons, a pattern match on Identifier type doesn't work.
-                        case ident => (ident.asInstanceOf[Identifier]._1, ident.asInstanceOf[Identifier]._2)
-                    }
-                    path match {
-                        case Some(idents) =>
-                            val pathStrings = List(identString) ++ idents.map(ident => ident._1)
-                            UnresolvedNonprimitiveType(pathStrings, mods.toSet).setLoc(position)
-                        case None => UnresolvedNonprimitiveType(List(identString), mods.toSet).setLoc(position)
-                    }
 
+
+        //        val parseNonPrimitive: Parser[NonPrimitiveType] =
+        //            rep(parseTypeModifier) ~ (parseId | ThisT() | ParentT()) ~ opt(parseDotPath) ^^ {
+        //                case mods ~ id ~ path => {
+        //                    val (identString, position: Position) = id match {
+        //                        case t: Token => (t.toString, t.pos)
+        //                        // For obscure type erasure reasons, a pattern match on Identifier type doesn't work.
+        //                        case ident => (ident.asInstanceOf[Identifier]._1, ident.asInstanceOf[Identifier]._2)
+        //                    }
+        //                    path match {
+        //                        case Some(idents) =>
+        //                            val pathStrings = List(identString) ++ idents.map(ident => ident._1)
+        //                            UnresolvedNonprimitiveType(pathStrings, mods.toSet, Shared()).setLoc(position)
+        //                        case None =>
+        //                            val permission =
+        //                                if (mods.contains(IsOwned())) {
+        //                                    Owned()
+        //                                }
+        //                                else {
+        //                                    Shared()
+        //                                }
+        //
+        //                            UnresolvedNonprimitiveType(List(identString), mods.toSet, permission).setLoc(position)
+        //                    }
+        //
+        //                }
+        // For now, support only one state specification
+
+        val parseNonPrimitive: Parser[NonPrimitiveType] = {
+            // TODO: remove mods
+             rep(parseTypeModifier) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
+                case mods ~ id ~ permission => {
+                    val typ =
+                        permission match {
+                            case None => ContractReferenceType(ContractType(id._1), Inferred())
+                            case Some(_ ~ permissionIdent) =>
+                                if (permissionIdent._1 == "Shared") {
+                                    ContractReferenceType(ContractType(id._1), Shared())
+                                }
+                                else if (permissionIdent._1 == "Owned") {
+                                    ContractReferenceType(ContractType(id._1), Owned())
+                                }
+                                else if (permissionIdent._1 == "Unowned") {
+                                    ContractReferenceType(ContractType(id._1), Unowned())
+                                }
+                                else {
+                                    StateType(id._1, permissionIdent._1)
+                                }
+                        }
+                    typ.setLoc(id)
                 }
+            }
         }
-
 
         val intPrim = IntT() ^^ { t => IntType().setLoc(t) }
         val boolPrim = BoolT() ^^ { t => BoolType().setLoc(t) }
@@ -345,7 +382,7 @@ object Parser extends Parsers {
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
-                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body).setLoc(f)
+                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body, Unowned()).setLoc(f)
         }
     }
 
@@ -401,7 +438,7 @@ object Parser extends Parsers {
                     case id => id.asInstanceOf[Identifier]._1
                 }
                 Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, transOptions.endsInState, body, isStatic).setLoc(t)
+                    ensures, transOptions.endsInState, body, isStatic, Shared(), Shared()).setLoc(t)
         }
     }
     //keep returns first, take union of available ins and ends in

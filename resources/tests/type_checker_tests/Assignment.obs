@@ -7,7 +7,7 @@ resource contract C_Owned {
 main contract C_Shared {
     int f1;
 
-    C_Shared() {
+    C_Shared() ends in S {
         ->S(f2 = f1);
     }
 
@@ -24,7 +24,7 @@ contract C {
         b = 1;
         // should fail: bool is not int
         b = true;
-        C_Shared c = new C_Shared();
+        C_Shared@Shared c = new C_Shared();
         // should fail: C_Owned is not C_Shared
         c = new C_Owned();
         c.f1 = 3;
@@ -32,9 +32,8 @@ contract C {
         c.f2 = 2;
         // should fail: this field doesn't exist
         c.f3 = 1;
-        /* this fails but isn't the point of the test: this is just to get
-         * something of type [C_Shared.S] */
-        C_Shared.S cs = new C_Shared();
+
+        C_Shared@S cs = new C_Shared();
         cs.f2 = 2;
         i = 3;
         this.i = 3;
@@ -42,5 +41,8 @@ contract C {
         j = 2;
         // should fail: assignment to non-assignable expression
         3 = 5;
+
+	// should fail: 2 is not a reference type and cannot have fields.
+	2.f = 3;
     }
 }

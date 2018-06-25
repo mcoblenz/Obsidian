@@ -1088,7 +1088,7 @@ class CodeGen (val target: Target) {
                 val setInvocation = nonNullBody.invoke(builderVar, setterName)
                 setInvocation.arg(fieldVar)
             }
-            case n@NonPrimitiveType(_, _) => handleNonPrimitive(field.name, n)
+            case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
             case _ => () // TODO handle other types
         }
     }
@@ -1247,7 +1247,6 @@ class CodeGen (val target: Target) {
                 ifNonempty._then().assign(fieldVar, getCall)
             }
             case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
-            case _: InterfaceContractType => assert(false, "Cannot generate field initializer for interface type.")
             case _: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
         }
@@ -1424,8 +1423,8 @@ class CodeGen (val target: Target) {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
-            case n@NonPrimitiveType(unpermissionedType, mods) =>
-                val contractName = unpermissionedType.extractSimpleType.contractName
+            case n: NonPrimitiveType =>
+                val contractName = n.contractName
                 if (n.isRemote) model.ref(classNameForStub(contractName)) else model.ref(contractName)
             case _ => model.VOID // TODO: translate PDTs
         }
@@ -1437,8 +1436,8 @@ class CodeGen (val target: Target) {
                                                   translationContext: TranslationContext,
                                                   containingContract: Contract): Option[Contract] = {
         typ match {
-            case NonPrimitiveType(t,_) => {
-                val name = t.extractSimpleType.contractName
+            case t: NonPrimitiveType => {
+                val name = t.contractName
 
                 var typeComponents = name.split(".")
                 if (typeComponents.isEmpty) {

@@ -6,18 +6,18 @@ contract Prescription {
 
 // Very simple pharmacy — only holds one prescription.
 main contract Pharmacy {
-    owned Prescription prescription;
+    Prescription@Owned prescription;
 
-    transaction depositPrescription(owned Prescription p) {
+    transaction depositPrescription(Prescription@Owned p) {
         prescription <- p;
     }
 
-    transaction stealPrescription(Prescription p) {
+    transaction stealPrescription(Prescription@Unowned p) {
         // Error: can't get ownership from non-owning reference.
         prescription <- p;
     }
 
-    transaction dropPrescription(owned Prescription p) {
+    transaction dropPrescription(Prescription@Owned p) {
         // OK, since Prescription is not a resource.
     }
 }

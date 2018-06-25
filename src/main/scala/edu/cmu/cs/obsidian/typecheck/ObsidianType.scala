@@ -14,17 +14,46 @@ case class IsOwned() extends TypeModifier {
     override def toString: String = "owned"
 }
 
-/* [SimpleType] simply indicates a contract, and possibly a state or set of states: there
- * is neither a permission nor a path associated with the type */
-sealed trait SimpleType { val contractName: String }
+trait Permission
+case class Shared() extends Permission
+case class Owned() extends Permission
+case class Unowned() extends Permission
+case class Inferred() extends Permission // For local variables
 
-case class JustContractType(contractName: String) extends SimpleType {
+// Type of references to contracts.
+case class ContractReferenceType(contractType: ContractType, permission: Permission) extends NonPrimitiveType {
+    override def toString: String = contractName
+
+    val contractName: String = contractType.contractName
+
+    override def isOwned = permission == Owned()
+
+    override val residualType: NonPrimitiveType = {
+        if (permission == Owned()) {
+            this.copy(permission = Unowned()).setLoc(this)
+        }
+        else {
+            this
+        }
+    }
+}
+
+
+
+// Type of actual contracts. This is ALMOST NEVER the right class; it is specially for actual contracts.
+// Almost everywhere will use ContractReferenceType. This intentionally does not extend ObsidianType
+// because it is not available in the language itself (for now).
+case class ContractType(contractName: String) {
     override def toString: String = contractName
 }
+
 /* Invariant: [stateNames] is missing at least one of the states of the
- * contract (i.e. it is more specific than [JustContractType(contractName)],
- * but has at least 2 distinct states */
-case class StateType(contractName: String, stateNames: Set[String]) extends SimpleType {
+ * contract (i.e. it is more specific than [ContractReferenceType(contractName)],
+ * but has at least 2 distinct states
+ *
+ * StateType is always owned.
+ * */
+case class StateType(contractName: String, stateNames: Set[String]) extends NonPrimitiveType {
     def this(contractName: String, stateName: String) = {
         this(contractName, Set(stateName))
     }
@@ -33,6 +62,12 @@ case class StateType(contractName: String, stateNames: Set[String]) extends Simp
         (prev: String, sName: String) => prev + " | " + sName
     )
     override def toString: String = contractName + "." + "(" + orOfStates + ")"
+
+    override val permission = Owned()
+
+    override def isOwned = true
+
+    override val residualType: NonPrimitiveType = ContractReferenceType(ContractType(contractName), Unowned()).setLoc(this)
 }
 
 object StateType {
@@ -40,25 +75,14 @@ object StateType {
 }
 
 
-/* [UnpermissionedType] is a contract type that doesn't have a permission associated with it,
- * but potentially has a path. */
-sealed trait UnpermissionedType { // NOT an ObsidianType!
-    val extractSimpleType: SimpleType
-}
-
-case class NoPathType(ts: SimpleType) extends UnpermissionedType {
-    override def toString: String = ts.toString
-    override val extractSimpleType: SimpleType = ts
-}
-
 /* a path starts with either a local variable or "this", but "this" can sometimes be omitted */
-case class PathType(path: Seq[String], ts: SimpleType) extends UnpermissionedType {
-    private def pathAsString = path.foldLeft("")(
-        (prev: String, pathNode: String) => prev + pathNode + "."
-    )
-    override def toString: String = pathAsString + ts.toString
-    override val extractSimpleType: SimpleType = ts
-}
+//case class PathType(path: Seq[String], ts: NonPrimitiveType) extends NonPrimitiveType {
+//    private def pathAsString = path.foldLeft("")(
+//        (prev: String, pathNode: String) => prev + pathNode + "."
+//    )
+//    override def toString: String = pathAsString + ts.toString
+//    override val extractSimpleType: NonPrimitiveType = ts
+//}
 
 /* Invariant for permissioned types: any path that occurs in the type makes "this" explicit */
 sealed trait ObsidianType extends HasLocation {
@@ -70,71 +94,57 @@ sealed trait ObsidianType extends HasLocation {
      * [residualType(t)] instead */
     val residualType: ObsidianType
 
-    val contractNameOpt: Option[String] = None
-    val extractSimpleType: Option[SimpleType]
-    val extractUnpermissionedType: Option[UnpermissionedType]
-    def extractModifiers: Set[TypeModifier] = Set.empty
-
     def isOwned = false
-    def isShared = false
-    def isReadOnlyState = false
     def isRemote = false
 
     def isResourceReference(contextContractTable: ContractTable) = false
 
 }
 
-sealed trait PotentiallyUnresolvedType extends ObsidianType
-sealed trait ResolvedType extends ObsidianType
-
 /* int, bool, or string */
-sealed trait PrimitiveType extends PotentiallyUnresolvedType with ResolvedType {
+sealed trait PrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
     override val residualType: ObsidianType = this
-    override val extractSimpleType: Option[SimpleType] = None
-    override val extractUnpermissionedType: Option[UnpermissionedType] = None
 }
 
 /* all permissioned types are associated with their corresponding symbol table
  * These types were generated by resolution; they are not generated by the parser.
  */
-case class NonPrimitiveType(t: UnpermissionedType, modifiers: Set[TypeModifier]) extends ResolvedType {
+sealed trait NonPrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
 
-    override val contractNameOpt: Option[String] = Some(t.extractSimpleType.contractName)
+    val permission: Permission
 
-    override def toString: String = {
-        val modifiersString = modifiers.map(m => m.toString).mkString(" ")
+    val contractName: String
 
-        if (modifiers.size > 0) {
-            modifiersString + " " + t.toString
-        }
-        else {
-            t.toString
-        }
-    }
 
-    override def equals(other: Any): Boolean = {
-        other match {
-            case NonPrimitiveType(typ, mod) => typ == t && mod == modifiers
-            case _ => false
-        }
-    }
-    override def hashCode(): Int = t.hashCode()
-    val residualType: ObsidianType = if (modifiers.contains(IsOwned()))
-        NonPrimitiveType(t, modifiers - IsOwned() + IsReadOnlyState())
-    else this
+    //    override def toString: String = {
+    //        val modifiersString = modifiers.map(m => m.toString).mkString(" ")
+    //
+    //        if (modifiers.size > 0) {
+    //            modifiersString + " " + t.toString
+    //        }
+    //        else {
+    //            t.toString
+    //        }
+    //    }
 
-    val extractSimpleType: Option[SimpleType] = Some(t.extractSimpleType)
-    val extractUnpermissionedType: Option[UnpermissionedType] = Some(t)
-    override val extractModifiers = modifiers
+    //    override def equals(other: Any): Boolean = {
+    //        other match {
+    //            case NonPrimitiveType(typ, mod) => typ == t && mod == modifiers
+    //            case _ => false
+    //        }
+    //    }
+    //    override def hashCode(): Int = t.hashCode()
+    //    val residualType: ObsidianType = if (modifiers.contains(IsOwned()))
+    //        NonPrimitiveType(t, modifiers - IsOwned() + IsReadOnlyState())
+    //    else this
+    val residualType = this
 
-    override def isOwned = modifiers.contains(IsOwned())
-    override def isReadOnlyState = modifiers.contains(IsReadOnlyState())
-    override def isRemote = modifiers.contains(IsRemote())
+    //override def isRemote = modifiers.contains(IsRemote())
 
     override def isResourceReference(contextContractTable: ContractTable): Boolean = {
-        val contract = contextContractTable.lookupContract(t.extractSimpleType.contractName)
+        val contract = contextContractTable.lookupContract(contractName)
         contract.isDefined && contract.get.contract.isResource
     }
 }
@@ -151,30 +161,26 @@ case class StringType() extends PrimitiveType {
 }
 /* Used to indicate an error in the type checker when a reasonable type cannot
  * otherwise be inferred */
-case class BottomType() extends ResolvedType {
+case class BottomType() extends ObsidianType {
     val isBottom: Boolean = true
     override val residualType: ObsidianType = this
-    override val extractSimpleType: Option[SimpleType] = None
-    override val extractUnpermissionedType: Option[UnpermissionedType] = None
 }
 
 // Only appears before running resolution, which happens right after parsing.
-case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeModifier]) extends PotentiallyUnresolvedType {
+// TODO: remove mods
+case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeModifier], permission: Permission) extends ObsidianType {
     val isBottom: Boolean = false
 
     override def toString: String = mods.map(m => m.toString).mkString(" ") + " " + identifiers.mkString(".")
 
 
     override val residualType: ObsidianType = this // Should never be invoked
-    override val extractSimpleType: Option[SimpleType] = None
-
-    override val extractUnpermissionedType: Option[UnpermissionedType] = None
 }
 
-case class InterfaceContractType(name: String, simpleType: SimpleType) extends ObsidianType {
+case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
-    val isBottom: Boolean = false
-    override val residualType: ObsidianType = this
-    override val extractSimpleType: Option[SimpleType] = Some(simpleType)
-    override val extractUnpermissionedType: Option[UnpermissionedType] = Some(NoPathType(simpleType))
+    override val isBottom: Boolean = false
+    override val residualType: NonPrimitiveType = this
+    override val contractName: String = name
+    override val permission: Permission = simpleType.permission
 }

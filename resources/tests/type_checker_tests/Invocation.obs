@@ -24,7 +24,7 @@ main contract Invocation {
         // should fail: int not invokable
         int f = 5.otherMethod(1);
 
-        OtherContract other = new OtherContract();
+        OtherContract@Shared other = new OtherContract();
 
         int g = other.otherMethod(3);
         // should fail: method undefined
@@ -33,7 +33,7 @@ main contract Invocation {
         int i = other.otherMethod("a");
 
         // should fail: Bogus undefined
-        Bogus b;
+        Bogus@Shared b;
         int j = b.bogus();
     }
 

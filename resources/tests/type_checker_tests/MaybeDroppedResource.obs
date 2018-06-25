@@ -6,7 +6,7 @@ main resource contract Wallet {
 	 }
 
 	 state Full {
-	       owned Money m;
+	       Money@Owned m;
 	 }
 
 	 state Empty {
@@ -17,7 +17,7 @@ main resource contract Wallet {
 	       ->Empty;
 	 }
 
-	 transaction loseMoney(owned Money n) {
-	       <-n;
+	 transaction loseMoney(Money@Owned n) {
+	       disown n;
 	 }
 }
