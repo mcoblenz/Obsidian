@@ -17,7 +17,7 @@ resource contract C2 {
 main resource contract C {
     // okay
 
-    owned C2.S f3;
+    C2@S f3;
 
     C1 f5;
     readonlyState C1 f6;

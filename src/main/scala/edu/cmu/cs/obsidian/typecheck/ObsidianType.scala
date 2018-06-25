@@ -18,6 +18,7 @@ trait Permission
 case class Shared() extends Permission
 case class Owned() extends Permission
 case class Unowned() extends Permission
+case class Inferred() extends Permission // For local variables
 
 // Type of references to contracts.
 case class ContractReferenceType(contractType: ContractType, permission: Permission) extends NonPrimitiveType {
@@ -138,8 +139,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
     //    else this
     val residualType = this
 
-    //override def isOwned = modifiers.contains(IsOwned())
-    //override def isReadOnlyState = modifiers.contains(IsReadOnlyState())
     //override def isRemote = modifiers.contains(IsRemote())
 
     override def isResourceReference(contextContractTable: ContractTable): Boolean = {

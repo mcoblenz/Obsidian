@@ -7,9 +7,10 @@ resource contract C_Owned {
 main contract C_Shared {
     int f1;
 
-    C_Shared() {
+    C_Shared() ends in S {
         ->S(f2 = f1);
     }
+
 
     state S { int f2; }
     state T {}
@@ -34,7 +35,7 @@ contract C {
         c.f3 = 1;
         /* this fails but isn't the point of the test: this is just to get
          * something of type [C_Shared.S] */
-        C_Shared.S cs = new C_Shared();
+        C_Shared cs = new C_Shared();
         cs.f2 = 2;
         i = 3;
         this.i = 3;
