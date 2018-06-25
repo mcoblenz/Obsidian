@@ -134,12 +134,11 @@ sub compile {
                  .qq( --output-path obs_output $file");
     print "$compile\n";
     my $result = `$compile`;
-    print $result if $verbose;
 
-    # I am unsure how to figure out if we succeeded or not -- sbt says 'success' a lot
-    # when it doesn't succeed, and it doesn't seem to do anything w/ return codes.
-    die "sbt did not say 'success':\n$result\n" unless $result =~ /success.+Total time/;
-    die "sbt said 'error':\n$result\n" if $result =~ /error/i;
+    # Make sure the file actually compiled.
+    die "compiler returned exit status $?:\n$result\n" if $? != 0;
+
+    print $result if $verbose;
 }
 
 sub run_test {
