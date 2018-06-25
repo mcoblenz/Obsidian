@@ -84,7 +84,7 @@ case class ReturnExpr(e: Expression) extends Statement
 
 // We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
 case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) extends Statement
-case class Assignment(assignTo: Expression, e: Expression, transfersOwnership: Boolean) extends Statement
+case class Assignment(assignTo: Expression, e: Expression) extends Statement
 case class Throw() extends Statement
 case class If(eCond: Expression, s: Seq[Statement]) extends Statement
 case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) extends Statement

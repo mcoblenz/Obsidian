@@ -486,11 +486,12 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
-            (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Unowned())), 17)
-                ::
+//                (TODO: https://github.com/mcoblenz/Obsidian/issues/134)
+//                (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Unowned())), 16)
+//                ::
                 (SubtypingError(
                     ContractReferenceType(ContractType("Prescription"), Unowned()),
-                    ContractReferenceType(ContractType("Prescription"), Owned())), 17)
+                    ContractReferenceType(ContractType("Prescription"), Owned())), 16)
                 ::
                 Nil
         )

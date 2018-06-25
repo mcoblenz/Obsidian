@@ -303,8 +303,8 @@ object AstTransformer {
 
                         (Transition(newStateName, Some(transformedUpdates)).setLoc(t), context, Seq())
                 }
-            case a@Assignment(assignTo, e, transfersOwnership) =>
-                (Assignment(transformExpression(assignTo), transformExpression(e), transfersOwnership).setLoc(a), context, Seq())
+            case a@Assignment(assignTo, e) =>
+                (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())
             case t@Throw() => (t, context, Seq())
             case oldIf@If(eCond, sIf) =>
                 val (sIfNew, newContext, errors) = transformBody(table, lexicallyInsideOf, context, sIf)

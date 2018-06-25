@@ -26,7 +26,7 @@ main contract C {
         return new C_Owned();
         // should fail twice, once for subtyping and again for unreachable code
         C_Owned@S cs = new C_Owned();
-        return <-cs;
+        return cs;
         // should fail: no return value
         return;
         // should fail: wrong type

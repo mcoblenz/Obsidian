@@ -16,7 +16,7 @@ resource contract Wallet {
     Money@Owned money;
 
     owned Wallet (Money@Owned m) {
-        money <- m;
+        money = m;
     }
 
     transaction loseMoney (Money@Owned m) {
@@ -29,7 +29,7 @@ resource contract Wallet {
     }
 
     transaction returnMoney (Money@Owned m) returns Money@Owned {
-    	return <-m;
+    	return m;
     }
 
     transaction failToReturnMoney (Money@Unowned m) returns Money@Owned {
