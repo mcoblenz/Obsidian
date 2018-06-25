@@ -52,11 +52,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def basicTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ExampleTypeFailure.obs",
-            (SubTypingError(BoolType(), IntType()), 19)
+            (SubtypingError(BoolType(), IntType()), 19)
                 ::
                 (WrongArityError(1, 0, "createC"), 21)
                 ::
-                (SubTypingError(BoolType(), IntType()), 23)
+                (SubtypingError(BoolType(), IntType()), 23)
                 ::
                 Nil
         )
@@ -64,25 +64,25 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def operationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleOperations.obs",
-            (SubTypingError(BoolType(), IntType()), 8)
+            (SubtypingError(BoolType(), IntType()), 8)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     IntType()), 10)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     BoolType(),
                     IntType()), 12)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     BoolType()), 14)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     IntType(),
                     BoolType()), 16)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     IntType(),
                     BoolType()), 16)
                 ::
@@ -92,25 +92,25 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def comparisonTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleComparisons.obs",
-            (SubTypingError(BoolType(), IntType()), 8)
+            (SubtypingError(BoolType(), IntType()), 8)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     BoolType(),
                     IntType()), 10)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     IntType()), 12)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     IntType()), 14)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     BoolType(),
                     IntType()), 16)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     BoolType(),
                     IntType()), 16)
                 :: Nil
@@ -135,9 +135,9 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
-            (SubTypingError(BoolType(), IntType()), 26)
+            (SubtypingError(BoolType(), IntType()), 26)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     ContractReferenceType(ContractType("C_Owned"), Owned()),
                     ContractReferenceType(ContractType("C_Shared"), Shared())),
                     29)
@@ -166,7 +166,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (UnreachableCodeError(), 22)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     ContractReferenceType(ContractType("C_Owned"), Owned()),
                     StateType("C_Owned", "S")),
                     28)
@@ -175,7 +175,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (MustReturnError("t_ret_nonprimitive"), 31)
                 ::
-                (SubTypingError(IntType(),
+                (SubtypingError(IntType(),
                     ContractReferenceType(ContractType("C_Owned"), Owned())), 33)
                 ::
                 (MustReturnError("no_return"), 38)
@@ -214,7 +214,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(1, 2, "a"), 19)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     IntType()), 21)
                 ::
@@ -228,7 +228,7 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("OtherContract"), Shared()),
                     "anotherMethod"), 31)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     IntType()), 33)
                 ::
@@ -254,11 +254,11 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(0, 1, "constructor of Thing"), 37)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     IntType()), 37)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StringType(),
                     IntType()), 37)
                 ::
@@ -270,11 +270,11 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(1, 3, "constructor of Thing"), 39)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     IntType(),
                     BoolType()), 39)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     IntType(),
                     StringType()), 39)
                 ::
@@ -392,12 +392,12 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def endsInStateTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInState.obs",
-            (SubTypingError(
+            (SubtypingError(
                 StateType("C", "S1"),
                 StateType("C", "S2")), 3
             )
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StateType("C", "S2"),
                     StateType("C", "S1")), 8
                 )
@@ -408,19 +408,19 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def endsInStateUnionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
-            (SubTypingError(
+            (SubtypingError(
                 StateType("C1", Set("S2", "S3")),
                 StateType("C1", Set("S1", "S2"))), 4
             )
                 ::
                 (StateUndefinedError("C1", "OtherState"), 13)
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StateType("C1", Set("S1", "S2")),
                     StateType("C1", Set("S1", "S3"))), 19
                 )
                 ::
-                (SubTypingError(
+                (SubtypingError(
                     StateType("C2", Set("S1", "S2")),
                     StateType("C2", "S1")), 33
                 )
@@ -451,12 +451,12 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (UnusedOwnershipError("m"), 22)
                 ::
-                (OwnershipSubtypingError(
-                    ContractReferenceType(ContractType("Money"), Shared()),
+                (SubtypingError(
+                    ContractReferenceType(ContractType("Money"), Unowned()),
                     ContractReferenceType(ContractType("Money"), Owned())), 28)
                 ::
-                (OwnershipSubtypingError(
-                    ContractReferenceType(ContractType("Money"), Shared()),
+                (SubtypingError(
+                    ContractReferenceType(ContractType("Money"), Unowned()),
                     ContractReferenceType(ContractType("Money"), Owned())), 37)
                 ::
                 (NonResourceOwningResourceError("BadWallet",
@@ -465,8 +465,8 @@ class TypeCheckerTests extends JUnitSuite {
                         "money",
                         None)), 43)
                 ::
-                (SubTypingError(
-                    ContractReferenceType(ContractType("Money"), Shared()),
+                (SubtypingError(
+                    ContractReferenceType(ContractType("Money"), Unowned()),
                     ContractReferenceType(ContractType("Money"), Owned())),
                     56)
                 ::
@@ -474,8 +474,8 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (UnusedOwnershipError("bad"), 52)
                 ::
-                (OwnershipSubtypingError(
-                    ContractReferenceType(ContractType("Money"), Owned()),
+                (SubtypingError(
+                    ContractReferenceType(ContractType("Money"), Unowned()),
                     ContractReferenceType(ContractType("Money"), Owned())), 59)
                 ::
                 (UnusedOwnershipError("m"), 75)
@@ -486,10 +486,10 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
-            (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Shared())), 17)
+            (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Unowned())), 17)
                 ::
-                (OwnershipSubtypingError(
-                    ContractReferenceType(ContractType("Prescription"), Shared()),
+                (SubtypingError(
+                    ContractReferenceType(ContractType("Prescription"), Unowned()),
                     ContractReferenceType(ContractType("Prescription"), Owned())), 17)
                 ::
                 Nil
@@ -511,10 +511,6 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def droppedResourcesTest(): Unit = {
         runTest("resources/tests/type_checker_tests/MaybeDroppedResource.obs",
             (PotentiallyUnusedOwnershipError("m"), 17)
-                ::
-                (NoEffectsError(OwnershipTransfer(ReferenceIdentifier("n"))), 21)
-                ::
-                (UnusedExpressionOwnershipError(OwnershipTransfer(ReferenceIdentifier("n"))), 21)
                 ::
                 Nil
         )

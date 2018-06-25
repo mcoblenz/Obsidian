@@ -375,7 +375,12 @@ object AstTransformer {
                                         errors = ErrorRecord(StateUndefinedError(np.contractName, stateName), pos) +: errors
                                     }
                                 }
-                                (BottomType(), errors)
+                                if (errors.isEmpty) {
+                                    (np, errors)
+                                }
+                                else {
+                                    (BottomType(), errors)
+                                }
                             case _ => (np, List.empty)
                         }
                     case None => (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos)))

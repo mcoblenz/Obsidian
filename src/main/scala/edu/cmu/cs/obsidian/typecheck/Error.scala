@@ -44,7 +44,7 @@ case class CombineAvailableIns(fieldName: String, states: String, prevLine: Int)
     val msg: String = s"Field '$fieldName' previously declared at line $prevLine. Did you mean '$fieldName available in $states'?"
 }
 
-case class SubTypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
+case class SubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Found type '$t1', but expected something of type '$t2'"
 }
 case class VariableUndefinedError(x: String, context: String) extends Error {

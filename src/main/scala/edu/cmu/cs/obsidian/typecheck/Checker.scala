@@ -193,10 +193,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         c2 == ContractType(c)
                     case _ => false
                 }
-                if (!mainSubtype) Some(SubTypingError(t1, t2))
+                if (!mainSubtype) Some(SubtypingError(t1, t2))
                 // TODO: make sure this is unnecessary: else if (!modifierSubtype) Some(OwnershipSubtypingError(t1, t2))
                 else None
-            case _ => Some(SubTypingError(t1, t2))
+            case _ => Some(SubtypingError(t1, t2))
         }
     }
 
@@ -774,7 +774,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val specTypeCallerPoV = specCallerPoV(i)
 
                 if (isSubtype(argTypeCallerPoV, specTypeCallerPoV).isDefined) {
-                    val err = SubTypingError(argTypeCallerPoV, specTypeCallerPoV)
+                    val err = SubtypingError(argTypeCallerPoV, specTypeCallerPoV)
                     errList = (ast, err)::errList
                 }
             }
@@ -1121,7 +1121,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case Assignment(Dereference(eDeref, f), e: Expression, transfersOwnership) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = transfersOwnership)
-                val (derefType, contextPrime2) = inferAndCheckExpr(decl, contextPrime, eDeref)
+                val (derefType, contextPrime2) = inferAndCheckExpr(decl, contextPrime, eDeref, consumeOwnershipIfOwned = true)
 
                 if (derefType.isBottom) {
                     return contextPrime2

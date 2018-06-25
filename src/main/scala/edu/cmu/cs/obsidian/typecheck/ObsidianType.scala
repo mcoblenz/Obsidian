@@ -66,6 +66,8 @@ case class StateType(contractName: String, stateNames: Set[String]) extends NonP
     override val permission = Owned()
 
     override def isOwned = true
+
+    override val residualType: NonPrimitiveType = ContractReferenceType(ContractType(contractName), Unowned()).setLoc(this)
 }
 
 object StateType {

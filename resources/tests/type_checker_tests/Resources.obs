@@ -13,26 +13,26 @@ resource contract Money {
 }
 
 resource contract Wallet {
-    owned Money money;
+    Money@Owned money;
 
-    owned Wallet (owned Money m) {
+    owned Wallet (Money@Owned m) {
         money <- m;
     }
 
-    transaction loseMoney (owned Money m) {
+    transaction loseMoney (Money@Owned m) {
         // Error: m is linear
     }
 
-    transaction stealMoney (Money m) {
+    transaction stealMoney (Money@Unowned m) {
         // Error: m is unowned, so it cannot be assigned to owned money
         money = m;
     }
 
-    transaction returnMoney (owned Money m) returns owned Money {
+    transaction returnMoney (Money@Owned m) returns Money@Owned {
     	return <-m;
     }
 
-    transaction failToReturnMoney (Money m) returns owned Money {
+    transaction failToReturnMoney (Money@Unowned m) returns Money@Owned {
         // Error: can't return unowned m when owned Money is required
         return m;
     }
@@ -40,37 +40,37 @@ resource contract Wallet {
 
 contract BadWallet {
     // Error: can't own a resource in a non-resource contract.
-    owned Money money;
+    Money@Owned money;
 }
 
 contract Disowning {
-	 transaction bogusDiscardMoney (Money m) {
+	 transaction bogusDiscardMoney (Money@Unowned m) {
 	 	     // Error: m is unowned
 	 	     disown m;
 	 }
 
-	 transaction discardMoney (owned Money m) {
+	 transaction discardMoney (Money@Owned m) {
      	 	 disown m;
 
      	 	 // Error: m is unowned
      	 	 discardMoney(m);
 
              // Error: m is unowned. Want to make sure we can't consume m twice.
-     	 	 owned Money bad = m;
+     	 	 Money@Owned bad = m;
      }
 
-     transaction getMoney() returns owned Money {
+     transaction getMoney() returns Money@Owned {
         return new Money();
      }
 
      transaction discardMoneyCall () {
         disown getMoney();
-        Money m = disown getMoney(); // disown is an expression, not just a statement
+        Money@Unowned m = disown getMoney(); // disown is an expression, not just a statement
      }
 }
 
 contract LosingResource {
-    transaction bogus (owned Money m) returns Money {
+    transaction bogus (Money@Owned m) returns Money@Unowned {
         // Error: losing m.
         return m;
     }
