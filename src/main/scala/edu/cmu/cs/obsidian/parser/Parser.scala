@@ -92,28 +92,31 @@ object Parser extends Parsers {
         //                }
         // For now, support only one state specification
 
-        val parseNonPrimitive: Parser[NonPrimitiveType] =
+        val parseNonPrimitive: Parser[NonPrimitiveType] = {
             // TODO: remove mods
-            rep(parseTypeModifier) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
+             rep(parseTypeModifier) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
                 case mods ~ id ~ permission => {
-                    permission match {
-                        case None => ContractReferenceType(ContractType(id._1), Inferred())
-                        case Some(_ ~ permissionIdent) =>
-                            if (permissionIdent._1 == "Shared") {
-                                ContractReferenceType(ContractType(id._1), Shared())
-                            }
-                            else if (permissionIdent._1 == "Owned") {
-                                ContractReferenceType(ContractType(id._1), Owned())
-                            }
-                            else if (permissionIdent._1 == "Unowned") {
-                                ContractReferenceType(ContractType(id._1), Unowned())
-                            }
-                            else {
-                                StateType(id._1, permissionIdent._1)
-                            }
-                    }
+                    val typ =
+                        permission match {
+                            case None => ContractReferenceType(ContractType(id._1), Inferred())
+                            case Some(_ ~ permissionIdent) =>
+                                if (permissionIdent._1 == "Shared") {
+                                    ContractReferenceType(ContractType(id._1), Shared())
+                                }
+                                else if (permissionIdent._1 == "Owned") {
+                                    ContractReferenceType(ContractType(id._1), Owned())
+                                }
+                                else if (permissionIdent._1 == "Unowned") {
+                                    ContractReferenceType(ContractType(id._1), Unowned())
+                                }
+                                else {
+                                    StateType(id._1, permissionIdent._1)
+                                }
+                        }
+                    typ.setLoc(id)
                 }
             }
+        }
 
         val intPrim = IntT() ^^ { t => IntType().setLoc(t) }
         val boolPrim = BoolT() ^^ { t => BoolType().setLoc(t) }

@@ -146,16 +146,11 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared"), Shared()), "f3"), 34)
                 ::
-                (SubTypingError(
-                    ContractReferenceType(ContractType("C_Shared"), Owned()),
-                    StateType("C_Shared", "S")),
-                    37)
+                (VariableUndefinedError("j", null), 41)
                 ::
-                (VariableUndefinedError("j", null), 42)
+                (AssignmentError(), 43)
                 ::
-                (AssignmentError(), 44)
-                ::
-                (DereferenceError(IntType()), 47)
+                (DereferenceError(IntType()), 46)
                 ::
                 Nil
         )

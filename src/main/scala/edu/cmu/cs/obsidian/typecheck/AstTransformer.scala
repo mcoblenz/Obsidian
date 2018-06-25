@@ -364,7 +364,22 @@ object AstTransformer {
                 }
             case i@InterfaceContractType(_, _) => (i, List.empty)
             case b@BottomType() => (b, List.empty)
-            case np: NonPrimitiveType => (np, List.empty)
+            case np: NonPrimitiveType =>
+                lexicallyInsideOf.lookupContract(np.contractName) match {
+                    case Some(ct) =>
+                        np match {
+                            case StateType(_, stateNames) =>
+                                var errors = List.empty[ErrorRecord]
+                                for (stateName <- stateNames) {
+                                    if (ct.state(stateName).isEmpty) {
+                                        errors = ErrorRecord(StateUndefinedError(np.contractName, stateName), pos) +: errors
+                                    }
+                                }
+                                (BottomType(), errors)
+                            case _ => (np, List.empty)
+                        }
+                    case None => (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos)))
+                }
         }
     }
 
