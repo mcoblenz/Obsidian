@@ -11,15 +11,15 @@ main contract InsuranceClient {
 	     insService.addInsurer(ins);
 	     insService.connectBankAndInsurer(bank);
 
-         owned Token token = bank.buyToken();
-	     owned Bid bid = insService.requestBids(3);
+         Token@Owned token = bank.buyToken();
+	     Bid@Owned bid = insService.requestBids(3);
 
          // test
          if (bid.getCost() == 7) {
              System.print("bid : 7 \n");
          }
 
-         owned Bid soldBid = insService.buyBid(<-bid, <-token);
+         Bid@Owned soldBid = insService.buyBid(<-bid, <-token);
 
          // to pass typechecker
          disown soldBid;

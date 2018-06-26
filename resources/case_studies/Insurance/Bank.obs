@@ -14,7 +14,7 @@ main contract Bank {
 
     // TODO: money should be exchanged for tokens
     // TODO: keep track of tokens
-    transaction buyToken() returns owned Token {
+    transaction buyToken() returns Token@Owned {
         return new Token(key);
     }
 

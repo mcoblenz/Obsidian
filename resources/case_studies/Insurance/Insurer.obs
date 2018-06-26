@@ -16,13 +16,13 @@ main contract Insurer {
     }
 
     // TODO : Calculate Bid(s) using some needed information, for now just int
-    transaction requestBids(int i) returns owned BidTokenPair {
+    transaction requestBids(int i) returns BidTokenPair@Owned {
         int cost = i + 4;
         // TODO : Proper timing
         int timeAvailable = 100;
         // TODO : give Money to Bank for Token
-        owned Token t = bank.buyToken();
-        owned Bid b = new Bid(cost, timeAvailable);
+        Token@Owned t = bank.buyToken();
+        Bid@Owned b = new Bid(cost, timeAvailable);
 
         return new BidTokenPair(<-b,<-t);
     }
