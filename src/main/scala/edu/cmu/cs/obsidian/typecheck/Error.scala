@@ -66,8 +66,8 @@ case class DifferentTypeError(e1: Expression, t1: ObsidianType, e2: Expression, 
 }
 case class FieldUndefinedError(fieldOf: NonPrimitiveType, fName: String) extends Error {
     val msg: String = fieldOf match {
-        case ContractReferenceType(cName, _) => s"Field '$fName' is not defined in contract '$cName'"
-        case StateType(cName, stateNames) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
+        case ContractReferenceType(cName, _, _) => s"Field '$fName' is not defined in contract '$cName'"
+        case StateType(cName, stateNames, _) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
         case InterfaceContractType(name, typ) => s"Interfaces do not include fields."
     }
 }
@@ -91,11 +91,11 @@ case class SwitchError(typ: ObsidianType) extends Error {
 }
 case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extends Error {
     val msg: String = receiver match {
-        case ContractReferenceType(cName, _) =>
+        case ContractReferenceType(cName, _, _) =>
             s"No transaction or function with name '$name' was found in contract '$cName'"
         case InterfaceContractType(cName, _) =>
             s"No transaction or function with name '$name' was found in interface '$cName'"
-        case StateType(cName, sNames) =>
+        case StateType(cName, sNames, _) =>
             s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"
 
     }
