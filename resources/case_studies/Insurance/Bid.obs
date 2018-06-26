@@ -1,12 +1,6 @@
 main resource contract Bid {
     int cost;
 
-    owned Bid(int c, int time) {
-        cost = c;
-        // Available by default
-        ->Available(timeAvailable = time);
-    }
-
     // available for consideration from client
     state Available {
         int timeAvailable;
@@ -18,9 +12,10 @@ main resource contract Bid {
     // client buys it
     state Sold {}
 
-    transaction makeAvailable(int time) available in Expired
-                                        ends in Available {
-        ->Available(timeAvailable = time);
+    owned Bid(int c, int expirationDate) {
+        cost = c;
+        // Available by default
+        ->Available(timeAvailable = expirationDate);
     }
 
     // TODO: Proper timing

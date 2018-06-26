@@ -2,7 +2,9 @@
 resource contract Money {
     int amount;
 
-    owned Money() {}
+    owned Money(int amt) {
+        amount = amt;
+    }
 
     transaction addMoney(owned Money m) {
          amount = amount + m.amount;

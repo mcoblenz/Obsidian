@@ -3,10 +3,11 @@ import "resources/case_studies/Insurance/Token.obs"
 
 
 main contract Bank {
-    //TODO: owned Money mon;
+    // TODO: owned Money mon;
+    // the bank's private key for making tokens
     int key;
 
-    Bank() {
+    owned Bank() {
         // TODO: generate key
         key = 35;
     }
