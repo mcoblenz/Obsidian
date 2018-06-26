@@ -1572,7 +1572,7 @@ class CodeGen (val target: Target) {
                 addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
-            case OwnershipTransfer(_) => assert(false, "OwnershipTransfer may be removed in the future."); JExpr._null()
+            case OwnershipTransfer(e) => recurse(e) // assert(false, "OwnershipTransfer may be removed in the future."); JExpr._null()
             case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
         }
     }
