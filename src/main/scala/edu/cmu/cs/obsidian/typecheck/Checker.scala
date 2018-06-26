@@ -764,7 +764,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case Right(trNew) => fixSimpleType(context, trNew)
                         }
                     case BottomType() => BottomType()
-                    case u@UnresolvedNonprimitiveType(_, _, _) => assert(false); u
+                    case u@UnresolvedNonprimitiveType(_, _) => assert(false); u
                 }
             })
 
