@@ -22,10 +22,10 @@ main contract C {
         return;
     }
 
-    transaction t_ret_nonprimitive() returns owned C_Owned {
+    transaction t_ret_nonprimitive() returns C_Owned@Owned {
         return new C_Owned();
         // should fail twice, once for subtyping and again for unreachable code
-        owned C_Owned.S cs = new C_Owned();
+        C_Owned@S cs = new C_Owned();
         return <-cs;
         // should fail: no return value
         return;
@@ -58,7 +58,7 @@ main contract C {
         int y = 3;
     }
 
-    transaction branching_return3(C_Owned c, bool b) returns C_Owned {
+    transaction branching_return3(C_Owned@Unowned c, bool b) returns C_Owned@Unowned {
         if (b) {
             return c;
         } else {

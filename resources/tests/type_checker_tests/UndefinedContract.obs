@@ -1,10 +1,10 @@
 main contract Thing {
     // should fail
-    OtherThing other;
+    OtherThing@Shared other;
     int x;
 
     // should fail
-    transaction a(OtherThing other) {
+    transaction a(OtherThing@Shared other) {
         int x = 2;
     }
 }

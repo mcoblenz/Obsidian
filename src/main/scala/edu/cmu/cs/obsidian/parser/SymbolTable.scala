@@ -21,7 +21,7 @@ sealed trait DeclarationTable {
     def lookupTransaction(name: String): Option[Transaction]
     def lookupFunction(name: String): Option[Func]
 
-    def simpleType: SimpleType
+    def contractType: ContractType
 
     def indexDecl[TCast](decls: Seq[Declaration], tag: DeclarationTag): Map[String, TCast] = {
         var lookup = new TreeMap[String, TCast]()
@@ -50,7 +50,8 @@ class StateTable(
 
     def name: String = astNodeRaw.name
 
-    def simpleType = StateType(contract.name, astNodeRaw.name)
+    def nonPrimitiveType = StateType(contract.name, astNodeRaw.name, false)
+    def contractType: ContractType = ContractType(name)
 
     def ast: State = astNode
 
@@ -105,7 +106,9 @@ class ContractTable(
     private var txLookup: Map[String, Transaction] = indexDecl[Transaction](contract.declarations, TransactionDeclTag)
     private var funLookup: Map[String, Func] = indexDecl[Func](contract.declarations, FuncDeclTag)
 
-    def simpleType = JustContractType(name)
+    val allFields: Set[Field] = fieldLookup.values.toSet
+
+    def contractType = ContractType(name)
 
 
     val stateLookup: Map[String, StateTable] = {

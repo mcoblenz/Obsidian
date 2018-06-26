@@ -44,7 +44,7 @@ case class CombineAvailableIns(fieldName: String, states: String, prevLine: Int)
     val msg: String = s"Field '$fieldName' previously declared at line $prevLine. Did you mean '$fieldName available in $states'?"
 }
 
-case class SubTypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
+case class SubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Found type '$t1', but expected something of type '$t2'"
 }
 case class VariableUndefinedError(x: String, context: String) extends Error {
@@ -64,11 +64,11 @@ case class DifferentTypeError(e1: Expression, t1: ObsidianType, e2: Expression, 
     val msg: String = s"Expression '$e1' has type '$t1', and expression '$e2' has type '$t2'," +
         s"but these expressions must have the same type"
 }
-case class FieldUndefinedError(fieldOf: SimpleType, fName: String) extends Error {
+case class FieldUndefinedError(fieldOf: NonPrimitiveType, fName: String) extends Error {
     val msg: String = fieldOf match {
-        case JustContractType(cName) => s"Field '$fName' is not defined in contract '$cName'"
-        case StateUnionType(cName, _) => s"Field '$fName' is not defined in contract '$cName'"
-        case StateType(cName, sName) => s"Field '$fName' is not defined in state '$sName' of contract '$cName'"
+        case ContractReferenceType(cName, _) => s"Field '$fName' is not defined in contract '$cName'"
+        case StateType(cName, stateNames) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
+        case InterfaceContractType(name, typ) => s"Interfaces do not include fields."
     }
 }
 case class RecursiveFieldTypeError(cName: String, fName: String) extends Error {
@@ -89,14 +89,15 @@ case class DereferenceError(typ: ObsidianType) extends Error {
 case class SwitchError(typ: ObsidianType) extends Error {
     val msg: String = s"Type '$typ' cannot be switched on"
 }
-case class MethodUndefinedError(receiver: SimpleType, name: String) extends Error {
+case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extends Error {
     val msg: String = receiver match {
-        case JustContractType(cName) =>
+        case ContractReferenceType(cName, _) =>
             s"No transaction or function with name '$name' was found in contract '$cName'"
-        case StateUnionType(cName, _) =>
-            s"No transaction or function with name '$name' was found in contract '$cName'"
-        case StateType(cName, sName) =>
-            s"No transaction or function with name '$name' was found in state '$sName' of contract '$cName'"
+        case InterfaceContractType(cName, _) =>
+            s"No transaction or function with name '$name' was found in interface '$cName'"
+        case StateType(cName, sNames) =>
+            s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"
+
     }
 }
 case class StateUndefinedError(cName: String, sName: String) extends Error {
@@ -136,21 +137,17 @@ case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
 case class AssignmentError() extends Error {
     val msg: String = s"Assignment target must be a variable or a field"
 }
-case class AlreadyKnowStateError(e: Expression, sName: String) extends Error {
-    val msg: String = s"'$e' is already known to be in state '$sName': a dynamic check is not needed"
-}
+//case class AlreadyKnowStateError(e: Expression, sName: String) extends Error {
+//    val msg: String = s"'$e' is already known to be in state '$sName': a dynamic check is not needed"
+//}
+
 case class LeakReturnValueError(methName: String) extends Error {
     val msg: String = s"Invocation of '$methName' leaks ownership of return value"
 }
 case class NoEffectsError(s: Statement) extends Error {
     val msg: String = s"Statement '$s' has no side-effects"
 }
-case class StateSpecificSharedError() extends Error {
-    val msg: String = s"State-specific types are not safe for 'shared' references"
-}
-case class StateSpecificReadOnlyError() extends Error {
-    val msg: String = s"State-specific types are not safe for 'readonlyState' references"
-}
+
 case class UnusedOwnershipError(name: String) extends Error {
     val msg: String = s"Variable '$name' holds ownership, but is unused at the end of its scope."
 }
@@ -166,7 +163,7 @@ case class PotentiallyUnusedOwnershipError(name: String) extends Error {
 case class ConstructorNameError(contractName: String) extends Error {
     val msg: String = s"Invalid constructor name for contract '$contractName'"
 }
-case class CannotConvertPathError(badPart: String, expr: Expression, typ: UnpermissionedType) extends Error {
+case class CannotConvertPathError(badPart: String, expr: Expression, typ: NonPrimitiveType) extends Error {
     val msg: String = s"Cannot convert path in type '$typ': '$badPart' is equivalent to" +
         s"a non-variable expression '$expr'"
 }

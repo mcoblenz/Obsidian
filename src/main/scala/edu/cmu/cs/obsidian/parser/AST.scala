@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.parser
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
-import edu.cmu.cs.obsidian.typecheck.{ObsidianType, TypeModifier}
+import edu.cmu.cs.obsidian.typecheck.{ObsidianType, Permission}
 
 trait HasLocation {
     var loc: Position = NoPosition
@@ -120,7 +120,8 @@ case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[ObsidianType],
                 availableIn: Option[Set[Identifier]],
-                body: Seq[Statement]) extends InvokableDeclaration with IsAvailableInStates {
+                body: Seq[Statement],
+                thisPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
     val endsInState: Option[Set[Identifier]] = None
     val tag: DeclarationTag = FuncDeclTag
 }
@@ -131,7 +132,9 @@ case class Transaction(name: String,
                        ensures: Seq[Ensures],
                        endsInState: Option[Set[Identifier]],
                        body: Seq[Statement],
-                       isStatic:Boolean) extends InvokableDeclaration with IsAvailableInStates {
+                       isStatic: Boolean,
+                       thisPermission: Permission, // TODO: refactor this
+                       thisFinalPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 }
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration {

@@ -38,7 +38,6 @@ object Lexer extends RegexParsers {
         case "return" => ReturnT()
         case "returns" => ReturnsT()
         case "new" => NewT()
-        case "readonlyState" => ReadOnlyT()
         case "switch" => SwitchT()
         case "case" => CaseT()
         case "owned" => OwnedT()
@@ -101,6 +100,7 @@ object Lexer extends RegexParsers {
     private def rightArrowP = """->""".r ^^ (_ => RightArrowT())
     private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT())
     private def coloncolonP = """::""".r ^^ (_ => ColonColonT())
+    private def atP = """@""".r ^^ (_ => AtT())
 
     private def oneToken: Parser[Token] =
 
@@ -112,7 +112,7 @@ object Lexer extends RegexParsers {
         /* order is important here because some tokens contain the others */
         gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | leftArrowP | ltP | gtP | eqP |
 
-        plusP | starP | forwardSlashP | minusP | coloncolonP
+        plusP | starP | forwardSlashP | minusP | coloncolonP | atP
     )
 
     private def tokenParser: Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))

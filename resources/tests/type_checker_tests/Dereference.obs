@@ -16,7 +16,7 @@ contract Thing {
 main contract Construct {
 
     transaction derefThings() {
-      Thing thing1 = new Thing(5);
+      Thing@Shared thing1 = new Thing(5);
 
       int a = thing1.x;
       // should fail: no such field

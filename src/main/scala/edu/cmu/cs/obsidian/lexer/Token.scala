@@ -25,7 +25,6 @@ case class AndT() extends Token { override def toString: String = "and" }
 case class OrT() extends Token { override def toString: String = "or" }
 case class ReturnT() extends Token { override def toString: String = "return" }
 case class ReturnsT() extends Token { override def toString: String = "returns" }
-case class ReadOnlyT() extends Token { override def toString: String = "readonlyState" }
 case class NewT() extends Token { override def toString: String = "new" }
 case class SwitchT() extends Token { override def toString: String = "switch"}
 case class CaseT() extends Token { override def toString: String = "case"}
@@ -76,6 +75,7 @@ case class StarT() extends Token { override def toString: String = "*" }
 case class ForwardSlashT() extends Token { override def toString: String = "/" }
 case class MinusT() extends Token { override def toString: String = "-" }
 case class LeftArrowT() extends Token { override def toString: String = "<-" }
+case class AtT() extends Token { override def toString: String = "@" }
 
 
 /* comment token: the parser never sees this; comments should be pruned in the lexer */
