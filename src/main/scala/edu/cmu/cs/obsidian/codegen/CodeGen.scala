@@ -950,20 +950,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
       runMeth.body()._return(returnBytes)
     }
 
-    private def generateInvokeMethod(
-                          newClass: JDefinedClass,
-                          translationContext: TranslationContext,
-                          stubType: AbstractJClass) = {
-        // Generate method that will be called when chaincode is invoked.
-        // At the moment, doesn't do anything.
-        val invokeMeth = newClass.method(JMod.PUBLIC, model.BYTE.array(), "invoke")
-        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
-        invokeMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
-        invokeMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
-        invokeMeth.param(stubType, "stub")
-        invokeMeth.param(model.ref("String").array(), "args")
-    }
-
     private def generateServerMainMethod(newClass: JDefinedClass) = {
         val mainMeth = newClass.method(JMod.STATIC | JMod.PUBLIC, model.VOID, "main")
         val args = mainMeth.param(model.ref("String").array(), "args")
