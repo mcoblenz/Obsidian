@@ -15,9 +15,12 @@ public class ChaincodeClientConnectionManager {
     protected Writer underlyingWriter;
     protected Reader underlyingReader;
 
-    public ChaincodeClientConnectionManager(Writer w, Reader r) {
+    private final boolean printDebug;
+
+    public ChaincodeClientConnectionManager(Writer w, Reader r, boolean printDebug) {
         this.underlyingWriter = w;
         this.underlyingReader = r;
+        this.printDebug = printDebug;
     }
 
     public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, boolean returnsNonvoid)
@@ -26,7 +29,7 @@ public class ChaincodeClientConnectionManager {
                 ChaincodeClientTransactionBugException
     {
         JSONWriter jsonWriter = new JSONWriter(underlyingWriter);
-        System.out.println("doTransaction: " + transactionName);
+        if (printDebug) System.out.println("doTransaction: " + transactionName);
         jsonWriter.object(); // outer object for whole message
         jsonWriter.key("jsonrpc");
         jsonWriter.value("2.0");
@@ -59,7 +62,7 @@ public class ChaincodeClientConnectionManager {
 
         JSONTokener jsonTokener = new JSONTokener(underlyingReader);
         Object reply = jsonTokener.nextValue();
-        System.out.println("Received from server: " + reply);
+        if (printDebug) System.out.println("Received from server: " + reply);
 
         if (reply instanceof JSONObject) {
             JSONObject jsonReply = (JSONObject)reply;

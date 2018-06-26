@@ -1,7 +1,5 @@
 server: IntContainer.obs
 client: IntContainerClient.obs
 ***
-doTransaction: setX
-Received from server: {"result":{"message":"BA==","status":"OK"}}
-doTransaction: setX
-Received from server: {"result":{"message":"Aw==","status":"OK"}}
+4
+3
