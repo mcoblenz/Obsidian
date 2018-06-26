@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.parser
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
-import edu.cmu.cs.obsidian.typecheck.{ObsidianType, Permission, TypeModifier}
+import edu.cmu.cs.obsidian.typecheck.{ObsidianType, Permission}
 
 trait HasLocation {
     var loc: Position = NoPosition

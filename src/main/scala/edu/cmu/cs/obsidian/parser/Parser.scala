@@ -41,13 +41,6 @@ object Parser extends Parsers {
         accept("identifier", { case t@IdentifierT(name) => (name, t.pos) })
     }
 
-    private def parseTypeModifier = {
-        val readOnlyStateP = ReadOnlyT() ^^ (t => IsReadOnlyState().setLoc(t))
-        val remoteP = RemoteT() ^^ (t => IsRemote().setLoc(t))
-        val ownedP = OwnedT() ^^ (t => IsOwned().setLoc(t))
-        readOnlyStateP | remoteP | ownedP
-    }
-
     private def parseType: Parser[ObsidianType] = {
         def parseDotPath: Parser[Seq[Identifier]] = DotT() ~ (parseId | ParentT()) ~ opt(parseDotPath) ^^ {
             case _ ~ ident ~ rest => {
@@ -93,24 +86,24 @@ object Parser extends Parsers {
         // For now, support only one state specification
 
         val parseNonPrimitive: Parser[NonPrimitiveType] = {
-            // TODO: remove mods
-             rep(parseTypeModifier) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
-                case mods ~ id ~ permission => {
+             opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
+                case remote ~ id ~ permission => {
+                    val isRemote = remote.isDefined
                     val typ =
                         permission match {
-                            case None => ContractReferenceType(ContractType(id._1), Inferred())
+                            case None => ContractReferenceType(ContractType(id._1), Inferred(), isRemote)
                             case Some(_ ~ permissionIdent) =>
                                 if (permissionIdent._1 == "Shared") {
-                                    ContractReferenceType(ContractType(id._1), Shared())
+                                    ContractReferenceType(ContractType(id._1), Shared(), isRemote)
                                 }
                                 else if (permissionIdent._1 == "Owned") {
-                                    ContractReferenceType(ContractType(id._1), Owned())
+                                    ContractReferenceType(ContractType(id._1), Owned(), isRemote)
                                 }
                                 else if (permissionIdent._1 == "Unowned") {
-                                    ContractReferenceType(ContractType(id._1), Unowned())
+                                    ContractReferenceType(ContractType(id._1), Unowned(), isRemote)
                                 }
                                 else {
-                                    StateType(id._1, permissionIdent._1)
+                                    StateType(id._1, permissionIdent._1, isRemote)
                                 }
                         }
                     typ.setLoc(id)

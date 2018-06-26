@@ -38,7 +38,6 @@ object Lexer extends RegexParsers {
         case "return" => ReturnT()
         case "returns" => ReturnsT()
         case "new" => NewT()
-        case "readonlyState" => ReadOnlyT()
         case "switch" => SwitchT()
         case "case" => CaseT()
         case "owned" => OwnedT()

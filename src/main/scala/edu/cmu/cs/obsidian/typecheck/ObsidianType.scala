@@ -1,18 +1,6 @@
 package edu.cmu.cs.obsidian.typecheck
 import edu.cmu.cs.obsidian.parser._
 
-sealed abstract class TypeModifier() extends HasLocation
-case class IsReadOnlyState() extends TypeModifier {
-    override def toString: String = "readonlyState"
-}
-
-case class IsRemote() extends TypeModifier {
-    override def toString: String = "remote"
-}
-
-case class IsOwned() extends TypeModifier {
-    override def toString: String = "owned"
-}
 
 trait Permission
 case class Shared() extends Permission
@@ -21,11 +9,10 @@ case class Unowned() extends Permission
 case class Inferred() extends Permission // For local variables
 
 // Type of references to contracts.
-case class ContractReferenceType(contractType: ContractType, permission: Permission) extends NonPrimitiveType {
+case class ContractReferenceType(contractType: ContractType, permission: Permission, override val isRemote: Boolean) extends NonPrimitiveType {
     override def toString: String = contractName
 
     val contractName: String = contractType.contractName
-
     override def isOwned = permission == Owned()
 
     override val residualType: NonPrimitiveType = {
@@ -53,9 +40,9 @@ case class ContractType(contractName: String) {
  *
  * StateType is always owned.
  * */
-case class StateType(contractName: String, stateNames: Set[String]) extends NonPrimitiveType {
-    def this(contractName: String, stateName: String) = {
-        this(contractName, Set(stateName))
+case class StateType(contractName: String, stateNames: Set[String], override val isRemote: Boolean) extends NonPrimitiveType {
+    def this(contractName: String, stateName: String, isRemote: Boolean) = {
+        this(contractName, Set(stateName), isRemote)
     }
 
     private def orOfStates: String = stateNames.toSeq.tail.foldLeft(stateNames.head)(
@@ -67,11 +54,11 @@ case class StateType(contractName: String, stateNames: Set[String]) extends NonP
 
     override def isOwned = true
 
-    override val residualType: NonPrimitiveType = ContractReferenceType(ContractType(contractName), Unowned()).setLoc(this)
+    override val residualType: NonPrimitiveType = ContractReferenceType(ContractType(contractName), Unowned(), isRemote).setLoc(this)
 }
 
 object StateType {
-    def apply(contractName: String, stateName: String): StateType = new StateType(contractName, Set(stateName))
+    def apply(contractName: String, stateName: String, isRemote: Boolean): StateType = new StateType(contractName, Set(stateName), isRemote)
 }
 
 
@@ -95,7 +82,6 @@ sealed trait ObsidianType extends HasLocation {
     val residualType: ObsidianType
 
     def isOwned = false
-    def isRemote = false
 
     def isResourceReference(contextContractTable: ContractTable) = false
 
@@ -113,6 +99,7 @@ sealed trait PrimitiveType extends ObsidianType {
 sealed trait NonPrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
 
+    val isRemote: Boolean = false
     val permission: Permission
 
     val contractName: String
@@ -141,7 +128,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
     //    else this
     val residualType = this
 
-    //override def isRemote = modifiers.contains(IsRemote())
 
     override def isResourceReference(contextContractTable: ContractTable): Boolean = {
         val contract = contextContractTable.lookupContract(contractName)
@@ -167,11 +153,10 @@ case class BottomType() extends ObsidianType {
 }
 
 // Only appears before running resolution, which happens right after parsing.
-// TODO: remove mods
-case class UnresolvedNonprimitiveType(identifiers: Seq[String], mods: Set[TypeModifier], permission: Permission) extends ObsidianType {
+case class UnresolvedNonprimitiveType(identifiers: Seq[String], permission: Permission) extends ObsidianType {
     val isBottom: Boolean = false
 
-    override def toString: String = mods.map(m => m.toString).mkString(" ") + " " + identifiers.mkString(".")
+    override def toString: String  = identifiers.mkString(".")
 
 
     override val residualType: ObsidianType = this // Should never be invoked

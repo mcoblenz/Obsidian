@@ -175,8 +175,8 @@ object AstTransformer {
     def startContext(lexicallyInsideOf: DeclarationTable, args: Seq[VariableDecl], thisPermission: Permission): Context = {
         var startContext = emptyContext
 
-        val simpleType =  ContractReferenceType(lexicallyInsideOf.contractType, thisPermission)
-        val contractType = UnresolvedNonprimitiveType(List("this"), Set(), thisPermission)
+        val simpleType =  ContractReferenceType(lexicallyInsideOf.contractType, thisPermission, false)
+        val contractType = UnresolvedNonprimitiveType(List("this"), thisPermission)
         startContext = startContext.updated("this", contractType)
 
         for (a <- args) {
@@ -352,7 +352,7 @@ object AstTransformer {
             case t@BoolType() => (t, List.empty[ErrorRecord])
             case t@IntType() => (t, List.empty[ErrorRecord])
             case t@StringType() => (t, List.empty[ErrorRecord])
-            case nonPrim@UnresolvedNonprimitiveType(_, _, _) =>
+            case nonPrim@UnresolvedNonprimitiveType(_, _) =>
                 //val tCanonified: UnresolvedNonprimitiveType = canonifyParsableType(table, context, nonPrim)
                 val result: TraverseResult = resolveNonPrimitiveTypeContext(table, lexicallyInsideOf, nonPrim,
                                                             new TreeSet(), context, pos)
@@ -368,7 +368,7 @@ object AstTransformer {
                 lexicallyInsideOf.lookupContract(np.contractName) match {
                     case Some(ct) =>
                         np match {
-                            case StateType(_, stateNames) =>
+                            case StateType(_, stateNames, _) =>
                                 var errors = List.empty[ErrorRecord]
                                 for (stateName <- stateNames) {
                                     if (ct.state(stateName).isEmpty) {
@@ -462,7 +462,7 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = ContractReferenceType(ct.contractType, t.permission)
+                    val tRaw = ContractReferenceType(ct.contractType, t.permission, false)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }
@@ -491,7 +491,7 @@ object AstTransformer {
                     case Some(ct) =>
                         ct.state(sNamePossible) match {
                             case Some(st) =>
-                                val tr = StateType(cNamePossible, sNamePossible)
+                                val tr = StateType(cNamePossible, sNamePossible, false)
                                 return Right((tr, st))
                             case None => ()
                         }
@@ -544,7 +544,7 @@ object AstTransformer {
             val cName = t.identifiers.head
             lexicallyInsideOf.lookupContract(cName) match {
                 case Some(ct) =>
-                    val tRaw = ContractReferenceType(ct.contractType, t.permission)
+                    val tRaw = ContractReferenceType(ct.contractType, t.permission, false)
                     Right((tRaw, ct))
                 case None => Left(ContractUndefinedError(cName))
             }
@@ -572,7 +572,7 @@ object AstTransformer {
                     case Some(ct) =>
                         ct.state(sNamePossible) match {
                             case Some(st) =>
-                                val tr = StateType(cNamePossible, sNamePossible)
+                                val tr = StateType(cNamePossible, sNamePossible, false)
                                 return Right((tr, st))
                             case None => ()
                         }
