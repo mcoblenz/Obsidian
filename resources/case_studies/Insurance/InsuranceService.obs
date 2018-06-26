@@ -22,7 +22,7 @@ resource contract Insurance {
     owned Money mon;
 
     owned Insurance(owned Money m) {
-        mon <- m;
+        mon = m;
     }
 
     // TODO : Calculate Bid(s) using some needed information, for now just int
@@ -36,7 +36,7 @@ resource contract Bank {
     owned Money mon;
 
     owned Bank(owned Money m) {
-        mon <- m;
+        mon = m;
     }
 }
 

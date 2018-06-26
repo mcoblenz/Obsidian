@@ -371,18 +371,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                              (BottomType(), context)
                          }
                  }
-             case OwnershipTransfer(e) =>
-                 e match {
-                     case ReferenceIdentifier(x) =>
-                         inferAndCheckExpr(decl, context, ReferenceIdentifier(x), consumeOwnershipIfOwned = true)
-                     case _ =>
-                         val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
-                         if (!typ.isOwned) {
-                             logError(e, InvalidOwnershipTransfer(e, typ))
-                         }
-                         (typ, contextPrime)
-                 }
-
              case NumLiteral(_) => (IntType(), context)
              case StringLiteral(_) => (StringType(), context)
              case TrueLiteral() => (BoolType(), context)

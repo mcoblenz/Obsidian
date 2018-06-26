@@ -165,8 +165,6 @@ object AstTransformer {
                 c.copy(args = c.args.map(eArg => transformExpression(eArg))).setLoc(c)
             case d@Disown(e) =>
                 Disown(transformExpression(e)).setLoc(d)
-            case t@OwnershipTransfer(e) =>
-                OwnershipTransfer(transformExpression(e)).setLoc(t)
             case s: StateInitializer => s.copy().setLoc(s)
 
         }

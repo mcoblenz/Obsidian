@@ -1572,7 +1572,6 @@ class CodeGen (val target: Target) {
                 addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
-            case OwnershipTransfer(_) => assert(false, "OwnershipTransfer may be removed in the future."); JExpr._null()
             case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
         }
     }
@@ -1820,20 +1819,20 @@ class CodeGen (val target: Target) {
                 }
 
                 translationContext.pendingFieldAssignments = Set.empty
-            case Assignment(ReferenceIdentifier(x), e, _) =>
+            case Assignment(ReferenceIdentifier(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext)
             /* it's bad that this is a special case */
-            case Assignment(Dereference(This(), field), e, _) => {
+            case Assignment(Dereference(This(), field), e) => {
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
                 translationContext.assignVariable(field, newValue, body)
             }
-            case Assignment(Dereference(eDeref, field), e, _) => {
+            case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
                 assert(false, "TODO")
             }
-            case Assignment(StateInitializer(stateName, fieldName), e, _) => {
+            case Assignment(StateInitializer(stateName, fieldName), e) => {
                 val stateContextOption = translationContext.states.get(stateName._1)
                 assert(stateContextOption.isDefined)
                 val stateContext = stateContextOption.get

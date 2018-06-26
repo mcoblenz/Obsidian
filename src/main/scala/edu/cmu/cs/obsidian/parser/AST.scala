@@ -58,7 +58,6 @@ case class Parent() extends Expression
 case class Conjunction(e1: Expression, e2: Expression) extends Expression
 case class Disjunction(e1: Expression, e2: Expression) extends Expression
 case class LogicalNegation(e: Expression) extends Expression
-case class OwnershipTransfer(e: Expression) extends Expression
 case class Add(e1: Expression, e2: Expression) extends Expression
 case class Subtract(e1: Expression, e2: Expression) extends Expression
 case class Divide(e1: Expression, e2: Expression) extends Expression
