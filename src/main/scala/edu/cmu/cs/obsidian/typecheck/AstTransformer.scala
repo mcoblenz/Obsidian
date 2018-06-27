@@ -165,8 +165,6 @@ object AstTransformer {
                 c.copy(args = c.args.map(eArg => transformExpression(eArg))).setLoc(c)
             case d@Disown(e) =>
                 Disown(transformExpression(e)).setLoc(d)
-            case t@OwnershipTransfer(e) =>
-                OwnershipTransfer(transformExpression(e)).setLoc(t)
             case s: StateInitializer => s.copy().setLoc(s)
 
         }
@@ -303,8 +301,8 @@ object AstTransformer {
 
                         (Transition(newStateName, Some(transformedUpdates)).setLoc(t), context, Seq())
                 }
-            case a@Assignment(assignTo, e, transfersOwnership) =>
-                (Assignment(transformExpression(assignTo), transformExpression(e), transfersOwnership).setLoc(a), context, Seq())
+            case a@Assignment(assignTo, e) =>
+                (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())
             case t@Throw() => (t, context, Seq())
             case oldIf@If(eCond, sIf) =>
                 val (sIfNew, newContext, errors) = transformBody(table, lexicallyInsideOf, context, sIf)

@@ -166,12 +166,7 @@ object Parser extends Parsers {
 
         val assign = EqT() ~! parseExpr ^^ {
             case eqSign ~ e2 => (e1: Expression) =>
-                Assignment(e1, e2, false).setLoc(eqSign)
-        }
-
-        val assignWithOwnershipTransfer = LeftArrowT() ~! parseExpr ^^ {
-            case arrrow ~ e2 => (e1: Expression) =>
-                Assignment(e1, e2, true).setLoc(arrrow)
+                Assignment(e1, e2).setLoc(eqSign)
         }
 
         val parseThrow = ThrowT() ~! SemicolonT() ^^ {
@@ -204,7 +199,7 @@ object Parser extends Parsers {
          * the expressions makes sense as the recipient of an assignment or
          * as a side-effect statement (e.g. func invocation) */
         val parseExprFirst = {
-            parseExpr ~ opt(assign | assignWithOwnershipTransfer) ~ SemicolonT() ^^ {
+            parseExpr ~ opt(assign) ~ SemicolonT() ^^ {
                 case e ~ Some(assn) ~ _ => assn(e)
                 case e ~ None ~ _ => e
             }
@@ -257,8 +252,7 @@ object Parser extends Parsers {
     private def parseAddition = parseBinary(PlusT(), Add.apply, parseSubtraction)
     private def parseSubtraction = parseBinary(MinusT(), Subtract.apply, parseMultiplication)
     private def parseMultiplication = parseBinary(StarT(), Multiply.apply, parseDivision)
-    private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseOwnershipTransfer)
-    private def parseOwnershipTransfer = parseUnary(LeftArrowT(), OwnershipTransfer.apply, parseNot)
+    private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseNot)
     private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseExprBottom)
 
 

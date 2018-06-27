@@ -269,11 +269,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def inferAndCheckExpr(decl: InvokableDeclaration,
                                   context: Context,
                                   e: Expression,
-                                  consumeOwnershipIfOwned: Boolean = false): (ObsidianType, Context) = {
+                                  consumeOwnershipIfOwned: Boolean): (ObsidianType, Context) = {
 
         /* returns [t] if [e : t], otherwise returns BottomType */
         def assertTypeEquality(e: Expression, t: ObsidianType, c: Context): (ObsidianType, Context) = {
-            val (tPrime, contextPrime) = inferAndCheckExpr(decl, c, e)
+            val (tPrime, contextPrime) = inferAndCheckExpr(decl, c, e, false)
             (checkIsSubtype(e, tPrime, t), contextPrime)
         }
 
@@ -349,11 +349,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case ReferenceIdentifier(x) =>
                  (context get x, context.lookupFieldTypeInThis(x)) match {
                      case (Some(t), _) =>
+                         // We always want x to have the type according to the context, but sometimes we're going to consume ownership.
                          if (consumeOwnershipIfOwned) {
                              (t, context.updated(x, t.residualType))
                          }
                          else {
-                             (t.residualType, context)
+                             (t, context)
                          }
                      case (_, Some(t)) =>
                          // TODO handle cases for e.g. if the field is owned
@@ -370,18 +371,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                              (BottomType(), context)
                          }
                  }
-             case OwnershipTransfer(e) =>
-                 e match {
-                     case ReferenceIdentifier(x) =>
-                         inferAndCheckExpr(decl, context, ReferenceIdentifier(x), consumeOwnershipIfOwned = true)
-                     case _ =>
-                         val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
-                         if (!typ.isOwned) {
-                             logError(e, InvalidOwnershipTransfer(e, typ))
-                         }
-                         (typ, contextPrime)
-                 }
-
              case NumLiteral(_) => (IntType(), context)
              case StringLiteral(_) => (StringType(), context)
              case TrueLiteral() => (BoolType(), context)
@@ -426,8 +415,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case Multiply(e1: Expression, e2: Expression) =>
                  assertOperationType(e1, e2, IntType())
              case Equals(e1: Expression, e2: Expression) =>
-                 val (t1, c1) = inferAndCheckExpr(decl, context, e1)
-                 val (t2, c2) = inferAndCheckExpr(decl, c1, e2)
+                 val (t1, c1) = inferAndCheckExpr(decl, context, e1, false)
+                 val (t2, c2) = inferAndCheckExpr(decl, c1, e2, false)
                  if (t1 == t2) (BoolType(), c2) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
                      (BottomType(), c2)
@@ -441,15 +430,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case LessThanOrEquals(e1: Expression, e2: Expression) =>
                  assertComparisonType(e1, e2)
              case NotEquals(e1: Expression, e2: Expression) =>
-                 val (t1, c1) = inferAndCheckExpr(decl, context, e1)
-                 val (t2, c2) = inferAndCheckExpr(decl, c1, e2)
+                 val (t1, c1) = inferAndCheckExpr(decl, context, e1, false)
+                 val (t2, c2) = inferAndCheckExpr(decl, c1, e2, false)
                  if (t1 == t2) (BoolType(), c2) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
                      (BottomType(), c2)
                  }
 
              case Dereference(eDeref: Expression, fieldName) =>
-                 val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref)
+                 val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref, true)
                  if (derefType.isBottom) {
                      return (BottomType(), contextPrime)
                  }
@@ -472,7 +461,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  handleInvocation(context, context.thisType, name, This(), args)
 
              case Invocation(receiver: Expression, name, args: Seq[Expression]) =>
-                 val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver)
+                 val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver, false)
 
                  receiverType match {
                      case BottomType() => (BottomType(), contextPrime)
@@ -559,7 +548,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         var contextPrime = context
         for (e <- es) {
             val (t, contextPrime2) =
-                inferAndCheckExpr(decl, contextPrime, e)
+                inferAndCheckExpr(decl, contextPrime, e, true)
             contextPrime = contextPrime2
             types.append((t, e))
         }
@@ -649,6 +638,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         for (remainingInitialization <- context.transitionFieldsInitialized) {
             logError(remainingInitialization._3, InvalidStateFieldInitialization(remainingInitialization._1, remainingInitialization._2))
         }
+    }
+
+    private def checkFieldTypeConsistency(context: Context): Unit = {
+        // TODO: https://github.com/mcoblenz/Obsidian/issues/134
     }
 
     /* returns a context that is the same as [branchContext], except only with
@@ -821,7 +814,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 args: Seq[Expression],
                 ensureStatic: Boolean): Context = {
             // Lookup the invocation
-            val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver)
+            val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver, false)
             val txLookup = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
             val funLookup = contextAfterReceiver.lookupFunctionInType(receiverType)(name)
             if(ensureStatic && !txLookup.get.isStatic) {
@@ -879,7 +872,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 context.updated(name, typ)
 
             case VariableDeclWithInit(typ: ObsidianType, name, e: Expression) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
                 val tDecl = typ match {
                     case np: NonPrimitiveType =>
                         val contractName = np.contractName
@@ -915,43 +908,31 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
             case ReturnExpr(e: Expression) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
-                val (tRet, tAst) = decl match {
+                val retTypeOpt = decl match {
                     /* must be no return type */
-                    case tx: Transaction if tx.retType.isDefined =>
-                        val variablesToExcludeFromOwnershipCheck =
-                            if (tx.retType.get.isOwned) {
-                                e match {
-                                    case ReferenceIdentifier(xOther) => Set(xOther, "this")
-                                    case _ => Set("this")
-                                }
-                            }
-                            else {
-                                Set("this")
-                            }
-                        checkForUnusedOwnershipErrors(s, contextPrime, variablesToExcludeFromOwnershipCheck)
-
-                        (tx.retType.get, tx.retType.get)
-                    case f: Func if f.retType.isDefined =>
-                        val variablesToExcludeFromOwnershipCheck =
-                            if (f.retType.get.isOwned) {
-                                e match {
-                                    case ReferenceIdentifier(xOther) => Set(xOther, "this")
-                                    case _ => Set("this")
-                                }
-                            }
-                            else {
-                                Set("this")
-                            }
-                        checkForUnusedOwnershipErrors(s, contextPrime, variablesToExcludeFromOwnershipCheck)
-
-                        (f.retType.get, f.retType.get)
+                    case tx: Transaction if tx.retType.isDefined => tx.retType
+                    case f: Func if f.retType.isDefined => f.retType
                     case _ =>
                         logError(s, CannotReturnError(decl.name))
-                        return contextPrime.makeThrown
+                        return context.makeThrown
                 }
 
-                if (!tRet.isBottom) checkIsSubtype(s, t, tRet)
+                val consumeOwnership = retTypeOpt match {
+                    case None => false
+                    case Some(retType) => retType.isOwned
+                }
+
+                val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnership)
+
+                val variablesToExcludeFromOwnershipCheck = e match {
+                    case ReferenceIdentifier(xOther)
+                        if retTypeOpt.isDefined && retTypeOpt.get.isOwned => Set(xOther, "this")
+                    case _ => Set("this")
+                }
+
+                checkForUnusedOwnershipErrors(s, contextPrime, variablesToExcludeFromOwnershipCheck)
+
+                if (retTypeOpt.isDefined && !retTypeOpt.get.isBottom) checkIsSubtype(s, typ, retTypeOpt.get)
                 contextPrime.makeThrown
 
             case Transition(newStateName, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) =>
@@ -1070,7 +1051,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
                         if (newFields.contains(f)) {
                             val fieldAST = newStateTable.lookupField(f).get
-                            val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e)
+                            val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e, true)
                             contextPrime = contextPrime2
                             checkIsSubtype(s, t, fieldAST.typ)
                         }
@@ -1091,15 +1072,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 contextPrime.updated("this", newSimpleType).updatedWithoutAnyTransitionFieldsInitialized()
 
-            case Assignment(ReferenceIdentifier(x), e: Expression, transfersOwnership) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = transfersOwnership)
-
-                // If we're going to transfer ownership, make sure we're starting with something owned.
-                if (transfersOwnership) {
-                    if (!t.isOwned) {
-                        logError(s, InvalidOwnershipTransfer(e, t))
-                    }
-                }
+            case Assignment(ReferenceIdentifier(x), e: Expression) =>
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
 
                 val contextType = context.get(s"$x")
 
@@ -1119,19 +1093,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
                 contextPrime
 
-            case Assignment(Dereference(eDeref, f), e: Expression, transfersOwnership) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = transfersOwnership)
-                val (derefType, contextPrime2) = inferAndCheckExpr(decl, contextPrime, eDeref, consumeOwnershipIfOwned = true)
+            case Assignment(Dereference(eDeref, f), e: Expression) =>
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
+                val (derefType, contextPrime2) = inferAndCheckExpr(decl, contextPrime, eDeref, consumeOwnershipIfOwned = false)
 
                 if (derefType.isBottom) {
                     return contextPrime2
-                }
-
-                // If we're going to transfer ownership, make sure we're starting with something owned.
-                if (transfersOwnership) {
-                    if (!t.isOwned) {
-                        logError(s, InvalidOwnershipTransfer(e, t))
-                    }
                 }
 
                 derefType match {
@@ -1151,15 +1118,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
 
 
-            case Assignment(StateInitializer(stateName, fieldName), e, transfersOwnership) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = transfersOwnership)
-
-                // If we're going to transfer ownership, make sure we're starting with something owned.
-                if (transfersOwnership) {
-                    if (!t.isOwned) {
-                        logError(s, InvalidOwnershipTransfer(e, t))
-                    }
-                }
+            case Assignment(StateInitializer(stateName, fieldName), e) =>
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
 
                 val stateOption = context.contractTable.state(stateName._1)
                 val fieldType = stateOption match {
@@ -1180,15 +1140,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
             // assignment target is neither a variable nor a field
-            case Assignment(_, e: Expression, transfersOwnership) =>
-                val (_, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = transfersOwnership)
+            case Assignment(_, e: Expression) =>
+                val (_, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
                 logError(s, AssignmentError())
                 contextPrime
 
             case Throw() => Context(context.contractTable, context.underlyingVariableMap, isThrown = true, Set.empty)
 
             case If(eCond: Expression, body: Seq[Statement]) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond)
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond, false)
                 checkIsSubtype(s, t, BoolType())
                 val contextIfTrue = pruneContext(s,
                     checkStatementSequence(decl, contextPrime, body),
@@ -1196,7 +1156,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 mergeContext(s, contextPrime, contextIfTrue)
 
             case IfThenElse(eCond: Expression, body1: Seq[Statement], body2: Seq[Statement]) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond)
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond, false)
                 checkIsSubtype(s, t, BoolType())
                 val contextIfTrue = pruneContext(s,
                     checkStatementSequence(decl, contextPrime, body1),
@@ -1216,7 +1176,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 mergeContext(s, contextIfTry, contextIfCatch)
 
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e)
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, false)
 
                 val contractName = t match {
                     case np: NonPrimitiveType =>
@@ -1270,7 +1230,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case Invocation(receiver: Expression, name, args: Seq[Expression]) =>
                 var ensureStatic = false
-                val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver)
+                val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver, false)
                 if (receiverType.isBottom) return contextPrime
 
                 receiverType match {
@@ -1288,11 +1248,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             // TODO maybe allow constructors as statements later, but it's not very important
             case d@Disown (e) =>
-                val (typ, contextPrime) = inferAndCheckExpr(decl, context, d)
+                val (typ, contextPrime) = inferAndCheckExpr(decl, context, d, true)
                 contextPrime
             /* expressions are statements, but we prune out expressions with no side effects */
             case e: Expression =>
-                val (typ, contextPrime) = inferAndCheckExpr(decl, context, e)
+                val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, true)
                 if (typ.isOwned) {
                     logError(s, UnusedExpressionOwnershipError(e))
                 }
@@ -1356,6 +1316,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             // We check for unused ownership errors at each return; if there isn't guaranteed to be one at the end, check separately.
             checkForUnusedOwnershipErrors(tx, outputContext, Set("this"))
         }
+
+        // Check to make sure all the field types are consistent with their declarations.
+        checkFieldTypeConsistency(context)
 
         // todo: check that every declared variable is initialized before use
     }

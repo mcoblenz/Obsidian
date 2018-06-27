@@ -9,12 +9,13 @@ main contract Pharmacy {
     Prescription@Owned prescription;
 
     transaction depositPrescription(Prescription@Owned p) {
-        prescription <- p;
+        prescription = p;
     }
 
     transaction stealPrescription(Prescription@Unowned p) {
-        // Error: can't get ownership from non-owning reference.
-        prescription <- p;
+        prescription = p;
+        // Error: prescription field's type does not match declaration at the end of this method
+        // (TODO: https://github.com/mcoblenz/Obsidian/issues/134)
     }
 
     transaction dropPrescription(Prescription@Owned p) {
