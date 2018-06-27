@@ -52,7 +52,7 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
             java.io.InputStreamReader socketReader = new java.io.InputStreamReader(socket.getInputStream());
             JSONWriter jsonWriter = new JSONWriter(socketWriter);
             JSONTokener jsonTokener = new JSONTokener(socket.getInputStream());
-            connectionManager = new ChaincodeClientConnectionManager(socketWriter, socketReader);
+            connectionManager = new ChaincodeClientConnectionManager(socketWriter, socketReader, false);
         }
         catch (java.io.IOException e) {
             System.err.println("Error: failed to connect to " + addressString + ":" + port);
