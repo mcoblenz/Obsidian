@@ -21,7 +21,7 @@ case class CompilerOptions (outputPath: Option[String],
                             printTokens: Boolean,
                             printAST: Boolean,
                             buildClient: Boolean,
-                            generateHyperledger: Boolean)
+                            mockChaincode: Boolean)
 
 object Main {
 
@@ -47,7 +47,7 @@ object Main {
         var printTokens = false
         var printAST = false
         var buildClient = false
-        var generateHyperledger = false
+        var mockChaincode = true
 
         def parseOptionsRec(remainingArgs: List[String]) : Unit = {
             remainingArgs match {
@@ -74,7 +74,7 @@ object Main {
                     buildClient = true
                     parseOptionsRec(tail)
                 case "--hyperledger" :: tail =>
-                    generateHyperledger = true
+                    mockChaincode = false
                     parseOptionsRec(tail)
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
@@ -105,7 +105,7 @@ object Main {
         }
 
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
-                        printTokens, printAST, buildClient, generateHyperledger)
+                        printTokens, printAST, buildClient, mockChaincode)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -283,8 +283,8 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(globalTable.ast, protobufOuterClassName, !options.generateHyperledger)
-            else translateServerASTToJava(globalTable.ast, protobufOuterClassName, !options.generateHyperledger)
+            val javaModel = if (options.buildClient) translateClientASTToJava(globalTable.ast, protobufOuterClassName, options.mockChaincode)
+            else translateServerASTToJava(globalTable.ast, protobufOuterClassName, options.mockChaincode)
             javaModel.build(srcDir.toFile)
 
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(globalTable.ast, sourceFilename)
