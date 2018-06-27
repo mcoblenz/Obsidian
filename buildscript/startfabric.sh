@@ -60,7 +60,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'======== START PEER ========='
 sleep $ENTER_PAUSE
-peer node start --peer-chaincodedev 2>&1 | tee bleh | sed "s/^/$CPEER[peer-node] /" &
+peer node start --peer-chaincodedev 2>&1 | tee peer_output.tmp | sed "s/^/$CPEER[peer-node] /" &
 sleep 1
 echo $CNORM'======= PEER STARTED ========'
 
@@ -90,7 +90,7 @@ echo $CNORM'==== CHAINCODE INSTALLED ===='
 
 sleep $BETWEEN_PAUSE
 
-ip=$(cat bleh | grep 'address=' | sed 's/.\+address=//g' | sed 's/^\[//g' | sed 's/:.\+$//' | head -1)
+ip=$(cat peer_output.tmp | grep 'address=' | sed 's/.\+address=//g' | sed 's/^\[//g' | sed 's/:.\+$//' | head -1)
 # echo -e "\e[96mIP address to connect to: " $ip
 echo -e "\e[96m *** IP: $ip *** $CNORM"
 
@@ -122,7 +122,7 @@ sleep $BETWEEN_PAUSE
 
 echo -e "\e[96m  *** Great! We made it. *** $CNORM"
 
-rm bleh
+rm peer_output.tmp
 
 sleep $BETWEEN_PAUSE
 
