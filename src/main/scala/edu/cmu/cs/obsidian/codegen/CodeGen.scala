@@ -1796,7 +1796,8 @@ class CodeGen (val target: Target) {
                 updates match {
                     case Some(u) =>
                         for ((f, e) <- u) {
-                            body.assign(newStField.ref(f.name), translateExpr(e, translationContext, localContext))
+                            assignVariable(f.name, translateExpr(e, translationContext, localContext),
+                                body, translationContext, localContext)
                         }
                     case None =>
                         // Fields should have been initialized individually, via S1::foo = bar.
