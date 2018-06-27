@@ -26,17 +26,17 @@ main resource contract InsuranceService {
 
         // TODO: add Tokens from bidAndTokens to Tokens
         // TODO: how to keep track of tokens for each client?
-        tokens <- bidAndTokens.getToken();
+        tokens = bidAndTokens.getToken();
         Bid@Owned bid = bidAndTokens.getBid();
 
-        return <-bid;
+        return bid;
     }
 
     transaction buyBid(Bid@Owned bid, Token@Owned token) returns Bid@Owned {
         // TODO: collect all tokens together (ones given by insurer and insuree) (for now just disown)
         disown token;
         // TODO: switch bid states with bid.buy();
-        return <-bid;
+        return bid;
     }
 
 }

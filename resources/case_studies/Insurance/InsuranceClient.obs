@@ -19,7 +19,7 @@ main contract InsuranceClient {
              System.print("bid : 7 \n");
          }
 
-         Bid@Owned soldBid = insService.buyBid(<-bid, <-token);
+         Bid@Owned soldBid = insService.buyBid(bid, token);
 
          // to pass typechecker
          disown soldBid;

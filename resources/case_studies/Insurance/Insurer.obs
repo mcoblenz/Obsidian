@@ -24,7 +24,7 @@ main contract Insurer {
         Token@Owned t = bank.buyToken();
         Bid@Owned b = new Bid(cost, timeAvailable);
 
-        return new BidTokenPair(<-b,<-t);
+        return new BidTokenPair(b, t);
     }
 
 }
