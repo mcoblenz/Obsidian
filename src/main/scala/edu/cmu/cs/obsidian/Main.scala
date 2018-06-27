@@ -316,22 +316,37 @@ object Main {
                 }
             }
 
-
-            // invoke javac and make a jar from the result
             val mainName = findMainContractName(globalTable.ast)
-            val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
-            if (options.verbose) {
-                println("javac exited with value " + javacExit)
-            }
-            if (javacExit == 0) {
-                val jarPath = outputPath.resolve(s"$mainName.jar")
-                val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+
+            if (options.mockChaincode) {
+                // invoke javac and make a jar from the result
+                val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
                 if (options.verbose) {
-                    println("jar exited with value " + jarExit)
+                    println("javac exited with value " + javacExit)
+                }
+                if (javacExit == 0) {
+                    val jarPath = outputPath.resolve(s"$mainName.jar")
+                    val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+                    if (options.verbose) {
+                        println("jar exited with value " + jarExit)
+                    }
+                }
+                else
+                    return false
+            } else {
+                // invoke gradle buildscript to produce a jar file
+                val gradleInvoke = s"gradle build -b buildscript/build.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
+
+                val gradleExit = gradleInvoke.!
+                if (gradleExit != 0) {
+                    println("`" + gradleInvoke + "` exited abnormally: " + gradleExit)
+                    return false
+                }
+
+                if (options.verbose) {
+                    println("gradle exited with value " + gradleExit)
                 }
             }
-            else
-                return false
 
         } catch {
             case e:

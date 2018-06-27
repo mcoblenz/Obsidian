@@ -19,7 +19,7 @@ repositories {
 sourceSets {
     main {
         java {
-            srcDirs = ['../obs_output/generated_java', '../Obsidian Runtime/src/Runtime']
+            srcDirs = ["$codeDirectory", '../Obsidian Runtime/src/Runtime']
         }
     }
 }
