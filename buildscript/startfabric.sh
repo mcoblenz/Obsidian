@@ -90,7 +90,7 @@ echo $CNORM'==== CHAINCODE INSTALLED ===='
 
 sleep $BETWEEN_PAUSE
 
-ip=$(cat peer_output.tmp | grep 'address=' | sed -E 's/.+address=//g' | sed 's/^\[//g' | sed -E 's/:.+$//' | head -1)
+ip=$(cat peer_output.tmp | grep 'address=' | sed 's/.*address=//g' | sed 's/^\[//g' | sed 's/:.*$//' | head -1)
 # echo -e "\e[96mIP address to connect to: " $ip
 echo -e "\e[96m *** IP: $ip *** $CNORM"
 
