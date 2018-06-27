@@ -186,12 +186,14 @@ sub run_test {
     print $cmd, "\n";
     my $output = `$cmd`;
 
-    if ($verbose) {
-        print "Client output:\n", $output;
-    }
+    print "Client output:\n", $output if $verbose;
 
     kill 'HUP', @pids;
-    sleep 1; # wait for processes to shut down
+
+    print "Waiting for child processes to shut down.\n" if $verbose;
+
+    # Wait for all child processes to finish.
+    1 while wait() != -1;
 
     return $output;
 }
