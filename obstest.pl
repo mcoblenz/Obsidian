@@ -202,6 +202,12 @@ sub run_test {
     # Wait for all child processes to finish.
     1 while wait() != -1;
 
+    print "Removing archive files produced by tests.\n" if $verbose;
+    for my $key (@servernames) {
+        print "rm test_chaincode_archive_$key\n" if $verbose;
+        `rm test_chaincode_archive_$key\n`;
+    }
+
     return $output;
 }
 
