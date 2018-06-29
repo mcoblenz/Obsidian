@@ -1594,9 +1594,10 @@ class CodeGen (val target: Target) {
 
     private def generateInvokeConstructor(newClass: JDefinedClass) = {
 
-        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, "invokeConstructor")
+        val meth: JMethod = newClass.method(JMod.PROTECTED, model.VOID, "invokeConstructor")
         val name : String = "new_" + newClass.name()
         val body = meth.body()
+        meth.annotate(model.directClass("java.lang.Override"))
         body.invokeThis(name)
 
     }
