@@ -162,13 +162,20 @@ sub run_test {
             push @pids, $child;
             $port ++;
         } else {
+            # Remove old archive files if they exist, so we start fresh every time
+            my $archive_file = "test_chaincode_archive_$key";
+            if (-e $archive_file) {
+                print "rm $archive_file\n";
+                `rm $archive_file`;
+            }
+
             # Start the server in child process.
-            print "java -jar $jars{$key} localhost $port\n";
+            print "java -jar $jars{$key} $archive_file $port\n";
 
             # Hide output from server process unless we're in verbose mode.
             open STDOUT, ">", "/dev/null" or die "$!" unless $verbose;
 
-            exec 'java', '-jar', $jars{$key}, 'localhost', $port;
+            exec 'java', '-jar', $jars{$key}, $archive_file, $port;
         }
     }
 
