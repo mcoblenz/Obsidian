@@ -13,3 +13,5 @@ jdk:
 before_install:
   - ./install-protobuf.sh
   - export PATH=${PATH}:${HOME}/protobuf/
+
+script: cat resources/tests/tests_to_run.txt | xargs perl obstest.pl
