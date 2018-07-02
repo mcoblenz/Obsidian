@@ -9,9 +9,10 @@ contract C {
 
     C() { return; }
 
-    C() ends in S1 { return; }
+    C@S1() { return; }
 
-    C() ends in S1, S2 { return; }
+    // don't support state unions yet
+    C@S1() { return; }
 
 
     transaction t() { return; }

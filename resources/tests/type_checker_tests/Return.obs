@@ -2,7 +2,7 @@
  * properties about statement sequences w.r.t. returns */
 
 resource contract C_Owned {
-  owned C_Owned() {
+  C_Owned@Owned() {
     ->S;
   }
   state S {}

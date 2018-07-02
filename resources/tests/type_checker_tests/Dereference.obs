@@ -4,8 +4,8 @@ contract Thing {
     int x;
     string y;
     bool z;
-
-    Thing(int x) {
+    // don't really support inferring types yet
+    Thing@Shared(int x) {
         this.x = x;
         this.y = "a";
         this.z = true;

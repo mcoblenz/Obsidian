@@ -13,7 +13,7 @@ main contract Test {
 
     int shared available in S1, S2;
 
-    Test()  ends in S1 {   
+    Test@S1() {
     	S1::x1 = 42;
 	S1::shared = 44;
 
