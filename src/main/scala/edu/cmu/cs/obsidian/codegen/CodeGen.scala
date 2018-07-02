@@ -705,8 +705,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
 
-        System.out.print("Generate mock chaincode: ")
-        System.out.println(mockChaincode)
+        System.out.print("Generate real chaincode: ")
+        System.out.println(!mockChaincode)
 
         if (mockChaincode) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
