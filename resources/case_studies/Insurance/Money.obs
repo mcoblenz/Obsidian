@@ -1,0 +1,14 @@
+// some sort of money
+resource contract Money {
+    int amount;
+
+    owned Money(int amt) {
+        amount = amt;
+    }
+
+    transaction addMoney(owned Money m) {
+         amount = amount + m.amount;
+         disown m;
+    }
+
+}

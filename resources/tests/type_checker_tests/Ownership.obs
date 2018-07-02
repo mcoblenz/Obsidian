@@ -6,18 +6,19 @@ contract Prescription {
 
 // Very simple pharmacy — only holds one prescription.
 main contract Pharmacy {
-    owned Prescription prescription;
+    Prescription@Owned prescription;
 
-    transaction depositPrescription(owned Prescription p) {
-        prescription <- p;
+    transaction depositPrescription(Prescription@Owned p) {
+        prescription = p;
     }
 
-    transaction stealPrescription(Prescription p) {
-        // Error: can't get ownership from non-owning reference.
-        prescription <- p;
+    transaction stealPrescription(Prescription@Unowned p) {
+        prescription = p;
+        // Error: prescription field's type does not match declaration at the end of this method
+        // (TODO: https://github.com/mcoblenz/Obsidian/issues/134)
     }
 
-    transaction dropPrescription(owned Prescription p) {
+    transaction dropPrescription(Prescription@Owned p) {
         // OK, since Prescription is not a resource.
     }
 }

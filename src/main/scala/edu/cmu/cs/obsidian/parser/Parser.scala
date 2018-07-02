@@ -26,7 +26,8 @@ E1 ::= ( E ) | n | x | true | false
  */
 
 object Parser extends Parsers {
-    class ParseException (val message : String) extends Exception {
+
+    class ParseException(val message: String) extends Exception {
 
     }
 
@@ -38,13 +39,6 @@ object Parser extends Parsers {
      * to the AST itself is clunky and adds unnecessary indirection */
     private def parseId: Parser[Identifier] = {
         accept("identifier", { case t@IdentifierT(name) => (name, t.pos) })
-    }
-
-    private def parseTypeModifier = {
-        val readOnlyStateP = ReadOnlyT() ^^ (t => IsReadOnlyState().setLoc(t))
-        val remoteP = RemoteT() ^^ (t => IsRemote().setLoc(t))
-        val ownedP = OwnedT() ^^ (t => IsOwned().setLoc(t))
-        readOnlyStateP | remoteP | ownedP
     }
 
     private def parseType: Parser[ObsidianType] = {
@@ -62,24 +56,60 @@ object Parser extends Parsers {
             }
         }
 
-        val parseNonPrimitive: Parser[UnresolvedNonprimitiveType] =
-            rep(parseTypeModifier) ~ (parseId | ThisT() | ParentT()) ~ opt(parseDotPath) ^^ {
-                case mods ~ id ~ path => {
-                    val (identString, position: Position) = id match {
-                        case t: Token => (t.toString, t.pos)
-                        // For obscure type erasure reasons, a pattern match on Identifier type doesn't work.
-                        case ident => (ident.asInstanceOf[Identifier]._1, ident.asInstanceOf[Identifier]._2)
-                    }
-                    path match {
-                        case Some(idents) =>
-                            val pathStrings = List(identString) ++ idents.map(ident => ident._1)
-                            UnresolvedNonprimitiveType(pathStrings, mods.toSet).setLoc(position)
-                        case None => UnresolvedNonprimitiveType(List(identString), mods.toSet).setLoc(position)
-                    }
 
+
+        //        val parseNonPrimitive: Parser[NonPrimitiveType] =
+        //            rep(parseTypeModifier) ~ (parseId | ThisT() | ParentT()) ~ opt(parseDotPath) ^^ {
+        //                case mods ~ id ~ path => {
+        //                    val (identString, position: Position) = id match {
+        //                        case t: Token => (t.toString, t.pos)
+        //                        // For obscure type erasure reasons, a pattern match on Identifier type doesn't work.
+        //                        case ident => (ident.asInstanceOf[Identifier]._1, ident.asInstanceOf[Identifier]._2)
+        //                    }
+        //                    path match {
+        //                        case Some(idents) =>
+        //                            val pathStrings = List(identString) ++ idents.map(ident => ident._1)
+        //                            UnresolvedNonprimitiveType(pathStrings, mods.toSet, Shared()).setLoc(position)
+        //                        case None =>
+        //                            val permission =
+        //                                if (mods.contains(IsOwned())) {
+        //                                    Owned()
+        //                                }
+        //                                else {
+        //                                    Shared()
+        //                                }
+        //
+        //                            UnresolvedNonprimitiveType(List(identString), mods.toSet, permission).setLoc(position)
+        //                    }
+        //
+        //                }
+        // For now, support only one state specification
+
+        val parseNonPrimitive: Parser[NonPrimitiveType] = {
+             opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
+                case remote ~ id ~ permission => {
+                    val isRemote = remote.isDefined
+                    val typ =
+                        permission match {
+                            case None => ContractReferenceType(ContractType(id._1), Inferred(), isRemote)
+                            case Some(_ ~ permissionIdent) =>
+                                if (permissionIdent._1 == "Shared") {
+                                    ContractReferenceType(ContractType(id._1), Shared(), isRemote)
+                                }
+                                else if (permissionIdent._1 == "Owned") {
+                                    ContractReferenceType(ContractType(id._1), Owned(), isRemote)
+                                }
+                                else if (permissionIdent._1 == "Unowned") {
+                                    ContractReferenceType(ContractType(id._1), Unowned(), isRemote)
+                                }
+                                else {
+                                    StateType(id._1, permissionIdent._1, isRemote)
+                                }
+                        }
+                    typ.setLoc(id)
                 }
+            }
         }
-
 
         val intPrim = IntT() ^^ { t => IntType().setLoc(t) }
         val boolPrim = BoolT() ^^ { t => BoolType().setLoc(t) }
@@ -136,12 +166,7 @@ object Parser extends Parsers {
 
         val assign = EqT() ~! parseExpr ^^ {
             case eqSign ~ e2 => (e1: Expression) =>
-                Assignment(e1, e2, false).setLoc(eqSign)
-        }
-
-        val assignWithOwnershipTransfer = LeftArrowT() ~! parseExpr ^^ {
-            case arrrow ~ e2 => (e1: Expression) =>
-                Assignment(e1, e2, true).setLoc(arrrow)
+                Assignment(e1, e2).setLoc(eqSign)
         }
 
         val parseThrow = ThrowT() ~! SemicolonT() ^^ {
@@ -174,7 +199,7 @@ object Parser extends Parsers {
          * the expressions makes sense as the recipient of an assignment or
          * as a side-effect statement (e.g. func invocation) */
         val parseExprFirst = {
-            parseExpr ~ opt(assign | assignWithOwnershipTransfer) ~ SemicolonT() ^^ {
+            parseExpr ~ opt(assign) ~ SemicolonT() ^^ {
                 case e ~ Some(assn) ~ _ => assn(e)
                 case e ~ None ~ _ => e
             }
@@ -227,8 +252,7 @@ object Parser extends Parsers {
     private def parseAddition = parseBinary(PlusT(), Add.apply, parseSubtraction)
     private def parseSubtraction = parseBinary(MinusT(), Subtract.apply, parseMultiplication)
     private def parseMultiplication = parseBinary(StarT(), Multiply.apply, parseDivision)
-    private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseOwnershipTransfer)
-    private def parseOwnershipTransfer = parseUnary(LeftArrowT(), OwnershipTransfer.apply, parseNot)
+    private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseNot)
     private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseExprBottom)
 
 
@@ -345,7 +369,7 @@ object Parser extends Parsers {
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
-                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body).setLoc(f)
+                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body, Unowned()).setLoc(f)
         }
     }
 
@@ -401,7 +425,7 @@ object Parser extends Parsers {
                     case id => id.asInstanceOf[Identifier]._1
                 }
                 Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, transOptions.endsInState, body, isStatic).setLoc(t)
+                    ensures, transOptions.endsInState, body, isStatic, Shared(), Shared()).setLoc(t)
         }
     }
     //keep returns first, take union of available ins and ends in

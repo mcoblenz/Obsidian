@@ -207,16 +207,17 @@ class ParserTests extends JUnitSuite {
             """.stripMargin)
     }
 
-    @Test def pathTests() = {
-
-        shouldSucceed(
-            """main contract UsesC {
-              |    transaction t1() {
-              |        z.T x = 3;
-              |    }
-              |}
-            """.stripMargin)
-    }
+    // MJC: paths are disabled for now.
+//    @Test def pathTests() = {
+//
+//        shouldSucceed(
+//            """main contract UsesC {
+//              |    transaction t1() {
+//              |        z.T x = 3;
+//              |    }
+//              |}
+//            """.stripMargin)
+//    }
 
     //test token ordering in transaction parsing
     @Test def transactionTests() = {

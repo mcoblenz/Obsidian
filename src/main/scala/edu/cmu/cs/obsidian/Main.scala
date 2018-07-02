@@ -79,7 +79,7 @@ object Main {
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
                         println("Unknown option " + option)
-                        sys.exit(0)
+                        sys.exit(2)
                     }
                     else if (option.endsWith(".obs")) {
                         // This is an input file.
@@ -88,7 +88,7 @@ object Main {
                     }
                     else {
                         println("Unknown argument " + option)
-                        sys.exit(0)
+                        sys.exit(2)
                     }
             }
         }
@@ -97,11 +97,12 @@ object Main {
 
         if (inputFiles.isEmpty) {
             println("Must pass at least one file")
-            sys.exit(0)
+            sys.exit(2)
         }
 
         if (inputFiles.length > 1) {
             println("For now: contracts can only consist of a single file")
+            sys.exit(2)
         }
 
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
@@ -206,12 +207,18 @@ object Main {
 
     // For input foo.obs, we generate foo.proto, from which we generate FooOuterClass.java.
     //    We also generate a jar at the specified directory, containing the generated classes.
+    // The compiler returns an exit status of 0 if everything went well, 1 if there was an error
+    //    compiling the contract, or 2 if it failed to parse the command-line options.
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
             println(usage)
             sys.exit(0)
         }
-        compileProgram(args)
+        if (compileProgram(args)) {
+            sys.exit(0)
+        } else {
+            sys.exit(1)
+        }
     }
     def compileProgram(args: Array[String]): Boolean = {
         val options = parseOptions(args.toList)
@@ -256,7 +263,10 @@ object Main {
                 println()
             }
 
-            val table = new SymbolTable(ast)
+            val importsProcessedAst = ImportProcessor.processImports(filename, ast)
+            val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
+
+            val table = new SymbolTable(fieldsLiftedAst)
             val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
 
             if (options.printAST) {

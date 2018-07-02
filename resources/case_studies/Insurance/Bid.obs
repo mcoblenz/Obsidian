@@ -1,0 +1,38 @@
+main resource contract Bid {
+    int cost;
+
+    // available for consideration from client
+    state Available {
+        int timeAvailable;
+    }
+
+    // expires after a certain amount of time
+    state Expired {}
+
+    // client buys it
+    state Sold {}
+
+    owned Bid(int c, int expirationDate) {
+        cost = c;
+        // Available by default
+        ->Available(timeAvailable = expirationDate);
+    }
+
+    // TODO: Proper timing
+    transaction hasExpired() available in Available
+                                ends in Available, Expired {
+        if (timeAvailable < 0) {
+                ->Expired;
+        }
+    }
+
+    transaction buy() available in Available
+                      ends in Sold {
+        ->Sold;
+    }
+
+    transaction getCost() returns int {
+        return cost;
+    }
+
+}

@@ -1,0 +1,15 @@
+main resource contract Token {
+    // bank's private key, only banks can make tokens
+    int bankKey;
+
+    owned Token(int key) {
+
+        //TODO: check that key is valid to make token
+        if (true) {
+            bankKey = key;
+        } else {
+            throw;
+        }
+    }
+
+}

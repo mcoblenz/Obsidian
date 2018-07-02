@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.parser
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
-import edu.cmu.cs.obsidian.typecheck.{ObsidianType, TypeModifier}
+import edu.cmu.cs.obsidian.typecheck.{ObsidianType, Permission}
 
 trait HasLocation {
     var loc: Position = NoPosition
@@ -58,7 +58,6 @@ case class Parent() extends Expression
 case class Conjunction(e1: Expression, e2: Expression) extends Expression
 case class Disjunction(e1: Expression, e2: Expression) extends Expression
 case class LogicalNegation(e: Expression) extends Expression
-case class OwnershipTransfer(e: Expression) extends Expression
 case class Add(e1: Expression, e2: Expression) extends Expression
 case class Subtract(e1: Expression, e2: Expression) extends Expression
 case class Divide(e1: Expression, e2: Expression) extends Expression
@@ -84,7 +83,7 @@ case class ReturnExpr(e: Expression) extends Statement
 
 // We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
 case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) extends Statement
-case class Assignment(assignTo: Expression, e: Expression, transfersOwnership: Boolean) extends Statement
+case class Assignment(assignTo: Expression, e: Expression) extends Statement
 case class Throw() extends Statement
 case class If(eCond: Expression, s: Seq[Statement]) extends Statement
 case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) extends Statement
@@ -120,7 +119,8 @@ case class Func(name: String,
                 args: Seq[VariableDecl],
                 retType: Option[ObsidianType],
                 availableIn: Option[Set[Identifier]],
-                body: Seq[Statement]) extends InvokableDeclaration with IsAvailableInStates {
+                body: Seq[Statement],
+                thisPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
     val endsInState: Option[Set[Identifier]] = None
     val tag: DeclarationTag = FuncDeclTag
 }
@@ -131,7 +131,9 @@ case class Transaction(name: String,
                        ensures: Seq[Ensures],
                        endsInState: Option[Set[Identifier]],
                        body: Seq[Statement],
-                       isStatic:Boolean) extends InvokableDeclaration with IsAvailableInStates {
+                       isStatic: Boolean,
+                       thisPermission: Permission, // TODO: refactor this
+                       thisFinalPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 }
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration {
@@ -143,6 +145,7 @@ case class Ensures(expr: Expression) extends AST
 sealed abstract trait ContractModifier extends HasLocation
 case class IsResource() extends ContractModifier
 case class IsMain() extends ContractModifier
+case class IsImport() extends ContractModifier
 
 case class Import(name: String) extends AST
 
@@ -154,6 +157,7 @@ case class Contract(modifiers: Set[ContractModifier],
 
     val isResource = modifiers.contains(IsResource())
     val isMain = modifiers.contains(IsMain())
+    val isImport = modifiers.contains(IsImport())
 }
 
 /* Program */

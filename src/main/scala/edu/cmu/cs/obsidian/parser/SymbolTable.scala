@@ -21,7 +21,7 @@ sealed trait DeclarationTable {
     def lookupTransaction(name: String): Option[Transaction]
     def lookupFunction(name: String): Option[Func]
 
-    def simpleType: SimpleType
+    def contractType: ContractType
 
     def indexDecl[TCast](decls: Seq[Declaration], tag: DeclarationTag): Map[String, TCast] = {
         var lookup = new TreeMap[String, TCast]()
@@ -50,7 +50,8 @@ class StateTable(
 
     def name: String = astNodeRaw.name
 
-    def simpleType = StateType(contract.name, astNodeRaw.name)
+    def nonPrimitiveType = StateType(contract.name, astNodeRaw.name, false)
+    def contractType: ContractType = ContractType(name)
 
     def ast: State = astNode
 
@@ -105,7 +106,9 @@ class ContractTable(
     private var txLookup: Map[String, Transaction] = indexDecl[Transaction](contract.declarations, TransactionDeclTag)
     private var funLookup: Map[String, Func] = indexDecl[Func](contract.declarations, FuncDeclTag)
 
-    def simpleType = JustContractType(name)
+    val allFields: Set[Field] = fieldLookup.values.toSet
+
+    def contractType = ContractType(name)
 
 
     val stateLookup: Map[String, StateTable] = {
@@ -141,11 +144,8 @@ class ContractTable(
                 }
         if (localLookupResult.isDefined) {
             localLookupResult
-        }
-        else {
-            // See if the name is defined in an import.
-            symbolTable.findNameInImports(name)
-        }
+        } // otherwise nothing was found
+        else None
 
     }
 
@@ -177,31 +177,8 @@ class SymbolTable(program: Program) {
         table
     }
 
-    var importContractLookup: Map[String, ContractTable] = {
-        var table = TreeMap[String, ContractTable]()
-
-        for (imp <- ast.imports) {
-            // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
-            val filename = imp.name;
-
-            val importAST = Parser.parseFileAtPath(filename, printTokens = false)
-            val importSymbolTable = new SymbolTable(importAST)
-            // This symbol table may include many different contracts. Unpack them.
-            for ((contractName, contractTable) <- importSymbolTable.contractLookup) {
-                if (table.contains(contractName)) {
-                    // TODO: report error for duplicate contract
-                }
-                table = table.updated(contractName, contractTable)
-            }
-        }
-
-        table
-    }
-
     def ast: Program = program
 
     /* only retrieves top level contracts (i.e. not nested) */
     def contract: Function[String, Option[ContractTable]] = contractLookup.get
-
-    def findNameInImports(name: String) : Option[ContractTable] = importContractLookup.get(name)
 }

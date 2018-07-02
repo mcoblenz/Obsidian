@@ -1,0 +1,23 @@
+// import "resources/case_studies/Insurance/Money.obs"
+import "resources/case_studies/Insurance/Token.obs"
+
+
+main contract Bank {
+    // TODO: owned Money mon;
+    // the bank's private key for making tokens
+    int key;
+
+    owned Bank() {
+        // TODO: generate key
+        key = 35;
+    }
+
+    // TODO: money should be exchanged for tokens
+    // TODO: keep track of tokens
+    transaction buyToken() returns Token@Owned {
+        return new Token(key);
+    }
+
+}
+
+

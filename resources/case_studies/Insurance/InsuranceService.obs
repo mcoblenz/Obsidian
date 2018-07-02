@@ -1,0 +1,44 @@
+import "resources/case_studies/Insurance/Insurer.obs"
+
+main resource contract InsuranceService {
+    // TODO: Collection of Insurer, Token
+    // TODO: Keys of trusted banks
+    Insurer ins;
+    Token@Owned tokens;
+
+    owned InsuranceService() {}
+
+
+    transaction addInsurer(Insurer insurer) {
+        ins = insurer;
+    }
+
+    transaction connectBankAndInsurer(Bank bank) {
+        // TODO: check that bank key is in trusted keys
+        if (true) {
+            ins.addBank(bank);
+        }
+    }
+
+    // TODO: information to calculate bids, Collection of Bid and Token
+    transaction requestBids(int x) returns Bid@Owned {
+        BidTokenPair bidAndTokens = ins.requestBids(x);
+
+        // TODO: add Tokens from bidAndTokens to Tokens
+        // TODO: how to keep track of tokens for each client?
+        tokens = bidAndTokens.getToken();
+        Bid@Owned bid = bidAndTokens.getBid();
+
+        return bid;
+    }
+
+    transaction buyBid(Bid@Owned bid, Token@Owned token) returns Bid@Owned {
+        // TODO: collect all tokens together (ones given by insurer and insuree) (for now just disown)
+        disown token;
+        // TODO: switch bid states with bid.buy();
+        return bid;
+    }
+
+}
+
+

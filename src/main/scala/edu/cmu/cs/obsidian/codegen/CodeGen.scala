@@ -88,20 +88,24 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                                           protobufOuterClassName: String,
                                           programPackage: JPackage): JCodeModel =
     {
-        // TODO: refactor this to support imports properly
         val contractNameResolutionMap: Map[Contract, String] = TranslationContext.contractNameResolutionMapForProgram(program)
         val protobufOuterClassNames = mutable.HashMap.empty[String, String]
+
+        assert(program.imports.isEmpty, "Imports should be empty after processing.")
+
         for (c <- program.contracts) {
             populateProtobufOuterClassNames(c, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
         }
 
-        for (imp <- program.imports) {
-            if(!imp.name.contains("/java-utilities/"))
-                translateImport(programPackage, imp, contractNameResolutionMap, protobufOuterClassNames)
-        }
-
         for (c <- program.contracts) {
-            translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+            // TODO : generate code for interfaces (issue #117)
+            if(!c.isInterface) {
+                translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+
+                if (c.isImport) {
+                    translateStubContract(c, programPackage)
+                }
+            }
         }
         model
     }
@@ -116,40 +120,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             }
         }
         return false
-    }
-
-
-    private def translateImport(programPackage: JPackage,
-                                imp: Import,
-                                contractNameResolutionMap: Map[Contract, String],
-                                protobufOuterClassNames: Map[String, String]): Unit = {
-        // Each import corresponds to a file. Each file has to be read, parsed, and translated into a list of stub contracts.
-        val filename = imp.name;
-
-        val parsedAst = Parser.parseFileAtPath(filename, printTokens = false)
-        val table = new SymbolTable(parsedAst)
-        val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
-        val ast = globalTable.ast
-
-        target match {
-            case Client(_) =>
-                val program = translateProgramInPackage(ast, Util.protobufOuterClassNameForFilename(filename), programPackage)
-                val stub = translateStubProgram(ast, programPackage, contractNameResolutionMap, protobufOuterClassNames)
-
-            case Server() => assert(false, "imports not yet supported in servers") // TODO
-        }
-    }
-
-    private def translateStubProgram(program: Program,
-                                     programPackage: JPackage,
-                                     contractNameResolutionMap: Map[Contract, String],
-                                     protobufOuterClassNames: Map[String, String]): Unit = {
-        // TODO: support imports in programs to be translated as stubs
-        assert(program.imports.isEmpty, "imports in imported contracts are not yet supported");
-
-        for (contract <- program.contracts) {
-            translateStubContract(contract, programPackage)
-        }
     }
 
     private def classNameForStub(contractName: String) = {
@@ -755,12 +725,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
         // need to gather the types of the main contract constructor in order to correctly deserialize arguments
         // find the first declaration that is a constructor
-        val constructor: Option[Declaration] = translationContext.contract.declarations.find(decl => decl.isInstanceOf[Constructor])
+        val constructor: Option[Declaration] = translationContext.contract.declarations.find(_.isInstanceOf[Constructor])
         // gather the types of its arguments
         val constructorTypes: Seq[ObsidianType] =
             constructor match {
-                case Some(constr: Constructor) => constr.args.map(a => a.typ)
-                case None => List.empty
+                case Some(constr: Constructor) => constr.args.map(_.typ)
+                case _ => List.empty
             }
 
         /* init method */
@@ -1135,7 +1105,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 val setInvocation = nonNullBody.invoke(builderVar, setterName)
                 setInvocation.arg(fieldVar)
             }
-            case n@NonPrimitiveType(_, _) => handleNonPrimitive(field.name, n)
+            case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
             case _ => () // TODO handle other types
         }
     }
@@ -1294,7 +1264,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 ifNonempty._then().assign(fieldVar, getCall)
             }
             case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
-            case _: InterfaceContractType => assert(false, "Cannot generate field initializer for interface type.")
             case _: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
         }
@@ -1471,8 +1440,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
-            case n@NonPrimitiveType(unpermissionedType, mods) =>
-                val contractName = unpermissionedType.extractSimpleType.contractName
+            case n: NonPrimitiveType =>
+                val contractName = n.contractName
                 if (n.isRemote) model.ref(classNameForStub(contractName)) else model.ref(contractName)
             case _ => model.VOID // TODO: translate PDTs
         }
@@ -1484,8 +1453,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                                                   translationContext: TranslationContext,
                                                   containingContract: Contract): Option[Contract] = {
         typ match {
-            case NonPrimitiveType(t,_) => {
-                val name = t.extractSimpleType.contractName
+            case t: NonPrimitiveType => {
+                val name = t.contractName
 
                 var typeComponents = name.split(".")
                 if (typeComponents.isEmpty) {
@@ -1620,7 +1589,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
-            case OwnershipTransfer(_) => assert(false, "OwnershipTransfer may be removed in the future."); JExpr._null()
             case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
         }
     }
@@ -1845,7 +1813,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 updates match {
                     case Some(u) =>
                         for ((f, e) <- u) {
-                            body.assign(newStField.ref(f.name), translateExpr(e, translationContext, localContext))
+                            assignVariable(f.name, translateExpr(e, translationContext, localContext),
+                                body, translationContext, localContext)
                         }
                     case None =>
                         // Fields should have been initialized individually, via S1::foo = bar.
@@ -1868,20 +1837,20 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 }
 
                 translationContext.pendingFieldAssignments = Set.empty
-            case Assignment(ReferenceIdentifier(x), e, transfersOwnership) =>
+            case Assignment(ReferenceIdentifier(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext)
             /* it's bad that this is a special case */
-            case Assignment(Dereference(This(), field), e, transfersOwnership) => {
+            case Assignment(Dereference(This(), field), e) => {
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
                 translationContext.assignVariable(field, newValue, body)
             }
-            case Assignment(Dereference(eDeref, field), e, transfersOwnership) => {
+            case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
                 assert(false, "TODO")
             }
-            case Assignment(StateInitializer(stateName, fieldName), e, transfersOwnership) => {
+            case Assignment(StateInitializer(stateName, fieldName), e) => {
                 val stateContextOption = translationContext.states.get(stateName._1)
                 assert(stateContextOption.isDefined)
                 val stateContext = stateContextOption.get
