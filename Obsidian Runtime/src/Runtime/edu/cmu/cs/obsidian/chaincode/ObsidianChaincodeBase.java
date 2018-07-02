@@ -56,7 +56,7 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
         }
     }
 
-    private void invokeConstructor() {}; //to be overidden in generated code
+    protected void invokeConstructor() {}; //to be overidden in generated code
 
     public void delegatedMain(String args[]) {
         /* archive path */
