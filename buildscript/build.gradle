@@ -19,7 +19,7 @@ repositories {
 sourceSets {
     main {
         java {
-            srcDirs = ["$codeDirectory", '../Obsidian Runtime/src/Runtime']
+            srcDirs = ["../$codeDirectory", '../Obsidian Runtime/src/Runtime']
         }
     }
 }
@@ -40,6 +40,7 @@ dependencies {
 }
 
 version = '1.0'
+libsDirName = '../../build'
 jar {
     archiveName = 'chaincode.jar'
     manifest {
