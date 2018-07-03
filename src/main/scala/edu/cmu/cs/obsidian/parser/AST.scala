@@ -89,6 +89,7 @@ case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement])
 case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement
 case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
+case class StaticAssert(expr: Expression, statesOrPermissions: Seq[Identifier]) extends Statement
 
 /* Declarations */
 case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {

@@ -332,6 +332,8 @@ object AstTransformer {
                 val newSwitch = oldSwitch.copy(e = transformExpression(e),
                                                cases = newCases).setLoc(oldSwitch)
                 (newSwitch, context, errors)
+            case oldAssert@StaticAssert(e, l) =>
+                (StaticAssert(transformExpression(e), l).setLoc(oldAssert), context, Seq())
             case e: Expression => (transformExpression(e), context, Seq())
 
         }

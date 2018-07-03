@@ -41,6 +41,25 @@ object Parser extends Parsers {
         accept("identifier", { case t@IdentifierT(name) => (name, t.pos) })
     }
 
+    private def parseIdAlternatives: Parser[Seq[Identifier]] = {
+        repsep(parseId, PipeT())
+    }
+
+    def resolvePermission(ident: String): Option[Permission] = {
+        if (ident == "Shared") {
+            Some(Shared())
+        }
+        else if (ident == "Owned") {
+            Some(Owned())
+        }
+        else if (ident == "Unowned") {
+            Some(Unowned())
+        }
+        else {
+            None
+        }
+    }
+
     private def parseType: Parser[ObsidianType] = {
         def parseDotPath: Parser[Seq[Identifier]] = DotT() ~ (parseId | ParentT()) ~ opt(parseDotPath) ^^ {
             case _ ~ ident ~ rest => {
@@ -87,9 +106,9 @@ object Parser extends Parsers {
 
         val parseNonPrimitive: Parser[NonPrimitiveType] = {
              opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
-                case remote ~ id ~ permission => {
+                case remote ~ id ~ permissionToken => {
                     val isRemote = remote.isDefined
-                    val typ = extractTypeFromPermission(permission, id, isRemote)
+                    val typ = extractTypeFromPermission(permissionToken, id, isRemote)
                     typ.setLoc(id)
                 }
             }
@@ -106,17 +125,10 @@ object Parser extends Parsers {
         permission match {
             case None => ContractReferenceType(ContractType(name._1), Inferred(), isRemote)
             case Some(_ ~ permissionIdent) =>
-                if (permissionIdent._1 == "Shared") {
-                    ContractReferenceType(ContractType(name._1), Shared(), isRemote)
-                }
-                else if (permissionIdent._1 == "Owned") {
-                    ContractReferenceType(ContractType(name._1), Owned(), isRemote)
-                }
-                else if (permissionIdent._1 == "Unowned") {
-                    ContractReferenceType(ContractType(name._1), Unowned(), isRemote)
-                }
-                else {
-                    StateType(name._1, permissionIdent._1, isRemote)
+                val permission = resolvePermission(permissionIdent._1)
+                permission match {
+                    case None => StateType(name._1, permissionIdent._1, isRemote)
+                    case Some(p) => ContractReferenceType(ContractType(name._1), p, isRemote)
                 }
         }
     }
@@ -198,6 +210,11 @@ object Parser extends Parsers {
                 case switch ~ e ~ _ ~ cases ~ _ => Switch(e, cases).setLoc(switch)
         }
 
+        val parseStaticAssertion = LBracketT() ~! parseExpr ~ AtT() ~ parseIdAlternatives ~ RBracketT() ~! SemicolonT() ^^ {
+            case _ ~ expr ~ at ~ idents ~ _ ~ _ => StaticAssert(expr, idents).setLoc(at)
+        }
+
+
         /* allow arbitrary expr as a statement and then check at later stage if
          * the expressions makes sense as the recipient of an assignment or
          * as a side-effect statement (e.g. func invocation) */
@@ -210,7 +227,7 @@ object Parser extends Parsers {
 
         parseReturn | parseTransition | parseThrow |
         parseVarDeclAssn | parseVarDecl | parseIf | parseSwitch |
-        parseTryCatch | parseExprFirst
+        parseTryCatch | parseExprFirst | parseStaticAssertion
     }
 
 

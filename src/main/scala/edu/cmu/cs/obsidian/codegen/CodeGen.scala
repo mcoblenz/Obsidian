@@ -1915,7 +1915,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             case Invocation(e, methName, args) =>
                 addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName),
                         args, translationContext, localContext)
-
+            case StaticAssert(e, l) => () // Nothing to do
             /* all expressions can be statements but no other expressions have a reasonable meaning */
             case _ => ()
         }

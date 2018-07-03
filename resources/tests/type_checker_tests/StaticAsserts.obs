@@ -1,0 +1,8 @@
+main contract C {
+    state S1;
+    state S2;
+
+    C() {
+        ->S1; [this@S1];
+    }
+}

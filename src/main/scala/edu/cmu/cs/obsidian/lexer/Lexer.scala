@@ -100,6 +100,9 @@ object Lexer extends RegexParsers {
     private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT())
     private def coloncolonP = """::""".r ^^ (_ => ColonColonT())
     private def atP = """@""".r ^^ (_ => AtT())
+    private def lBracketP = """\[""".r ^^ (_ => LBracketT())
+    private def rBracketP = """\]""".r ^^ (_ => RBracketT())
+    private def pipeP = """\|""".r ^^ (_ => PipeT())
 
     private def oneToken: Parser[Token] =
 
@@ -111,7 +114,7 @@ object Lexer extends RegexParsers {
         /* order is important here because some tokens contain the others */
         gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
 
-        plusP | starP | forwardSlashP | minusP | coloncolonP | atP
+        plusP | starP | forwardSlashP | minusP | coloncolonP | atP | lBracketP | rBracketP | pipeP
     )
 
     private def tokenParser: Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))

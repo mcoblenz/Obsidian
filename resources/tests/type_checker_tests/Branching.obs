@@ -10,31 +10,31 @@ resource contract Ow/*ned*/ {
 
 main contract C {
     transaction t() {
-        Ow o1 = new Ow();
-        Sh s1 = new Sh();
+        Ow@Owned o1 = new Ow();
+        Sh@Shared s1 = new Sh();
         // [o1] is incompatible after the branch because it's used in only one
         if (true) {
-            Ow o2 = o1;
-            Sh s2 = s1;
+            Ow@Owned o2 = o1;
+            Sh@Shared s2 = s1;
         } else {
             int x = 5;
         }
     }
 
     transaction t2() {
-        Ow o1 = new Ow();
+        Ow@Owned o1 = new Ow();
         // shouldn't cause a merge incompatibility because of the exception
         if (true) {
-            Ow o2 = o1;
+            Ow@Owned o2 = o1;
         } else {
             throw;
         }
     }
 
     transaction t3() {
-        Ow o1 = new Ow();
+        Ow@Owned o1 = new Ow();
         if (true) {
-            Ow o2 = o1;
+            Ow@Owned o2 = o1;
         }
     }
 

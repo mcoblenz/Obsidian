@@ -75,7 +75,10 @@ case class StarT() extends Token { override def toString: String = "*" }
 case class ForwardSlashT() extends Token { override def toString: String = "/" }
 case class MinusT() extends Token { override def toString: String = "-" }
 case class AtT() extends Token { override def toString: String = "@" }
+case class LBracketT() extends Token { override def toString: String ="[" }
+case class RBracketT() extends Token { override def toString: String ="]" }
+case class PipeT() extends Token { override def toString: String ="|" }
 
 
-/* comment token: the parser never sees this; comments should be pruned in the lexer */
+    /* comment token: the parser never sees this; comments should be pruned in the lexer */
 case class CommentT() extends Token

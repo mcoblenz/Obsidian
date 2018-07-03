@@ -48,7 +48,7 @@ case class SubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Found type '$t1', but expected something of type '$t2'"
 }
 case class VariableUndefinedError(x: String, context: String) extends Error {
-    val msg: String = s"Variable '$x' is undefined in $context"
+    val msg: String = s"Variable '$x' is undefined in '$context'."
 
     override def equals(that: Any): Boolean = {
         that match {
@@ -118,7 +118,7 @@ case class WrongArityError(expected: Int, have: Int, methName: String) extends E
         }
 }
 case class MergeIncompatibleError(name: String, t1: ObsidianType, t2: ObsidianType) extends Error {
-    val msg: String = s"Variable '$name' is incompatibly typed as both '$t1' and '$t2' after branch"
+    val msg: String = s"Variable '$name' is incompatibly typed as both '$t1' and '$t2' after branch."
 }
 case class MustReturnError(methName: String) extends Error {
     val msg: String = s"'$methName' specifies a return type, but no return value is given"
@@ -211,4 +211,20 @@ case class InvalidStateFieldInitialization(stateName: String, fieldName: String)
 
 case class NonStaticAccessError(method: String, name:String) extends Error {
     val msg: String = s"Cannot invoke a non-static transaction '$method' via a static reference '$name'"
+}
+
+case class StaticAssertOnPrimitiveError(e: Expression) extends Error {
+    val msg: String = s"Cannot check the ownership or state of primitive expression '$e'."
+}
+
+case class StaticAssertFailed(e: Expression, actualPermission: Permission, requiredPermission: Permission) extends Error {
+    val msg: String = s"Expression '$e' failed assertion '$requiredPermission'. Actual permission: '$actualPermission'."
+}
+
+case class StaticAssertFailedStates(e: Expression, actualStateList: Seq[String], requiredState: String) extends Error {
+    val msg: String = s"Expression '$e' may not be in state '$requiredState'. Possible states: '$actualStateList'."
+}
+
+case class StaticAssertFailedNotStateful(e: Expression, actualType: ObsidianType, requiredState: String) extends Error {
+    val msg: String = s"Expression '$e' may not be in state '$requiredState'. Its type, '$actualType', does not specify state."
 }

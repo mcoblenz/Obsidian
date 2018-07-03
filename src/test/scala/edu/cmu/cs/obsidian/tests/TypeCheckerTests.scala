@@ -293,22 +293,20 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
-            // TODO: https://github.com/mcoblenz/Obsidian/issues/56
-            //            (MergeIncompatibleError("o1",
-            //                NonPrimitiveType(null, ContractReferenceType("Ow") ,Set(IsOwned()), false),
-            //                NonPrimitiveType(null, ContractReferenceType("Ow"), Set(IsReadOnlyState(), false))), 16)
-            //              ::
-            //              (UnusedOwnershipError("o2"), 16)
-            //              ::
-            //              (UnusedOwnershipError("o2"), 27)
-            //              ::
-            // TODO: https://github.com/mcoblenz/Obsidian/issues/56
-            //              (MergeIncompatibleError("o1",
-            //                  NonPrimitiveType(null, ContractReferenceType("Ow"), Set(IsOwned()), false),
-            //                  NonPrimitiveType(null, ContractReferenceType("Ow"), Set(IsReadOnlyState(), false))), 36)
-            //              ::
-            //              (UnusedOwnershipError("o2"), 36)
-            //              ::
+                        (MergeIncompatibleError("o1",
+                            ContractReferenceType(ContractType("Ow"), Owned(), false),
+                            ContractReferenceType(ContractType("Ow"), Unowned(), false)), 16)
+                          ::
+                          (UnusedOwnershipError("o2"), 16)
+                          ::
+                          (UnusedOwnershipError("o2"), 27)
+                          ::
+                          (MergeIncompatibleError("o1",
+                              ContractReferenceType(ContractType("Ow"), Owned(), false),
+                              ContractReferenceType(ContractType("Ow"), Unowned(), false)), 36)
+                          ::
+                          (UnusedOwnershipError("o2"), 36)
+                          ::
             (VariableUndefinedError("x", null), 48)
                 ::
                 Nil)

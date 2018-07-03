@@ -3,15 +3,25 @@ import edu.cmu.cs.obsidian.parser._
 
 
 trait Permission
-case class Shared() extends Permission
-case class Owned() extends Permission
-case class Unowned() extends Permission
-case class Inferred() extends Permission // For local variables
+case class Shared() extends Permission {
+    override def toString: String = "Shared"
+}
+case class Owned() extends Permission {
+    override def toString: String = "Owned"
+}
+
+case class Unowned() extends Permission {
+    override def toString: String = "Unowned"
+}
+
+case class Inferred() extends Permission {
+    override def toString: String = "Inferred"
+}
+// For local variables
 
 // Type of references to contracts.
 case class ContractReferenceType(contractType: ContractType, permission: Permission, override val isRemote: Boolean) extends NonPrimitiveType {
-    override def toString: String = contractName
-
+    override def toString: String = contractName + "@" + permission
     val contractName: String = contractType.contractName
 
     override def isOwned = permission == Owned()
@@ -48,10 +58,10 @@ case class StateType(contractName: String, stateNames: Set[String], override val
         this(contractName, Set(stateName), isRemote)
     }
 
-    private def orOfStates: String = stateNames.toSeq.tail.foldLeft(stateNames.head)(
-        (prev: String, sName: String) => prev + " | " + sName
-    )
-    override def toString: String = contractName + "." + "(" + orOfStates + ")"
+    private def orOfStates: String = stateNames.mkString(" | ")
+
+    override def toString: String = contractName + "@" +
+        (if (stateNames.size > 1) "(" + orOfStates + ")" else orOfStates)
 
     override val permission = Owned()
 
