@@ -252,6 +252,11 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Construction.obs",
             (ConstructorNameError("Thing"), 27)
                 ::
+                (RepeatConstructorsError("Thing"), 27)
+                ::
+                (SubtypingError(ContractReferenceType(ContractType("Thing"), Owned(), false),
+                                ContractReferenceType(ContractType("OtherThing"), Inferred(), false)), 27)
+                ::
                 (WrongArityError(0, 1, "constructor of Thing"), 37)
                 ::
                 (SubtypingError(
@@ -410,7 +415,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
             (SubtypingError(
                 StateType("C1", Set("S2", "S3"), false),
-                StateType("C1", Set("S1", "S2"), false)), 4
+                StateType("C1", Set("S1"), false)), 4
             )
                 ::
                 (StateUndefinedError("C1", "OtherState"), 13)

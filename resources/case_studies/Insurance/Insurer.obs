@@ -9,7 +9,7 @@ main contract Insurer {
     //TODO: owned Money mon;
     Bank bank;
 
-    owned Insurer() {}
+    Insurer() {}
 
     transaction addBank(Bank b) {
         bank = b;
@@ -22,7 +22,7 @@ main contract Insurer {
         int timeAvailable = 100;
         // TODO : give Money to Bank for Token
         Token@Owned t = bank.buyToken();
-        Bid@Owned b = new Bid(cost, timeAvailable);
+        Bid@Available b = new Bid(cost, timeAvailable);
 
         return new BidTokenPair(b, t);
     }

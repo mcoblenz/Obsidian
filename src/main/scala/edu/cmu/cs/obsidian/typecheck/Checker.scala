@@ -213,7 +213,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     //-------------------------------------------------------------------------
     /* Helper functions to easily make new types */
 
-    /* Determines what sort of simple type should be used, given a set a possible states */
+    /*/* Determines what sort of simple type should be used, given a set a possible states */
     // TODO: refactor this when we support specifying permissions on "this" for transactions
     private def simpleOfWithStateNames(cName: String, states: Option[Set[String]], permission: Permission): NonPrimitiveType = {
         states match {
@@ -230,7 +230,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case Some(ss) => Some(ss.map(_._1))
         }
         simpleOfWithStateNames(cName, stateNames, permission)
-    }
+    }*/
 
 
     //-------------------------------------------------------------------------
@@ -247,7 +247,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (StateType(_, ss1, _), StateType(_, ss2, _)) =>
                 val c = t1.contractName
                 val unionStates = ss1.union(ss2)
-                Some(simpleOfWithStateNames(c, Some(unionStates), Owned()))
+                Some(StateType(c, unionStates, false))
             case _ => None
         }
     }
@@ -493,12 +493,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val result =
                      checkArgs(e, s"constructor of $name", context, constrSpecs, This(), argTypes)
 
-                 // TODO: https://github.com/mcoblenz/Obsidian/issues/63
                  val simpleType = result match {
                      // Even if the args didn't check, we can still output a type
                      case None => ContractReferenceType(ctTableOfConstructed.contractType, Owned(), false)
-                     case Some((constr, _)) =>
-                         simpleOf(contextPrime.contractTable, name, constr.endsInState, Owned())
+                     case Some((constr, _)) => constr.resultType
                  }
 
                  (simpleType, contextPrime)
@@ -1291,20 +1289,22 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val outputContext =
             checkStatementSequence(tx, initContext, tx.body)
 
+        val expectedType = tx.thisFinalType(lexicallyInsideOf.contract.name)
         // Check that all the states the transaction can end in are valid, named states
-        if (tx.endsInState.isDefined) {
-            for (state <- tx.endsInState.get) {
-                val stateTableOpt = lexicallyInsideOf.contractTable.state(state._1)
-                stateTableOpt match {
-                    case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, state._1))
-                    case Some(_) => ()
+        expectedType match {
+            case StateType(_, states, _) => {
+                for (stateName <- states) {
+                    val stateTableOpt = lexicallyInsideOf.contractTable.state(stateName)
+                    stateTableOpt match {
+                        case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, stateName))
+                        case Some(_) => ()
+                    }
                 }
             }
+            case _ => ()
         }
 
         // TODO: make the permission depend on the transaction's specification
-        val expectedType =
-            simpleOf(lexicallyInsideOf, lexicallyInsideOf.name, tx.endsInState, tx.thisFinalPermission)
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
         checkForUnusedStateInitializers(outputContext)
@@ -1354,8 +1354,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         else {
             None
         }
-        val thisType = simpleOfWithStateNames(lexicallyInsideOf.contract.name, stateNames, tx.thisPermission)
 
+        val thisType = tx.thisType(lexicallyInsideOf.contract.name)
         // TODO: consider path case. Previously it was something like:
         // PathType("this"::"parent"::Nil, lexicallyInsideOf.simpleType)
         val table = thisType match {
@@ -1478,7 +1478,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(constr, ConstructorNameError(table.name))
         }
 
-        if (table.contract.isResource && !constr.isOwned) {
+        if (table.contract.isResource && !constr.resultType.isOwned) {
             logError(constr, ResourceContractConstructorError(table.name))
         }
 
@@ -1505,18 +1505,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             checkStatementSequence(constr, initContext, constr.body)
 
         // Check that all the states the constructor can end in are valid, named states
-        if (constr.endsInState.isDefined) {
-            for (stateName <- constr.endsInState.get.map(_._1)) {
-                val stateTableOpt = table.contractTable.state(stateName)
-                stateTableOpt match {
-                    case None => logError(constr, StateUndefinedError(table.contract.name, stateName))
-                    case Some(_) => ()
+        constr.resultType match {
+            case StateType(_, states, _) => {
+                for (stateName <- states) {
+                    val stateTableOpt = table.contractTable.state(stateName)
+                    stateTableOpt match {
+                        case None => logError(constr, StateUndefinedError(table.contract.name, stateName))
+                        case Some(_) => ()
+                    }
                 }
             }
+            case _ => ()
         }
 
-        // TODO: make this owned?
-        val expectedThisType = simpleOf(table, table.name, constr.endsInState, Owned())
+        val expectedThisType: NonPrimitiveType = constr.resultType
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
@@ -1527,6 +1529,24 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(constr, NoStartStateError(constr.name))
         }
 
+    }
+
+    private def checkConstructors(constructors: Seq[Constructor], contract: Contract, table: ContractTable): Unit = {
+        if (constructors.isEmpty && table.stateLookup.nonEmpty) {
+            logError(contract, NoConstructorError(contract.name))
+        }
+
+        if (constructors.length > 1 && contract.isMain) {
+            logError(contract, MultipleConstructorsError(contract.name))
+        }
+
+        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typ.topPermissionType))
+        val matchingConstructors = constructorsByArgTypes.filter(_._2.size > 1)
+
+        matchingConstructors.foreach(typeAndConstructors => {
+            val greatestLine = typeAndConstructors._2.maxBy(_.loc.line)
+            logError(greatestLine, RepeatConstructorsError(contract.name))
+        })
     }
 
     private def checkForMainContract(ast: Program) = {
@@ -1550,14 +1570,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case _ => () // TODO
             }
         }
+        checkConstructors(table.constructors, contract, table)
 
-        if (table.constructors.isEmpty && table.stateLookup.nonEmpty) {
-            logError(contract, NoConstructorError(contract.name))
-        }
-
-        if (table.constructors.length > 1 && contract.modifiers.contains(IsMain())) {
-            logError(contract, MultipleConstructorsError(contract.name))
-        }
     }
 
 

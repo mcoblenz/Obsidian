@@ -1,7 +1,7 @@
 main contract C1 {
 
-    // error: constructor for 'C1' ends in S2, S3 instead of S1, S2
-    C1(bool b) ends in S1, S2 {
+    // error: constructor for 'C1' ends in S2, S3 instead of S1
+    C1@S1(bool b){
         if(b) {
             ->S2;
         } else {
@@ -30,7 +30,7 @@ main contract C1 {
 contract C2 {
 
     // error: C2 ends in S1, S2 but must end in S1
-    C2(bool b) ends in S1 {
+    C2@S1(bool b) {
         if(b) {
             ->S1;
         } else {
