@@ -322,24 +322,31 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
             // check arguments
-            val (argTypes, contextPrime) = inferAndCheckExprs(decl, context, args)
+            val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, context, args)
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
                 checkArgs(e, name, context, specList, receiver, argTypes) match {
-                    case None => return (BottomType(), contextPrime)
+                    case None => return (BottomType(), contextAfterArgs)
                     case Some(x) => x
                 }
 
             // check that there's a value to return
             if (correctInvokable.retType.isEmpty) {
                 logError(e, NotAValueError(name))
-                return (BottomType(), contextPrime)
+                return (BottomType(), contextAfterArgs)
             }
 
             val spec = correctInvokable.args
 
             val astType = correctInvokable.retType.get
+
+            val contextPrime =
+                correctInvokable match {
+                    case t: Transaction =>
+                        updateReceiverTypeInContext(receiver, receiverType, t, contextAfterArgs)
+                    case _ => contextAfterArgs
+                }
 
             (astType, contextPrime)
 
@@ -800,6 +807,27 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         None
     }
 
+    // updates the type of an identifier in the context based on the transaction invoked on it
+    private def updateReceiverTypeInContext(receiver: Expression,
+                                            receiverType: ObsidianType,
+                                            invokable: Transaction,
+                                            context: Context): Context = {
+
+        val contextPrime = receiver match {
+            case ReferenceIdentifier(x) => {
+                receiverType match {
+                    case typ: NonPrimitiveType => {
+                        val newType = invokable.thisFinalType(typ.contractName)
+                        context.updated(x, newType)
+                    }
+                    case _ => context
+                }
+            }
+            case _ => context
+        }
+        contextPrime
+    }
+
     private def checkStatement(
                                   decl: InvokableDeclaration,
                                   context: Context,
@@ -830,12 +858,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
             // check arguments
-            val (argTypes, contextPrime) = inferAndCheckExprs(decl, contextAfterReceiver, args)
+            val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, contextAfterReceiver, args)
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
                 checkArgs(s, name, contextAfterReceiver, specList, receiver, argTypes) match {
-                    case None => return contextPrime
+                    case None => return contextAfterArgs
                     case Some(x) => x
                 }
 
@@ -862,8 +890,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             }
 
+            val contextPrime =
+                correctInvokable match {
+                    case t: Transaction =>
+                        updateReceiverTypeInContext(receiver, receiverType, t, contextAfterArgs)
+                    case _ => contextAfterArgs
+                }
+
             contextPrime
         }
+
 
         s match {
             case VariableDecl(typ: ObsidianType, name) =>
