@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -n "$1" && -n "$2" ] ; then
+if [ -n "$1" ] ; then
     peer chaincode invoke -n mycc -v 0 -C ch1 -c "{\"Function\": \"$1\", \"Args\":[$2]}"
 else
     echo "Usage: $0 <function> <arguments>"
