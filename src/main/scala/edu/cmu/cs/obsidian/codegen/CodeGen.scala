@@ -804,6 +804,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                               JExpr.newArray(model.BYTE, 0))
 
         runMeth._throws(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
+        runMeth._throws(model.ref("edu.cmu.cs.obsidian.chaincode.NoSuchTransactionException"))
 
         /* we use this map to group together all transactions with the same name */
         val txsByName = new mutable.HashMap[String, mutable.Set[Transaction]]()
@@ -819,11 +820,22 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             }
         }
 
+        var lastTransactionElse: Option[JBlock] = None
+
         /* for each transaction name, we have a branch in the run method */
         for (txName <- txsByName.keySet) {
             val transEq = JExpr.ref("transName").invoke("equals").arg(JExpr.lit(txName))
 
-            val transCond = runMeth.body()._if(transEq)
+            /* If we have an 'else' from the last 'if', attach the new 'if' statement to this 'else'.
+             * Otherwise, just attach it to the main method body. */
+            val transCond = lastTransactionElse match {
+                case None => runMeth.body()._if(transEq)
+                case Some(e) => e._if(transEq)
+            }
+
+            /* Get the 'else' of this last 'if' statement, to attach the next 'if' to. */
+            lastTransactionElse = Some(transCond._else())
+
             val transCondBody = transCond._then()
             var transactionIsConditional = false // assume transaction is only available in one state unless we find otherwise
 
@@ -917,7 +929,19 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
             }
         }
-      runMeth.body()._return(returnBytes)
+
+        /* Find where to throw a 'no such transaction' error.
+         * (If we never generated any if statements, we throw it in the main method
+         * body, since no transaction can be valid; otherwise, put it in the last
+         * 'else' of the if-else tree.) */
+        val noSuchTransactionBody = lastTransactionElse match {
+            case None => runMeth.body()
+            case Some(e) => e
+        }
+
+        noSuchTransactionBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.NoSuchTransactionException")))
+
+        runMeth.body()._return(returnBytes)
     }
 
     private def generateServerMainMethod(newClass: JDefinedClass) = {

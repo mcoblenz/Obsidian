@@ -51,6 +51,8 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
         try {
             byte result[] = run(stub, function, byte_args);
             return newSuccessResponse(result);
+        } catch (NoSuchTransactionException e) {
+            return newErrorResponse("No such transaction: " + function);
         } catch (Throwable e) {
             return newErrorResponse(e);
         }
@@ -105,7 +107,8 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
     public abstract byte[] init(ChaincodeStub stub, byte[][] args)
             throws InvalidProtocolBufferException;
     public abstract byte[] run(ChaincodeStub stub, String transactionName, byte[][] args)
-            throws InvalidProtocolBufferException, ReentrancyException, BadTransactionException;
+            throws InvalidProtocolBufferException, ReentrancyException,
+                   BadTransactionException, NoSuchTransactionException;
     public abstract ObsidianChaincodeBase __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
 }
