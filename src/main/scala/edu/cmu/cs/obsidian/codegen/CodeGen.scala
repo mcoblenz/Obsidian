@@ -17,7 +17,7 @@ trait Target
 case class Client(mainContract: Contract) extends Target
 case class Server() extends Target
 
-class CodeGen (val target: Target) {
+class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
     private val model: JCodeModel = new JCodeModel()
 
@@ -660,7 +660,11 @@ class CodeGen (val target: Target) {
         target match {
             case Client(mainContract) =>
                 if (aContract == mainContract) {
-                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
+                    if (mockChaincode) {
+                        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
+                    } else {
+                        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianChaincodeBase"))
+                    }
                     generateClientMainMethod(newClass)
                     generateInvokeClientMainMethod(aContract, newClass)
                 }
@@ -700,8 +704,21 @@ class CodeGen (val target: Target) {
     }
 
     private def generateMainServerClassMethods(newClass: JDefinedClass, translationContext: TranslationContext): Unit = {
-        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
-        val stubType = model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
+
+        System.out.print("Generate real chaincode: ")
+        System.out.println(!mockChaincode)
+
+        if (mockChaincode) {
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
+        } else {
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianChaincodeBase"))
+        }
+
+        val stubType = if (mockChaincode) {
+            model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
+        } else {
+            model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
+        }
 
         /* run method */
         generateRunMethod(newClass, translationContext, stubType)

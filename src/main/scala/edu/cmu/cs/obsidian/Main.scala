@@ -20,7 +20,8 @@ case class CompilerOptions (outputPath: Option[String],
                             typeCheckerDebug: Boolean,
                             printTokens: Boolean,
                             printAST: Boolean,
-                            buildClient: Boolean)
+                            buildClient: Boolean,
+                            mockChaincode: Boolean)
 
 object Main {
 
@@ -34,6 +35,7 @@ object Main {
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
+          |    --hyperledger                generate Java chaincode for Hyperledger Fabric
         """.stripMargin
 
     def parseOptions(args: List[String]): CompilerOptions = {
@@ -45,6 +47,7 @@ object Main {
         var printTokens = false
         var printAST = false
         var buildClient = false
+        var mockChaincode = true
 
         def parseOptionsRec(remainingArgs: List[String]) : Unit = {
             remainingArgs match {
@@ -69,6 +72,9 @@ object Main {
                     parseOptionsRec(tail)
                 case "--build-client" :: tail =>
                     buildClient = true
+                    parseOptionsRec(tail)
+                case "--hyperledger" :: tail =>
+                    mockChaincode = false
                     parseOptionsRec(tail)
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
@@ -100,7 +106,7 @@ object Main {
         }
 
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
-                        printTokens, printAST, buildClient)
+                        printTokens, printAST, buildClient, mockChaincode)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -111,8 +117,8 @@ object Main {
         return mainContractOption.get.name
     }
 
-    def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
-        val codeGen = new CodeGen(Server())
+    def translateServerASTToJava (ast: Program, protobufOuterClassName: String, mockChaincode: Boolean): JCodeModel = {
+        val codeGen = new CodeGen(Server(), mockChaincode)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
@@ -120,13 +126,13 @@ object Main {
         ast.contracts.find((c: Contract) => c.modifiers.contains(IsMain()))
     }
 
-    def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
+    def translateClientASTToJava (ast: Program, protobufOuterClassName: String, mockChaincode: Boolean): JCodeModel = {
         // Client programs must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val codeGen = new CodeGen(Client(mainContractOption.get))
+        val codeGen = new CodeGen(Client(mainContractOption.get), mockChaincode)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
@@ -139,7 +145,7 @@ object Main {
 
         val sourcePath = sourceDir.toString
         val classPath =
-            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.5.1.jar:lib/json-20160810.jar"
+            s"Obsidian Runtime/src/Runtime/:$sourcePath:lib/protobuf-java-3.5.1.jar:lib/json-20160810.jar:lib/shim-client-1.0.jar"
         val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
         val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
                                                        "-classpath", classPath,
@@ -287,8 +293,8 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(globalTable.ast, protobufOuterClassName)
-            else translateServerASTToJava(globalTable.ast, protobufOuterClassName)
+            val javaModel = if (options.buildClient) translateClientASTToJava(globalTable.ast, protobufOuterClassName, options.mockChaincode)
+            else translateServerASTToJava(globalTable.ast, protobufOuterClassName, options.mockChaincode)
             javaModel.build(srcDir.toFile)
 
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(globalTable.ast, sourceFilename)
@@ -320,22 +326,37 @@ object Main {
                 }
             }
 
-
-            // invoke javac and make a jar from the result
             val mainName = findMainContractName(globalTable.ast)
-            val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
-            if (options.verbose) {
-                println("javac exited with value " + javacExit)
-            }
-            if (javacExit == 0) {
-                val jarPath = outputPath.resolve(s"$mainName.jar")
-                val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+
+            if (options.mockChaincode) {
+                // invoke javac and make a jar from the result
+                val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
                 if (options.verbose) {
-                    println("jar exited with value " + jarExit)
+                    println("javac exited with value " + javacExit)
+                }
+                if (javacExit == 0) {
+                    val jarPath = outputPath.resolve(s"$mainName.jar")
+                    val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+                    if (options.verbose) {
+                        println("jar exited with value " + jarExit)
+                    }
+                }
+                else
+                    return false
+            } else {
+                // invoke gradle buildscript to produce a jar file
+                val gradleInvoke = s"gradle build -b buildscript/build.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
+
+                val gradleExit = gradleInvoke.!
+                if (gradleExit != 0) {
+                    println("`" + gradleInvoke + "` exited abnormally: " + gradleExit)
+                    return false
+                }
+
+                if (options.verbose) {
+                    println("gradle exited with value " + gradleExit)
                 }
             }
-            else
-                return false
 
         } catch {
             case e:
