@@ -76,7 +76,7 @@ object ProtobufGen {
             case b@edu.cmu.cs.obsidian.typecheck.BoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.name)
             case s@edu.cmu.cs.obsidian.typecheck.StringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.name)
                 // TODO: get the right type for the state if this is type specifies typestate?
-            case np: NonPrimitiveType => ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(np.toString), f.name)
+            case np: NonPrimitiveType => ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(np.contractName), f.name)
             case BottomType() => assert(false, "Bottom type should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
             case u@UnresolvedNonprimitiveType(_, _) => assert(false, "Unresolved types should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
         }

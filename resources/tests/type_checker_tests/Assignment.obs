@@ -7,7 +7,7 @@ resource contract C_Owned {
 main contract C_Shared {
     int f1;
 
-    C_Shared() ends in S {
+    C_Shared@S()  {
         ->S(f2 = f1);
     }
 

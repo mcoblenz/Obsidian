@@ -2,11 +2,11 @@
 resource contract Money {
     int amount;
 
-    owned Money(int amt) {
+    Money@Owned(int amt) {
         amount = amt;
     }
 
-    transaction addMoney(owned Money m) {
+    transaction addMoney(Money@Owned m) {
          amount = amount + m.amount;
          disown m;
     }

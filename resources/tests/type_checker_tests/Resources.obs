@@ -7,7 +7,7 @@ main resource contract BogusMoney {
 }
 
 resource contract Money {
-    owned Money() {
+    Money@Owned() {
 
     }
 }
@@ -15,7 +15,7 @@ resource contract Money {
 resource contract Wallet {
     Money@Owned money;
 
-    owned Wallet (Money@Owned m) {
+    Wallet@Owned(Money@Owned m) {
         money = m;
     }
 
