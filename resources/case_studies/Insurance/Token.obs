@@ -2,7 +2,7 @@ main resource contract Token {
     // bank's private key, only banks can make tokens
     int bankKey;
 
-    owned Token(int key) {
+    Token@Owned(int key) {
 
         //TODO: check that key is valid to make token
         if (true) {
