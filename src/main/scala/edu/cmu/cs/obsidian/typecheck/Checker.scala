@@ -493,7 +493,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val result =
                      checkArgs(e, s"constructor of $name", context, constrSpecs, This(), argTypes)
 
-                 // TODO: https://github.com/mcoblenz/Obsidian/issues/63
                  val simpleType = result match {
                      // Even if the args didn't check, we can still output a type
                      case None => ContractReferenceType(ctTableOfConstructed.contractType, Owned(), false)
@@ -1519,7 +1518,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case _ => ()
         }
 
-        // TODO: make this owned?
         val expectedThisType: NonPrimitiveType = constr.resultType
         checkIsSubtype(constr, outputContext("this"), expectedThisType)
 
@@ -1542,12 +1540,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(contract, MultipleConstructorsError(contract.name))
         }
 
-        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typ))
+        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typ.topPermissionType))
         val matchingConstructors = constructorsByArgTypes.filter(_._2.size > 1)
 
         matchingConstructors.foreach(typeAndConstructors => {
-            val highestLine = typeAndConstructors._2.maxBy(_.loc.line)
-            logError(highestLine, RepeatConstructorsError(contract.name))
+            val greatestLine = typeAndConstructors._2.maxBy(_.loc.line)
+            logError(greatestLine, RepeatConstructorsError(contract.name))
         })
     }
 

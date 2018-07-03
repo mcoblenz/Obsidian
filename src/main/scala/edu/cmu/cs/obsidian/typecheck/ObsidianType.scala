@@ -13,6 +13,7 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
     override def toString: String = contractName
 
     val contractName: String = contractType.contractName
+
     override def isOwned = permission == Owned()
 
     override val residualType: NonPrimitiveType = {
@@ -23,6 +24,8 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
             this
         }
     }
+
+    override def topPermissionType: NonPrimitiveType = this.copy(permission = Unowned()).setLoc(this)
 }
 
 
@@ -55,6 +58,8 @@ case class StateType(contractName: String, stateNames: Set[String], override val
     override def isOwned = true
 
     override val residualType: NonPrimitiveType = ContractReferenceType(ContractType(contractName), Unowned(), isRemote).setLoc(this)
+
+    override val topPermissionType: NonPrimitiveType = this
 }
 
 object StateType {
@@ -81,6 +86,8 @@ sealed trait ObsidianType extends HasLocation {
      * [residualType(t)] instead */
     val residualType: ObsidianType
 
+    def topPermissionType: ObsidianType
+
     def isOwned = false
 
     def isResourceReference(contextContractTable: ContractTable) = false
@@ -91,6 +98,7 @@ sealed trait ObsidianType extends HasLocation {
 sealed trait PrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
     override val residualType: ObsidianType = this
+    override val topPermissionType: ObsidianType = this
 }
 
 /* all permissioned types are associated with their corresponding symbol table
@@ -128,6 +136,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
     //    else this
     val residualType = this
 
+    def topPermissionType = this
 
     override def isResourceReference(contextContractTable: ContractTable): Boolean = {
         val contract = contextContractTable.lookupContract(contractName)
@@ -150,6 +159,7 @@ case class StringType() extends PrimitiveType {
 case class BottomType() extends ObsidianType {
     val isBottom: Boolean = true
     override val residualType: ObsidianType = this
+    override def topPermissionType: ObsidianType = this
 }
 
 // Only appears before running resolution, which happens right after parsing.
@@ -160,12 +170,14 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], permission: Perm
 
 
     override val residualType: ObsidianType = this // Should never be invoked
+    override def topPermissionType: ObsidianType = this
 }
 
 case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
     override val isBottom: Boolean = false
     override val residualType: NonPrimitiveType = this
+    override def topPermissionType: NonPrimitiveType = this
     override val contractName: String = name
     override val permission: Permission = simpleType.permission
 }
