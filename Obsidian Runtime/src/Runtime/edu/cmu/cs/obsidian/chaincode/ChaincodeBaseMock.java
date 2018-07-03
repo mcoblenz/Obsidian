@@ -212,7 +212,7 @@ class ChaincodeBaseServer {
 public abstract class ChaincodeBaseMock {
     public final ChaincodeStubMock stub = new ChaincodeStubMock();
 
-    private void invokeConstructor() {}; //to be overidden in generated code
+    protected void invokeConstructor() {}; //to be overidden in generated code
 
     public void delegatedMain(String args[]) {
         if (args.length != 2) {
