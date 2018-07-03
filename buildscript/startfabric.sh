@@ -19,30 +19,28 @@
 ENTER_PAUSE=0.4
 BETWEEN_PAUSE=0.25
 
-if [ "$1" == "-h" ] || [ "$1" == "--help" ] ; then
-    echo "Usage: $0 [ clean ] [ <instantiation parameters> ]"
-    echo "       for example: $0 '\"a\",\"200\",\"b\",\"100\"'"
+if [ -z "$1" ] ; then
+    echo "Usage: $0 <path to chaincode.jar> [ clean ] [ <instantiation parameters> ]"
+    echo "       for example: $0 build/chaincode.jar clean '\"a\",\"200\",\"b\",\"100\"'"
     echo "!!!! Warning: the 'clean' option will delete everything in /var/hyperledger/production."
     echo "!!!! Please be careful with it."
     echo "(However, without it, this script probably won't work multiple times.)"
     exit 1
 fi
 
-# Find the location of the script so we can locate e.g. chaincode.jar
-# relative to this file.
-parent_path=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
-cd "$parent_path"
+CCPATH=$1
+CCDIR=$(dirname $CCPATH)
 
 CCNAME="mycc"
 CCVERSION=0
 
-INIT_PARAMS=$1
+INIT_PARAMS=$2
 
-if [ "$1" == "clean" ]; then
+if [ "$2" == "clean" ]; then
     rm ch1.block
     rm -rf /var/hyperledger/production
     mkdir /var/hyperledger/production
-    INIT_PARAMS=$2
+    INIT_PARAMS=$3
 fi
 
 pkill orderer || true
@@ -90,7 +88,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'===== INSTALL CHAINCODE ====='
 sleep $ENTER_PAUSE
-peer chaincode install -l java -p ../build -n $CCNAME -v $CCVERSION 2>&1 | sed "s/^/$CINST[-install-] /"
+peer chaincode install -l java -p $CCDIR -n $CCNAME -v $CCVERSION 2>&1 | sed "s/^/$CINST[-install-] /"
 sleep 0.5
 echo $CNORM'==== CHAINCODE INSTALLED ===='
 
@@ -104,7 +102,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'======= RUN CHAINCODE ======='
 sleep $ENTER_PAUSE
-java -jar ../build/chaincode.jar -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
+java -jar $CCPATH -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
 sleep 5
 echo $CNORM'===== CHAINCODE RUNNING ====='
 
