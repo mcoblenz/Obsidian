@@ -440,7 +440,7 @@ object Parser extends Parsers {
                 }
 
                 Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, body, isStatic, thisType, finalType, Shared(), Shared()).setLoc(t)
+                    ensures, body, isStatic, thisType, finalType).setLoc(t)
         }
     }
     //keep returns first, take union of available ins and ends in

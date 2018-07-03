@@ -205,10 +205,10 @@ object AstTransformer {
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             t: Transaction): (Transaction, Seq[ErrorRecord]) = {
-        val context = startContext(lexicallyInsideOf, t.args, t.thisPermission)
+        val context = startContext(lexicallyInsideOf, t.args, t.thisType.permission)
 
 
-        var (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args, t.thisPermission)
+        var (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args, t.thisType.permission)
 
         val newEnsures = t.ensures.map(en => en.copy(expr = transformExpression(en.expr)))
 

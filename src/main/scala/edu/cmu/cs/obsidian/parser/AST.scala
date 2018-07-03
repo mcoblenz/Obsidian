@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.parser
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.{EndsInState, Identifier}
-import edu.cmu.cs.obsidian.typecheck.{ContractReferenceType, ContractType, StateType, InterfaceContractType, NonPrimitiveType, ObsidianType, Permission}
+import edu.cmu.cs.obsidian.typecheck._
 
 trait HasLocation {
     var loc: Position = NoPosition
@@ -129,9 +129,7 @@ case class Transaction(name: String,
                        body: Seq[Statement],
                        isStatic: Boolean,
                        thisType: NonPrimitiveType,
-                       thisFinalType: NonPrimitiveType,
-                       thisPermission: Permission, // TODO: refactor this
-                       thisFinalPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
+                       thisFinalType: NonPrimitiveType) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 
     // contract name is necessary since we don't have it at parse time
