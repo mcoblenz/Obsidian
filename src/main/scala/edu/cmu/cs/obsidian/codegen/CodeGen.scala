@@ -660,11 +660,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         target match {
             case Client(mainContract) =>
                 if (aContract == mainContract) {
-                    if (mockChaincode) {
-                        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
-                    } else {
-                        newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianChaincodeBase"))
-                    }
+                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
                     generateClientMainMethod(newClass)
                     generateInvokeClientMainMethod(aContract, newClass)
                 }
