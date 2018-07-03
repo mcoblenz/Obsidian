@@ -2,16 +2,16 @@ import "resources/case_studies/Insurance/Token.obs"
 import "resources/case_studies/Insurance/Bid.obs"
 
 main resource contract BidTokenPair {
-    Bid@Owned bid;
+    Bid@Available bid;
     // TODO: Token or Tokens?
     Token@Owned token;
 
-    owned BidTokenPair(Bid@Owned b, Token@Owned t) {
+    BidTokenPair@Owned(Bid@Available b, Token@Owned t) {
         bid = b;
         token = t;
     }
 
-    transaction getBid() returns Bid@Owned {
+    transaction getBid() returns Bid@Available {
         return bid;
     }
 

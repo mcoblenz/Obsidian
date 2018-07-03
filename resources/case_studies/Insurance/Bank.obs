@@ -7,7 +7,7 @@ main contract Bank {
     // the bank's private key for making tokens
     int key;
 
-    owned Bank() {
+    Bank() {
         // TODO: generate key
         key = 35;
     }

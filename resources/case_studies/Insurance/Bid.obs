@@ -12,7 +12,7 @@ main resource contract Bid {
     // client buys it
     state Sold {}
 
-    owned Bid(int c, int expirationDate) {
+    Bid@Available(int c, int expirationDate) {
         cost = c;
         // Available by default
         ->Available(timeAvailable = expirationDate);

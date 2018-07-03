@@ -89,23 +89,7 @@ object Parser extends Parsers {
              opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
                 case remote ~ id ~ permission => {
                     val isRemote = remote.isDefined
-                    val typ =
-                        permission match {
-                            case None => ContractReferenceType(ContractType(id._1), Inferred(), isRemote)
-                            case Some(_ ~ permissionIdent) =>
-                                if (permissionIdent._1 == "Shared") {
-                                    ContractReferenceType(ContractType(id._1), Shared(), isRemote)
-                                }
-                                else if (permissionIdent._1 == "Owned") {
-                                    ContractReferenceType(ContractType(id._1), Owned(), isRemote)
-                                }
-                                else if (permissionIdent._1 == "Unowned") {
-                                    ContractReferenceType(ContractType(id._1), Unowned(), isRemote)
-                                }
-                                else {
-                                    StateType(id._1, permissionIdent._1, isRemote)
-                                }
-                        }
+                    val typ = extractTypeFromPermission(permission, id, isRemote)
                     typ.setLoc(id)
                 }
             }
@@ -116,6 +100,25 @@ object Parser extends Parsers {
         val stringPrim = StringT() ^^ { t => StringType().setLoc(t) }
 
         parseNonPrimitive | intPrim | boolPrim | stringPrim
+    }
+
+    private def extractTypeFromPermission(permission: Option[~[Token, Identifier]], name: Identifier, isRemote: Boolean): NonPrimitiveType = {
+        permission match {
+            case None => ContractReferenceType(ContractType(name._1), Inferred(), isRemote)
+            case Some(_ ~ permissionIdent) =>
+                if (permissionIdent._1 == "Shared") {
+                    ContractReferenceType(ContractType(name._1), Shared(), isRemote)
+                }
+                else if (permissionIdent._1 == "Owned") {
+                    ContractReferenceType(ContractType(name._1), Owned(), isRemote)
+                }
+                else if (permissionIdent._1 == "Unowned") {
+                    ContractReferenceType(ContractType(name._1), Unowned(), isRemote)
+                }
+                else {
+                    StateType(name._1, permissionIdent._1, isRemote)
+                }
+        }
     }
 
     private def parseArgList: Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
@@ -424,8 +427,20 @@ object Parser extends Parsers {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
                 }
+
+                // contract name is THIS as there is no way to access it at the moment
+                val thisType = transOptions.availableIn match {
+                    case None => ContractReferenceType(ContractType("THIS"), Shared(), false)
+                    case Some(s) => StateType("THIS", s.map(_._1), false)
+                }
+
+                val finalType = transOptions.endsInState match {
+                    case None => ContractReferenceType(ContractType("THIS"), Shared(), false)
+                    case Some(s) => StateType("THIS", s.map(_._1), false)
+                }
+
                 Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, transOptions.endsInState, body, isStatic, Shared(), Shared()).setLoc(t)
+                    ensures, body, isStatic, thisType, finalType).setLoc(t)
         }
     }
     //keep returns first, take union of available ins and ends in
@@ -487,10 +502,11 @@ object Parser extends Parsers {
 
     // maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor = {
-        opt(OwnedT()) ~ parseId ~ LParenT() ~! parseArgDefList ~! RParenT() ~! opt(parseEndsInState) ~!
-        LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case isOwned ~ name ~ _ ~ args ~ _ ~ ensuresState ~ _ ~ body ~ _ =>
-                Constructor(name._1, isOwned.isDefined, args, ensuresState, body).setLoc(name)
+        parseId ~ opt(AtT() ~! parseId) ~! LParenT() ~! parseArgDefList ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
+                val resultType = extractTypeFromPermission(permission, name, isRemote = false)
+
+                Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }
 

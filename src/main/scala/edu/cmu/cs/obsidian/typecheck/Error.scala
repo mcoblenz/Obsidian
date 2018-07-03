@@ -181,6 +181,10 @@ case class MultipleConstructorsError(contractName: String) extends Error {
     val msg: String = s"Main contract '$contractName' must only contain one constructor."
 }
 
+case class RepeatConstructorsError(contractName: String) extends Error {
+    val msg: String = s"Contract '$contractName' has multiple constructors that take the same arguments."
+}
+
 case class NoParentError(cName: String) extends Error {
     val msg: String = s"Contract $cName has no parent contract"
 }

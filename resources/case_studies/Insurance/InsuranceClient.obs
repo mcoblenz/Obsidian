@@ -12,13 +12,13 @@ main contract InsuranceClient {
 	     insService.connectBankAndInsurer(bank);
 
          Token@Owned token = bank.buyToken();
-	     Bid@Owned bid = insService.requestBids(3);
+	     Bid@Available bid = insService.requestBids(3);
 
          // test
          if (bid.getCost() == 7) {
              System.print("bid : 7 \n");
          }
-
+         // TODO: return Bid@Sold (issue 140)
          Bid@Owned soldBid = insService.buyBid(bid, token);
 
          // to pass typechecker
