@@ -937,7 +937,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
         noSuchTransactionBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.NoSuchTransactionException")))
 
-        runMeth.body()._return(returnBytes)
+        /* Don't return anything if we put the 'throw' directly in the method body, since
+         * it will make the java compiler complain about 'unreachable code.' */
+        lastTransactionElse match {
+            case None =>
+            case Some(_) => runMeth.body()._return(returnBytes)
+        }
     }
 
     private def generateServerMainMethod(newClass: JDefinedClass) = {
