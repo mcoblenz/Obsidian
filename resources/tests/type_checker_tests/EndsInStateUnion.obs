@@ -1,7 +1,6 @@
 main contract C1 {
 
-    // error: constructor for 'C1' ends in S2, S3 instead of S1
-    C1@S1(bool b){
+    C1@(S2|S3)(bool b){
         if(b) {
             ->S2;
         } else {

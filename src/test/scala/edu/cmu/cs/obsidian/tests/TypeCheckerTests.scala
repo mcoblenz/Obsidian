@@ -411,25 +411,20 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def endsInStateUnionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
-            (SubtypingError(
-                StateType("C1", Set("S2", "S3"), false),
-                StateType("C1", Set("S1"), false)), 4
-            )
-                ::
-                (StateUndefinedError("C1", "OtherState"), 13)
+            (StateUndefinedError("C1", "OtherState"), 12)
                 ::
                 (SubtypingError(
                     StateType("C1", Set("S1", "S2"), false),
-                    StateType("C1", Set("S1", "S3"), false)), 19
+                    StateType("C1", Set("S1", "S3"), false)), 18
                 )
                 ::
                 (SubtypingError(
                     StateType("C2", Set("S1", "S2"), false),
-                    StateType("C2", "S1", false)), 33
+                    StateType("C2", "S1", false)), 32
                 )
                 ::
                 (
-                    VariableUndefinedError("f2", null), 65
+                    VariableUndefinedError("f2", null), 64
                 )
                 ::
                 Nil
