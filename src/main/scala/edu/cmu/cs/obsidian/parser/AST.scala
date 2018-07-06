@@ -52,7 +52,9 @@ case class NumLiteral(value: Int) extends Expression
 case class StringLiteral(value: String) extends Expression
 case class TrueLiteral() extends Expression
 case class FalseLiteral() extends Expression
-case class This() extends Expression
+case class This() extends Expression {
+    override def toString: String = "this"
+}
 case class Parent() extends Expression
 case class Conjunction(e1: Expression, e2: Expression) extends Expression
 case class Disjunction(e1: Expression, e2: Expression) extends Expression

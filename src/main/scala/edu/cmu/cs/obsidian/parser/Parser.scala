@@ -42,7 +42,12 @@ object Parser extends Parsers {
     }
 
     private def parseIdAlternatives: Parser[Seq[Identifier]] = {
-        repsep(parseId, PipeT())
+        val withParens = LParenT() ~ repsep(parseId, PipeT()) ~ RParenT() ^^ {
+            case _ ~ seq ~ _ => seq
+        }
+        val withoutParens = repsep(parseId, PipeT())
+
+        withParens | withoutParens
     }
 
     def resolvePermission(ident: String): Option[Permission] = {
@@ -105,7 +110,7 @@ object Parser extends Parsers {
         // For now, support only one state specification
 
         val parseNonPrimitive: Parser[NonPrimitiveType] = {
-             opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseId) ^^ {
+             opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseIdAlternatives) ^^ {
                 case remote ~ id ~ permissionToken => {
                     val isRemote = remote.isDefined
                     val typ = extractTypeFromPermission(permissionToken, id, isRemote)
@@ -121,14 +126,21 @@ object Parser extends Parsers {
         parseNonPrimitive | intPrim | boolPrim | stringPrim
     }
 
-    private def extractTypeFromPermission(permission: Option[~[Token, Identifier]], name: Identifier, isRemote: Boolean): NonPrimitiveType = {
+    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]], name: Identifier, isRemote: Boolean): NonPrimitiveType = {
         permission match {
             case None => ContractReferenceType(ContractType(name._1), Inferred(), isRemote)
-            case Some(_ ~ permissionIdent) =>
-                val permission = resolvePermission(permissionIdent._1)
-                permission match {
-                    case None => StateType(name._1, permissionIdent._1, isRemote)
-                    case Some(p) => ContractReferenceType(ContractType(name._1), p, isRemote)
+            case Some(_ ~ permissionIdentSeq) =>
+                if (permissionIdentSeq.size == 1) {
+                    val thePermissionOrState = permissionIdentSeq.head
+                    val permission = resolvePermission(thePermissionOrState._1)
+                    permission match {
+                        case None => StateType(name._1, thePermissionOrState._1, isRemote)
+                        case Some(p) => ContractReferenceType(ContractType(name._1), p, isRemote)
+                    }
+                }
+                else {
+                    val stateNames = permissionIdentSeq.map(_._1)
+                    StateType(name._1, stateNames.toSet, isRemote)
                 }
         }
     }
@@ -385,7 +397,7 @@ object Parser extends Parsers {
             case _ ~ s => EndsInState(s)
         }
 
-    private def parseFuncDecl = { 
+    private def parseFuncDecl = {
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
@@ -519,7 +531,7 @@ object Parser extends Parsers {
 
     // maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor = {
-        parseId ~ opt(AtT() ~! parseId) ~! LParenT() ~! parseArgDefList ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+        parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
                 val resultType = extractTypeFromPermission(permission, name, isRemote = false)
 

@@ -2,7 +2,27 @@ main contract C {
     state S1;
     state S2;
 
-    C() {
-        ->S1; [this@S1];
+    C@Owned() {
+        ->S1; [this@S1|S3]; // should fail
+        [this@S1|S2];
+        [this@S1];
+        [this @ (S1|S2)];
+
+        if (true) {
+            ->S2;
+        }
+
+        [this @ (S1 | S2)];
+
+        [this @ S2]; // should fail
+    }
+
+    transaction t() {
+        C@Owned ow = new C();
+        [ow @ Owned];
+
+        [ow @ Unowned]; // should fail
+
+        [ow @ Owned | Unowned];
     }
 }

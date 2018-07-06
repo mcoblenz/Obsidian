@@ -579,5 +579,16 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
 
+  @Test def staticAssertsTest(): Unit = {
+    runTest("resources/tests/type_checker_tests/StaticAsserts.obs",
+      (StaticAssertInvalidState("C", "S3"), 6)
+        ::
+        (StaticAssertFailed(This(), Seq("S2"), StateType("C", Set("S1", "S2"), false)), 17)
+        ::
+        (StaticAssertFailed(ReferenceIdentifier("ow"), Seq("Unowned"), ContractReferenceType(ContractType("C"), Owned(), false)), 24)
+        ::
+        Nil
+    )
+  }
 
 }

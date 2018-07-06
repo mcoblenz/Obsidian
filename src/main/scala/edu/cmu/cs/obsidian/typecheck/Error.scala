@@ -217,14 +217,12 @@ case class StaticAssertOnPrimitiveError(e: Expression) extends Error {
     val msg: String = s"Cannot check the ownership or state of primitive expression '$e'."
 }
 
-case class StaticAssertFailed(e: Expression, actualPermission: Permission, requiredPermission: Permission) extends Error {
-    val msg: String = s"Expression '$e' failed assertion '$requiredPermission'. Actual permission: '$actualPermission'."
+case class StaticAssertFailed(e: Expression, statesOrPermissions: Seq[String], actualType: ObsidianType) extends Error {
+    val stateStr = statesOrPermissions.mkString(" | ")
+
+    val msg: String = s"Expression '$e' failed assertion $stateStr. Actual type: $actualType."
 }
 
-case class StaticAssertFailedStates(e: Expression, actualStateList: Seq[String], requiredState: String) extends Error {
-    val msg: String = s"Expression '$e' may not be in state '$requiredState'. Possible states: '$actualStateList'."
-}
-
-case class StaticAssertFailedNotStateful(e: Expression, actualType: ObsidianType, requiredState: String) extends Error {
-    val msg: String = s"Expression '$e' may not be in state '$requiredState'. Its type, '$actualType', does not specify state."
+case class StaticAssertInvalidState(contractName: String, stateOrPermission: String) extends Error {
+    val msg: String = s"Cannot assert for invalid state '$stateOrPermission' in contract $contractName"
 }

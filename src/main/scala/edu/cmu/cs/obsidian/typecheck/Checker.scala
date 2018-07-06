@@ -207,7 +207,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
 
-
+    // returns true iff [p1 <: p2]
     private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
         p1 match {
             case Owned() => true
@@ -1261,31 +1261,48 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
                 logError(s, NoEffectsError(s))
                 contextPrime
-            case StaticAssert(e, statesOrPermissions) =>
+            case StaticAssert(e, allowedStatesOrPermissions) =>
                 val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, true)
 
-                typ match {
+                def checkStateOrPermissionValid(contractName: String, stateOrPermission: Identifier): Unit = {
+                    val stateOrPermissionStr = stateOrPermission._1
+                    val resolvedPermission = Parser.resolvePermission(stateOrPermissionStr)
+                    resolvedPermission match {
+                        case Some(requiredPermission) => ()
+                        case None =>
+                            // Assume stateOrPermission is a state name.
+                            // Make sure it's a valid name, although it wouldn't harm too much it if it were.
+                            val contractType = context.contractTable.lookupContract(contractName).get
+                            val referencedState = contractType.state(stateOrPermissionStr)
+                            if (referencedState.isEmpty) {
+                                logError(s, StaticAssertInvalidState(contractName, stateOrPermissionStr))
+                            }
+                    }
+                }
+
+                val typToCheck = typ match {
+                    case InterfaceContractType(name, realTyp) => realTyp
+                    case _ => typ
+                }
+
+                val allowedStatesOrPermissionNames = allowedStatesOrPermissions.map(_._1)
+                typToCheck match {
                     case b: BottomType => ()
                     case p: PrimitiveType => logError(s, StaticAssertOnPrimitiveError(e))
-                    case npExprType: NonPrimitiveType =>
-                        for (stateOrPermission <- statesOrPermissions) {
-                            val resolvedPermission = Parser.resolvePermission(stateOrPermission._1)
-                            resolvedPermission match {
-                                case Some(requiredPermission) => if (!isSubpermission(npExprType.permission, requiredPermission)) {
-                                    logError(s, StaticAssertFailed(e, npExprType.permission, requiredPermission))
-                                }
-                                case None =>
-                                    // Assume this is a state name.
-                                    npExprType match {
-                                        case StateType(_, stateNames, _) =>
-                                            if (!stateNames.contains(stateOrPermission._1)) {
-                                                logError(s, StaticAssertFailedStates(e, stateNames.toSeq, stateOrPermission._1))
-                                            }
-                                        case _ =>
-                                            logError(s, StaticAssertFailedNotStateful(e, npExprType, stateOrPermission._1))
-                                    }
-                            }
+                    case ContractReferenceType(contractType, permission, _) =>
+                        // Make sure the permission is somewhere in the list of asserted permissions.
+                        if (!allowedStatesOrPermissionNames.contains(permission.toString)) {
+                            logError(s, StaticAssertFailed(e, allowedStatesOrPermissionNames, typ))
                         }
+                        allowedStatesOrPermissions.toSet.foreach((stateName: Identifier) => checkStateOrPermissionValid(contractType.contractName, stateName))
+
+                    case stateType@StateType(contractName, stateNames, _) =>
+                        if (!stateNames.subsetOf(allowedStatesOrPermissionNames.toSet)) {
+                            logError(s, StaticAssertFailed(e, allowedStatesOrPermissionNames, typ))
+                        }
+                        allowedStatesOrPermissions.toSet.foreach((stateName: Identifier) => checkStateOrPermissionValid(stateType.contractName, stateName))
+
+                    case InterfaceContractType(name, _) => assert(false, "Should have already eliminated this case")
                     case u: UnresolvedNonprimitiveType =>
                         assert(false, "Should not encounter unresolved nonprimitive types in the typechecker")
                 }
