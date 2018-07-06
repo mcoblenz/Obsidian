@@ -182,11 +182,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 val mainSubtype: Boolean = (np1, np2) match {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
-                        c1 == c2 &&
-                            ((c1p == c2p) ||
-                                (c1p == Shared() && c2p == Unowned()) ||
-                                (c1p == Owned())
-                                )
+                        c1 == c2 && isSubpermission(c1p, c2p)
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
                         c1 == c2 && ss1.subsetOf(ss2)
                     case (StateType(c, ss1, _), ContractReferenceType(c2, c2p, _)) =>
@@ -210,40 +206,37 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         else t1
     }
 
-    //-------------------------------------------------------------------------
-    /* Helper functions to easily make new types */
 
-    /*/* Determines what sort of simple type should be used, given a set a possible states */
-    // TODO: refactor this when we support specifying permissions on "this" for transactions
-    private def simpleOfWithStateNames(cName: String, states: Option[Set[String]], permission: Permission): NonPrimitiveType = {
-        states match {
-            case None => ContractReferenceType(ContractType(cName), permission, false)
-            case Some(ss) =>
-                StateType(cName, ss, false)
+    // returns true iff [p1 <: p2]
+    private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
+        p1 match {
+            case Owned() => true
+            case Unowned() => p2 == Unowned()
+            case Shared() => (p2 == Shared()) || (p2 == Unowned())
         }
     }
-
-    // Usually we have the identifiers available, so this is the main entry point.
-    private def simpleOf(lexicallyInsideOf: DeclarationTable, cName: String, states: Option[Set[Identifier]], permission: Permission): NonPrimitiveType = {
-        val stateNames = states match {
-            case None => None
-            case Some(ss) => Some(ss.map(_._1))
-        }
-        simpleOfWithStateNames(cName, stateNames, permission)
-    }*/
-
-
     //-------------------------------------------------------------------------
-    /* the upper bound U of two types T1 and T2 is a type such that
-     * subtypeOf(T1, U) and subtypeOf(t2, U). Such a type doesn't always exist. */
-
-    private def nonPrimitiveUpperBound(
+    private def nonPrimitiveMergeTypes(
             t1: NonPrimitiveType,
             t2: NonPrimitiveType): Option[NonPrimitiveType] = {
         if (t1.contractName != t2.contractName) return None
         (t1, t2) match {
-            case (_, ContractReferenceType(_, _, _)) => Some(t2)
-            case (ContractReferenceType(_, _, _), _) => Some(t1)
+            case (ContractReferenceType(_, p1, _), ContractReferenceType(_, p2, _)) =>
+                if (p1 == p2) {
+                    Some(t1)
+                }
+                else {
+                    p1 match {
+                        case Owned() => None
+                        case Unowned() => if (p2 == Shared()) Some(t2) else None
+                        case Shared() => if (p2 == Unowned()) Some(t1) else None
+                        case Inferred() => assert(false, "Inferred types should be removed"); None
+                    }
+                }
+            case (ContractReferenceType(_, Owned(), _), StateType(_, _, _)) =>
+                Some(t1)
+            case (StateType(_, _, _), ContractReferenceType(_, Owned(), _)) =>
+                Some(t2)
             case (StateType(_, ss1, _), StateType(_, ss2, _)) =>
                 val c = t1.contractName
                 val unionStates = ss1.union(ss2)
@@ -252,13 +245,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def upperBound(t1: ObsidianType, t2: ObsidianType): Option[ObsidianType] = {
+    private def mergeTypes(t1: ObsidianType, t2: ObsidianType): Option[ObsidianType] = {
         (t1, t2) match {
             case (IntType(), IntType()) => Some(IntType())
             case (BoolType(), BoolType()) => Some(BoolType())
             case (StringType(), StringType()) => Some(StringType())
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
-                nonPrimitiveUpperBound(np1, np2).flatMap(s => Some(s))
+                nonPrimitiveMergeTypes(np1, np2).flatMap(s => Some(s))
             case _ => None
         }
     }
@@ -376,9 +369,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case TrueLiteral() => (BoolType(), context)
              case FalseLiteral() => (BoolType(), context)
              case This() =>
-                 /* unlike variables, "this" must always be valid, so the residual type
-                  * is returned, and the actual type stays in the variable */
-                 (context("this").residualType, context)
+                 val thisType = context.thisType
+                 val newContext = if (consumeOwnershipIfOwned) context.updated("this", thisType.residualType) else context
+                 (thisType, newContext)
              case Parent() =>
                  assert(false, "TODO: re-add support for parents")
                  /*
@@ -623,11 +616,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def checkForUnusedOwnershipErrors(ast: AST, context: Context, exceptions: Set[String]) = {
         for ((x, typ) <- context.underlyingVariableMap) {
             if (!exceptions.contains(x)) {
-                typ match {
-                    case t: NonPrimitiveType =>
-                        if (t.isOwned && t.isResourceReference(context.contractTable)) logError(ast, UnusedOwnershipError(x))
-                    case _ => ()
-                }
+                errorIfNotDisposable(x, typ, context, ast)
             }
         }
     }
@@ -661,6 +650,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         Context(oldContext.contractTable, newContext.underlyingVariableMap, isThrown = branchContext.isThrown, newContext.transitionFieldsInitialized)
     }
 
+    private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
+        typ match {
+            case t: NonPrimitiveType =>
+                if (t.isOwned && t.isResourceReference(context.contractTable)) logError(ast, UnusedOwnershipError(variable))
+            case _ => ()
+        }
+    }
+
     private def mergeContext(
             ast: AST,
             context1: Context,
@@ -679,12 +676,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         for (x <- inBoth) {
             val t1 = context1(x)
             val t2 = context2(x)
-            upperBound(t1, t2) match {
+            mergeTypes(t1, t2) match {
                 case Some(u) => mergedMap = mergedMap.updated(x, u)
                 case None =>
                     logError(ast, MergeIncompatibleError(x, t1, t2))
             }
         }
+
+        // Make sure anything that is not in both is disposable.
+
+        val inOnlyContext1 = context1.keys.toSet -- inBoth
+        val inOnlyContext2 = context2.keys.toSet -- inBoth
+
+        inOnlyContext1.foreach((x: String) => errorIfNotDisposable(x, context1(x), context1, ast))
+        inOnlyContext2.foreach((x: String) => errorIfNotDisposable(x, context2(x), context2, ast))
 
         Context(context1.contractTable, mergedMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized))
     }
@@ -1256,6 +1261,53 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
                 logError(s, NoEffectsError(s))
                 contextPrime
+            case StaticAssert(e, allowedStatesOrPermissions) =>
+                val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, true)
+
+                def checkStateOrPermissionValid(contractName: String, stateOrPermission: Identifier): Unit = {
+                    val stateOrPermissionStr = stateOrPermission._1
+                    val resolvedPermission = Parser.resolvePermission(stateOrPermissionStr)
+                    resolvedPermission match {
+                        case Some(requiredPermission) => ()
+                        case None =>
+                            // Assume stateOrPermission is a state name.
+                            // Make sure it's a valid name, although it wouldn't harm too much it if it were.
+                            val contractType = context.contractTable.lookupContract(contractName).get
+                            val referencedState = contractType.state(stateOrPermissionStr)
+                            if (referencedState.isEmpty) {
+                                logError(s, StaticAssertInvalidState(contractName, stateOrPermissionStr))
+                            }
+                    }
+                }
+
+                val typToCheck = typ match {
+                    case InterfaceContractType(name, realTyp) => realTyp
+                    case _ => typ
+                }
+
+                val allowedStatesOrPermissionNames = allowedStatesOrPermissions.map(_._1)
+                typToCheck match {
+                    case b: BottomType => ()
+                    case p: PrimitiveType => logError(s, StaticAssertOnPrimitiveError(e))
+                    case ContractReferenceType(contractType, permission, _) =>
+                        // Make sure the permission is somewhere in the list of asserted permissions.
+                        if (!allowedStatesOrPermissionNames.contains(permission.toString)) {
+                            logError(s, StaticAssertFailed(e, allowedStatesOrPermissionNames, typ))
+                        }
+                        allowedStatesOrPermissions.toSet.foreach((stateName: Identifier) => checkStateOrPermissionValid(contractType.contractName, stateName))
+
+                    case stateType@StateType(contractName, stateNames, _) =>
+                        if (!stateNames.subsetOf(allowedStatesOrPermissionNames.toSet)) {
+                            logError(s, StaticAssertFailed(e, allowedStatesOrPermissionNames, typ))
+                        }
+                        allowedStatesOrPermissions.toSet.foreach((stateName: Identifier) => checkStateOrPermissionValid(stateType.contractName, stateName))
+
+                    case InterfaceContractType(name, _) => assert(false, "Should have already eliminated this case")
+                    case u: UnresolvedNonprimitiveType =>
+                        assert(false, "Should not encounter unresolved nonprimitive types in the typechecker")
+                }
+
+                context // Not contextPrime!
             case _ =>
                 logError(s, NoEffectsError(s))
                 context

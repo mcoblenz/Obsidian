@@ -1,5 +1,5 @@
 contract C {
-    C(string s) {
+    C@Owned(string s) {
         ->HasString(s = s);
     }
 
@@ -23,7 +23,7 @@ main contract IntContainer {
         return this.b;
     }
 
-    transaction createC(string s) returns C {
+    transaction createC(string s) returns C@Owned {
         return new C(s);
     }
 }

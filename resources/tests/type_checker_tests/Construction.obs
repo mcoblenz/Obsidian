@@ -5,19 +5,19 @@ contract Thing {
     string y;
     bool z;
 
-    Thing() {
+    Thing@Owned() {
         this.x = 1;
         this.y = "a";
         this.z = true;
     }
 
-    Thing(int x) {
+    Thing@Owned(int x) {
         this.x = x;
         this.y = "b";
         this.z = true;
     }
 
-    Thing(int x, string y, bool z) {
+    Thing@Owned(int x, string y, bool z) {
         this.x = x;
         this.y = y;
         this.z = z;
@@ -32,11 +32,11 @@ contract Thing {
 main contract Construct {
 
     transaction constructThings() {
-        Thing thing1 = new Thing();
+        Thing@Owned thing1 = new Thing();
         // should fail for each constructor above
-        Thing thing2 = new Thing("hi");
+        Thing@Owned thing2 = new Thing("hi");
         // should fail for each constructor above
-        Thing thing3 = new Thing(1, 2, 3);
+        Thing@Owned thing3 = new Thing(1, 2, 3);
         // should fail twice: undefined contract
         Stuff stuff = new Stuff();
     }

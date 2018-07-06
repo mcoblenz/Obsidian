@@ -52,7 +52,9 @@ case class NumLiteral(value: Int) extends Expression
 case class StringLiteral(value: String) extends Expression
 case class TrueLiteral() extends Expression
 case class FalseLiteral() extends Expression
-case class This() extends Expression
+case class This() extends Expression {
+    override def toString: String = "this"
+}
 case class Parent() extends Expression
 case class Conjunction(e1: Expression, e2: Expression) extends Expression
 case class Disjunction(e1: Expression, e2: Expression) extends Expression
@@ -89,6 +91,7 @@ case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement])
 case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement
 case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
+case class StaticAssert(expr: Expression, statesOrPermissions: Seq[Identifier]) extends Statement
 
 /* Declarations */
 case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {
