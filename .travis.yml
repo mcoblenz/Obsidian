@@ -13,3 +13,7 @@ jdk:
 before_install:
   - ./install-protobuf.sh
   - export PATH=${PATH}:${HOME}/protobuf/
+
+script:
+  - sbt ++2.12.4 test
+  - cat resources/tests/tests_to_run.txt | xargs perl obstest.pl -v
