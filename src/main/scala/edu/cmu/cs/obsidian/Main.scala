@@ -228,7 +228,7 @@ object Main {
                 val path = Paths.get(p)
                 /* create the dir if it doesn't exist */
                 Files.createDirectories(path)
-                path
+                path.toAbsolutePath
             case None => Files.createTempDirectory("obsidian").toAbsolutePath
         }
 

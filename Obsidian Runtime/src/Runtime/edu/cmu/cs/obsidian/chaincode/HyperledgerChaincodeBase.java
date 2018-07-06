@@ -18,7 +18,7 @@ import java.util.Base64;
 import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 
-public abstract class ObsidianChaincodeBase extends ChaincodeBase {
+public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
@@ -51,6 +51,11 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
         try {
             byte result[] = run(stub, function, byte_args);
             return newSuccessResponse(result);
+        } catch (NoSuchTransactionException e) {
+            /* This will be returned when calling an invalid transaction
+             * from the command line -- referencing an invalid transaction
+             * in the client will give a compile-time error. */
+            return newErrorResponse("No such transaction: " + function);
         } catch (Throwable e) {
             return newErrorResponse(e);
         }
@@ -105,7 +110,8 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
     public abstract byte[] init(ChaincodeStub stub, byte[][] args)
             throws InvalidProtocolBufferException;
     public abstract byte[] run(ChaincodeStub stub, String transactionName, byte[][] args)
-            throws InvalidProtocolBufferException, ReentrancyException, BadTransactionException;
-    public abstract ObsidianChaincodeBase __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
+            throws InvalidProtocolBufferException, ReentrancyException,
+                   BadTransactionException, NoSuchTransactionException;
+    public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
 }
