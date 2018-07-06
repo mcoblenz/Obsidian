@@ -52,6 +52,9 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
             byte result[] = run(stub, function, byte_args);
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
+            /* This will be returned when calling an invalid transaction
+             * from the command line -- referencing an invalid transaction
+             * in the client will give a compile-time error. */
             return newErrorResponse("No such transaction: " + function);
         } catch (Throwable e) {
             return newErrorResponse(e);

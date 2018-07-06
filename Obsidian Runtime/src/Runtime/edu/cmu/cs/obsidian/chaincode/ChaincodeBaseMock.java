@@ -136,6 +136,11 @@ class ChaincodeBaseServer {
                 failureMessage = ": Reentrant call made";
             } catch (BadTransactionException e) {
                 System.out.println("Invalid state access");
+            } catch (NoSuchTransactionException e) {
+                /* This should never happen, because it won't compile if you
+                 * reference a nonexistent transaction. */
+                System.out.println("Invalid transaction call " + txName);
+                failureMessage = ": No such transaction: " + txName;
             }
         }
         else if (method.equals("query")) {
@@ -283,7 +288,8 @@ public abstract class ChaincodeBaseMock {
     public abstract byte[] init(ChaincodeStubMock stub, byte[][] args)
             throws InvalidProtocolBufferException;
     public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args)
-            throws InvalidProtocolBufferException, ReentrancyException, BadTransactionException;
+            throws InvalidProtocolBufferException, ReentrancyException,
+                   BadTransactionException, NoSuchTransactionException;
     public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
 }
