@@ -2,9 +2,9 @@ contract A {}
 
 main contract C {
     int a;
-    A b;
+    A@Shared b;
 
-    C(int x, A y) {
+    C@Owned(int x, A@Shared y) {
         a = x;
         b = y;
         ->S1;
