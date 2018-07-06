@@ -733,7 +733,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             ast: AST,
             methName: String,
             context: Context,
-            spec: Seq[VariableDecl],
+            spec: Seq[VariableDeclWithSpec],
             receiver: Expression,
             args: Seq[(ObsidianType, Expression)]): Either[Seq[(AST, Error)], Map[String, Expression]] = {
 
@@ -751,7 +751,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             calleeToCaller = calleeToCaller.updated("this", receiver)
 
             val specCallerPoV: Seq[ObsidianType] = spec.map(arg => {
-                arg.typ match {
+                arg.typIn match {
                     case prim: PrimitiveType => prim
                     case np: NonPrimitiveType =>
                         toCallerPoV(calleeToCaller, np) match {
@@ -788,7 +788,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             ast: AST,
             methName: String,
             context: Context,
-            specs: Seq[(Seq[VariableDecl], U)],
+            specs: Seq[(Seq[VariableDeclWithSpec], U)],
             receiver: Expression,
             args: Seq[(ObsidianType, Expression)]): Option[(U, Map[String, Expression])] = {
 
@@ -1334,7 +1334,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         var context = initContext
 
         for (arg <- tx.args) {
-            context = initContext.updated(arg.varName, arg.typ)
+            context = initContext.updated(arg.varName, arg.typIn)
         }
 
         // Check the body; ensure [this] is well-typed after, and check for leaked ownership
@@ -1431,7 +1431,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         // Add all the args first (in an unsafe way) before checking anything
         for (arg <- tx.args) {
-            initContext = initContext.updated(arg.varName, arg.typ)
+            initContext = initContext.updated(arg.varName, arg.typIn)
         }
 
         checkTransactionArgShadowing(startStates, tx)
@@ -1539,7 +1539,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         // Add all the args first (in an unsafe way) before checking anything
         for (arg <- constr.args) {
-            context = context.updated(arg.varName, arg.typ)
+            context = context.updated(arg.varName, arg.typIn)
         }
 
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
@@ -1592,7 +1592,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(contract, MultipleConstructorsError(contract.name))
         }
 
-        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typ.topPermissionType))
+        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typIn.topPermissionType))
         val matchingConstructors = constructorsByArgTypes.filter(_._2.size > 1)
 
         matchingConstructors.foreach(typeAndConstructors => {

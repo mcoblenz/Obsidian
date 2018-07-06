@@ -237,7 +237,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         var argExpressions: List[IJExpression] = Nil
         /* add args */
         for (arg <- transaction.args) {
-            argExpressions = argExpressions :+ meth.param(resolveType(arg.typ), arg.varName)
+            argExpressions = argExpressions :+ meth.param(resolveType(arg.typIn), arg.varName)
         }
 
         /* add body */
@@ -254,7 +254,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         for (i <- 0 until argExpressions.length) {
             val unmarshalledArg = argExpressions(i)
 
-            val marshalledArg = marshallExpr(unmarshalledArg, transaction.args(i).typ)
+            val marshalledArg = marshallExpr(unmarshalledArg, transaction.args(i).typIn)
             val setInvocation = body.invoke(argArray, "add")
             setInvocation.arg(marshalledArg)
         }
@@ -355,7 +355,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
 
       /* add the appropriate args to the method and collect them in a list */
-        val jArgs = txExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
+        val jArgs = txExample.args.map( (arg: VariableDeclWithSpec) => meth.param(resolveType(arg.typIn), arg.varName) )
 
         val body = meth.body()
 
@@ -393,7 +393,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         val meth = newClass.method(JMod.PUBLIC, retType, funExample.name)
 
         /* add the appropriate args to the method and collect them in a list */
-        val jArgs = funExample.args.map( (arg: VariableDecl) => meth.param(resolveType(arg.typ), arg.varName) )
+        val jArgs = funExample.args.map( (arg: VariableDeclWithSpec) => meth.param(resolveType(arg.typIn), arg.varName) )
 
         val body = meth.body()
 
@@ -725,7 +725,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         // gather the types of its arguments
         val constructorTypes: Seq[ObsidianType] =
             constructor match {
-                case Some(constr: Constructor) => constr.args.map(_.typ)
+                case Some(constr: Constructor) => constr.args.map(_.typIn)
                 case _ => List.empty
             }
 
@@ -850,9 +850,9 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 var runArgNumber = 0
                 for (txArg <- tx.args) {
                     val runArg = runArgs.component(JExpr.lit(runArgNumber))
-                    val javaArgType = resolveType(txArg.typ)
+                    val javaArgType = resolveType(txArg.typIn)
 
-                    val transactionArgExpr: IJExpression = txArg.typ match {
+                    val transactionArgExpr: IJExpression = txArg.typIn match {
                         case IntType() =>
                             JExpr._new(javaArgType).arg(runArg)
                         case BoolType() =>
@@ -966,7 +966,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             val mainTransaction: Transaction = mainTransactionOption.get
 
             // The main transaction expects to be passed a stub of a particular type. Construct it.
-            val stubType: ObsidianType = mainTransaction.args(0).typ
+            val stubType: ObsidianType = mainTransaction.args(0).typIn
             val stubJavaType = resolveType(stubType)
             val newStubExpr = JExpr._new(stubJavaType)
             newStubExpr.arg(JExpr.ref("connectionManager"))
@@ -1638,8 +1638,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         }
 
         /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDecl) =>
-            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+        val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
+            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
 
         /* construct the local context from this list */
@@ -1730,8 +1730,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         }
 
         /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = tx.args.map((arg: VariableDecl) =>
-            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+        val argList: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
+            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
 
         /* construct the local context from this list */
@@ -1945,8 +1945,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         val meth: JMethod = newClass.method(JMod.PRIVATE, javaRetType, decl.name)
 
         /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDecl) =>
-            (arg.varName, meth.param(resolveType(arg.typ), arg.varName))
+        val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDeclWithSpec) =>
+            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
 
         /* construct the local context from this list */

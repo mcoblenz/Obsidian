@@ -147,12 +147,37 @@ object Parser extends Parsers {
 
     private def parseArgList: Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
 
-    private def parseArgDefList: Parser[Seq[VariableDecl]] = {
-        val oneDecl = parseType ~ parseId ^^ {
+    private def parseArgDefList: Parser[Seq[VariableDeclWithSpec]] = {
+        val oneDecl = parseSpec ~ parseId ^^ {
 
-            case typ ~ name => VariableDecl(typ, name._1).setLoc(typ)
+            case (typIn, typOut) ~ name => VariableDeclWithSpec(typIn, typOut, name._1).setLoc(typIn)
         }
         repsep(oneDecl, CommaT())
+    }
+
+    private def parseSpec: Parser[(ObsidianType, ObsidianType)] = {
+        val parseWithoutSpec = parseType ^^ {
+            case typ => (typ, typ)
+        }
+
+        val parseWithSpec = parseType ~ opt(ChevT() ~ parseIdAlternatives) ^^ {
+            case typ ~ permission => {
+                typ match {
+                    case t: NonPrimitiveType => {
+                        permission match {
+                            case None => (t, t)
+                            case Some(_ ~ idSeq) => {
+                                val typOut = extractTypeFromPermission(permission, (t.contractName, idSeq.head._2) , t.isRemote)
+                                (t, typOut)
+                            }
+                        }
+                    }
+                    case _ => (typ, typ)
+                }
+            }
+        }
+
+        parseWithoutSpec | parseWithSpec
     }
 
     private def parseBody: Parser[Seq[Statement]] =
