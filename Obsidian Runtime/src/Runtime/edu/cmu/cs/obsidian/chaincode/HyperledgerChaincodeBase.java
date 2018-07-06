@@ -18,7 +18,7 @@ import java.util.Base64;
 import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 
-public abstract class ObsidianChaincodeBase extends ChaincodeBase {
+public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
@@ -112,6 +112,6 @@ public abstract class ObsidianChaincodeBase extends ChaincodeBase {
     public abstract byte[] run(ChaincodeStub stub, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
                    BadTransactionException, NoSuchTransactionException;
-    public abstract ObsidianChaincodeBase __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
+    public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
 }

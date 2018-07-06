@@ -707,7 +707,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         if (mockChaincode) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
         } else {
-            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianChaincodeBase"))
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.HyperledgerChaincodeBase"))
         }
 
         val stubType = if (mockChaincode) {
