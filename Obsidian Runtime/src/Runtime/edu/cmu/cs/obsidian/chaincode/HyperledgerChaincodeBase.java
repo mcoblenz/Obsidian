@@ -98,7 +98,14 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
 
         /* spin up server */
         try {
-            start(args);
+            /* Don't pass the first argument (archive path) to be processed
+             * by Hyperledger. Because arguments are an array, we have to copy
+             * all the remaining arguments into a new array. */
+            String[] less_args = new String[args.length - 1];
+            for (int i = 0; i < args.length - 1; i++) {
+                less_args[i] = args[i+1];
+            }
+            start(less_args);
         }
         catch (Exception e) {
             System.out.println("Error: Exception raised when running server: " + e);

@@ -102,7 +102,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'======= RUN CHAINCODE ======='
 sleep $ENTER_PAUSE
-java -jar $CCPATH -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
+java -jar $CCPATH chaincode_archive -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
 sleep 5
 echo $CNORM'===== CHAINCODE RUNNING ====='
 
