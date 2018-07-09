@@ -21,7 +21,7 @@ contract HasStates {
 
     }
 
-    transaction a(HasStates@Start this) {
+    transaction a(HasStates@Start >> S1 this) {
          ->S1;
     }
 }
@@ -34,7 +34,7 @@ main contract StatesNoConstr {
 
     }
 
-    transaction a(StatesNoConstr@Start this) {
+    transaction a(StatesNoConstr@Start >> S1 this) {
         ->S1;
     }
     state S1 {

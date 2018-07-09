@@ -7,7 +7,7 @@ main contract C {
     state Start {
     }
 
-    transaction a(C@Start this) {
+    transaction a(C@Start >> S1 this) {
         ->S1;
         // should fail: need to assign x
         ->S2;
