@@ -229,5 +229,5 @@ case class StaticAssertInvalidState(contractName: String, stateOrPermission: Str
 
 case class ArgumentSpecificationError(arg: String, transactionName: String, t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"The argument '$arg' in transaction '$transactionName' was specified to end as type '$t1', " +
-        s"but actuals ends as type '$t2'."
+        s"but actually ends as type '$t2'."
 }
