@@ -3,6 +3,6 @@ main contract C {
         function f() { return x; }
         function f(T x) { return x; }
     }
-    transaction t() available in S1 returns int { return x; }
-    transaction t(T x) returns int available in S1 { return x; }
+    transaction t(C@S1 this) returns int { return x; }
+    transaction t(C@S1 this. T x) returns int { return x; }
 }

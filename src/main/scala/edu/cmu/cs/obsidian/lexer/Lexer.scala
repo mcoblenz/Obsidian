@@ -103,6 +103,8 @@ object Lexer extends RegexParsers {
     private def lBracketP = """\[""".r ^^ (_ => LBracketT())
     private def rBracketP = """\]""".r ^^ (_ => RBracketT())
     private def pipeP = """\|""".r ^^ (_ => PipeT())
+    private def chevP = """>>""".r ^^ (_ => ChevT())
+
 
     private def oneToken: Parser[Token] =
 
@@ -112,7 +114,7 @@ object Lexer extends RegexParsers {
         lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
         /* order is important here because some tokens contain the others */
-        gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
+        chevP | gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
 
         plusP | starP | forwardSlashP | minusP | coloncolonP | atP | lBracketP | rBracketP | pipeP
     )

@@ -12,12 +12,12 @@ main resource contract Wallet {
 	 state Empty {
 	 }
 
-	 transaction loseMoney() available in Full, Empty {
+	 transaction loseMoney(Wallet@(Full|Empty) this) {
 	       // Error -- maybe losing Money!
 	       ->Empty;
 	 }
 
-	 transaction loseMoney(Money@Owned n) {
+	 transaction loseMoney(Money@Owned >> Unowned n) {
 	       disown n;
 	 }
 }

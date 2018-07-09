@@ -38,7 +38,9 @@ object Parser extends Parsers {
     /* other parsers need to know the position of the identifier, but adding identifiers
      * to the AST itself is clunky and adds unnecessary indirection */
     private def parseId: Parser[Identifier] = {
-        accept("identifier", { case t@IdentifierT(name) => (name, t.pos) })
+        accept("identifier", {
+            case t@IdentifierT(name) => (name, t.pos)
+            case t@ThisT() => ("this", t.pos)})
     }
 
     private def parseIdAlternatives: Parser[Seq[Identifier]] = {
@@ -113,7 +115,7 @@ object Parser extends Parsers {
              opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseIdAlternatives) ^^ {
                 case remote ~ id ~ permissionToken => {
                     val isRemote = remote.isDefined
-                    val typ = extractTypeFromPermission(permissionToken, id, isRemote)
+                    val typ = extractTypeFromPermission(permissionToken, id._1, isRemote)
                     typ.setLoc(id)
                 }
             }
@@ -126,21 +128,21 @@ object Parser extends Parsers {
         parseNonPrimitive | intPrim | boolPrim | stringPrim
     }
 
-    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]], name: Identifier, isRemote: Boolean): NonPrimitiveType = {
+    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]], name: String, isRemote: Boolean): NonPrimitiveType = {
         permission match {
-            case None => ContractReferenceType(ContractType(name._1), Inferred(), isRemote)
+            case None => ContractReferenceType(ContractType(name), Inferred(), isRemote)
             case Some(_ ~ permissionIdentSeq) =>
                 if (permissionIdentSeq.size == 1) {
                     val thePermissionOrState = permissionIdentSeq.head
                     val permission = resolvePermission(thePermissionOrState._1)
                     permission match {
-                        case None => StateType(name._1, thePermissionOrState._1, isRemote)
-                        case Some(p) => ContractReferenceType(ContractType(name._1), p, isRemote)
+                        case None => StateType(name, thePermissionOrState._1, isRemote)
+                        case Some(p) => ContractReferenceType(ContractType(name), p, isRemote)
                     }
                 }
                 else {
                     val stateNames = permissionIdentSeq.map(_._1)
-                    StateType(name._1, stateNames.toSet, isRemote)
+                    StateType(name, stateNames.toSet, isRemote)
                 }
         }
     }
@@ -150,24 +152,20 @@ object Parser extends Parsers {
     private def parseArgDefList: Parser[Seq[VariableDeclWithSpec]] = {
         val oneDecl = parseSpec ~ parseId ^^ {
 
-            case (typIn, typOut) ~ name => VariableDeclWithSpec(typIn, typOut, name._1).setLoc(typIn)
+            case (typIn, typOut) ~ name => VariableDeclWithSpec(typIn, typOut, name._1).setLoc(name)
         }
         repsep(oneDecl, CommaT())
     }
 
     private def parseSpec: Parser[(ObsidianType, ObsidianType)] = {
-        val parseWithoutSpec = parseType ^^ {
-            case typ => (typ, typ)
-        }
-
-        val parseWithSpec = parseType ~ opt(ChevT() ~ parseIdAlternatives) ^^ {
+        parseType ~! opt(ChevT() ~! parseIdAlternatives) ^^ {
             case typ ~ permission => {
                 typ match {
                     case t: NonPrimitiveType => {
                         permission match {
                             case None => (t, t)
                             case Some(_ ~ idSeq) => {
-                                val typOut = extractTypeFromPermission(permission, (t.contractName, idSeq.head._2) , t.isRemote)
+                                val typOut = extractTypeFromPermission(permission, t.contractName, t.isRemote)
                                 (t, typOut)
                             }
                         }
@@ -176,8 +174,6 @@ object Parser extends Parsers {
                 }
             }
         }
-
-        parseWithoutSpec | parseWithSpec
     }
 
     private def parseBody: Parser[Seq[Statement]] =
@@ -448,10 +444,6 @@ object Parser extends Parsers {
         }
     }
 
-    case class TransOptions (val returnType : Option[ObsidianType],
-                             val availableIn : Option[Set[Identifier]],
-                             val endsInState : Option[Set[Identifier]])
-
     case class FuncOptions (val returnType : Option[ObsidianType],
                              val availableIn : Option[Set[Identifier]])
 
@@ -470,9 +462,8 @@ object Parser extends Parsers {
 
     private def parseTransDecl(isInterface:Boolean): Parser[Transaction] = {
         opt(StaticT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-          parseTransOptions ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
-            case static ~ t ~ name ~ _ ~ args ~ _ ~ transOptions ~
-              ensures ~ body =>
+          opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
+            case static ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
                 val isStatic = static match {
                     case None => false
                     case Some(static) => true
@@ -482,45 +473,28 @@ object Parser extends Parsers {
                     case id => id.asInstanceOf[Identifier]._1
                 }
 
+                val (thisArg, filteredArgs) = args.headOption match {
+                    case None => (None, args)
+                    case Some(v) => if (v.varName == "this") (Some(v), args.tail) else (None, args)
+                }
+
+                val (availableIn, finalType) = thisArg match {
+                    case None => (None, ContractReferenceType(ContractType("THIS"), Shared(), false))
+                    case Some(v) =>
+                        v.typIn match {
+                            case StateType(_,states,_) => (Some(states.map(s => (s, v.typIn.loc))), v.typOut)
+                            case _ => (None, v.typOut)
+                        }
+                }
+
                 // contract name is THIS as there is no way to access it at the moment
-                val thisType = transOptions.availableIn match {
+                val thisType = availableIn match {
                     case None => ContractReferenceType(ContractType("THIS"), Shared(), false)
                     case Some(s) => StateType("THIS", s.map(_._1), false)
                 }
 
-                val finalType = transOptions.endsInState match {
-                    case None => ContractReferenceType(ContractType("THIS"), Shared(), false)
-                    case Some(s) => StateType("THIS", s.map(_._1), false)
-                }
-
-                Transaction(nameString, args, transOptions.returnType, transOptions.availableIn,
-                    ensures, body, isStatic, thisType, finalType).setLoc(t)
-        }
-    }
-    //keep returns first, take union of available ins and ends in
-    private def parseTransOptions: Parser[TransOptions] = {
-        opt(parseReturns) ~! rep(parseAvailableInAlt | parseEndsInStateAlt) ^^ { //use match to determine each
-            //check for repeats
-            case returns ~ optionsSeq =>
-                var options: TransOptions = TransOptions(returns, None, None)
-                for (option <- optionsSeq) {
-                    val newOption = option match {
-                        case a: AvailableIn => TransOptions(None, Some(a.identifiers), None)
-                        case e: EndsInState => TransOptions(None, None, Some(e.identifiers))
-                    }
-                    options = (newOption, options) match {
-                        case (TransOptions(None, Some(a), None), TransOptions(t, Some(a2), e)) =>
-                            TransOptions(t, Some(a ++ a2), e)
-                        case (TransOptions(None, Some(a), None), TransOptions(t, None, e)) =>
-                            TransOptions(t, Some(a), e)
-                        case (TransOptions(None, None, Some(e)), TransOptions(t, a, Some(e2))) =>
-                            TransOptions(t, a, Some(e ++ e2))
-                        case (TransOptions(None, None, Some(e)), TransOptions(t, a, None)) =>
-                            TransOptions(t, a, Some(e))
-                        case _ => options
-                    }
-                }
-                options
+                Transaction(nameString, filteredArgs, returns, availableIn,
+                    ensures, body, isStatic, thisType, finalType.asInstanceOf[NonPrimitiveType]).setLoc(t)
         }
     }
 
@@ -558,7 +532,7 @@ object Parser extends Parsers {
     private def parseConstructor = {
         parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name, isRemote = false)
+                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false)
 
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }

@@ -5,7 +5,7 @@ state S {
     int y;
  }
 
- transaction t(C x) available in S
+ transaction t(C@S this, C@Unowned x)
  { ->S(x = y, y = x); }
 
 }

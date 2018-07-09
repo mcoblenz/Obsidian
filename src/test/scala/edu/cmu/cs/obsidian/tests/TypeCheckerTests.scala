@@ -331,7 +331,10 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def stateTest(): Unit = {
         runTest("resources/tests/type_checker_tests/States.obs",
-            (TransitionUpdateError(Set("x")), 13)
+            (SubtypingError(StateType("C", "S1", false),
+                            StateType("C", "Start", false)), 10)
+                ::
+                (TransitionUpdateError(Set("x")), 13)
                 ::
                 (StateUndefinedError("C", "S3"), 15)
                 ::
@@ -376,7 +379,13 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/StartState.obs",
             (NoStartStateError("HasStates"), 12)
                 ::
+                (SubtypingError(StateType("HasStates", "S1", false),
+                                StateType("HasStates", "Start", false)), 24)
+                ::
                 (NoConstructorError("StatesNoConstr"), 31)
+                ::
+                (SubtypingError(StateType("StatesNoConstr", "S1", false),
+                                StateType("StatesNoConstr", "Start", false)), 37)
                 ::
                 Nil
         )
@@ -415,16 +424,16 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (SubtypingError(
                     StateType("C1", Set("S1", "S2"), false),
-                    StateType("C1", Set("S1", "S3"), false)), 18
+                    StateType("C1", Set("S1", "S3"), false)), 17
                 )
                 ::
                 (SubtypingError(
                     StateType("C2", Set("S1", "S2"), false),
-                    StateType("C2", "S1", false)), 32
+                    StateType("C2", "S1", false)), 30
                 )
                 ::
                 (
-                    VariableUndefinedError("f2", null), 64
+                    VariableUndefinedError("f2", null), 62
                 )
                 ::
                 Nil

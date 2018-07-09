@@ -1395,6 +1395,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         // TODO: make the permission depend on the transaction's specification
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
+        // check that the arguments meet the correct specification afterwards
+        tx.args.foreach(arg => {
+            val actualTypOut = outputContext(arg.varName)
+
+            val errorOpt = isSubtype(actualTypOut, arg.typOut)
+            if (errorOpt.isDefined) {
+                logError(tx, ArgumentSpecificationError(arg.varName, tx.name, arg.typOut, actualTypOut))
+            }
+        })
+
         checkForUnusedStateInitializers(outputContext)
 
         if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {

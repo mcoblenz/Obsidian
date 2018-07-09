@@ -9,14 +9,12 @@ main contract C1 {
     }
 
     // error: 'OtherState' is not a valid state
-    transaction t1() available in S2
-                    ends in S2, OtherState {
+    transaction t1(C1@S2 >> (S2|OtherState) this) {
         int x = 1;
     }
 
     // error: if we access t2 from S2, it will not end in S1, S3
-    transaction t2() available in S1, S2
-                     ends in S1, S3 {
+    transaction t2(C1@(S1|S2) >> (S1|S3) this) {
         int x = 1;
     }
 
@@ -52,7 +50,7 @@ contract C3 {
     ->S1;
   }
 
-  transaction toUnknownState(int x) available in S1 ends in S1, S2 {
+  transaction toUnknownState(C3@S1 >> (S1|S2) this, int x) {
     if (x > 3) {
       ->S2(f2 = 0);
     }
