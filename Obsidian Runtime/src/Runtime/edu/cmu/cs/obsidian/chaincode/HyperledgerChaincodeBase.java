@@ -102,9 +102,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
              * by Hyperledger. Because arguments are an array, we have to copy
              * all the remaining arguments into a new array. */
             String[] less_args = new String[args.length - 1];
-            for (int i = 0; i < args.length - 1; i++) {
-                less_args[i] = args[i+1];
-            }
+            System.arraycopy(args, 1, less_args, 0, args.length-1);
+
             start(less_args);
         }
         catch (Exception e) {
