@@ -8,7 +8,7 @@ contract Prescription {
 main contract Pharmacy {
     Prescription@Owned prescription;
 
-    transaction depositPrescription(Prescription@Owned p) {
+    transaction depositPrescription(Prescription@Owned >> Unowned p) {
         prescription = p;
     }
 

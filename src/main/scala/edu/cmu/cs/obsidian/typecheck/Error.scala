@@ -226,3 +226,8 @@ case class StaticAssertFailed(e: Expression, statesOrPermissions: Seq[String], a
 case class StaticAssertInvalidState(contractName: String, stateOrPermission: String) extends Error {
     val msg: String = s"Cannot assert for invalid state '$stateOrPermission' in contract $contractName"
 }
+
+case class ArgumentSpecificationError(arg: String, transactionName: String, t1: ObsidianType, t2: ObsidianType) extends Error {
+    val msg: String = s"The argument '$arg' in transaction '$transactionName' was specified to end as type '$t1', " +
+        s"but actually ends as type '$t2'."
+}

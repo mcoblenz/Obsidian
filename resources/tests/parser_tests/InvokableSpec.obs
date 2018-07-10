@@ -1,4 +1,3 @@
-/* for now, the ordering is 'requires -> returns -> ensures' */
 
 // NOTE: this file should parse, but not type-check
 
@@ -11,8 +10,7 @@ contract C {
 
     C@S1() { return; }
 
-    // don't support state unions yet
-    C@S1() { return; }
+    C@(S1|S2)() { return; }
 
 
     transaction t() { return; }
@@ -25,9 +23,7 @@ contract C {
 
     transaction t() returns C_Owned { return; }
 
-    transaction t() returns C_Owned
-                    ends in S1 { return; }
+    transaction t(C@S1 this) returns C_Owned { return; }
 
-    transaction t() returns C_Owned
-                    ends in S1, S2 { return; }
+    transaction t(C@(S1|S2) this) returns C_Owned { return; }
 }

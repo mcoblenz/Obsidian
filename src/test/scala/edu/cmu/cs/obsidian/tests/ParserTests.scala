@@ -91,7 +91,7 @@ class ParserTests extends JUnitSuite {
               |     state S1 {
               |     }
               |
-              |     transaction t1 () available in S1 {
+              |     transaction t1 (C@S1 this) {
               |       x = (x.f.y.z((((5)))));
               |       (x).f = (new A()).f;
               |     }
@@ -108,7 +108,7 @@ class ParserTests extends JUnitSuite {
               |     state S1 {
               |
               |     }
-              |     transaction t1() available in S1 {
+              |     transaction t1(C@S1 this) {
               |             x.x = x.f1.f2.f3();
               |             x = x();
               |             x();
@@ -149,9 +149,9 @@ class ParserTests extends JUnitSuite {
               |         function f(T1 x, T2 y, T3 z) { return x; }
               |
               |     }
-              |     transaction t() available in S1 { return x; }
-              |         transaction t(T x) available in S1 { return x; }
-              |         transaction t(T1 x, T2 y, T3 z) available in S1 {
+              |     transaction t(C@S1 this) { return x; }
+              |         transaction t(C@S1 this, T x) { return x; }
+              |         transaction t(C@S1 this, T1 x, T2 y, T3 z) {
               |             f(x, y, z);
               |             f();
               |             x.f(x, y, z);
@@ -184,25 +184,25 @@ class ParserTests extends JUnitSuite {
         shouldSucceed(
             """ main contract C { state S {
               | }
-              | transaction t(T x) available in S { ->S(x = y, y = x); }
+              | transaction t(C@S this, T x) { ->S(x = y, y = x); }
               | }
             """.stripMargin)
         shouldSucceed(
             """ main contract C { state S {
               | }
-              | transaction t(T x) available in S { ->S(); }
+              | transaction t(C@S this, T x) { ->S(); }
               | }
             """.stripMargin)
         shouldSucceed(
             """ main contract C { state S {
               | }
-              |  transaction t(T x) available in S { ->S; }
+              |  transaction t(C@S this, T x) { ->S; }
               | }
             """.stripMargin)
         shouldSucceed(
             """ main contract C { state S {
               | }
-              |  transaction t(T x) available in S { ->S(x = y); }
+              |  transaction t(C@S this, T x) { ->S(x = y); }
               | }
             """.stripMargin)
     }

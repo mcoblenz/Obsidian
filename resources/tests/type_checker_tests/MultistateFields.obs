@@ -9,17 +9,17 @@ main contract MultistateFields {
 
   int foo available in S1, S2;
 
-  transaction setFoo(int f) available in S1, S2 {
+  transaction setFoo(C@(S1|S2) this, int f) {
     foo = f;
     int x = foo;
   }
 
-  transaction invalidSetFoo1(int f) available in S3 {
+  transaction invalidSetFoo1(C@S3 this, int f) {
     // Error: foo not available in S3
     foo = f;
   }
 
-  transaction invalidSetFoo2(int f) available in S2, S3 {
+  transaction invalidSetFoo2(C@(S2|S3) this, int f) {
     // Error: foo not available in S3
     foo = f;
 

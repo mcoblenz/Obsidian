@@ -12,11 +12,11 @@ main contract A {
    }
 
 
-   transaction t() available in S1, S2 {
+   transaction t(A@(S1|S2) this) {
        int x = 3;
    }
 
-   transaction inState3() available in S3 {
+   transaction inState3(A@S3 this) {
        y = 4;
    }
 

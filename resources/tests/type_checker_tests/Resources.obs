@@ -28,7 +28,7 @@ resource contract Wallet {
         money = m;
     }
 
-    transaction returnMoney (Money@Owned m) returns Money@Owned {
+    transaction returnMoney (Money@Owned >> Unowned m) returns Money@Owned {
     	return m;
     }
 
@@ -49,7 +49,7 @@ contract Disowning {
 	 	     disown m;
 	 }
 
-	 transaction discardMoney (Money@Owned m) {
+	 transaction discardMoney (Money@Owned >> Unowned m) {
      	 	 disown m;
 
      	 	 // Error: m is unowned

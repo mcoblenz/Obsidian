@@ -609,6 +609,32 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         transition
     }
 
+    // returns the last transition(s), since if statements can enable transitions to state unions
+    private def lastTransition(statements: Seq[Statement]) : Option[Set[Transition]] = {
+        var last: Option[Set[Transition]] = None
+
+        for (statement <- statements) {
+            statement match {
+                case t@Transition(_, _) =>
+                    last = Some(Set(t))
+                case IfThenElse(_, s1, s2) =>
+                    val s1Transitions = lastTransition(s1)
+                    val s2Transitions = lastTransition(s2)
+
+                    (s1Transitions, s2Transitions) match {
+                        case (Some(ts1), Some(ts2)) => last = Some(ts1 ++ ts2)
+                        case (Some(ts1), _) => last = Some(ts1)
+                        case (_, Some(ts2)) => last = Some(ts2)
+                        case _ => ()
+                    }
+
+                case _ => ()
+            }
+        }
+
+        return last
+    }
+
     private def checkStatementSequence(
                                           decl: InvokableDeclaration,
                                           context: Context,
@@ -740,7 +766,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             ast: AST,
             methName: String,
             context: Context,
-            spec: Seq[VariableDecl],
+            spec: Seq[VariableDeclWithSpec],
             receiver: Expression,
             args: Seq[(ObsidianType, Expression)]): Either[Seq[(AST, Error)], Map[String, Expression]] = {
 
@@ -758,7 +784,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             calleeToCaller = calleeToCaller.updated("this", receiver)
 
             val specCallerPoV: Seq[ObsidianType] = spec.map(arg => {
-                arg.typ match {
+                arg.typIn match {
                     case prim: PrimitiveType => prim
                     case np: NonPrimitiveType =>
                         toCallerPoV(calleeToCaller, np) match {
@@ -795,7 +821,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             ast: AST,
             methName: String,
             context: Context,
-            specs: Seq[(Seq[VariableDecl], U)],
+            specs: Seq[(Seq[VariableDeclWithSpec], U)],
             receiver: Expression,
             args: Seq[(ObsidianType, Expression)]): Option[(U, Map[String, Expression])] = {
 
@@ -1370,7 +1396,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         var context = initContext
 
         for (arg <- tx.args) {
-            context = initContext.updated(arg.varName, arg.typ)
+            context = initContext.updated(arg.varName, arg.typIn)
         }
 
         // Check the body; ensure [this] is well-typed after, and check for leaked ownership
@@ -1394,6 +1420,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         // TODO: make the permission depend on the transaction's specification
         checkIsSubtype(tx, outputContext("this"), expectedType)
+
+        // Check that the arguments meet the correct specification afterwards
+        tx.args.foreach(arg => {
+            val actualTypOut = outputContext(arg.varName)
+
+            val errorOpt = isSubtype(actualTypOut, arg.typOut)
+            if (errorOpt.isDefined) {
+                logError(tx, ArgumentSpecificationError(arg.varName, tx.name, arg.typOut, actualTypOut))
+            }
+        })
 
         checkForUnusedStateInitializers(outputContext)
 
@@ -1467,7 +1503,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         // Add all the args first (in an unsafe way) before checking anything
         for (arg <- tx.args) {
-            initContext = initContext.updated(arg.varName, arg.typ)
+            initContext = initContext.updated(arg.varName, arg.typIn)
         }
 
         checkTransactionArgShadowing(startStates, tx)
@@ -1575,7 +1611,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         // Add all the args first (in an unsafe way) before checking anything
         for (arg <- constr.args) {
-            context = context.updated(arg.varName, arg.typ)
+            context = context.updated(arg.varName, arg.typIn)
         }
 
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
@@ -1628,7 +1664,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(contract, MultipleConstructorsError(contract.name))
         }
 
-        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typ.topPermissionType))
+        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typIn.topPermissionType))
         val matchingConstructors = constructorsByArgTypes.filter(_._2.size > 1)
 
         matchingConstructors.foreach(typeAndConstructors => {

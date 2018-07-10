@@ -170,7 +170,7 @@ object AstTransformer {
         }
     }
 
-    def startContext(lexicallyInsideOf: DeclarationTable, args: Seq[VariableDecl], thisPermission: Permission): Context = {
+    def startContext(lexicallyInsideOf: DeclarationTable, args: Seq[VariableDeclWithSpec], thisPermission: Permission): Context = {
         var startContext = emptyContext
 
         val simpleType =  ContractReferenceType(lexicallyInsideOf.contractType, thisPermission, false)
@@ -178,7 +178,7 @@ object AstTransformer {
         startContext = startContext.updated("this", contractType)
 
         for (a <- args) {
-            startContext = startContext.updated(a.varName, a.typ)
+            startContext = startContext.updated(a.varName, a.typIn)
         }
         startContext
     }
@@ -186,16 +186,16 @@ object AstTransformer {
     def transformArgs(
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
-            args: Seq[VariableDecl],
-            thisPermission: Permission): (Seq[VariableDecl], Seq[ErrorRecord]) = {
+            args: Seq[VariableDeclWithSpec],
+            thisPermission: Permission): (Seq[VariableDeclWithSpec], Seq[ErrorRecord]) = {
         var errors = List.empty[ErrorRecord]
-        var newArgs: Seq[VariableDecl] = Nil
+        var newArgs: Seq[VariableDeclWithSpec] = Nil
         val context = startContext(lexicallyInsideOf, args, thisPermission)
         for (a <- args) {
-            val (transformedType, newErrors) = transformType(table, lexicallyInsideOf, context - a.varName, a.typ, a.loc)
+            val (transformedType, newErrors) = transformType(table, lexicallyInsideOf, context - a.varName, a.typIn, a.loc)
             errors = errors ++ newErrors
 
-            val aNew = a.copy(typ = transformedType)
+            val aNew = a.copy(typIn = transformedType)
             newArgs = aNew +: newArgs
         }
         (newArgs.reverse, errors)
@@ -286,6 +286,12 @@ object AstTransformer {
                 val newTypChoice = transformType(table, lexicallyInsideOf, context, typ, s.loc)
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc)
                 (oldDecl.copy(typ = newTyp).setLoc(oldDecl), context.updated(varName, newTyp), errors)
+            case oldDecl@VariableDeclWithSpec(typIn, typOut, varName) =>
+                val (newTypIn, errorsIn) = transformType(table, lexicallyInsideOf, context, typIn, s.loc)
+                val (newTypOut, errorsOut) = transformType(table, lexicallyInsideOf, context, typOut, s.loc)
+                val newDecl = oldDecl.copy(typIn = newTypIn, typOut = newTypOut)
+                val totalErrors = errorsIn ++ errorsOut
+                (newDecl, context.updated(varName, newTypIn), totalErrors)
             case oldDecl@VariableDeclWithInit(typ, varName, e) =>
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc)
                 val newDecl = oldDecl.copy(typ = newTyp, e = transformExpression(e)).setLoc(oldDecl)
