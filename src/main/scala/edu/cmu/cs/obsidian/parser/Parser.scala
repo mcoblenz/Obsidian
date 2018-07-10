@@ -309,37 +309,6 @@ object Parser extends Parsers {
     private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseExprBottom)
 
 
-
-    /* parsing of invocations and dereferences is used in both statements and expressions */
-
-    private def parseLocalInv = {
-        parseId ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
-            case name ~ _ ~ args ~ _ => LocalInvocation(name._1, args).setLoc(name)
-        }
-    }
-
-    /* avoids left recursion by parsing from the dot, e.g. ".f(a)", not "x.f(a)" */
-
-    type DotExpr = Either[Identifier, (Identifier, Seq[Expression])]
-
-    private def foldDotExpr(e: Expression, dots: Seq[DotExpr]): Expression = {
-        dots.foldLeft(e)(
-            (e: Expression, inv: DotExpr) => inv match {
-                case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
-                case Right((funcName, args)) => Invocation(e, funcName._1, args).setLoc(funcName)
-            }
-        )
-    }
-
-    private def parseDots: Parser[Expression => Expression] = {
-        val parseOne: Parser[DotExpr] = DotT() ~! parseId ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
-            case _ ~ name ~ Some(_ ~ args ~ _) => Right((name, args))
-            case _ ~ name ~ None => Left(name)
-        }
-
-        rep(parseOne) ^^ ((lst: Seq[DotExpr]) => (e: Expression) => foldDotExpr(e, lst))
-    }
-
     private val parseStringLiteral: Parser[StringLiteral] = {
         val partialFunction: PartialFunction[Token, StringLiteral] = {
             case t@StringLiteralT(s) => StringLiteral(s).setLoc(t)
@@ -349,6 +318,33 @@ object Parser extends Parsers {
     }
 
     private def parseExprBottom: Parser[Expression] = {
+        def parseLocalInv = {
+            parseId ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
+                case name ~ _ ~ args ~ _ => LocalInvocation(name._1, args).setLoc(name)
+            }
+        }
+
+        /* avoids left recursion by parsing from the dot, e.g. ".f(a)", not "x.f(a)" */
+        type DotExpr = Either[Identifier, (Identifier, Seq[Expression])]
+
+        def foldDotExpr(e: Expression, dots: Seq[DotExpr]): Expression = {
+            dots.foldLeft(e)(
+                (e: Expression, inv: DotExpr) => inv match {
+                    case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
+                    case Right((funcName, args)) => Invocation(e, funcName._1, args).setLoc(funcName)
+                }
+            )
+        }
+
+        def parseDots: Parser[Expression => Expression] = {
+            val parseOne: Parser[DotExpr] = DotT() ~! parseId ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
+                case _ ~ name ~ Some(_ ~ args ~ _) => Right((name, args))
+                case _ ~ name ~ None => Left(name)
+            }
+
+            rep(parseOne) ^^ ((lst: Seq[DotExpr]) => (e: Expression) => foldDotExpr(e, lst))
+        }
+
         val parenExpr = LParenT() ~! parseExpr ~! RParenT() ^^ {
             case _ ~ e ~ _ => e
         }

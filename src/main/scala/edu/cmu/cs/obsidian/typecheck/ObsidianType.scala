@@ -164,6 +164,11 @@ case class BoolType() extends PrimitiveType {
 case class StringType() extends PrimitiveType {
     override def toString: String = "string"
 }
+
+case class UnitType() extends PrimitiveType {
+    override def toString: String = "unit"
+}
+
 /* Used to indicate an error in the type checker when a reasonable type cannot
  * otherwise be inferred */
 case class BottomType() extends ObsidianType {

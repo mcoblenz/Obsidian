@@ -13,6 +13,18 @@ main contract C_Shared {
 
     state S { int f2; }
     state T {}
+
+    transaction setFields1(C_Shared@Shared this) {
+        this.f1 = 3;
+        // should fail: this type isn't guaranteed to have this field
+        this.f2 = 2;
+        // should fail: this field doesn't exist
+        this.f3 = 1;
+    }
+
+    transaction setFields2(C_Shared@S this) {
+        this.f2 = 2;
+    }
 }
 
 contract C {
@@ -27,14 +39,10 @@ contract C {
         C_Shared@Shared c = new C_Shared();
         // should fail: C_Owned is not C_Shared
         c = new C_Owned();
-        c.f1 = 3;
-        // should fail: this type isn't guaranteed to have this field
-        c.f2 = 2;
-        // should fail: this field doesn't exist
-        c.f3 = 1;
+        c.setFields1();
 
         C_Shared@S cs = new C_Shared();
-        cs.f2 = 2;
+        cs.setFields2();
         i = 3;
         this.i = 3;
         // should fail: variable j undefined
@@ -42,7 +50,7 @@ contract C {
         // should fail: assignment to non-assignable expression
         3 = 5;
 
-	// should fail: 2 is not a reference type and cannot have fields.
-	2.f = 3;
+	    // should fail: 2 is not a reference type and cannot have fields.
+	    2.f = 3;
     }
 }

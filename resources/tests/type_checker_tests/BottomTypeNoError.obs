@@ -13,7 +13,7 @@ main contract C {
         t2(i);
         // test with dereferences
         int i = d.f;
-        d.f = 3;
+
         // test as recipient of a call
         d.t();
         int i = d.t();

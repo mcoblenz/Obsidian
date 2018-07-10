@@ -231,3 +231,12 @@ case class ArgumentSpecificationError(arg: String, transactionName: String, t1: 
     val msg: String = s"The argument '$arg' in transaction '$transactionName' was specified to end as type '$t1', " +
         s"but actually ends as type '$t2'."
 }
+
+case class InvalidNonThisFieldAssignment() extends Error {
+    val msg: String = "Cannot assign to fields of variables other than 'this'."
+}
+
+case class InvalidInconsistentFieldType(fieldName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
+    val msg: String = s"At the ends of transactions, all fields must reference objects consistent with their declared types. " +
+        s" Field '$fieldName' is of type $actualType but was declared as $expectedType."
+}

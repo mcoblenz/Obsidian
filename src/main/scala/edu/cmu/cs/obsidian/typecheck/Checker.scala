@@ -15,16 +15,23 @@ import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
  * The AST is for error message generation.
  */
 
-case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, ObsidianType], isThrown: Boolean, transitionFieldsInitialized: Set[(String, String, AST)]) {
+case class Context(table: DeclarationTable,
+                   underlyingVariableMap: Map[String, ObsidianType],
+                   isThrown: Boolean,
+                   transitionFieldsInitialized: Set[(String, String, AST)],
+                   thisFieldTypes: Map[String, ObsidianType]) {
     def keys: Iterable[String] = underlyingVariableMap.keys
 
     def updated(s: String, t: ObsidianType): Context =
-        Context(contractTable, underlyingVariableMap.updated(s, t), isThrown, transitionFieldsInitialized)
+        Context(contractTable, underlyingVariableMap.updated(s, t), isThrown, transitionFieldsInitialized, thisFieldTypes)
     def updatedWithInitialization(stateName: String, fieldName: String, ast: AST): Context =
-        Context(contractTable, underlyingVariableMap, isThrown, transitionFieldsInitialized + ((stateName, fieldName, ast)))
+        Context(contractTable, underlyingVariableMap, isThrown, transitionFieldsInitialized + ((stateName, fieldName, ast)), thisFieldTypes)
 
     def updatedWithoutAnyTransitionFieldsInitialized(): Context =
-        Context(contractTable, underlyingVariableMap, isThrown, Set.empty)
+        Context(contractTable, underlyingVariableMap, isThrown, Set.empty, thisFieldTypes)
+
+    def updatedThisFieldType(fieldName: String, newType: ObsidianType): Context =
+        Context(contractTable, underlyingVariableMap, isThrown, transitionFieldsInitialized, thisFieldTypes.updated(fieldName, newType))
 
     def get(s: String): Option[ObsidianType] = underlyingVariableMap.get(s)
 
@@ -124,6 +131,12 @@ case class Context(table: DeclarationTable, underlyingVariableMap: Map[String, O
 
     def lookupFunctionInType(typ: ObsidianType) (functionName: String): Option[Func] = {
         doLookup((declTable: DeclarationTable) => declTable.lookupFunction(functionName), typ)
+    }
+
+    def isPacked: Boolean = {
+        // TODO
+        assert(false, "TODO")
+        true
     }
 }
 
@@ -284,55 +297,66 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         def handleInvocation(
                 context: Context,
-                receiverType: NonPrimitiveType,
                 name: String,
                 receiver: Expression,
                 args: Seq[Expression]): (ObsidianType, Context) = {
             // Lookup the invocation
+            /*
+            var ensureStatic = false
+            val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver, false)
 
-            val foundTransaction =
-                if (receiverType == context.thisType) {
-                    context.lookupTransactionInThis(name)
-                }
-                else {
-                    context.lookupTransactionInType(receiverType)(name)
-                }
-            val foundFunction =
-                if (receiverType == context.thisType) {
-                    context.lookupFunctionInThis(name)
-                }
-                else {
-                    context.lookupFunctionInType(receiverType)(name)
-                }
+
+*/
+
+
+            val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver, false)
+
+            // Eliminate things we can't invoke methods on first.
+            val nonPrimitiveReceiverType = receiverType match {
+                case BottomType() => return (BottomType(), contextAfterReceiver)
+                case UnitType() | IntType() | BoolType() | StringType() =>
+                    logError(e, NonInvokeableError(receiverType))
+                    return (BottomType(), contextAfterReceiver)
+                case u: UnresolvedNonprimitiveType => assert(false, "Should have resolved unresolved types already"); return (BottomType(), contextAfterReceiver)
+                case np: NonPrimitiveType => np
+            }
+
+
+            val foundTransaction = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
+            val foundFunction = contextAfterReceiver.lookupFunctionInType(receiverType)(name)
+
+            if (receiverType.isInstanceOf[InterfaceContractType] && !foundTransaction.get.isStatic) {
+                val err = NonStaticAccessError(foundTransaction.get.name, receiver.toString)
+                logError(e, err)
+                return (BottomType(), contextAfterReceiver)
+            }
+
 
             val invokable: InvokableDeclaration = (foundTransaction, foundFunction) match {
                 case (None, None) =>
-                    val err = MethodUndefinedError(receiverType, name)
+                    val err = MethodUndefinedError(nonPrimitiveReceiverType, name)
                     logError(e, err)
-                    return (BottomType(), context)
+                    return (BottomType(), contextAfterReceiver)
                 case (_, Some(f)) => f
                 case (Some(t), _) => t
             }
 
             // check arguments
-            val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, context, args)
+            val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, contextAfterReceiver, args)
             val specList = (invokable.args, invokable)::Nil
 
             val (correctInvokable, calleeToCaller) =
-                checkArgs(e, name, context, specList, receiver, argTypes) match {
+                checkArgs(e, name, contextAfterArgs, specList, receiver, argTypes) match {
                     case None => return (BottomType(), contextAfterArgs)
                     case Some(x) => x
                 }
 
-            // check that there's a value to return
-            if (correctInvokable.retType.isEmpty) {
-                logError(e, NotAValueError(name))
-                return (BottomType(), contextAfterArgs)
-            }
-
             val spec = correctInvokable.args
 
-            val astType = correctInvokable.retType.get
+            val astType = correctInvokable.retType match {
+                case None => UnitType()
+                case Some(typ) => typ
+            }
 
             val contextPrime =
                 correctInvokable match {
@@ -458,21 +482,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  (fieldType, contextPrime)
 
              case LocalInvocation(name, args: Seq[Expression]) =>
-                 handleInvocation(context, context.thisType, name, This(), args)
+                 handleInvocation(context, name, This(), args)
 
              case Invocation(receiver: Expression, name, args: Seq[Expression]) =>
-                 val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver, false)
-
-                 receiverType match {
-                     case BottomType() => (BottomType(), contextPrime)
-                     case IntType() | BoolType() | StringType() =>
-                         logError(e, NonInvokeableError(receiverType))
-                         return (BottomType(), contextPrime)
-                     case np: NonPrimitiveType => handleInvocation(contextPrime, np, name, receiver, args)
-                     case u: UnresolvedNonprimitiveType => assert(false, "Should have resolved unresolved types already"); return (BottomType(), contextPrime)
-                 }
-
-
+                 handleInvocation(context, name, receiver, args)
 
              case Construction(name, args: Seq[Expression]) =>
                  val tableLookup = context.contractTable.lookupContract(name)
@@ -609,32 +622,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         transition
     }
 
-    // returns the last transition(s), since if statements can enable transitions to state unions
-    private def lastTransition(statements: Seq[Statement]) : Option[Set[Transition]] = {
-        var last: Option[Set[Transition]] = None
-
-        for (statement <- statements) {
-            statement match {
-                case t@Transition(_, _) =>
-                    last = Some(Set(t))
-                case IfThenElse(_, s1, s2) =>
-                    val s1Transitions = lastTransition(s1)
-                    val s2Transitions = lastTransition(s2)
-
-                    (s1Transitions, s2Transitions) match {
-                        case (Some(ts1), Some(ts2)) => last = Some(ts1 ++ ts2)
-                        case (Some(ts1), _) => last = Some(ts1)
-                        case (_, Some(ts2)) => last = Some(ts2)
-                        case _ => ()
-                    }
-
-                case _ => ()
-            }
-        }
-
-        return last
-    }
-
     private def checkStatementSequence(
                                           decl: InvokableDeclaration,
                                           context: Context,
@@ -660,7 +647,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def checkFieldTypeConsistency(context: Context): Unit = {
+    private def checkFieldTypeConsistency(context: Context, ast: AST): Unit = {
+        for ((field, typ) <- context.thisFieldTypes) {
+            val fieldDeclType = context.lookupFieldTypeInThis(field)
+            fieldDeclType match {
+                case None =>
+                    assert(false, "Bug: invalid field in field type context")
+                case Some(declaredFieldType) =>
+                    if (isSubtype(typ, declaredFieldType).isDefined) {
+                        logError(ast, InvalidInconsistentFieldType(field, typ, declaredFieldType))
+                    }
+            }
+        }
         // TODO: https://github.com/mcoblenz/Obsidian/issues/134
     }
 
@@ -680,7 +678,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         checkForUnusedOwnershipErrors(ast, branchContext, oldContext.keys.toSet)
 
-        Context(oldContext.contractTable, newContext.underlyingVariableMap, isThrown = branchContext.isThrown, newContext.transitionFieldsInitialized)
+        Context(oldContext.contractTable, newContext.underlyingVariableMap, isThrown = branchContext.isThrown, newContext.transitionFieldsInitialized, branchContext.thisFieldTypes)
     }
 
     private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
@@ -702,29 +700,36 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         if (context1.isThrown && !context2.isThrown) return context2
         if (!context1.isThrown && context2.isThrown) return context1
 
-        var mergedMap = new TreeMap[String, ObsidianType]()
+        def mergeMaps(map1: Map[String, ObsidianType], map2: Map[String, ObsidianType]): Map[String, ObsidianType] = {
+            var mergedMap = new TreeMap[String, ObsidianType]()
 
-        val inBoth = context1.keys.toSet.intersect(context2.keys.toSet)
+            val inBoth = map1.keys.toSet.intersect(map2.keys.toSet)
 
-        for (x <- inBoth) {
-            val t1 = context1(x)
-            val t2 = context2(x)
-            mergeTypes(t1, t2) match {
-                case Some(u) => mergedMap = mergedMap.updated(x, u)
-                case None =>
-                    logError(ast, MergeIncompatibleError(x, t1, t2))
+            for (x <- inBoth) {
+                val t1 = map1(x)
+                val t2 = map2(x)
+                mergeTypes(t1, t2) match {
+                    case Some(u) => mergedMap = mergedMap.updated(x, u)
+                    case None =>
+                        logError(ast, MergeIncompatibleError(x, t1, t2))
+                }
             }
+
+            // Make sure anything that is not in both is disposable.
+
+            val inOnlyContext1 = map1.keys.toSet -- inBoth
+            val inOnlyContext2 = map2.keys.toSet -- inBoth
+
+            inOnlyContext1.foreach((x: String) => errorIfNotDisposable(x, map1(x), context1, ast))
+            inOnlyContext2.foreach((x: String) => errorIfNotDisposable(x, map2(x), context2, ast))
+
+            mergedMap
         }
 
-        // Make sure anything that is not in both is disposable.
+        val mergedVariableMap = mergeMaps(context1.underlyingVariableMap, context2.underlyingVariableMap)
+        val mergedThisFieldMap = mergeMaps(context1.thisFieldTypes, context2.thisFieldTypes)
 
-        val inOnlyContext1 = context1.keys.toSet -- inBoth
-        val inOnlyContext2 = context2.keys.toSet -- inBoth
-
-        inOnlyContext1.foreach((x: String) => errorIfNotDisposable(x, context1(x), context1, ast))
-        inOnlyContext2.foreach((x: String) => errorIfNotDisposable(x, context2(x), context2, ast))
-
-        Context(context1.contractTable, mergedMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized))
+        Context(context1.contractTable, mergedVariableMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized), mergedThisFieldMap)
     }
 
     /* if [e] is of the form ReferenceIdentifier(x), This(), or if [e] is a sequence of
@@ -864,74 +869,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                   context: Context,
                                   s: Statement
                               ): Context = {
-        def handleInvocation(
-                context: Context,
-                name: String,
-                receiver: Expression,
-                args: Seq[Expression],
-                ensureStatic: Boolean): Context = {
-            // Lookup the invocation
-            val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver, false)
-            val txLookup = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
-            val funLookup = contextAfterReceiver.lookupFunctionInType(receiverType)(name)
-            if(ensureStatic && !txLookup.get.isStatic) {
-                val err = NonStaticAccessError(txLookup.get.name, receiver.toString)
-                logError(s, err)
-                return contextAfterReceiver
-            }
-            val invokable: InvokableDeclaration = (txLookup, funLookup) match {
-                case (None, None) =>
-                    val err = MethodUndefinedError(contextAfterReceiver.thisType, name)
-                    logError(s, err)
-                    return contextAfterReceiver
-                case (_, Some(f)) => f
-                case (Some(t), _) => t
-            }
-
-            // check arguments
-            val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, contextAfterReceiver, args)
-            val specList = (invokable.args, invokable)::Nil
-
-            val (correctInvokable, calleeToCaller) =
-                checkArgs(s, name, contextAfterReceiver, specList, receiver, argTypes) match {
-                    case None => return contextAfterArgs
-                    case Some(x) => x
-                }
-
-            val spec = correctInvokable.args
-
-            val retOpt = correctInvokable.retType
-
-            if (retOpt.isDefined) {
-                retOpt.get match {
-                    // TODO: Is this check actually necessary?
-                    case nonprimitiveType: NonPrimitiveType =>
-                        val unpermissionedTypeOurPoV = toCallerPoV(calleeToCaller, nonprimitiveType)
-                        if (unpermissionedTypeOurPoV.isLeft) {
-                            val (first, badExpr) = unpermissionedTypeOurPoV.left.get
-                            val err = CannotConvertPathError(first, badExpr, nonprimitiveType)
-                            logError(s, err)
-                        }
-                    case _ => ()
-                }
-
-                // check that no ownership is leaked by the (necessarily unused) return value
-                if (retOpt.get.isOwned) {
-                    logError(s, LeakReturnValueError(name))
-                }
-            }
-
-            val contextPrime =
-                correctInvokable match {
-                    case t: Transaction =>
-                        updateReceiverTypeInContext(receiver, receiverType, t, contextAfterArgs)
-                    case _ => contextAfterArgs
-                }
-
-            contextPrime
-        }
-
-
         s match {
             case VariableDecl(typ: ObsidianType, name) =>
                 context.updated(name, typ)
@@ -1160,6 +1097,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnershipIfOwned = true)
+
+                if (eDeref != This()) {
+                    logError(s, InvalidNonThisFieldAssignment())
+                }
+
                 val (derefType, contextPrime2) = inferAndCheckExpr(decl, contextPrime, eDeref, consumeOwnershipIfOwned = false)
 
                 if (derefType.isBottom) {
@@ -1174,9 +1116,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 logError(s, FieldUndefinedError(np, f))
                                 return contextPrime2
                         }
-
-                        checkIsSubtype(s, t, fieldType)
-                        contextPrime2
+                        if (isSubtype(t, fieldType).isDefined) {
+                            // Not a subtype. Record the temporary type of the field.
+                            contextPrime2.updatedThisFieldType(f, t)
+                        }
+                        else {
+                            contextPrime2
+                        }
                     case _ => logError(s, DereferenceError(derefType))
                         contextPrime2
                 }
@@ -1210,7 +1156,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 logError(s, AssignmentError())
                 contextPrime
 
-            case Throw() => Context(context.contractTable, context.underlyingVariableMap, isThrown = true, Set.empty)
+            case Throw() =>
+                // If exceptions are ever catchable, we will need to make sure the fields of this have types consistent with their declarations.
+                // For now, we treat this like a permanent abort.
+                Context(context.contractTable, context.underlyingVariableMap, isThrown = true, Set.empty, Map.empty)
 
             case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond, false)
@@ -1290,38 +1239,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 mergedContext
 
-            case LocalInvocation(name, args: Seq[Expression]) =>
-                handleInvocation(context, name, This(), args, false)
-
-            case Invocation(receiver: Expression, name, args: Seq[Expression]) =>
-                var ensureStatic = false
-                val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver, false)
-                if (receiverType.isBottom) return contextPrime
-
-                receiverType match {
-                    case BottomType() => contextPrime
-                    case IntType() | BoolType() | StringType() =>
-                        logError(s, NonInvokeableError(receiverType))
-                        contextPrime
-                    case InterfaceContractType(_, simpleType) =>
-                        handleInvocation(contextPrime, name, receiver, args, true)
-                    case _ =>
-                        handleInvocation(contextPrime, name, receiver, args, false)
-                }
-
-
-
             // TODO maybe allow constructors as statements later, but it's not very important
             case d@Disown (e) =>
                 val (typ, contextPrime) = inferAndCheckExpr(decl, context, d, true)
                 contextPrime
-            /* expressions are statements, but we prune out expressions with no side effects */
             case e: Expression =>
                 val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, true)
                 if (typ.isOwned) {
                     logError(s, UnusedExpressionOwnershipError(e))
                 }
-                logError(s, NoEffectsError(s))
+                if (!(s.isInstanceOf[LocalInvocation] || s.isInstanceOf[Invocation])) {
+                    logError(s, NoEffectsError(s))
+                }
                 contextPrime
             case StaticAssert(e, allowedStatesOrPermissions) =>
                 val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, true)
@@ -1442,7 +1371,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // Check to make sure all the field types are consistent with their declarations.
-        checkFieldTypeConsistency(context)
+        checkFieldTypeConsistency(context, tx)
 
         // todo: check that every declared variable is initialized before use
     }
@@ -1495,7 +1424,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // Construct the context that the body should start with
-        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
+        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, Map.empty)
         initContext = initContext.updated("this", thisType)
 
         // first create this context so we can resolve types
@@ -1615,7 +1544,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
-        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty)
+        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, Map.empty)
 
         val thisType = ContractReferenceType(table.contractType, Owned(), false)
 
