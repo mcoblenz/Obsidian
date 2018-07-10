@@ -574,16 +574,33 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
 
-  @Test def staticAssertsTest(): Unit = {
-    runTest("resources/tests/type_checker_tests/StaticAsserts.obs",
-      (StaticAssertInvalidState("C", "S3"), 6)
-        ::
-        (StaticAssertFailed(This(), Seq("S2"), StateType("C", Set("S1", "S2"), false)), 17)
-        ::
-        (StaticAssertFailed(ReferenceIdentifier("ow"), Seq("Unowned"), ContractReferenceType(ContractType("C"), Owned(), false)), 24)
-        ::
-        Nil
-    )
+    @Test def staticAssertsTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/StaticAsserts.obs",
+            (StaticAssertInvalidState("C", "S3"), 6)
+              ::
+              (StaticAssertFailed(This(), Seq("S2"), StateType("C", Set("S1", "S2"), false)), 17)
+              ::
+              (StaticAssertFailed(ReferenceIdentifier("ow"), Seq("Unowned"), ContractReferenceType(ContractType("C"), Owned(), false)), 24)
+              ::
+              Nil
+        )
+    }
+
+    @Test def typeSpecificationTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/TypeSpecification.obs",
+            (SubtypingError (StateType("C", Set("S3", "S2"), false),
+                             StateType("C", "S1", false)), 24)
+              ::
+              (ArgumentSpecificationError("a", "badChangeA",
+                  StateType("A", "Unavailable", false),
+                  StateType("A", "Available", false)), 51)
+              ::
+              (ArgumentSpecificationError("a", "badChangeA2",
+                  StateType("A", "Available", false),
+                  StateType("A", "Unavailable", false)), 56)
+              ::
+              Nil
+        )
   }
 
 }

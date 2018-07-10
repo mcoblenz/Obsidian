@@ -1,0 +1,77 @@
+main contract C {
+
+    state S1;
+    state S2;
+    state S3;
+
+    C@S1() {
+        ->S1;
+    }
+
+    // this should be fine, since we transition back to S1
+    transaction transitionsBack(C@S1 this) {
+
+        if (true) {
+            ->S2;
+        } else {
+            ->S3;
+        }
+
+        ->S1;
+    }
+
+    // this fails. since we don't transition back to S1
+    transaction badTransition(C@S1 this) {
+
+        if (true) {
+            ->S2;
+        } else {
+            ->S3;
+        }
+
+    }
+
+    transaction toS2(C@(S2|S3) this) {
+        ->S2;
+    }
+
+    transaction toS3(C@(S2|S3) this) {
+        ->S3;
+    }
+
+    transaction changeA(A@Available >> Unavailable a) {
+        a.makeUnavailable();
+    }
+
+    transaction changeA2(A@Unavailable >> Available a) {
+        a.makeAvailable();
+    }
+
+    // this errors since a switched states
+    transaction badChangeA(A@Unavailable a) {
+        a.makeAvailable();
+    }
+
+    // this errors since a switched states
+    transaction badChangeA2(A@Available a) {
+        a.makeUnavailable();
+    }
+
+}
+
+contract A {
+    state Available;
+    state Unavailable;
+
+    A() {
+        ->Available;
+    }
+
+    transaction makeUnavailable(A@Available >> Unavailable this) {
+        ->Unavailable;
+    }
+
+    transaction makeAvailable(A@Unavailable >> Available this) {
+        ->Available;
+    }
+}

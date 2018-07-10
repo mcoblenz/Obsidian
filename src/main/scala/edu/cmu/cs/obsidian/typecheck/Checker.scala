@@ -591,27 +591,48 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         hasRet
     }
 
-    /* returns the transition if the sequence of statements includes a state transition, or an if/else statement
-    * where both branches have state transitions, and nothing otherwise
+    /* returns true if the sequence of statements includes a state transition, or an if/else statement
+    * where both branches have state transitions, and false otherwise
     */
-    private def hasTransition(statements: Seq[Statement]) : Option[Transition] = {
-
+    private def hasTransition(statements: Seq[Statement]) : Boolean = {
+        var transition = false
 
         for (statement <- statements) {
             statement match {
-                case t@Transition(_, _) => return Some(t)
+                case Transition(_, _) => transition = true
                 case IfThenElse(_, s1, s2) =>
-                    val s1Transition = hasTransition(s1)
-                    val s2Transition = hasTransition(s1)
-
-                    if (s1Transition.isDefined && s2Transition.isDefined) {
-                        return s1Transition
-                    }
+                    transition = hasTransition(s1) && hasTransition(s2)
                 case _ => ()
             }
         }
 
-        return None
+        transition
+    }
+
+    // returns the last transition(s), since if statements can enable transitions to state unions
+    private def lastTransition(statements: Seq[Statement]) : Option[Set[Transition]] = {
+        var last: Option[Set[Transition]] = None
+
+        for (statement <- statements) {
+            statement match {
+                case t@Transition(_, _) =>
+                    last = Some(Set(t))
+                case IfThenElse(_, s1, s2) =>
+                    val s1Transitions = lastTransition(s1)
+                    val s2Transitions = lastTransition(s2)
+
+                    (s1Transitions, s2Transitions) match {
+                        case (Some(ts1), Some(ts2)) => last = Some(ts1 ++ ts2)
+                        case (Some(ts1), _) => last = Some(ts1)
+                        case (_, Some(ts2)) => last = Some(ts2)
+                        case _ => ()
+                    }
+
+                case _ => ()
+            }
+        }
+
+        return last
     }
 
     private def checkStatementSequence(
@@ -1383,7 +1404,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             checkStatementSequence(tx, initContext, tx.body)
 
         val expectedType = tx.thisFinalType(lexicallyInsideOf.contract.name)
-        val thisType = tx.thisType(lexicallyInsideOf.contract.name)
         // Check that all the states the transaction can end in are valid, named states
         expectedType match {
             case StateType(_, states, _) => {
@@ -1400,12 +1420,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         // TODO: make the permission depend on the transaction's specification
         checkIsSubtype(tx, outputContext("this"), expectedType)
-
-        // Ensure that the state does not change if there is no specification
-        val transition = hasTransition(tx.body)
-        if (thisType.equals(expectedType) & transition.isDefined) {
-            logError(tx, ThisSpecificationError(tx.name, lexicallyInsideOf.contract.name, transition.get.newStateName))
-        }
 
         // Check that the arguments meet the correct specification afterwards
         tx.args.foreach(arg => {
@@ -1635,7 +1649,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkForUnusedStateInitializers(outputContext)
 
         // if the contract contains states, its constructor must contain a state transition
-        if (hasStates && hasTransition(constr.body).isEmpty) {
+        if (hasStates && !hasTransition(constr.body)) {
             logError(constr, NoStartStateError(constr.name))
         }
 
