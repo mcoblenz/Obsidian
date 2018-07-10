@@ -37,7 +37,8 @@ CCVERSION=0
 INIT_PARAMS=$2
 
 if [ "$2" == "clean" ]; then
-    rm ch1.block
+    rm -f ch1.block
+    rm -f chaincode_archive
     rm -rf /var/hyperledger/production
     mkdir /var/hyperledger/production
     INIT_PARAMS=$3
