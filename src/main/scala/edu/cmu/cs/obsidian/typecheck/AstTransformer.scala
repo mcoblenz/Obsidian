@@ -289,7 +289,9 @@ object AstTransformer {
             case oldDecl@VariableDeclWithSpec(typIn, typOut, varName) =>
                 val (newTypIn, errorsIn) = transformType(table, lexicallyInsideOf, context, typIn, s.loc)
                 val (newTypOut, errorsOut) = transformType(table, lexicallyInsideOf, context, typOut, s.loc)
-                (oldDecl.copy(typIn = newTypIn, typOut = newTypOut).setLoc(oldDecl), context.updated(varName, newTypIn), errorsIn ++ errorsOut)
+                val newDecl = oldDecl.copy(typIn = newTypIn, typOut = newTypOut)
+                val totalErrors = errorsIn ++ errorsOut
+                (newDecl, context.updated(varName, newTypIn), totalErrors)
             case oldDecl@VariableDeclWithInit(typ, varName, e) =>
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc)
                 val newDecl = oldDecl.copy(typ = newTyp, e = transformExpression(e)).setLoc(oldDecl)

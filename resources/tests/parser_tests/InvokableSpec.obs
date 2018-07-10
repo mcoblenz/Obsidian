@@ -1,4 +1,3 @@
-/* for now, the ordering is 'requires -> returns -> ensures' */
 
 // NOTE: this file should parse, but not type-check
 
