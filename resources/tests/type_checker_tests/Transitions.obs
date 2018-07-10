@@ -9,12 +9,12 @@ main contract Test {
 
     state S2;
 
-    transaction foo() {
+    transaction foo(Test@S2 >> S1 this) {
         S1::x1 = 42;
     	->S1;
     }
 
-    transaction bar() {
+    transaction bar(Test@S1 >> S2 this) {
         ->S2;
     }
 

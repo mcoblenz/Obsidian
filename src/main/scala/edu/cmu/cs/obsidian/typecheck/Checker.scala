@@ -591,22 +591,27 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         hasRet
     }
 
-    /* returns true if the sequence of statements includes a state transition, or an if/else statement
-    * where both branches have state transitions, and false otherwise
+    /* returns the transition if the sequence of statements includes a state transition, or an if/else statement
+    * where both branches have state transitions, and nothing otherwise
     */
-    private def hasTransition(statements: Seq[Statement]) : Boolean = {
-        var transition = false
+    private def hasTransition(statements: Seq[Statement]) : Option[Transition] = {
+
 
         for (statement <- statements) {
             statement match {
-                case Transition(_, _) => transition = true
+                case t@Transition(_, _) => return Some(t)
                 case IfThenElse(_, s1, s2) =>
-                    transition = hasTransition(s1) && hasTransition(s2)
+                    val s1Transition = hasTransition(s1)
+                    val s2Transition = hasTransition(s1)
+
+                    if (s1Transition.isDefined && s2Transition.isDefined) {
+                        return s1Transition
+                    }
                 case _ => ()
             }
         }
 
-        transition
+        return None
     }
 
     private def checkStatementSequence(
@@ -1378,6 +1383,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             checkStatementSequence(tx, initContext, tx.body)
 
         val expectedType = tx.thisFinalType(lexicallyInsideOf.contract.name)
+        val thisType = tx.thisType(lexicallyInsideOf.contract.name)
         // Check that all the states the transaction can end in are valid, named states
         expectedType match {
             case StateType(_, states, _) => {
@@ -1395,7 +1401,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         // TODO: make the permission depend on the transaction's specification
         checkIsSubtype(tx, outputContext("this"), expectedType)
 
-        // check that the arguments meet the correct specification afterwards
+        // Ensure that the state does not change if there is no specification
+        val transition = hasTransition(tx.body)
+        if (thisType.equals(expectedType) & transition.isDefined) {
+            logError(tx, ThisSpecificationError(tx.name, lexicallyInsideOf.contract.name, transition.get.newStateName))
+        }
+
+        // Check that the arguments meet the correct specification afterwards
         tx.args.foreach(arg => {
             val actualTypOut = outputContext(arg.varName)
 
@@ -1623,7 +1635,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkForUnusedStateInitializers(outputContext)
 
         // if the contract contains states, its constructor must contain a state transition
-        if (hasStates && !hasTransition(constr.body)) {
+        if (hasStates && hasTransition(constr.body).isEmpty) {
             logError(constr, NoStartStateError(constr.name))
         }
 

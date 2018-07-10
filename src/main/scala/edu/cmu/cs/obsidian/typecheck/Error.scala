@@ -231,3 +231,8 @@ case class ArgumentSpecificationError(arg: String, transactionName: String, t1: 
     val msg: String = s"The argument '$arg' in transaction '$transactionName' was specified to end as type '$t1', " +
         s"but actually ends as type '$t2'."
 }
+
+case class ThisSpecificationError(transactionName: String, contractName: String, stateName: String) extends Error {
+    val msg: String = s"Transaction '$transactionName' specified that it does not change the state of '$contractName', " +
+        s"but it does. Consider specifying 'this' to change to '$stateName'."
+}

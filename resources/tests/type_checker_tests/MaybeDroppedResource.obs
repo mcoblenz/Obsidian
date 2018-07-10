@@ -12,7 +12,7 @@ main resource contract Wallet {
 	 state Empty {
 	 }
 
-	 transaction loseMoney(Wallet@(Full|Empty) this) {
+	 transaction loseMoney(Wallet@Full >> Empty this) {
 	       // Error -- maybe losing Money!
 	       ->Empty;
 	 }

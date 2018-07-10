@@ -560,7 +560,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def argShadowingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ArgumentShadowing.obs",
-            (ArgShadowingError("x", "t", 4), 8)
+            (ArgShadowingError("x", "t", 6), 10)
               ::
               Nil
         )
