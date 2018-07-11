@@ -387,9 +387,11 @@ object Parser extends Parsers {
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }
 
-    private def parseFieldDecl = {
-        opt(ConstT()) ~ parseType ~ parseId ~! opt(parseAvailableIn) ~! SemicolonT() ^^ {
-            case isConst ~ typ ~ name ~ availableIn ~ _ =>
+    private def parseFieldDecl: Parser[Declaration] = {
+        opt(ConstT()) ~ parseType ~ parseId ~! opt(parseAvailableIn) ~!
+                opt(EqT() ~! parseExpr ~! failure("fields may only be assigned inside of transactions")) ~!
+                SemicolonT() ^^ {
+            case isConst ~ typ ~ name ~ availableIn ~ None ~ _ =>
                 isConst match {
                     case Some(constToken) =>
                         Field(isConst = true, typ, name._1, availableIn).setLoc(constToken)
