@@ -150,20 +150,24 @@ object Parser extends Parsers {
     private def parseArgList: Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
 
     private def parseArgDefList: Parser[Seq[VariableDeclWithSpec]] = {
-        val oneDecl = parseSpec ~ parseId ^^ {
-
+        val oneDecl = parseArgumentSpec ~ parseId ^^ {
             case (typIn, typOut) ~ name => VariableDeclWithSpec(typIn, typOut, name._1).setLoc(name)
         }
         repsep(oneDecl, CommaT())
     }
 
-    private def parseSpec: Parser[(ObsidianType, ObsidianType)] = {
+    private def parseArgumentSpec: Parser[(ObsidianType, ObsidianType)] = {
         parseType ~! opt(ChevT() ~! parseIdAlternatives) ^^ {
             case typ ~ permission => {
                 typ match {
                     case t: NonPrimitiveType => {
                         permission match {
-                            case None => (t, t)
+                            case None =>
+                                val correctedType = t match {
+                                    case ContractReferenceType(ct, Inferred(), isRemote) => ContractReferenceType(ct, ReadOnlyState(), isRemote)
+                                    case _ => t
+                                }
+                                (correctedType, correctedType)
                             case Some(_ ~ idSeq) => {
                                 val typOut = extractTypeFromPermission(permission, t.contractName, t.isRemote)
                                 (t, typOut)
@@ -473,7 +477,17 @@ object Parser extends Parsers {
 
                 val (thisArg, filteredArgs) = args.headOption match {
                     case None => (None, args)
-                    case Some(v) => if (v.varName == "this") (Some(v), args.tail) else (None, args)
+                    case Some(v) =>
+                        if (v.varName == "this") {
+                            if (!v.typIn.isInstanceOf[NonPrimitiveType]) {
+                                return err("Type of 'this' must be a contract type.")
+                            }
+                            else {
+                                (Some(v), args.tail)
+                            }
+                        } else {
+                            (None, args)
+                        }
                 }
 
                 val (availableIn, finalType) = thisArg match {
@@ -486,9 +500,10 @@ object Parser extends Parsers {
                 }
 
                 // contract name is THIS as there is no way to access it at the moment
-                val thisType = availableIn match {
+                val thisType = thisArg match {
                     case None => ContractReferenceType(ContractType("THIS"), Shared(), false)
-                    case Some(s) => StateType("THIS", s.map(_._1), false)
+                    case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType]
+
                 }
 
                 Transaction(nameString, filteredArgs, returns, availableIn,

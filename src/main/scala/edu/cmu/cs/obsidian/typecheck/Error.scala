@@ -240,3 +240,8 @@ case class InvalidInconsistentFieldType(fieldName: String, actualType: ObsidianT
     val msg: String = s"At the ends of transactions, all fields must reference objects consistent with their declared types. " +
         s" Field '$fieldName' is of type $actualType but was declared as $expectedType."
 }
+
+case class TransitionNotAllowedError() extends Error {
+    val msg: String = "Cannot change state because 'this' was specified to not allow state changes."
+}
+

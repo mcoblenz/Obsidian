@@ -949,6 +949,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val oldType = context.thisType
 
+                if (oldType.permission == ReadOnlyState()) {
+                    logError(s, TransitionNotAllowedError())
+                }
+
                 // First we focus on the fields declared in states individually.
                 // oldFields is the set of fields declared in the old state, which are definitely going away.
                 // maybeOldFields is the set of fields from the old state that MAY be going away — 
