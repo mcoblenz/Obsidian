@@ -1,0 +1,17 @@
+main contract C {
+    state S1;
+    state S2;
+
+    C@S1() {
+        ->S1;
+    }
+
+    transaction t1(C this) {
+        // error: can't change state of 'this'.
+        ->S2;
+    }
+
+    // Error: int is the wrong type
+    transaction t2(int this) {
+    }
+}
