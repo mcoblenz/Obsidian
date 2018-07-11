@@ -6,16 +6,17 @@ contract C {
         ->S1;
     }
 
-    transaction toS2() ends in S2
+    transaction toS2(C@Owned >> S2 this)
     {
         ->S2;
     }
 
-    transaction toS1() ends in S1
+    transaction toS1(C@Owned >> S1 this)
     {
         ->S1;
     }
 }
+
 
 main contract FieldTypeMismatch {
     C@S1 c;
@@ -24,5 +25,23 @@ main contract FieldTypeMismatch {
         c.toS2();
         // Error: c needs to be in state S1.
     }
+}
 
+resource contract Money {}
+
+resource contract Wallet {
+    Wallet@Empty () {
+        ->Empty;
+    }
+
+    state Empty {}
+    state Full {
+        Money@Owned money;
+    }
+
+    transaction removeMoney(Wallet@Full >> Empty this) returns Money@Owned {
+        Money@Owned m = money; // TODO: remove ownership annotation
+        ->Empty;
+        return m;
+    }
 }

@@ -50,5 +50,7 @@ contract D {
 
         // OK: s1C is now still in state S1
         s1C.changeStateStateSpecified();
+
+        // But now we have an error: s1C needs to be in state S1 per its declaration.
     }
 }
