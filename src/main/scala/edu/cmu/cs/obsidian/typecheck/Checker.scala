@@ -65,6 +65,7 @@ case class Context(table: DeclarationTable,
                 // Look inside the contract.
                 val insideContractResult = contractTableOpt.flatMap(lookupFunction)
 
+
                 val possibleCurrentStateNames: Iterable[String] = np match {
                     case ContractReferenceType(contractName, _, _) => contractTableOpt.get.stateLookup.values.map((s: StateTable) => s.name)
                     case StateType(contractName, stateNames, _) =>
@@ -126,7 +127,20 @@ case class Context(table: DeclarationTable,
     }
 
     def lookupTransactionInType(typ: ObsidianType) (transactionName: String): Option[Transaction] = {
-        doLookup((declTable: DeclarationTable) => declTable.lookupTransaction(transactionName), typ)
+        if (typ.isBottom) {
+            return None
+        }
+
+        typ match {
+            case np: NonPrimitiveType =>
+                // Look up the type in the current scope, NOT with lookupFunction.
+                val contractTableOpt = contractTable.lookupContract(np.contractName)
+                contractTableOpt match {
+                    case None => None
+                    case Some(contractTable) => contractTable.lookupTransaction(transactionName)
+                }
+            case _ => None
+        }
     }
 
     def lookupFunctionInType(typ: ObsidianType) (functionName: String): Option[Func] = {
@@ -300,15 +314,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 name: String,
                 receiver: Expression,
                 args: Seq[Expression]): (ObsidianType, Context) = {
-            // Lookup the invocation
-            /*
-            var ensureStatic = false
-            val (receiverType, contextPrime) = inferAndCheckExpr(decl, context, receiver, false)
-
-
-*/
-
-
             val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver, false)
 
             // Eliminate things we can't invoke methods on first.
@@ -340,6 +345,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case (_, Some(f)) => f
                 case (Some(t), _) => t
             }
+
+            checkIsSubtype(e, receiverType, invokable.thisType)
 
             // check arguments
             val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, contextAfterReceiver, args)

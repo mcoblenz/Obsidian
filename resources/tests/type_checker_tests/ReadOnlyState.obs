@@ -45,8 +45,8 @@ contract D {
     }
 
     transaction t2() {
-        s1C.invalidStateChange();
+        s1C.invalidChangeState();
         // s1C is now still in state S1
-        s1c.changeStateStateSpecified();
+        s1C.changeStateStateSpecified();
     }
 }

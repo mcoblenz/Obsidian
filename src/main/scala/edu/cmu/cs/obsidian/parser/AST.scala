@@ -41,6 +41,7 @@ sealed abstract class InvokableDeclaration() extends Declaration {
     val args: Seq[VariableDeclWithSpec]
     val retType: Option[ObsidianType]
     val body: Seq[Statement]
+    val thisType: ObsidianType
 }
 
 /* Expressions */
@@ -116,6 +117,7 @@ case class Constructor(name: String,
                        body: Seq[Statement]) extends InvokableDeclaration {
     val retType: Option[ObsidianType] = None
     val tag: DeclarationTag = ConstructorDeclTag
+    val thisType: ObsidianType = resultType
 }
 case class Func(name: String,
                 args: Seq[VariableDeclWithSpec],
@@ -124,6 +126,7 @@ case class Func(name: String,
                 body: Seq[Statement],
                 thisPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = FuncDeclTag
+    val thisType: ObsidianType = BottomType() // TODO: merge Func into Transaction. This is bogus for now.
 }
 case class Transaction(name: String,
                        args: Seq[VariableDeclWithSpec],
