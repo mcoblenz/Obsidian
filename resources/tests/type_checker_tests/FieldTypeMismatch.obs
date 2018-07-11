@@ -1,0 +1,28 @@
+contract C {
+    state S1;
+    state S2;
+
+    C@S1() {
+        ->S1;
+    }
+
+    transaction toS2() ends in S2
+    {
+        ->S2;
+    }
+
+    transaction toS1() ends in S1
+    {
+        ->S1;
+    }
+}
+
+main contract FieldTypeMismatch {
+    C@S1 c;
+
+    transaction t1() {
+        c.toS2();
+        // Error: c needs to be in state S1.
+    }
+
+}
