@@ -141,23 +141,11 @@ case class Transaction(name: String,
                        thisFinalType: NonPrimitiveType) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 
-    // contract name is necessary since we don't have it at parse time
-    def thisType(contractName: String): NonPrimitiveType = typeWithContractName(thisType, contractName)
-
-    def thisFinalType(contractName: String): NonPrimitiveType = typeWithContractName(thisFinalType, contractName)
-
     def availableIn: Option[Set[String]] = thisType match {
         case StateType(_, stateNames, _) => Some(stateNames)
         case _ => None
     }
 
-    private def typeWithContractName(typ: NonPrimitiveType, contractName: String): NonPrimitiveType =
-        typ match {
-            case ContractReferenceType(ContractType(_), permission, isRemote) =>
-                ContractReferenceType(ContractType(contractName), permission, isRemote)
-            case StateType(_, stateNames, isRemote) => StateType(contractName, stateNames, isRemote)
-            case InterfaceContractType(_, simpleType) =>  InterfaceContractType(contractName, simpleType)
-        }
 }
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration {
     val tag: DeclarationTag = StateDeclTag

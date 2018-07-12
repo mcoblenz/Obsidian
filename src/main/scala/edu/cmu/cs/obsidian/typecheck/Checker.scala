@@ -863,7 +863,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case ReferenceIdentifier(x) => {
                 receiverType match {
                     case typ: NonPrimitiveType => {
-                        val newType = invokable.thisFinalType(typ.contractName)
+                        val newType = invokable.thisFinalType
                         if (newType.permission == ReadOnlyState()) {
                             // The transaction promised not to change the state of the receiver.
                             context
@@ -1351,7 +1351,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val outputContext =
             checkStatementSequence(tx, initContext, tx.body)
 
-        val expectedType = tx.thisFinalType(lexicallyInsideOf.contract.name)
+        val expectedType = tx.thisFinalType
         // Check that all the states the transaction can end in are valid, named states
         expectedType match {
             case StateType(_, states, _) => {
@@ -1423,7 +1423,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     stateSet.map(s => s._2)
             }
 
-        val thisType = tx.thisType(lexicallyInsideOf.contract.name)
+        val thisType = tx.thisType
         // TODO: consider path case. Previously it was something like:
         // PathType("this"::"parent"::Nil, lexicallyInsideOf.simpleType)
         val table = thisType match {
