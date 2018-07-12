@@ -347,7 +347,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case (Some(t), _) => t
             }
 
-            if (isSubtype(receiverType, invokable.thisType).isDefined) {
+            if (!invokable.isStatic && isSubtype(receiverType, invokable.thisType).isDefined) {
                 logError(e, ReceiverTypeIncompatibleError(name, receiverType, invokable.thisType))
             }
 
