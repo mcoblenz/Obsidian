@@ -38,7 +38,6 @@ INIT_PARAMS=$2
 
 if [ "$2" == "clean" ]; then
     rm -f ch1.block
-    rm -f chaincode_archive
     rm -rf /var/hyperledger/production
     mkdir /var/hyperledger/production
     INIT_PARAMS=$3
@@ -103,7 +102,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'======= RUN CHAINCODE ======='
 sleep $ENTER_PAUSE
-java -jar $CCPATH chaincode_archive -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
+java -jar $CCPATH -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
 sleep 5
 echo $CNORM'===== CHAINCODE RUNNING ====='
 
