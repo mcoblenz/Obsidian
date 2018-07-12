@@ -68,7 +68,7 @@ class StateTable(
                 if (found.isDefined) {
                     val availableIn = found.get.availableIn
                     if (availableIn.isDefined) {
-                        val availableInCurrentState = availableIn.get.exists(p => p._1 == name)
+                        val availableInCurrentState = availableIn.get.exists(p => p == name)
                         if (availableInCurrentState) found else None
                     }
                     else found // The field is available in all states.

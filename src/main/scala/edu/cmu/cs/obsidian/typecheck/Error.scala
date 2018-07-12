@@ -240,3 +240,11 @@ case class InvalidInconsistentFieldType(fieldName: String, actualType: ObsidianT
     val msg: String = s"At the ends of transactions, all fields must reference objects consistent with their declared types. " +
         s" Field '$fieldName' is of type $actualType but was declared as $expectedType."
 }
+
+case class TransitionNotAllowedError() extends Error {
+    val msg: String = "Cannot change state because 'this' was specified to not allow state changes."
+}
+
+case class ReceiverTypeIncompatibleError(transactionName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
+    val msg: String = s"Cannot invoke $transactionName on a receiver of type $actualType; a receiver of type $expectedType is required."
+}

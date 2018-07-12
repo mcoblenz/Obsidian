@@ -16,8 +16,12 @@ case class Unowned() extends Permission {
 
 case class Inferred() extends Permission {
     override def toString: String = "Inferred"
+} // For local variables
+
+case class ReadOnlyState() extends Permission {
+    override def toString: String = "ReadOnlyState"
 }
-// For local variables
+
 
 // Type of references to contracts.
 case class ContractReferenceType(contractType: ContractType, permission: Permission, override val isRemote: Boolean) extends NonPrimitiveType {

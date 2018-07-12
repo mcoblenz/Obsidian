@@ -391,6 +391,7 @@ object AstTransformer {
                         }
                     case None => (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos)))
                 }
+            case UnitType() => (t, List.empty)
         }
     }
 

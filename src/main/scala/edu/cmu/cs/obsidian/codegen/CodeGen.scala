@@ -841,8 +841,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                     tx.availableIn match {
                         case Some(stateSet) =>
                             var test: IJExpression = JExpr.TRUE
-                            for (state <- stateSet) {
-                                val stateName = state._1
+                            for (stateName <- stateSet) {
                                 val thisTest = JExpr.invoke(getStateMeth)
                                     .eq(translationContext.getEnum(stateName))
 
@@ -1291,6 +1290,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
             case _: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
+            case UnitType() => assert(false, "Fields must not be of unit type.")
         }
     }
 
@@ -1721,20 +1721,18 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
 
         // Dynamically check the state
-        val availableIn: Option[Set[Identifier]] = tx.availableIn
-
-        availableIn match {
-            case Some(states) => {
+        tx.thisType match {
+            case StateType(_, states, _) => {
                 var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
                 for (st <- states) {
-                    cond = JOp.cand(JExpr.invoke(getStateMeth).ne(translationContext.getEnum(st._1)), cond)
+                    cond = JOp.cand(JExpr.invoke(getStateMeth).ne(translationContext.getEnum(st)), cond)
                 }
 
                 meth.body()._if(cond)
                    ._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
             }
-            case None => ()
+            case _ => ()
         }
 
         /* We put the method body in a try block, and set the tx flag to false in a finally

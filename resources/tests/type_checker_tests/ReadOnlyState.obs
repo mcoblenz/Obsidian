@@ -1,0 +1,54 @@
+main contract C {
+    state S1;
+    state S2;
+
+    C@S1() {
+        ->S1;
+    }
+
+    transaction invalidChangeState(C this) {
+        // error: can't change state of 'this'.
+        ->S2;
+    }
+
+    // OK because by default, 'this' is Shared.
+    transaction changeStateShared() {
+        ->S2;
+    }
+
+    transaction changeStateOwned(C@Owned this) {
+        ->S2;
+    }
+
+    transaction changeStateStateSpecified(C@S1 >> S2 this) {
+        ->S2;
+    }
+
+    // Error: int is the wrong type
+    // transaction t2(int this) {
+    // }
+}
+
+contract D {
+    C@Shared sharedC;
+    C@Owned ownedC;
+    C@S1 s1C;
+
+    transaction t1(C c) {
+        // Error: cannot change state of c.
+        c.changeStateShared();
+
+        // Error: cannot invoke.
+        c.changeStateOwned();
+
+        // Error: cannot invoke.
+        c.changeStateStateSpecified();
+    }
+
+    transaction t2() {
+        s1C.invalidChangeState(); // OK
+
+        // OK: s1C is now still in state S1
+        s1C.changeStateStateSpecified();
+    }
+}

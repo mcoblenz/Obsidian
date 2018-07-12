@@ -129,7 +129,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def fieldsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/CheckFields.obs",
-                Nil
+            Nil
         )
     }
 
@@ -257,7 +257,7 @@ class TypeCheckerTests extends JUnitSuite {
                 (RepeatConstructorsError("Thing"), 27)
                 ::
                 (SubtypingError(ContractReferenceType(ContractType("Thing"), Owned(), false),
-                                ContractReferenceType(ContractType("OtherThing"), Inferred(), false)), 27)
+                    ContractReferenceType(ContractType("OtherThing"), Inferred(), false)), 27)
                 ::
                 (WrongArityError(0, 1, "constructor of Thing"), 37)
                 ::
@@ -295,21 +295,21 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
-                        (MergeIncompatibleError("o1",
-                            ContractReferenceType(ContractType("Ow"), Owned(), false),
-                            ContractReferenceType(ContractType("Ow"), Unowned(), false)), 16)
-                          ::
-                          (UnusedOwnershipError("o2"), 16)
-                          ::
-                          (UnusedOwnershipError("o2"), 27)
-                          ::
-                          (MergeIncompatibleError("o1",
-                              ContractReferenceType(ContractType("Ow"), Owned(), false),
-                              ContractReferenceType(ContractType("Ow"), Unowned(), false)), 36)
-                          ::
-                          (UnusedOwnershipError("o2"), 36)
-                          ::
-            (VariableUndefinedError("x", null), 48)
+            (MergeIncompatibleError("o1",
+                ContractReferenceType(ContractType("Ow"), Owned(), false),
+                ContractReferenceType(ContractType("Ow"), Unowned(), false)), 16)
+                ::
+                (UnusedOwnershipError("o2"), 16)
+                ::
+                (UnusedOwnershipError("o2"), 27)
+                ::
+                (MergeIncompatibleError("o1",
+                    ContractReferenceType(ContractType("Ow"), Owned(), false),
+                    ContractReferenceType(ContractType("Ow"), Unowned(), false)), 36)
+                ::
+                (UnusedOwnershipError("o2"), 36)
+                ::
+                (VariableUndefinedError("x", null), 48)
                 ::
                 Nil)
     }
@@ -486,12 +486,12 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
-//                (TODO: https://github.com/mcoblenz/Obsidian/issues/134)
-//                (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Unowned())), 16)
-//                ::
-                (SubtypingError(
-                    ContractReferenceType(ContractType("Prescription"), Unowned(), false),
-                    ContractReferenceType(ContractType("Prescription"), Owned(), false)), 16)
+            //                (TODO: https://github.com/mcoblenz/Obsidian/issues/134)
+            //                (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Unowned())), 16)
+            //                ::
+            (SubtypingError(
+                ContractReferenceType(ContractType("Prescription"), Unowned(), false),
+                ContractReferenceType(ContractType("Prescription"), Owned(), false)), 16)
                 ::
                 Nil
         )
@@ -519,7 +519,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def transitionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Transitions.obs",
-                Nil
+            Nil
         )
     }
 
@@ -535,9 +535,9 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def shadowingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ForbiddenShadowing.obs",
-                (RepeatContractFields("x", 9, 2), 9)
-                    ::
-                    Nil
+            (RepeatContractFields("x", 9, 2), 9)
+                ::
+                Nil
         )
     }
 
@@ -563,46 +563,61 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def argShadowingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ArgumentShadowing.obs",
             (ArgShadowingError("x", "t", 6), 10)
-              ::
-              Nil
+                ::
+                Nil
         )
     }
 
     @Test def multipleConstructorsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/MultipleConstructors.obs",
             (MultipleConstructorsError("C"), 3)
-              ::
-              Nil
+                ::
+                Nil
         )
     }
 
     @Test def staticAssertsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/StaticAsserts.obs",
             (StaticAssertInvalidState("C", "S3"), 6)
-              ::
-              (StaticAssertFailed(This(), Seq("S2"), StateType("C", Set("S1", "S2"), false)), 17)
-              ::
-              (StaticAssertFailed(ReferenceIdentifier("ow"), Seq("Unowned"), ContractReferenceType(ContractType("C"), Owned(), false)), 24)
-              ::
-              Nil
+                ::
+                (StaticAssertFailed(This(), Seq("S2"), StateType("C", Set("S1", "S2"), false)), 17)
+                ::
+                (StaticAssertFailed(ReferenceIdentifier("ow"), Seq("Unowned"), ContractReferenceType(ContractType("C"), Owned(), false)), 24)
+                ::
+                Nil
         )
     }
 
     @Test def typeSpecificationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/TypeSpecification.obs",
-            (SubtypingError (StateType("C", Set("S3", "S2"), false),
-                             StateType("C", "S1", false)), 24)
-              ::
-              (ArgumentSpecificationError("a", "badChangeA",
-                  StateType("A", "Unavailable", false),
-                  StateType("A", "Available", false)), 51)
-              ::
-              (ArgumentSpecificationError("a", "badChangeA2",
-                  StateType("A", "Available", false),
-                  StateType("A", "Unavailable", false)), 56)
-              ::
-              Nil
+            (SubtypingError(StateType("C", Set("S3", "S2"), false),
+                StateType("C", "S1", false)), 24)
+                ::
+                (ArgumentSpecificationError("a", "badChangeA",
+                    StateType("A", "Unavailable", false),
+                    StateType("A", "Available", false)), 51)
+                ::
+                (ArgumentSpecificationError("a", "badChangeA2",
+                    StateType("A", "Available", false),
+                    StateType("A", "Unavailable", false)), 56)
+                ::
+                Nil
         )
-  }
+    }
 
+    @Test def readOnlyStateTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/ReadOnlyState.obs",
+            (TransitionNotAllowedError(), 11) ::
+                (ReceiverTypeIncompatibleError("changeStateShared",
+                    ContractReferenceType(ContractType("C"), ReadOnlyState(), false),
+                    ContractReferenceType(ContractType("C"), Shared(), false)), 39) ::
+                (ReceiverTypeIncompatibleError("changeStateOwned",
+                    ContractReferenceType(ContractType("C"), Shared(), false),
+                    ContractReferenceType(ContractType("C"), Owned(), false)), 42) ::
+                (ReceiverTypeIncompatibleError("changeStateStateSpecified",
+                    ContractReferenceType(ContractType("C"), Owned(), false),
+                    StateType("C", Set("S1"), false)), 45) ::
+                Nil
+        )
+    }
 }

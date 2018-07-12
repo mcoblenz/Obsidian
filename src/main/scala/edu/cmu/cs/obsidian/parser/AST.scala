@@ -41,6 +41,8 @@ sealed abstract class InvokableDeclaration() extends Declaration {
     val args: Seq[VariableDeclWithSpec]
     val retType: Option[ObsidianType]
     val body: Seq[Statement]
+    val thisType: ObsidianType
+    val isStatic: Boolean
 }
 
 /* Expressions */
@@ -100,13 +102,13 @@ case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {
 }
 
 sealed trait IsAvailableInStates {
-    val availableIn: Option[Set[Identifier]]
+    def availableIn: Option[Set[String]]
 }
 
 case class Field(isConst: Boolean,
                  typ: ObsidianType,
                  name: String,
-                 availableIn: Option[Set[Identifier]]) extends Declaration with IsAvailableInStates {
+                 availableIn: Option[Set[String]]) extends Declaration with IsAvailableInStates {
     val tag: DeclarationTag = FieldDeclTag
 }
 
@@ -116,19 +118,22 @@ case class Constructor(name: String,
                        body: Seq[Statement]) extends InvokableDeclaration {
     val retType: Option[ObsidianType] = None
     val tag: DeclarationTag = ConstructorDeclTag
+    val thisType: ObsidianType = resultType
+    val isStatic: Boolean = false
 }
 case class Func(name: String,
                 args: Seq[VariableDeclWithSpec],
                 retType: Option[ObsidianType],
-                availableIn: Option[Set[Identifier]],
+                availableIn: Option[Set[String]],
                 body: Seq[Statement],
                 thisPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = FuncDeclTag
+    val thisType: ObsidianType = BottomType() // TODO: merge Func into Transaction (#159). This is bogus for now.
+    val isStatic: Boolean = false;
 }
 case class Transaction(name: String,
                        args: Seq[VariableDeclWithSpec],
                        retType: Option[ObsidianType],
-                       availableIn: Option[Set[Identifier]],
                        ensures: Seq[Ensures],
                        body: Seq[Statement],
                        isStatic: Boolean,
@@ -136,18 +141,11 @@ case class Transaction(name: String,
                        thisFinalType: NonPrimitiveType) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 
-    // contract name is necessary since we don't have it at parse time
-    def thisType(contractName: String): NonPrimitiveType = typeWithContractName(thisType, contractName)
+    def availableIn: Option[Set[String]] = thisType match {
+        case StateType(_, stateNames, _) => Some(stateNames)
+        case _ => None
+    }
 
-    def thisFinalType(contractName: String): NonPrimitiveType = typeWithContractName(thisFinalType, contractName)
-
-    private def typeWithContractName(typ: NonPrimitiveType, contractName: String): NonPrimitiveType =
-        typ match {
-            case ContractReferenceType(ContractType(_), permission, isRemote) =>
-                ContractReferenceType(ContractType(contractName), permission, isRemote)
-            case StateType(_, stateNames, isRemote) => StateType(contractName, stateNames, isRemote)
-            case InterfaceContractType(_, simpleType) =>  InterfaceContractType(contractName, simpleType)
-        }
 }
 case class State(name: String, declarations: Seq[Declaration]) extends Declaration {
     val tag: DeclarationTag = StateDeclTag
