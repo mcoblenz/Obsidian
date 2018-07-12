@@ -101,13 +101,13 @@ case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {
 }
 
 sealed trait IsAvailableInStates {
-    val availableIn: Option[Set[Identifier]]
+    def availableIn: Option[Set[String]]
 }
 
 case class Field(isConst: Boolean,
                  typ: ObsidianType,
                  name: String,
-                 availableIn: Option[Set[Identifier]]) extends Declaration with IsAvailableInStates {
+                 availableIn: Option[Set[String]]) extends Declaration with IsAvailableInStates {
     val tag: DeclarationTag = FieldDeclTag
 }
 
@@ -122,16 +122,15 @@ case class Constructor(name: String,
 case class Func(name: String,
                 args: Seq[VariableDeclWithSpec],
                 retType: Option[ObsidianType],
-                availableIn: Option[Set[Identifier]],
+                availableIn: Option[Set[String]],
                 body: Seq[Statement],
                 thisPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = FuncDeclTag
-    val thisType: ObsidianType = BottomType() // TODO: merge Func into Transaction. This is bogus for now.
+    val thisType: ObsidianType = BottomType() // TODO: merge Func into Transaction (#159). This is bogus for now.
 }
 case class Transaction(name: String,
                        args: Seq[VariableDeclWithSpec],
                        retType: Option[ObsidianType],
-                       availableIn: Option[Set[Identifier]],
                        ensures: Seq[Ensures],
                        body: Seq[Statement],
                        isStatic: Boolean,
@@ -143,6 +142,11 @@ case class Transaction(name: String,
     def thisType(contractName: String): NonPrimitiveType = typeWithContractName(thisType, contractName)
 
     def thisFinalType(contractName: String): NonPrimitiveType = typeWithContractName(thisFinalType, contractName)
+
+    def availableIn: Option[Set[String]] = thisType match {
+        case StateType(_, stateNames, _) => Some(stateNames)
+        case _ => None
+    }
 
     private def typeWithContractName(typ: NonPrimitiveType, contractName: String): NonPrimitiveType =
         typ match {

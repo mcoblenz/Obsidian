@@ -2,8 +2,9 @@ main contract C {
     state S1 {
     }
     state S2 {
-        function f() returns int available in S1 { return x; }
-        function f(T x) { return x; }
+        // Disabled fuctions pending #159.
+        //function f() returns int available in S1 { return x; }
+        //function f(T x) { return x; }
     }
     transaction t(C@(S1|S2) this) { return x; }
     transaction t(C@S1 this, T x) { return x; }

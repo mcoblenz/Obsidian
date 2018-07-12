@@ -392,11 +392,15 @@ object Parser extends Parsers {
                 opt(EqT() ~! parseExpr ~! failure("fields may only be assigned inside of transactions")) ~!
                 SemicolonT() ^^ {
             case isConst ~ typ ~ name ~ availableIn ~ None ~ _ =>
+                val availableInSet = availableIn match {
+                    case Some(idents) => Some(idents.map(_._1))
+                    case None => None
+                }
                 isConst match {
                     case Some(constToken) =>
-                        Field(isConst = true, typ, name._1, availableIn).setLoc(constToken)
+                        Field(isConst = true, typ, name._1, availableInSet).setLoc(constToken)
                     case None =>
-                        Field(isConst = false, typ, name._1, availableIn).setLoc(typ)
+                        Field(isConst = false, typ, name._1, availableInSet).setLoc(typ)
             }
         }
     }
@@ -420,6 +424,7 @@ object Parser extends Parsers {
             case _ ~ s => EndsInState(s)
         }
 
+/*
     private def parseFuncDecl = {
         FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
             parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
@@ -427,6 +432,7 @@ object Parser extends Parsers {
                 Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body, Unowned()).setLoc(f)
         }
     }
+    */
 
     private def parseEnsures = {
         EnsuresT() ~! parseExpr ~! SemicolonT() ^^ {
@@ -506,7 +512,7 @@ object Parser extends Parsers {
 
                 }
 
-                Transaction(nameString, filteredArgs, returns, availableIn,
+                Transaction(nameString, filteredArgs, returns,
                     ensures, body, isStatic, thisType, finalType.asInstanceOf[NonPrimitiveType]).setLoc(t)
         }
     }
@@ -552,7 +558,7 @@ object Parser extends Parsers {
     }
 
     private def parseDeclInState: Parser[Declaration] = {
-        parseFieldDecl | parseFuncDecl |
+        parseFieldDecl | // parseFuncDecl |
         parseStateDecl | parseConstructor | parseContractDecl | failure("declaration expected")
     }
 

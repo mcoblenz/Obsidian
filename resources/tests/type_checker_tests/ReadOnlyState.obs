@@ -34,7 +34,7 @@ contract D {
     C@S1 s1C;
 
     transaction t1(C c) {
-        // Error: cannot change state of c
+        // Error: cannot change state of c.
         c.changeStateShared();
 
         // Error: cannot invoke.

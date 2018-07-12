@@ -82,7 +82,7 @@ case class Context(table: DeclarationTable,
                         insideContractResult.get.availableIn match {
                             case None => // This identifier is available in all states of the contract.
                                 contractTableOpt.get.stateLookup.map(_._1)
-                            case Some(identifiers) => identifiers.map(_._1)
+                            case Some(identifiers) => identifiers
                         }
                     }
                     else {
@@ -981,7 +981,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             true
                         }
                         else {
-                            f.availableIn.get.map(_._1).contains(stateName)
+                            f.availableIn.get.contains(stateName)
                         }
                 ))
 
@@ -1017,8 +1017,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             availableIn match {
                                 case None => false // We're not interested in fields that are available in all states because they were available in the old state too.
                                 case Some(stateIdentifiers) =>
-                                    val availableInStateNames = stateIdentifiers.map(_._1)
-                                    availableInStateNames.contains(newStateName)
+                                    stateIdentifiers.contains(newStateName)
                             }
                         }
                         else {
@@ -1392,32 +1391,28 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
 
         // Construct the set of states that the transaction might start in.
-        val startStates: Set[StateTable] =
-            if (tx.availableIn.isDefined) {
-                var allStates = Set.empty[StateTable]
-                for (containingStateName <- tx.availableIn.get) {
-                    // Look up each state name and make sure it's a real state.
-                    val stateTableOpt = lexicallyInsideOf.contractTable.state(containingStateName._1)
-                    stateTableOpt match {
-                        case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, containingStateName._1))
-                        case Some(stateTable) =>
-                            allStates = allStates + stateTable
-                    }
-                }
-                allStates
-            }
-        else {
-            // All states are possible.
-            val stateSet: Set[(String, StateTable)] = lexicallyInsideOf.contractTable.stateLookup.toSet
-            stateSet.map(s => s._2)
-        }
 
-        val stateNames = if (tx.availableIn.isDefined) {
-            Some(startStates.map(t => t.name))
-        }
-        else {
-            None
-        }
+
+
+        val startStates: Set[StateTable] =
+            tx.thisType match {
+                case StateType(_, stateNames, _) =>
+                    var allStates = Set.empty[StateTable]
+                    for (containingStateName <- stateNames) {
+                        // Look up each state name and make sure it's a real state.
+                        val stateTableOpt = lexicallyInsideOf.contractTable.state(containingStateName)
+                        stateTableOpt match {
+                            case None => logError(tx, StateUndefinedError(lexicallyInsideOf.contract.name, containingStateName))
+                            case Some(stateTable) =>
+                                allStates = allStates + stateTable
+                        }
+                    }
+                    allStates
+                case _ =>
+                    // All states are possible.
+                    val stateSet: Set[(String, StateTable)] = lexicallyInsideOf.contractTable.stateLookup.toSet
+                    stateSet.map(s => s._2)
+            }
 
         val thisType = tx.thisType(lexicallyInsideOf.contract.name)
         // TODO: consider path case. Previously it was something like:
@@ -1510,7 +1505,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case (None, _) => logError(field, RepeatContractFields(field.name, f.loc.line, f.loc.line))
                             case (Some(_), None) => logError(field, RepeatContractFields(field.name, field.loc.line, f.loc.line))
                             case (Some(states1), Some(states2)) => {
-                                logError(field, CombineAvailableIns(field.name, (states2 | states1).map(_._1).mkString(", "), f.loc.line))
+                                logError(field, CombineAvailableIns(field.name, (states2 | states1).mkString(", "), f.loc.line))
                             }
                         }
                     }

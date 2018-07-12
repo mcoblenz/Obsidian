@@ -31,7 +31,7 @@ object StateFieldTransformer {
             state.declarations.foldLeft(Seq.empty[Field])((fieldsSoFar: Seq[Field], d: Declaration) =>
                 if (d.isInstanceOf[Field]) {
                     val f = d.asInstanceOf[Field]
-                    val newField = f.copy(availableIn = Some(Set((state.name, state.loc))))
+                    val newField = f.copy(availableIn = Some(Set(state.name)))
                     newField.setLoc(f)
                     newField +: fieldsSoFar
                 }
