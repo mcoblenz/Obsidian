@@ -468,7 +468,7 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseTransDecl(isInterface:Boolean): Parser[Transaction] = {
+    private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
         opt(StaticT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
           opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
             case static ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
@@ -496,18 +496,14 @@ object Parser extends Parsers {
                         }
                 }
 
-                val (availableIn, finalType) = thisArg match {
-                    case None => (None, ContractReferenceType(ContractType("THIS"), Shared(), false))
-                    case Some(v) =>
-                        v.typIn match {
-                            case StateType(_,states,_) => (Some(states.map(s => (s, v.typIn.loc))), v.typOut)
-                            case _ => (None, v.typOut)
-                        }
+                val finalType = thisArg match {
+                    case None => ContractReferenceType(ContractType(contractName), Shared(), false)
+                    case Some(v) => v.typOut
                 }
 
                 // contract name is THIS as there is no way to access it at the moment
                 val thisType = thisArg match {
-                    case None => ContractReferenceType(ContractType("THIS"), Shared(), false)
+                    case None => ContractReferenceType(ContractType(contractName), Shared(), false)
                     case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType]
 
                 }
@@ -562,9 +558,9 @@ object Parser extends Parsers {
         parseStateDecl | parseConstructor | parseContractDecl | failure("declaration expected")
     }
 
-    private def parseDeclInContract(isInterface:Boolean): Parser[Declaration] = {
-        if(isInterface) parseDeclInState | parseTransDecl(true)
-        else parseDeclInState | parseTransDecl(false)
+    private def parseDeclInContract(isInterface:Boolean)(contractName: String):  Parser[Declaration] = {
+
+        parseDeclInState | parseTransDecl(isInterface)(contractName)
     }
 
     private def parseContractModifier = {
@@ -574,16 +570,14 @@ object Parser extends Parsers {
     }
 
     private def parseContractDecl = {
-        rep(parseContractModifier) ~ ContractT() ~! parseId ~!
-            LBraceT() ~! rep(parseDeclInContract(false)) ~! RBraceT() ^^ {
-            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod.toSet, name._1, defs, false).setLoc(ct)
-        }
-    }
+        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseId >> {
+            case mod ~ ct ~ name =>
+                val isInterface = ct == InterfaceT()
 
-    private def parseInterfaceDecl = {
-        rep(parseContractModifier) ~ InterfaceT() ~! parseId ~!
-          LBraceT() ~! rep(parseDeclInContract(true)) ~! RBraceT() ^^ {
-            case mod ~ ct ~ name ~ _ ~ defs ~ _ => Contract(mod.toSet, name._1, defs, true).setLoc(ct)
+                LBraceT() ~! rep(parseDeclInContract(isInterface)(name._1)) ~! RBraceT() ^^ {
+                case _ ~ defs ~ _ =>
+                    Contract(mod.toSet, name._1, defs, isInterface).setLoc(ct)
+            }
         }
     }
 
@@ -594,7 +588,7 @@ object Parser extends Parsers {
     }
 
     private def parseProgram = {
-        phrase(rep(parseImport) ~ rep1(parseContractDecl | parseInterfaceDecl)) ^^ {
+        phrase(rep(parseImport) ~ rep1(parseContractDecl)) ^^ {
             case imports ~ contracts => Program(imports, contracts).setLoc(contracts.head)
         }
     }
