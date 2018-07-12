@@ -245,3 +245,6 @@ case class TransitionNotAllowedError() extends Error {
     val msg: String = "Cannot change state because 'this' was specified to not allow state changes."
 }
 
+case class ReceiverTypeIncompatibleError(transactionName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
+    val msg: String = s"Cannot invoke $transactionName on a receiver of type $actualType; a receiver of type $expectedType is required."
+}

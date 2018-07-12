@@ -11,6 +11,7 @@ main contract C {
         ->S2;
     }
 
+    // OK because by default, 'this' is Shared.
     transaction changeStateShared() {
         ->S2;
     }
@@ -45,8 +46,9 @@ contract D {
     }
 
     transaction t2() {
-        s1C.invalidChangeState();
-        // s1C is now still in state S1
+        s1C.invalidChangeState(); // OK
+
+        // OK: s1C is now still in state S1
         s1C.changeStateStateSpecified();
     }
 }

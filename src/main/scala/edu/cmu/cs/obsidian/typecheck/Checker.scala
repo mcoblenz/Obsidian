@@ -238,8 +238,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
         p1 match {
             case Owned() => true
-            case Unowned() => p2 == Unowned()
-            case Shared() => (p2 == Shared()) || (p2 == Unowned())
+            case Unowned() => (p2 == Unowned()) || (p2 == ReadOnlyState())
+            case Shared() => (p2 == Shared()) || (p2 == Unowned()) || (p2 == ReadOnlyState())
+            case ReadOnlyState() => (p2 == ReadOnlyState())
         }
     }
     //-------------------------------------------------------------------------
@@ -346,7 +347,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case (Some(t), _) => t
             }
 
-            checkIsSubtype(e, receiverType, invokable.thisType)
+            if (isSubtype(receiverType, invokable.thisType).isDefined) {
+                logError(e, ReceiverTypeIncompatibleError(name, receiverType, invokable.thisType))
+            }
 
             // check arguments
             val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, contextAfterReceiver, args)
@@ -360,7 +363,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             val spec = correctInvokable.args
 
-            val astType = correctInvokable.retType match {
+            val resultType = correctInvokable.retType match {
                 case None => UnitType()
                 case Some(typ) => typ
             }
@@ -372,7 +375,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case _ => contextAfterArgs
                 }
 
-            (astType, contextPrime)
+            (resultType, contextPrime)
 
         }
 
@@ -861,7 +864,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 receiverType match {
                     case typ: NonPrimitiveType => {
                         val newType = invokable.thisFinalType(typ.contractName)
-                        context.updated(x, newType)
+                        if (newType.permission == ReadOnlyState()) {
+                            // The transaction promised not to change the state of the receiver.
+                            context
+                        }
+                        else {
+                            context.updated(x, newType)
+                        }
                     }
                     case _ => context
                 }
