@@ -472,7 +472,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
 
              case Dereference(eDeref: Expression, fieldName) =>
-                 val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref, true)
+                 val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref, false)
                  if (derefType.isBottom) {
                      return (BottomType(), contextPrime)
                  }
@@ -589,7 +589,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
             statement match {
-                case Return() | ReturnExpr(_) => hasRet = true
+                case Return() | ReturnExpr(_) | Throw() => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
                 case _ => ()

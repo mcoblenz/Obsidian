@@ -2,24 +2,27 @@ import "resources/case_studies/Insurance/InsuranceService.obs"
 import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/java-utilities/System.obs"
 
 main contract InsuranceClient {
-	transaction main(remote InsuranceService insService) {
-	     Insurer ins = new Insurer();
-	     Bank bank = new Bank();
+	transaction main(remote InsuranceService@Shared insService) {
+	     TimeService@Shared timeService = new TimeService();
+	     Bank@Shared bank = new Bank();
+	     Insurer@Owned insurer = new Insurer(timeService, bank);
+	     // give insurer some money
+	     insurer.addMoney(10);
 
-	     // ins. service needs reference to insurer, where it
-	     // then initializes insurer w bank
-	     insService.addInsurer(ins);
-	     insService.connectBankAndInsurer(bank);
+	     // ins. service needs reference to insurer
+	     insService.addInsurer(insurer);
 
-         Token@Owned token = bank.buyToken();
 	     Bid@Available bid = insService.requestBids(3);
 
          // test
-         if (bid.getCost() == 7) {
-             System.print("bid : 7 \n");
-         }
-         // TODO: return Bid@Sold (issue 140)
-         Bid@Owned soldBid = insService.buyBid(bid, token);
+         System.println(bid.getCost());
+
+         // now buy the bid with a token
+         Token@Owned token = bank.buyToken(new Money(bid.getCost()));
+
+         System.println(bank.getMoneyAmount());
+
+         Bid@Sold soldBid = insService.buyBid(bid, token);
 
          // to pass typechecker
          disown soldBid;

@@ -1,9 +1,13 @@
+import "resources/case_studies/Insurance/TimeService.obs"
+
 main resource contract Bid {
     int cost;
+    TimeService@Shared timeService;
+
 
     // available for consideration from client
     state Available {
-        int timeAvailable;
+        int expirationTime;
     }
 
     // expires after a certain amount of time
@@ -12,26 +16,27 @@ main resource contract Bid {
     // client buys it
     state Sold {}
 
-    Bid@Available(int c, int expirationDate) {
+    Bid@Available(int c, int expiration, TimeService@Shared ts) {
         cost = c;
         // Available by default
-        ->Available(timeAvailable = expirationDate);
+        timeService = ts;
+        ->Available(expirationTime = expiration);
     }
 
     // TODO: Proper timing
-    transaction hasExpired() available in Available
-                                ends in Available, Expired {
-        if (timeAvailable < 0) {
-                ->Expired;
-        }
+    transaction hasExpired(Bid@Available this) returns bool {
+        return expirationTime < timeService.getTime();
     }
 
-    transaction buy() available in Available
-                      ends in Sold {
+    transaction expire(Bid@Available >> Expired this) {
+        ->Expired;
+    }
+
+    transaction buy(Bid@Available >> Sold this) {
         ->Sold;
     }
 
-    transaction getCost() returns int {
+    transaction getCost(Bid this) returns int {
         return cost;
     }
 
