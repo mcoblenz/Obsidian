@@ -62,4 +62,18 @@ class CompilerTests extends JUnitSuite {
     result = Main.compileProgram(inputArgs)
     assertTrue(result)
   }
+
+  @Test def InsuranceService(): Unit = {
+    var result = true
+    val inputArgs: Array[String] = Array("--dump-debug", "obs_output", "resources/case_studies/Insurance/InsuranceService.obs")
+    result = Main.compileProgram(inputArgs)
+    assertTrue(result)
+  }
+
+  @Test def InsuranceClient(): Unit = {
+    var result = true
+    val inputArgs: Array[String] = Array("--build-client", "--dump-debug", "obs_output", "resources/case_studies/Insurance/InsuranceClient.obs")
+    result = Main.compileProgram(inputArgs)
+    assertTrue(result)
+  }
 }
