@@ -1,0 +1,10 @@
+main contract C {
+    private static transaction t1() {
+    }
+
+    transaction t2() {
+    }
+
+    static private transaction t3() {
+    }
+}

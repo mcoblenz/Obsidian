@@ -220,7 +220,8 @@ class ParserTests extends JUnitSuite {
         shouldSucceedFile("resources/tests/parser_tests/ValidTransactions.obs")
         shouldFail("resources/tests/parser_tests/BadTransactionOrdering.obs")
         shouldSucceedFile("resources/tests/parser_tests/AvailableInRepeats.obs")
-
+        shouldSucceedFile("resources/tests/parser_tests/TransactionOptions.obs")
+        shouldFail("resources/tests/parser_tests/BadTransactionOptions.obs")
     }
 
     @Test def invocationSpec() = {

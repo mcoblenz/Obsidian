@@ -137,6 +137,7 @@ case class Transaction(name: String,
                        ensures: Seq[Ensures],
                        body: Seq[Statement],
                        isStatic: Boolean,
+                       isPrivate: Boolean,
                        thisType: NonPrimitiveType,
                        thisFinalType: NonPrimitiveType
                       ) extends InvokableDeclaration with IsAvailableInStates {
