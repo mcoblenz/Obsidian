@@ -300,7 +300,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     }
 
     private def translateStubState(s: State, inClass: JDefinedClass, txNames: mutable.Set[String]) : Unit = {
-        for (decl <- s.declarations) {
+        for (decl <- s.fields) {
             translateStubDeclaration(decl, inClass, Some(s), txNames)
         }
     }
@@ -398,18 +398,16 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         /* collect all declarations (fields, functions, transactions) that are particular
          * to a state.
          * Each declaration is also paired with the state it is defined in */
-        val declarations = contract.declarations
+        val declarations: Seq[(Field, State)] = contract.declarations
                 // look in all the states of the contract
                 .filter(_.isInstanceOf[State])
                 .map(_.asInstanceOf[State])
-                // make a big, flat list of pains (d: Declaration, s: State)
-                .flatMap((s: State) => s.declarations.zip(List.fill(s.declarations.size)(s)))
+                // make a big, flat list of pairs (d: Declaration, s: State)
+                .flatMap((s: State) => s.fields.zip(List.fill(s.fields.size)(s)))
 
         /* separate declarations by their type */
         val fields = declarations.filter(_._1.isInstanceOf[Field])
                                  .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Field]))
-        val txs = declarations.filter(_._1.isInstanceOf[Transaction])
-                              .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Transaction]))
 
         /* splits items in [ts] into groups based on equality of the result of applying [f] */
         def generalizedPartition[T, S](ts: List[T], f: Function[T, S]): immutable.HashMap[S, Seq[T]] = {
@@ -427,7 +425,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         else {
 
             val fieldInfoFunc = makeFieldInfo(newClass, stateLookup) _
-            val transactionInfoFunc = makeTransactionInfo(newClass, stateLookup) _
 
             /* this uses the above helper function to group declarations by name. Conceptually, if we
             * define field "f" in states "S1" and "S2", it is one declaration that specifies multiple
@@ -436,8 +433,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             * the necessary information for the table */
             var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.name)
                 .transform(fieldInfoFunc)
-            var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name)
-                .transform(transactionInfoFunc)
+            var txLookup = Map.empty[String, TransactionInfo]
 
             /* add on any whole-contract declarations to the lookup table: these are fairly simple */
             for (decl <- contract.declarations) {
@@ -1258,7 +1254,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             protobufClassName + ".newBuilder();")
         val builderVariable = JExpr.ref("builder")
 
-        val declarations = state.declarations
+        val declarations = state.fields
 
         for (f <- declarations if f.isInstanceOf[Field]) {
             val field: Field = f.asInstanceOf[Field]
@@ -1437,7 +1433,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val fromArchiveBody = fromArchiveMeth.body()
 
         // Call setters.
-        val declarations = state.declarations
+        val declarations = state.fields
 
         /* this takes care of fields that are not specific to any particular state */
         for (f <- declarations if f.isInstanceOf[Field]) {
@@ -1782,7 +1778,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         /* we change one thing: the currently translated state */
         val newTranslationContext = translationContext.copy(currentStateName = Some(state.name))
-        for (decl <- state.declarations) {
+        for (decl <- state.fields) {
             translateDeclaration(decl, stateClass, newTranslationContext, contract)
         }
         generateStateArchiveInitializer(contract, state, stateClass, translationContext)

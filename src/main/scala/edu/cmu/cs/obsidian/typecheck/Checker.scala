@@ -336,13 +336,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             val foundTransaction = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
 
-            if (receiverType.isInstanceOf[InterfaceContractType] && !foundTransaction.get.isStatic) {
-                val err = NonStaticAccessError(foundTransaction.get.name, receiver.toString)
-                logError(e, err)
-                return (BottomType(), contextAfterReceiver)
-            }
-
-
             val invokable: InvokableDeclaration = foundTransaction match {
                 case None =>
                     val err = MethodUndefinedError(nonPrimitiveReceiverType, name)
@@ -351,8 +344,25 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case Some(t) => t
             }
 
+            if (receiverType.isInstanceOf[InterfaceContractType] && !foundTransaction.get.isStatic) {
+                val err = NonStaticAccessError(foundTransaction.get.name, receiver.toString)
+                logError(e, err)
+                return (BottomType(), contextAfterReceiver)
+            }
+
             if (!invokable.isStatic && isSubtype(receiverType, invokable.thisType).isDefined) {
                 logError(e, ReceiverTypeIncompatibleError(name, receiverType, invokable.thisType))
+            }
+
+            // Check field types for private invocations
+            for ((fieldName, requiredInitialFieldType) <- foundTransaction.get.initialFieldTypes) {
+                val currentFieldType = context.lookupCurrentFieldTypeInThis(fieldName)
+                currentFieldType match {
+                   case None => ()
+                   case Some(cft) => if(isSubtype(cft, requiredInitialFieldType).isDefined) {
+                       logError(e, FieldSubtypingError(fieldName, cft, requiredInitialFieldType))
+                   }
+                }
             }
 
             // check arguments
@@ -370,6 +380,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case Some(typ) => typ
             }
 
+            // XXX TODO: check to make sure type of "this" is tracked correctly!
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
@@ -377,7 +388,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case _ => contextAfterArgs
                 }
 
-            (resultType, contextPrime)
+            // Update field types if we invoked a private method.
+            val contextAfterPrivateInvocation = updateFieldsForPrivateInvocation(contextPrime, foundTransaction.get)
+
+            (resultType, contextAfterPrivateInvocation)
 
         }
 
@@ -645,16 +659,48 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def checkFieldTypeConsistency(context: Context, ast: AST): Unit = {
+    private def checkFieldTypeConsistency(context: Context, tx: Transaction): Unit = {
+        // First check fields that may be of inconsistent type with their declarations to make sure they match
+        // either the declarations or the specified final types.
         for ((field, typ) <- context.thisFieldTypes) {
-            val fieldDeclType = context.lookupDeclaredFieldTypeInThis(field)
-            fieldDeclType match {
+            val requiredFieldType =
+                if (tx.finalFieldTypes.contains(field)) {
+                    if (context.lookupDeclaredFieldTypeInThis(field).isEmpty) {
+                        // There is a final field type declaration for a nonexistent field.
+                        logError(tx, InvalidFinalFieldTypeDeclarationError(field))
+                        Some(BottomType())
+                    }
+                    else {
+                        tx.finalFieldTypes.get(field)
+                    }
+                }
+                else {
+                    context.lookupDeclaredFieldTypeInThis(field)
+                }
+
+            requiredFieldType match {
                 case None =>
                     assert(false, "Bug: invalid field in field type context")
                 case Some(declaredFieldType) =>
                     if (isSubtype(typ, declaredFieldType).isDefined) {
-                        logError(ast, InvalidInconsistentFieldType(field, typ, declaredFieldType))
+                        logError(tx, InvalidInconsistentFieldType(field, typ, declaredFieldType))
                     }
+            }
+        }
+
+        // Next check the specified final field types to make sure any that are NOT overridden in thisFieldTypes are satisfied.
+
+        for ((field, requiredTyp) <- tx.finalFieldTypes) {
+            if (!context.thisFieldTypes.contains(field)) { // otherwise it was already checked above
+                val currentType = context.lookupDeclaredFieldTypeInThis(field)
+                currentType match {
+                    case None =>
+                        logError(tx, InvalidFinalFieldTypeDeclarationError(field))
+                    case Some(currentTyp) =>
+                        if (isSubtype(currentTyp, requiredTyp).isDefined) {
+                            logError(tx, InvalidInconsistentFieldType(field, currentTyp, requiredTyp))
+                        }
+                }
             }
         }
     }
@@ -806,6 +852,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
         errs.foreach((err: (AST, Error)) => logError(err._1, err._2))
         None
+    }
+
+    private def updateFieldsForPrivateInvocation(context: Context, tx: Transaction): Context = {
+        var finalContext = context
+        for ((fieldName, finalFieldType) <- tx.finalFieldTypes) {
+            finalContext = context.updatedThisFieldType(fieldName, finalFieldType)
+        }
+
+        finalContext
     }
 
     // updates the type of an identifier in the context based on the transaction invoked on it
@@ -1033,7 +1088,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                     }
 
-                val newStateFields = newStateTable.ast.declarations
+                val newStateFields = newStateTable.ast.fields
                                 .filter(_.isInstanceOf[Field])
                                 .map((decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ))
                 val contractDeclarations = thisTable.contractTable.ast.asInstanceOf[Contract].declarations
@@ -1374,6 +1429,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def checkTransaction(tx: Transaction, lexicallyInsideOf: DeclarationTable): Unit = {
+        if (!tx.isPrivate && (!tx.initialFieldTypes.isEmpty || !tx.finalFieldTypes.isEmpty)) {
+            logError(tx, FieldTypesDeclaredOnPublicTransactionError(tx.name))
+        }
+
         // Construct the set of states that the transaction might start in.
         val startStates: Set[StateTable] =
             tx.thisType match {
@@ -1411,7 +1470,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // Construct the context that the body should start with
-        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, Map.empty)
+        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, tx.initialFieldTypes)
         initContext = initContext.updated("this", thisType)
 
         // Add all the args first (in an unsafe way) before checking anything
@@ -1439,7 +1498,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 lexicallyInsideOf.state(stateName) match {
                     case None => ()
                     case Some(state: StateTable) => {
-                        for (decl <- state.ast.declarations) {
+                        for (decl <- state.ast.fields) {
                             decl match {
                                 case field: Field => {
                                     if ((field.name == f.name) && (field.loc.line < f.loc.line) && (!foundField)) {
@@ -1491,15 +1550,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     private def checkState(lexicallyInsideOf: ContractTable, state: State): Unit = {
         val table = lexicallyInsideOf.state(state.name).get
-        for (decl <- state.declarations) {
-            decl match {
-                case t: Transaction => checkTransaction(t, table) // Unsupported for now but leaving this here just in case.
-                case f: Field => {
-                    checkField(f, table.contractTable)
-                    checkStateFieldShadowing(lexicallyInsideOf, f, state)
-                }
-                case _ => () // TODO
-            }
+        for (field <- state.fields) {
+            checkField(field, table.contractTable)
+            checkStateFieldShadowing(lexicallyInsideOf, field, state)
         }
     }
 

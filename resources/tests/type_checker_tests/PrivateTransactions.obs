@@ -1,0 +1,50 @@
+contract C {
+    state S1;
+    state S2;
+
+    C@S1() {
+        ->S1;
+    }
+
+    transaction toS2(C@S1 >> S2 this) {
+        ->S2;
+    }
+
+    transaction toS1(C@S2 >> S1 this) {
+        ->S1;
+    }
+}
+
+main contract PrivateTransactions {
+    C@S1 c;
+
+    private (C@S2 >> S1 c) transaction t1() {
+        c.toS1();
+    }
+
+    private (C@S1 >> S2 c) transaction t2() {
+        c.toS2();
+    }
+
+    // Error: field "bogus" is not a real field.
+    private (C@S1 >> S2 bogus) transaction bogusFieldSpec() {
+    }
+
+    (C@S1 >> S2 c) transaction t2() { // Error: can't specify initial/final field types on public transactions
+        c.toS2();
+    }
+
+    transaction publicTransaction1() {
+        t2(); // OK
+        t1(); // OK
+    }
+
+    transaction publicTransaction2() {
+        t2(); // OK
+        // Error: c@S2 but it needs to be in S1
+    }
+
+    transaction publicTransaction3() {
+        t1(); // Error: t1 requires c@S2 but actually c@S1
+    }
+}

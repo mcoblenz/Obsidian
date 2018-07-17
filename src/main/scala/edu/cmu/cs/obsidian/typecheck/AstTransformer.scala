@@ -81,28 +81,18 @@ object AstTransformer {
     }
 
     def transformState(table: SymbolTable, sTable: StateTable): (State, Seq[ErrorRecord]) = {
-        var newDecls: Seq[Declaration] = Nil
+        var newDecls: Seq[Field] = Nil
         var errors = List.empty[ErrorRecord]
 
-        for (d <- sTable.ast.declarations) {
-            val (newDecl, newErrors) = d.tag match {
-                case TransactionDeclTag =>
-                    transformTransaction(table, sTable, d.asInstanceOf[Transaction])
-                case ConstructorDeclTag =>
-                    transformConstructor(table, sTable, d.asInstanceOf[Constructor])
-                case FieldDeclTag =>
-                    transformField(table, sTable, d.asInstanceOf[Field])
-                case StateDeclTag => null
-                case ContractDeclTag => null
-                case TypeDeclTag => null
-            }
+        for (d <- sTable.ast.fields) {
+            val (newDecl, newErrors) = transformField(table, sTable, d.asInstanceOf[Field])
             newDecls = newDecl +: newDecls
             errors = errors ++ newErrors
         }
 
         newDecls = newDecls.reverse
 
-        val newState = sTable.ast.copy(declarations = newDecls)
+        val newState = sTable.ast.copy(fields = newDecls)
         (newState, errors.reverse)
     }
 

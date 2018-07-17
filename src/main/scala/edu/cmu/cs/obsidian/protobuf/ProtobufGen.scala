@@ -93,7 +93,7 @@ object ProtobufGen {
 
     private def translateStateDecl(s: State): ProtobufDeclaration = {
         // We only care about the fields. The actual code is irrelevant.
-        val allFields = s.declarations.map(translateDeclaration)
+        val allFields = s.fields.map(translateDeclaration)
 
         val fields: List[ProtobufDeclaration] = allFields.foldLeft(List[ProtobufDeclaration]())((accum, optionField) =>
             optionField match {

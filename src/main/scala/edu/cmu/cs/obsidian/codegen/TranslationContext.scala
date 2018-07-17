@@ -104,7 +104,7 @@ case class TranslationContext(
      * in the contract as a whole */
     def conservedFields(stNameFrom: String, stNameTo: String) : Set[Field] = {
         val getFields = (stName: String) =>
-            states(stName).astState.declarations.filter(_.isInstanceOf[Field]).map(_.asInstanceOf[Field])
+            states(stName).astState.fields.filter(_.isInstanceOf[Field]).map(_.asInstanceOf[Field])
         val (fromFields, toFields) = (getFields(stNameFrom), getFields(stNameTo))
 
         def conservedFilter(fieldPrime: Field): Boolean = { toFields.exists(_.name == fieldPrime.name) }

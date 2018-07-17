@@ -1,0 +1,40 @@
+contract C {
+    state S1;
+    state S2;
+
+    C@S1() {
+        ->S1;
+    }
+}
+
+main contract TypeInference {
+    state T1;
+    state T2 {
+        C@S2 c2;
+    }
+
+    TypeInference@T1() {
+        ->T1;
+    }
+
+
+
+    C@S1 c;
+
+    private transaction assumeAnyC() {
+        // No code here; this transaction can be called with c having any permission.
+    }
+
+    private transaction assumeAnyC2(TypeInference@Owned this) {
+        // No code here; this transaction can be called with c having any permission.
+    }
+
+    private transaction inT2(TypeInference@T2 this) {
+    }
+
+    private transaction inSomeState(TypeInference@(T1|T2) this) {
+    }
+
+    private transaction ownedThis(TypeInference@Owned this) {
+    }
+}

@@ -624,4 +624,17 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def unownedReferenceTest(): Unit = {
         runTest("resources/tests/type_checker_tests/UnownedReference.obs", Nil)
     }
+
+    @Test def typeInferenceTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/TypeInference.obs", Nil)
+    }
+
+    @Test def privateTransactionsTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/PrivateTransactions.obs",
+            (InvalidFinalFieldTypeDeclarationError("bogus"), 30)::
+                (FieldTypesDeclaredOnPublicTransactionError("t2"), 33)::
+                (InvalidInconsistentFieldType("c", StateType("C", "S2", false), StateType("C", "S1", false)), 42)::
+                (FieldSubtypingError("c", StateType("C", "S1", false), StateType("C", "S2", false)), 48)::
+            Nil)
+    }
 }

@@ -8,7 +8,7 @@ import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.protobuf._
-import edu.cmu.cs.obsidian.typecheck.{AstTransformer, Checker}
+import edu.cmu.cs.obsidian.typecheck.{AstTransformer, Checker, InferTypes}
 import edu.cmu.cs.obsidian.util._
 
 import scala.sys.process._
@@ -280,15 +280,20 @@ object Main {
             val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
             val table = new SymbolTable(fieldsLiftedAst)
-            val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
+            val (transformedTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
 
             if (options.printAST) {
                 println("Transformed AST:")
-                println(globalTable.ast)
+                println(transformedTable.ast)
                 println()
             }
 
-            val checker = new Checker(globalTable, options.typeCheckerDebug)
+            val inferTypes = new InferTypes(transformedTable)
+            val inferredTypesProgram = inferTypes.inferTypesInProgram()
+            // TODO: dispense with unnecessary symbol table re-creation
+            val inferredTable = new SymbolTable(inferredTypesProgram)
+
+            val checker = new Checker(inferredTable, options.typeCheckerDebug)
             val typecheckingErrors = checker.checkProgram()
 
             val allSortedErrors = (transformErrors ++ typecheckingErrors).sorted
@@ -306,13 +311,13 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(globalTable.ast, protobufOuterClassName,
+            val javaModel = if (options.buildClient) translateClientASTToJava(inferredTable.ast, protobufOuterClassName,
                 options.mockChaincode, options.lazySerialization)
-            else translateServerASTToJava(globalTable.ast, protobufOuterClassName,
+            else translateServerASTToJava(inferredTable.ast, protobufOuterClassName,
                 options.mockChaincode, options.lazySerialization)
             javaModel.build(srcDir.toFile)
 
-            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(globalTable.ast, sourceFilename,
+            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(inferredTable.ast, sourceFilename,
                                                                                   options.lazySerialization)
 
             // Each import results in a .proto file, which needs to be compiled.
@@ -342,7 +347,7 @@ object Main {
                 }
             }
 
-            val mainName = findMainContractName(globalTable.ast)
+            val mainName = findMainContractName(inferredTable.ast)
 
             if (options.mockChaincode) {
                 // invoke javac and make a jar from the result

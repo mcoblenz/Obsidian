@@ -28,7 +28,7 @@ object StateFieldTransformer {
     // returns the new state and a sequence of lifted fields.
     def transformState(state: State): Seq[Declaration] = {
         val transformedStateFields: Seq[Field] =
-            state.declarations.foldLeft(Seq.empty[Field])((fieldsSoFar: Seq[Field], d: Declaration) =>
+            state.fields.foldLeft(Seq.empty[Field])((fieldsSoFar: Seq[Field], d: Declaration) =>
                 if (d.isInstanceOf[Field]) {
                     val f = d.asInstanceOf[Field]
                     val newField = f.copy(availableIn = Some(Set(state.name)))
@@ -39,7 +39,7 @@ object StateFieldTransformer {
                     fieldsSoFar
                 }
             )
-        val remainingStateDecls = state.declarations.filterNot((d: Declaration) => d.isInstanceOf[Field])
+        val remainingStateDecls = state.fields.filterNot((d: Declaration) => d.isInstanceOf[Field])
 
         new State(state.name, remainingStateDecls) +: transformedStateFields
     }

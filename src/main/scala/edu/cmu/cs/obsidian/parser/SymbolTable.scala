@@ -40,8 +40,8 @@ class StateTable(
     assert(astNodeRaw != null)
 
     private var astNode: State = astNodeRaw
-    private var fieldLookup: Map[String, Field] = indexDecl[Field](ast.declarations, FieldDeclTag)
-    private var txLookup: Map[String, Transaction] = indexDecl[Transaction](ast.declarations, TransactionDeclTag)
+    private var fieldLookup: Map[String, Field] = indexDecl[Field](ast.fields, FieldDeclTag)
+    private var txLookup: Map[String, Transaction] = indexDecl[Transaction](ast.fields, TransactionDeclTag)
 
     def contractTable: ContractTable = lexicallyInsideOf
     def contract: Contract = lexicallyInsideOf.contract
@@ -54,6 +54,8 @@ class StateTable(
     def ast: State = astNode
 
     def lookupContract(name: String): Option[ContractTable] = contractTable.lookupContract(name)
+
+    def allFields: Set[Field] = fieldLookup.values.toSet
 
     // Implements two-stage lookup for two nested scopes (state and then contract).
     private def doLookup[FoundType <: IsAvailableInStates](toFind: String,
@@ -100,6 +102,11 @@ class ContractTable(
     private var txLookup: Map[String, Transaction] = indexDecl[Transaction](contract.declarations, TransactionDeclTag)
 
     val allFields: Set[Field] = fieldLookup.values.toSet
+
+    // We know we are in one of the given states. Which fields are available?
+    def allFieldsAvailableInStates(stateNames: Set[String]) = {
+        allFields.filter((f: Field) => f.availableIn.isEmpty || stateNames.subsetOf(f.availableIn.get))
+    }
 
     def contractType = ContractType(name)
 

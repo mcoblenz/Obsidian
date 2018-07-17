@@ -260,3 +260,15 @@ case class InconsistentTypeAssignmentError(declaredType: ObsidianType, actualTyp
 case class ArgumentSubtypingError(tName: String, arg: String, t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Found type '$t1' as an argument to '$tName', but the argument '$arg' is expected something of type '$t2'."
 }
+
+case class FieldTypesDeclaredOnPublicTransactionError(tName: String) extends Error {
+    val msg: String = s"Transaction $tName is public, so it cannot have initial or final field types specified."
+}
+
+case class InvalidFinalFieldTypeDeclarationError(fieldName: String) extends Error {
+    val msg: String = s"Field $fieldName does not exist, so it cannot have a different declared final type."
+}
+
+case class FieldSubtypingError(fieldName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
+    val msg: String = s"Field $fieldName needs to be of type $expectedType but is actually of type $actualType."
+}

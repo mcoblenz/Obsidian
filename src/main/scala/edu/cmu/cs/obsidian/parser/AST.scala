@@ -140,9 +140,10 @@ case class Transaction(name: String,
         case StateType(_, stateNames, _) => Some(stateNames)
         case _ => None
     }
-
 }
-case class State(name: String, declarations: Seq[Declaration]) extends Declaration {
+
+
+case class State(name: String, fields: Seq[Field]) extends Declaration {
     val tag: DeclarationTag = StateDeclTag
 }
 
