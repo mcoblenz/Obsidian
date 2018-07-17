@@ -38,12 +38,12 @@ class LexerTests extends JUnitSuite {
     @Test def keywords(): Unit = {
         shouldEqual(
             """
-              | contract Contract if else transaction trans function function1 type state try
+              | contract Contract if else transaction trans function1 type state try
               | catch throw not and or return new newa
             """.stripMargin,
             List(
                 ContractT(), IdentifierT("Contract"), IfT(), ElseT(), TransactionT(), IdentifierT("trans"),
-                FunctionT(), IdentifierT("function1"), TypeT(), StateT(), TryT(), CatchT(), ThrowT(), NotT(),
+                IdentifierT("function1"), TypeT(), StateT(), TryT(), CatchT(), ThrowT(), NotT(),
                 AndT(), OrT(), ReturnT(), NewT(), IdentifierT("newa")
             )
         )

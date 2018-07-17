@@ -1495,10 +1495,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkTransactionInState(tx, lexicallyInsideOf, initContext)
     }
 
-    private def checkFunc(func: Func, lexicallyInsideOf: Contract): Unit = {
-        None // todo
-    }
-
     private def checkStateFieldShadowing(lexicallyInsideOf: ContractTable, f: Field, s: State): Unit = {
         //check if field also declared in contract
         val fieldInContract = lexicallyInsideOf.lookupField(f.name)

@@ -144,11 +144,6 @@ class ParserTests extends JUnitSuite {
             """
               | main contract C {
               |     state S1 {
-//                        Disabled fuctions pending #159.
-//              |         function f() { return x; }
-//              |         function f(T x) { return x; }
-//              |         function f(T1 x, T2 y, T3 z) { return x; }
-              |
               |     }
               |     transaction t(C@S1 this) { return x; }
               |         transaction t(C@S1 this, T x) { return x; }
