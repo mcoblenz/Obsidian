@@ -1,0 +1,24 @@
+
+contract ExampleService {
+    transaction t(C@Shared c) {
+        c.setI(4);
+    }
+}
+
+contract C {
+    int i;
+
+    transaction setI(int j) {
+        i = j;
+    }
+}
+
+main contract ExampleClient {
+
+    transaction main(remote ExampleService@Shared service) {
+        C@Shared c = new C();
+        service.t(c);
+        // error, c cannot be used after used in invocation on remote instance
+        c.setI(5);
+    }
+}

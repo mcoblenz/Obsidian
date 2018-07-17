@@ -24,6 +24,7 @@ case class Context(table: DeclarationTable,
 
     def updated(s: String, t: ObsidianType): Context =
         Context(contractTable, underlyingVariableMap.updated(s, t), isThrown, transitionFieldsInitialized, thisFieldTypes)
+
     def updatedWithInitialization(stateName: String, fieldName: String, ast: AST): Context =
         Context(contractTable, underlyingVariableMap, isThrown, transitionFieldsInitialized + ((stateName, fieldName, ast)), thisFieldTypes)
 
@@ -371,9 +372,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
-                        updateReceiverTypeInContext(receiver, receiverType, t, contextAfterArgs)
+                        updateReceiverTypeInContext(receiver, nonPrimitiveReceiverType, t, contextAfterArgs)
                     case _ => contextAfterArgs
                 }
+
+            // update any references that are passed to a invocation on a remote instance
+            if (nonPrimitiveReceiverType.isRemote) {
+                args.foreach({
+                    case ReferenceIdentifier(x) => {
+                        contextPrime(x) match {
+                            case t: NonPrimitiveType =>
+                                t.passedToRemote = true
+                            case _ => ()
+                        }
+                    }
+                    case _ => ()
+                })
+            }
 
             (resultType, contextPrime)
 
@@ -387,7 +402,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          if (consumeOwnershipIfOwned) {
                              (t, context.updated(x, t.residualType))
                          }
-                         else {
+                         else if (t.passedToRemote) {
+                             logError(e, UsedInRemoteInvoke(x))
+                             (BottomType(), context)
+                         } else {
                              (t, context)
                          }
                      case (_, Some(t)) =>
@@ -855,24 +873,19 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     // updates the type of an identifier in the context based on the transaction invoked on it
     private def updateReceiverTypeInContext(receiver: Expression,
-                                            receiverType: ObsidianType,
+                                            receiverType: NonPrimitiveType,
                                             invokable: Transaction,
                                             context: Context): Context = {
 
         val contextPrime = receiver match {
             case ReferenceIdentifier(x) => {
-                receiverType match {
-                    case typ: NonPrimitiveType => {
-                        val newType = invokable.thisFinalType
-                        if (newType.permission == ReadOnlyState()) {
-                            // The transaction promised not to change the state of the receiver.
-                            context
-                        }
-                        else {
-                            context.updated(x, newType)
-                        }
-                    }
-                    case _ => context
+                val newType = invokable.thisFinalType
+                if (newType.permission == ReadOnlyState()) {
+                    // The transaction promised not to change the state of the receiver.
+                    context
+                }
+                else {
+                    context.updated(x, newType)
                 }
             }
             case _ => context

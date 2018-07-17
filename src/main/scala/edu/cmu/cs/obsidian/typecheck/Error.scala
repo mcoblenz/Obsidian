@@ -248,3 +248,7 @@ case class TransitionNotAllowedError() extends Error {
 case class ReceiverTypeIncompatibleError(transactionName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
     val msg: String = s"Cannot invoke $transactionName on a receiver of type $actualType; a receiver of type $expectedType is required."
 }
+
+case class UsedInRemoteInvoke(varName: String) extends Error {
+    val msg: String = s"Variable $varName cannot be used after passed as an argument to a remote invocation."
+}

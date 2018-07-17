@@ -620,4 +620,12 @@ class TypeCheckerTests extends JUnitSuite {
                 Nil
         )
     }
+
+    @Test def remoteInstanceInvocationTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/RemoteInstanceInvocation.obs",
+            (UsedInRemoteInvoke("c"), 22)
+                ::
+                Nil
+        )
+    }
 }

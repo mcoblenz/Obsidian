@@ -106,6 +106,8 @@ sealed trait ObsidianType extends HasLocation {
 
     def isResourceReference(contextContractTable: ContractTable) = false
 
+    var passedToRemote = false
+
 }
 
 /* int, bool, or string */
