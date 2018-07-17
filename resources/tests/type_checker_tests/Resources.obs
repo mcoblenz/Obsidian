@@ -24,8 +24,8 @@ resource contract Wallet {
     }
 
     transaction stealMoney (Money@Unowned m) {
-        // Error: m is unowned, so it cannot be assigned to owned money
         money = m;
+        // Error: type of money is inconsistent with declaration.
     }
 
     transaction returnMoney (Money@Owned >> Unowned m) returns Money@Owned {
