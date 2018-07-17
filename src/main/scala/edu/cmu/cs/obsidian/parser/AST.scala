@@ -138,7 +138,8 @@ case class Transaction(name: String,
                        body: Seq[Statement],
                        isStatic: Boolean,
                        thisType: NonPrimitiveType,
-                       thisFinalType: NonPrimitiveType) extends InvokableDeclaration with IsAvailableInStates {
+                       thisFinalType: NonPrimitiveType
+                      ) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 
     def availableIn: Option[Set[String]] = thisType match {

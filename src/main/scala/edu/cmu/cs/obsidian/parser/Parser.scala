@@ -424,16 +424,6 @@ object Parser extends Parsers {
             case _ ~ s => EndsInState(s)
         }
 
-/*
-    private def parseFuncDecl = {
-        FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-            parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
-                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body, Unowned()).setLoc(f)
-        }
-    }
-    */
-
     private def parseEnsures = {
         EnsuresT() ~! parseExpr ~! SemicolonT() ^^ {
             case ensures ~ expr ~ _ => Ensures(expr).setLoc(ensures)
@@ -451,9 +441,6 @@ object Parser extends Parsers {
             case _ ~ s => AvailableIn(s)
         }
     }
-
-    case class FuncOptions (val returnType : Option[ObsidianType],
-                             val availableIn : Option[Set[Identifier]])
 
     case class AvailableIn (val identifiers: Set[Identifier])
     case class EndsInState (val identifiers: Set[Identifier])
@@ -513,26 +500,6 @@ object Parser extends Parsers {
         }
     }
 
-    //take union of availableIns
-    private def parseFuncOptions: Parser[FuncOptions] = {
-        opt(parseReturns) ~! rep(parseAvailableInAlt) ^^ { //use match to determine each
-            //check for repeats
-            case returns ~ optionsSeq =>
-                var options: FuncOptions = FuncOptions(returns, None)
-                for (option <- optionsSeq) {
-                    val newOption = option match {
-                        case a: AvailableIn => FuncOptions(None, Some(a.identifiers))
-                    }
-                    options = (newOption, options) match {
-                        case (FuncOptions(None, a), FuncOptions(t, None)) => FuncOptions(t, a)
-                        case (FuncOptions(None, Some(a)), FuncOptions(t, Some(a2))) => FuncOptions(t, Some(a ++ a2))
-                        case _ => options
-                    }
-                }
-                options
-        }
-    }
-
     private def parseStateDecl = {
         StateT() ~! parseId ~! opt(LBraceT() ~! rep(parseDeclInState) ~! RBraceT()) ~ opt(SemicolonT()) ^^ {
             case st ~ name ~ maybeDefs ~ _ =>
@@ -554,7 +521,7 @@ object Parser extends Parsers {
     }
 
     private def parseDeclInState: Parser[Declaration] = {
-        parseFieldDecl | // parseFuncDecl |
+        parseFieldDecl |
         parseStateDecl | parseConstructor | parseContractDecl | failure("declaration expected")
     }
 
