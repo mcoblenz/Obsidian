@@ -1692,7 +1692,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         if (lazySerialization) {
             /* Generate a GUID for the object when it's created. */
-            /* If it's a main contract, we use the ID '0' so we know
+            /* If it's a main contract, we use the contract name as an ID so we know
              * how to find the root of the object graph. */
             if (aContract.isMain) {
                 meth.body().assign(newClass.fields get guidFieldName, JExpr.lit(aContract.name))
