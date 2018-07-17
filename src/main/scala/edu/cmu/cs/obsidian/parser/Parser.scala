@@ -164,7 +164,7 @@ object Parser extends Parsers {
                         permission match {
                             case None =>
                                 val correctedType = t match {
-                                    case ContractReferenceType(ct, Inferred(), isRemote) => ContractReferenceType(ct, ReadOnlyState(), isRemote)
+                                    case ContractReferenceType(ct, Inferred(), isRemote) => ContractReferenceType(ct, Unowned(), isRemote)
                                     case _ => t
                                 }
                                 (correctedType, correctedType)

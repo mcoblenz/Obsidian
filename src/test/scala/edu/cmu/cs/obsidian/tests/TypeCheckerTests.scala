@@ -601,7 +601,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/ReadOnlyState.obs",
             (TransitionNotAllowedError(), 11) ::
                 (ReceiverTypeIncompatibleError("changeStateShared",
-                    ContractReferenceType(ContractType("C"), ReadOnlyState(), false),
+                    ContractReferenceType(ContractType("C"), Unowned(), false),
                     ContractReferenceType(ContractType("C"), Shared(), false)), 39) ::
                 (ReceiverTypeIncompatibleError("changeStateOwned",
                     ContractReferenceType(ContractType("C"), Shared(), false),

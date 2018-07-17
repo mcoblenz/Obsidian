@@ -18,9 +18,6 @@ case class Inferred() extends Permission {
     override def toString: String = "Inferred"
 } // For local variables
 
-case class ReadOnlyState() extends Permission {
-    override def toString: String = "ReadOnlyState"
-}
 
 
 // Type of references to contracts.

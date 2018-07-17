@@ -7,7 +7,7 @@ main contract C {
         int y;
     }
 
-    transaction t(C@Unowned >> S this, C@Unowned x) {
+    transaction t(C@Owned >> S this, C@Unowned x) {
         ->S(x = y, y = x);
     }
 
