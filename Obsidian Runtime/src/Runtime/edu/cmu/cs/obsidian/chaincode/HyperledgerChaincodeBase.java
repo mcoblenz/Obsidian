@@ -19,12 +19,8 @@ import java.util.Base64;
 
 import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
-import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
-    // Fields to be written out at the end of transaction invocation.
-    ObsidianSerialized[] dirtyFields;
-
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
@@ -70,7 +66,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
 
         try {
             byte result[] = run(stub, function, byte_args);
-            //__saveModifiedData(stub);
+            byte worldState[] = __archiveBytes();
+            stub.putStringState("obsState", new String(worldState));
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
             /* This will be returned when calling an invalid transaction
@@ -104,5 +101,4 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
-    //public abstract void __saveModifiedData(ChaincodeStub stub);
 }

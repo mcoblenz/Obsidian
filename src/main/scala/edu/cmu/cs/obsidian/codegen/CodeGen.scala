@@ -17,7 +17,7 @@ trait Target
 case class Client(mainContract: Contract) extends Target
 case class Server() extends Target
 
-class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerialization: Boolean) {
+class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
     private val model: JCodeModel = new JCodeModel()
 
@@ -32,7 +32,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     /* naming conventions for various generated Java constructs */
     private final val stateField: String = "__state"
     private final val getStateMeth: String = "getState"
-    private final val guidFieldName: String = "__guid"
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
     }
@@ -581,13 +580,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         translationContext
     }
 
-    private def generateLazySerializationCode(newClass: JDefinedClass,
-                                              translationContext: TranslationContext): Unit = {
-        newClass.field(JMod.PRIVATE, model.ref("String"), guidFieldName);
-        val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID");
-        getGUIDMeth.body()._return(newClass.fields get guidFieldName);
-    }
-
 
     private def generateStateHelpers(newClass: JDefinedClass,
                                      translationContext: TranslationContext): Unit = {
@@ -632,11 +624,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                     aContract: Contract,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext) = {
-
-        if (lazySerialization) {
-            newClass._implements(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
-            generateLazySerializationCode(newClass, translationContext)
-        }
 
         var generated: Boolean = false
 
@@ -1689,18 +1676,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         /* add body */
         translateBody(meth.body(), c.body, translationContext, localContext)
-
-        if (lazySerialization) {
-            /* Generate a GUID for the object when it's created. */
-            /* If it's a main contract, we use the ID '0' so we know
-             * how to find the root of the object graph. */
-            if (aContract.isMain) {
-                meth.body().assign(newClass.fields get guidFieldName, JExpr.lit(aContract.name))
-            } else {
-                val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
-                meth.body().assign(newClass.fields get guidFieldName, generateUUID)
-            }
-        }
 
         meth
     }
