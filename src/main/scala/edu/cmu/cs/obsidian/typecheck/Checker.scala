@@ -253,9 +253,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
         p1 match {
             case Owned() => true
-            case Unowned() => (p2 == Unowned()) || (p2 == ReadOnlyState())
-            case Shared() => (p2 == Shared()) || (p2 == Unowned()) || (p2 == ReadOnlyState())
-            case ReadOnlyState() => (p2 == ReadOnlyState())
+            case Unowned() => p2 == Unowned()
+            case Shared() => (p2 == Shared()) || (p2 == Unowned())
         }
     }
     //-------------------------------------------------------------------------
@@ -882,7 +881,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 receiverType match {
                     case typ: NonPrimitiveType => {
                         val newType = invokable.thisFinalType
-                        if (newType.permission == ReadOnlyState()) {
+                        if (newType.permission == Unowned()) {
                             // The transaction promised not to change the state of the receiver.
                             context
                         }
@@ -1050,7 +1049,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val oldType = context.thisType
 
-                if (oldType.permission == ReadOnlyState()) {
+                if (oldType.permission == Unowned()) {
                     logError(s, TransitionNotAllowedError())
                 }
 
