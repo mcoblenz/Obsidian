@@ -110,10 +110,6 @@ case class Context(table: DeclarationTable,
         lookupTransactionInType(thisType)(transactionName)
     }
 
-    def lookupFunctionInThis(functionName: String): Option[Func] = {
-        lookupFunctionInType(thisType)(functionName)
-    }
-
     def lookupDeclaredFieldTypeInThis(fieldName: String): Option[ObsidianType] = {
         lookupDeclaredFieldTypeInType(thisType)(fieldName)
     }
@@ -155,10 +151,6 @@ case class Context(table: DeclarationTable,
                 }
             case _ => None
         }
-    }
-
-    def lookupFunctionInType(typ: ObsidianType) (functionName: String): Option[Func] = {
-        doLookup((declTable: DeclarationTable) => declTable.lookupFunction(functionName), typ)
     }
 
     def isPacked: Boolean = {
@@ -343,7 +335,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
 
             val foundTransaction = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
-            val foundFunction = contextAfterReceiver.lookupFunctionInType(receiverType)(name)
 
             if (receiverType.isInstanceOf[InterfaceContractType] && !foundTransaction.get.isStatic) {
                 val err = NonStaticAccessError(foundTransaction.get.name, receiver.toString)
@@ -352,13 +343,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
 
-            val invokable: InvokableDeclaration = (foundTransaction, foundFunction) match {
-                case (None, None) =>
+            val invokable: InvokableDeclaration = foundTransaction match {
+                case None =>
                     val err = MethodUndefinedError(nonPrimitiveReceiverType, name)
                     logError(e, err)
                     return (BottomType(), contextAfterReceiver)
-                case (_, Some(f)) => f
-                case (Some(t), _) => t
+                case Some(t) => t
             }
 
             if (!invokable.isStatic && isSubtype(receiverType, invokable.thisType).isDefined) {
@@ -1001,9 +991,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case tx: Transaction if tx.retType.isEmpty =>
                         checkForUnusedOwnershipErrors(s, context, Set("this"))
                         context.makeThrown
-                    case f: Func if f.retType.isEmpty =>
-                        checkForUnusedOwnershipErrors(s, context, Set("this"))
-                        context.makeThrown
                     case _ =>
                         logError(s, MustReturnError(decl.name))
                         context.makeThrown
@@ -1013,7 +1000,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val retTypeOpt = decl match {
                     /* must be no return type */
                     case tx: Transaction if tx.retType.isDefined => tx.retType
-                    case f: Func if f.retType.isDefined => f.retType
                     case _ =>
                         logError(s, CannotReturnError(decl.name))
                         return context.makeThrown
@@ -1435,14 +1421,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         // todo: check that every declared variable is initialized before use
     }
 
-
     private def checkTransaction(tx: Transaction, lexicallyInsideOf: DeclarationTable): Unit = {
-
-
         // Construct the set of states that the transaction might start in.
-
-
-
         val startStates: Set[StateTable] =
             tx.thisType match {
                 case StateType(_, stateNames, _) =>
@@ -1482,9 +1462,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, Map.empty)
         initContext = initContext.updated("this", thisType)
 
-        // first create this context so we can resolve types
-        var context = new TreeMap[String, ObsidianType]()
-
         // Add all the args first (in an unsafe way) before checking anything
         for (arg <- tx.args) {
             initContext = initContext.updated(arg.varName, arg.typIn)
@@ -1501,7 +1478,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case None => ()
             case Some(field) => logError(f, ShadowingError(f.name, s.name, field.loc.line))
         }
-
 
         //check if field is in another state too
         val allStateNames: Set[String] = lexicallyInsideOf.possibleStates

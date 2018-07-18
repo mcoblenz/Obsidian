@@ -455,14 +455,43 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
-        opt(StaticT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-          opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
-            case static ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
-                val isStatic = static match {
-                    case None => false
-                    case Some(static) => true
+    case class TransactionOptions (isStatic: Boolean, isPrivate: Boolean)
+
+    private def parseTransactionOptions: Parser[TransactionOptions] = {
+        rep(StaticT() | PrivateT()) ^^ {
+            case opts =>
+                var options = TransactionOptions(false, false)
+
+                for (opt <- opts) {
+                    options =
+                        opt match {
+                            case StaticT() =>
+                                if (options.isStatic) {
+                                    return err("Duplicate static keyword in transaction declaration.")
+                                }
+                                else {
+                                    TransactionOptions(true, options.isPrivate)
+                                }
+                            case PrivateT() =>
+                                if (options.isPrivate) {
+                                    return err("Duplicate private keyword in transaction declaration.")
+                                }
+                                else {
+                                    TransactionOptions(options.isStatic, true)
+                                }
+                            case _ =>
+                                return err(s"Unexpected option found: $opt")
+                        }
                 }
+                options
+        }
+    }
+
+
+    private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
+        parseTransactionOptions ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+          opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
+            case opts ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
@@ -496,7 +525,7 @@ object Parser extends Parsers {
                 }
 
                 Transaction(nameString, filteredArgs, returns,
-                    ensures, body, isStatic, thisType, finalType.asInstanceOf[NonPrimitiveType]).setLoc(t)
+                    ensures, body, opts.isStatic, opts.isPrivate, thisType, finalType.asInstanceOf[NonPrimitiveType]).setLoc(t)
         }
     }
 

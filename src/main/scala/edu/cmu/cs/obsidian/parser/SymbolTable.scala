@@ -19,7 +19,6 @@ sealed trait DeclarationTable {
     def lookupContract(name: String): Option[ContractTable]
     def lookupField(name: String): Option[Field]
     def lookupTransaction(name: String): Option[Transaction]
-    def lookupFunction(name: String): Option[Func]
 
     def contractType: ContractType
 
@@ -43,7 +42,6 @@ class StateTable(
     private var astNode: State = astNodeRaw
     private var fieldLookup: Map[String, Field] = indexDecl[Field](ast.declarations, FieldDeclTag)
     private var txLookup: Map[String, Transaction] = indexDecl[Transaction](ast.declarations, TransactionDeclTag)
-    private var funLookup: Map[String, Func] = indexDecl[Func](ast.declarations, FuncDeclTag)
 
     def contractTable: ContractTable = lexicallyInsideOf
     def contract: Contract = lexicallyInsideOf.contract
@@ -84,10 +82,6 @@ class StateTable(
     def lookupTransaction(transactionName: String): Option[Transaction] = {
         doLookup[Transaction](transactionName, txLookup.get, lexicallyInsideOf.lookupTransaction)
     }
-
-    def lookupFunction(functionName: String): Option[Func] = {
-        doLookup[Func](functionName, funLookup.get, lexicallyInsideOf.lookupFunction)
-    }
 }
 
 class ContractTable(
@@ -104,7 +98,6 @@ class ContractTable(
 
     private var fieldLookup: Map[String, Field] = indexDecl[Field](contract.declarations, FieldDeclTag)
     private var txLookup: Map[String, Transaction] = indexDecl[Transaction](contract.declarations, TransactionDeclTag)
-    private var funLookup: Map[String, Func] = indexDecl[Func](contract.declarations, FuncDeclTag)
 
     val allFields: Set[Field] = fieldLookup.values.toSet
 
@@ -151,7 +144,6 @@ class ContractTable(
 
     def lookupField(name: String): Option[Field] = fieldLookup.get(name)
     def lookupTransaction(name: String): Option[Transaction] = txLookup.get(name)
-    def lookupFunction(name: String): Option[Func] = funLookup.get(name)
 
     def state(name: String): Option[StateTable] = stateLookup.get(name)
     def possibleStates: Set[String] = stateLookup.values.map(_.name).toSet

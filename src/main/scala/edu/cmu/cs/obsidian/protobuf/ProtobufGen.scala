@@ -64,7 +64,6 @@ object ProtobufGen {
             case c: Contract => Some(translateContract(c))
             case t: TypeDecl => None // TODO
             case f: edu.cmu.cs.obsidian.parser.Field => Some(translateFieldDecl(f))
-            case f: Func => None
             case t: Transaction => None
             case s: State => Some(translateStateDecl(s))
         }
