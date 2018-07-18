@@ -1,42 +1,43 @@
 import "resources/case_studies/Insurance/Insurer.obs"
+import "resources/case_studies/Insurance/ResultBid.obs"
 
 main resource contract InsuranceService {
     // TODO: Collection of Insurer, Token
     // TODO: Keys of trusted banks
     Insurer@Shared insurer;
     Token@Owned tokens;
+    TimeService@Shared timeService;
 
     InsuranceService@Owned() {}
-
 
     transaction addInsurer(Insurer@Shared ins) {
         insurer = ins;
     }
 
+    transaction addTimeService(TimeService@Shared ts) {
+        timeService = ts;
+    }
+
     // TODO: information to calculate bids, Collection of Bid and Token
-    transaction requestBids(int i) returns Bid@Available {
+    transaction requestBids(int i) returns Bid@Unpurchased {
         BidTokenPair@Shared bidAndTokens = insurer.requestBids(i);
 
-        // TODO: add Tokens from bidAndTokens to Tokens
+        // TODO: add Tokens from bidAndTokens to the collection of tokens
         // TODO: how to keep track of tokens for each client?
         tokens = bidAndTokens.getToken();
-        Bid@Available bid = bidAndTokens.getBid();
+        Bid@Unpurchased bid = bidAndTokens.getBid();
 
         return bid;
     }
 
-    transaction buyBid(Bid@Available >> Unowned bid, Token@Owned >> Unowned token) returns Bid@Sold {
+    transaction buyBid(ResultBid@Unpurchased >> (Purchased | Err) result, Token@Owned token) {
+        Bid@Unpurchased unpurchasedBid = result.getUnpurchasedBid();
 
-        if (bid.hasExpired()) {
-            insurer.returnToken(token);
-            bid.expire();
-            disown bid;
-            throw;
+        if (timeService.getTime() > unpurchasedBid.getExpirationTime()) {
+            result.toErr("Bid expired.");
         } else {
-            // TODO: collect all tokens together (ones given by insurer and insuree) (for now just disown)
-            disown token;
-            bid.buy();
-            return bid;
+            //TODO: drain token?
+            result.buy();
         }
     }
 

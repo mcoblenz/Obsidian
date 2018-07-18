@@ -1,0 +1,44 @@
+import "resources/case_studies/Insurance/Bid.obs"
+
+main contract ResultBid {
+    state Purchased {
+        Bid@Purchased purchasedBid;
+    }
+
+    state Unpurchased {
+        Bid@Unpurchased unpurchasedBid;
+    }
+
+    state Err {
+        string errorMsg;
+    }
+
+    ResultBid@Unpurchased(Bid@Unpurchased >> Unowned bid) {
+        ->Unpurchased(unpurchasedBid = bid);
+    }
+
+    ResultBid@Err(string msg) {
+        ->Err(errorMsg = msg);
+    }
+
+    transaction toErr(ResultBid@(Unpurchased | Purchased) >> Err this, string msg) {
+        ->Err(errorMsg = msg);
+    }
+
+    transaction buy(ResultBid@Unpurchased >> Purchased this) {
+        unpurchasedBid.buy();
+        ->Purchased(purchasedBid = unpurchasedBid);
+    }
+
+    transaction getPurchasedBid(ResultBid@Purchased this) returns Bid@Purchased {
+        return purchasedBid;
+    }
+
+    transaction getUnpurchasedBid(ResultBid@Unpurchased this) returns Bid@Unpurchased {
+        return unpurchasedBid;
+    }
+
+    transaction getErrorMsg(ResultBid@Err this) returns string {
+        return errorMsg;
+    }
+}

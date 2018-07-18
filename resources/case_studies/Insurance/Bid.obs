@@ -1,43 +1,31 @@
-import "resources/case_studies/Insurance/TimeService.obs"
-
-main resource contract Bid {
+main contract Bid {
     int cost;
-    TimeService@Shared timeService;
-
 
     // available for consideration from client
-    state Available {
+    state Unpurchased {
         int expirationTime;
     }
 
-    // expires after a certain amount of time
-    state Expired {}
-
     // client buys it
-    state Sold {}
+    state Purchased {}
 
-    Bid@Available(int c, int expiration, TimeService@Shared ts) {
+    Bid@Unpurchased(int c, int expiration) {
         cost = c;
-        // Available by default
-        timeService = ts;
-        ->Available(expirationTime = expiration);
+        // unpurchased by default
+        ->Unpurchased(expirationTime = expiration);
     }
 
-    // TODO: Proper timing
-    transaction hasExpired(Bid@Available this) returns bool {
-        return expirationTime < timeService.getTime();
-    }
-
-    transaction expire(Bid@Available >> Expired this) {
-        ->Expired;
-    }
-
-    transaction buy(Bid@Available >> Sold this) {
-        ->Sold;
+    transaction buy(Bid@Unpurchased >> Purchased this) {
+        ->Purchased;
     }
 
     transaction getCost(Bid this) returns int {
         return cost;
     }
+
+    transaction getExpirationTime(Bid@Unpurchased this) returns int {
+        return expirationTime;
+    }
+
 
 }

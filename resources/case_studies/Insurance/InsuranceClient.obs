@@ -12,7 +12,7 @@ main contract InsuranceClient {
 	     // ins. service needs reference to insurer
 	     insService.addInsurer(insurer);
 
-	     Bid@Available bid = insService.requestBids(3);
+	     Bid@Unpurchased bid = insService.requestBids(3);
 
          // test
          System.println(bid.getCost());
@@ -22,10 +22,8 @@ main contract InsuranceClient {
 
          System.println(bank.getMoneyAmount());
 
-         Bid@Sold soldBid = insService.buyBid(bid, token);
+         insService.buyBid(new ResultBid(bid), token);
 
-         // to pass typechecker
-         disown soldBid;
 	}
 }
 

@@ -1,4 +1,4 @@
-main resource contract Token {
+main contract Token {
     // bank's private key, only banks can make tokens
     int bankKey;
 

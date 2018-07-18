@@ -34,13 +34,13 @@ main resource contract Insurer {
         Money@Owned m = mon.getAmountOfMoney(costOfPayout);
         Token@Owned t = bank.buyToken(m);
 
-        Bid@Available b = new Bid(costOfBid, expirationTime, timeService);
+        Bid@Unpurchased b = new Bid(costOfBid, expirationTime);
 
         return new BidTokenPair(b, t);
     }
 
     transaction returnToken(Token@Owned >> Unowned token) {
-        Money@Owned m = bank.getMoneyFromToken(token);
+        Money@Owned m = bank.tokenToMoney(token);
         mon.addMoney(m);
     }
 
