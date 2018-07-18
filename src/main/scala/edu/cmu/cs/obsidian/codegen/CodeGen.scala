@@ -152,7 +152,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             case _: TypeDecl => assert(false, "unsupported"); // TODO
             case f: Field => translateStubField(f, inClass)
             case c: Constructor => // Constructors aren't translated because stubs are only for remote instances.
-            case f: Func => translateStubFunction(f, inClass)
             case t: Transaction => if (!txNames.contains(t.name)) translateStubTransaction(t, inClass, stOption)
                                                  txNames.add(t.name)
             case s: State => translateStubState(s, inClass, txNames)
@@ -166,10 +165,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         // Primitive fields will not map to anything; instead, their accesses will translate to remote calls.
         val remoteFieldType = decl.typ
         newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.name)
-    }
-
-    private def translateStubFunction(f: Func, inClass: JDefinedClass) : Unit = {
-        // TODO
     }
 
     private def marshallExpr(unmarshalledExpr: IJExpression, typ: ObsidianType): IJExpression = {
@@ -381,41 +376,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         StateSpecificTransactionInfo(declSeq, meth)
     }
 
-    def makeFuncInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
-                    (name: String, declSeq: Seq[(State, Func)]): FuncInfo = {
-        val funExample = declSeq.head._2
-
-        val (hasReturn, retType) = funExample.retType match {
-            case Some(typ) => (true, resolveType(typ))
-            case None => (false, model.VOID)
-        }
-
-        val meth = newClass.method(JMod.PUBLIC, retType, funExample.name)
-
-        /* add the appropriate args to the method and collect them in a list */
-        val jArgs = funExample.args.map( (arg: VariableDeclWithSpec) => meth.param(resolveType(arg.typIn), arg.varName) )
-
-        val body = meth.body()
-
-        for ((st, f) <- declSeq) {
-            val inv = JExpr.invoke(stateLookup(st.name).innerClassField, funExample.name)
-
-            /* add args to the invocation */
-            jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
-
-            // dynamically check the state
-            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))._then()
-
-            if (hasReturn) stBody._return(inv)
-            else stBody.add(inv)
-        }
-        // exhaustive return to please compiler
-        if (hasReturn) body._return(JExpr._null())
-
-
-        StateSpecificFuncInfo(declSeq, meth)
-    }
-
     /* Collects all the [transactions/functions/fields] in a contract.
      * This process also collects related definitions in different states: i.e. if a
      * field is defined in several states, these are collected together.
@@ -426,7 +386,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                     stateLookup: Map[String, StateContext],
                     newClass: JDefinedClass,
                     generateStub: Boolean):
-                        (Map[String, FieldInfo], Map[String, TransactionInfo], Map[String, FuncInfo]) = {
+                        (Map[String, FieldInfo], Map[String, TransactionInfo]) = {
 
         /* collect all declarations (fields, functions, transactions) that are particular
          * to a state.
@@ -443,8 +403,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                                  .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Field]))
         val txs = declarations.filter(_._1.isInstanceOf[Transaction])
                               .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Transaction]))
-        val funs = declarations.filter(_._1.isInstanceOf[Func])
-                               .map((x: (Declaration, State)) => (x._2, x._1.asInstanceOf[Func]))
 
         /* splits items in [ts] into groups based on equality of the result of applying [f] */
         def generalizedPartition[T, S](ts: List[T], f: Function[T, S]): immutable.HashMap[S, Seq[T]] = {
@@ -457,13 +415,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         }
 
         if (generateStub) {
-            (Map.empty, Map.empty, Map.empty)
+            (Map.empty, Map.empty)
         }
         else {
 
             val fieldInfoFunc = makeFieldInfo(newClass, stateLookup) _
             val transactionInfoFunc = makeTransactionInfo(newClass, stateLookup) _
-            val functionInfoFunc = makeFuncInfo(newClass, stateLookup) _
 
             /* this uses the above helper function to group declarations by name. Conceptually, if we
             * define field "f" in states "S1" and "S2", it is one declaration that specifies multiple
@@ -474,20 +431,17 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 .transform(fieldInfoFunc)
             var txLookup = generalizedPartition[(State, Transaction), String](txs.toList, _._2.name)
                 .transform(transactionInfoFunc)
-            var funLookup = generalizedPartition[(State, Func), String](funs.toList, _._2.name)
-                .transform(functionInfoFunc)
 
             /* add on any whole-contract declarations to the lookup table: these are fairly simple */
             for (decl <- contract.declarations) {
                 decl match {
                     case f: Field => fieldLookup = fieldLookup.updated(f.name, GlobalFieldInfo(f))
                     case t: Transaction => txLookup = txLookup.updated(t.name, GlobalTransactionInfo(t))
-                    case f: Func => funLookup = funLookup.updated(f.name, GlobalFuncInfo(f))
                     case _ => ()
                 }
             }
 
-            (fieldLookup, txLookup, funLookup)
+            (fieldLookup, txLookup)
         }
     }
 
@@ -555,7 +509,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         }
 
         /* setup tx/fun/field lookup tables */
-        val (fieldLookup, txLookup, funLookup) = makeDeclarationLookupTables(aContract, stateLookup, newClass, generateStub)
+        val (fieldLookup, txLookup) = makeDeclarationLookupTables(aContract, stateLookup, newClass, generateStub)
 
         /* setup the TranslationContext */
         val translationContext = TranslationContext(
@@ -568,7 +522,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             stateEnumClass = stateEnumOption,
             stateEnumField = stateEnumField,
             txLookup = txLookup,
-            funLookup = funLookup,
             fieldLookup = fieldLookup,
             pendingFieldAssignments = Set.empty
         )
@@ -1443,8 +1396,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 translateConstructor(c, newClass, translationContext, aContract)
             case (f: Field) =>
                 translateFieldDecl(f, newClass)
-            case (f: Func) =>
-                translateFuncDecl(f, newClass, translationContext)
             case (t: Transaction) =>
                 translateTransDecl(t, newClass, translationContext)
                 if (aContract.isMain) {
@@ -1604,10 +1555,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 recurse(e1).invoke("equals").arg(recurse(e2)).not()
             case Dereference(e1, f) => recurse(e1).ref(f) /* TODO : do we ever need this? */
             case LocalInvocation(name, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(name), args, translationContext, localContext)
+                addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext)
             /* TODO : this shouldn't be an extra case */
             case Invocation(This(), name, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(name), args, translationContext, localContext)
+                addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext)
             case Invocation(recipient, name, args) =>
                 addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext)
             case Construction(name, args) =>
@@ -1932,11 +1883,11 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                     translateBody(jPrev._then(), _case.body, translationContext, localContext)
                 }
             case LocalInvocation(methName, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(methName),
+                addArgs(translationContext.invokeTransaction(methName),
                         args, translationContext, localContext)
             /* TODO : it's bad that this is a special case */
             case Invocation(This(), methName, args) =>
-                addArgs(translationContext.invokeTransactionOrFunction(methName),
+                addArgs(translationContext.invokeTransaction(methName),
                         args, translationContext, localContext)
 
             case Invocation(e, methName, args) =>
@@ -1959,27 +1910,5 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         for (st <- statements) {
             nextContext = translateStatement(body, st, translationContext, nextContext)
         }
-    }
-
-    private def translateFuncDecl(
-                    decl: Func,
-                    newClass: JDefinedClass,
-                    translationContext: TranslationContext): Unit = {
-        val javaRetType = decl.retType match {
-            case Some(typ) => resolveType(typ)
-            case None => model.VOID
-        }
-        val meth: JMethod = newClass.method(JMod.PRIVATE, javaRetType, decl.name)
-
-        /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = decl.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
-        )
-
-        /* construct the local context from this list */
-        val localContext: immutable.Map[String, JVar] = argList.toMap
-
-        /* add body */
-        translateBody(meth.body(), decl.body, translationContext, localContext)
     }
 }
