@@ -1,43 +1,65 @@
 import "resources/case_studies/Insurance/Insurer.obs"
-import "resources/case_studies/Insurance/ResultBid.obs"
+import "resources/case_studies/Insurance/PolicyRecord.obs"
 
 main resource contract InsuranceService {
     // TODO: Collection of Insurer, Token
     // TODO: Keys of trusted banks
-    Insurer@Shared insurer;
-    Token@Owned tokens;
+    Insurer@Owned insurers;
     TimeService@Shared timeService;
 
-    InsuranceService@Owned() {}
+    // pending and active policies
+    PolicyRecord@Pending pendingPolicies;
+    PolicyRecord@Active activePolicies;
 
-    transaction addInsurer(Insurer@Shared ins) {
-        insurer = ins;
+    // for now have to have a reference to bank
+    Bank@Shared bank;
+
+    InsuranceService@Owned() {
+
     }
 
-    transaction addTimeService(TimeService@Shared ts) {
-        timeService = ts;
+    transaction addInsurer(Insurer@Owned >> Unowned insurer) {
+        insurers = insurer;
     }
 
     // TODO: information to calculate bids, Collection of Bid and Token
-    transaction requestBids(int i) returns Bid@Unpurchased {
-        BidTokenPair@Shared bidAndTokens = insurer.requestBids(i);
+    transaction requestBids(int i) returns Policy@Offered {
+        InsuranceBid@Owned insBid = insurers.requestBid(i);
 
-        // TODO: add Tokens from bidAndTokens to the collection of tokens
-        // TODO: how to keep track of tokens for each client?
-        tokens = bidAndTokens.getToken();
-        Bid@Unpurchased bid = bidAndTokens.getBid();
+        int cost = insBid.getCost();
+        int expiration = insBid.getExpirationTime();
+        Money@Owned payout = insBid.getPayout();
 
-        return bid;
+        Policy@Offered policy = new Policy(cost, expiration);
+        Policy@Offered policyCopy = policy;
+
+        pendingPolicies = new PolicyRecord(policy, payout);
+
+        return policyCopy;
     }
 
-    transaction buyBid(ResultBid@Unpurchased >> (Purchased | Err) result, Token@Owned token) {
-        Bid@Unpurchased unpurchasedBid = result.getUnpurchasedBid();
+    transaction buyPolicy(Policy@Offered >> (Active | Expired) policy, Money@Owned >> Unowned money) returns Money@Owned {
 
-        if (timeService.getTime() > unpurchasedBid.getExpirationTime()) {
-            result.toErr("Bid expired.");
+        if (timeService.getTime() > policy.getExpirationTime()) {
+            // refund insurer's payout
+            Money@Owned insurerRefund = pendingPolicies.refund();
+            insurers.receiveRefund(insurerRefund);
+
+            // expire policy and return money
+            policy.expire();
+            return money;
         } else {
-            //TODO: drain token?
-            result.buy();
+            // get payment
+            int cost = policy.getCost();
+            Money@Owned payment = money.getAmountOfMoney(cost);
+
+            // activate policy record with payment
+            pendingPolicies.activate(payment);
+            activePolicies = pendingPolicies;
+
+            // activate policy and return any change
+            policy.activate();
+            return money;
         }
     }
 

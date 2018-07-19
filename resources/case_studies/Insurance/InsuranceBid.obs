@@ -1,0 +1,27 @@
+import "resources/case_studies/Insurance/Money.obs"
+
+main resource contract InsuranceBid {
+    int cost;
+    int expirationTime;
+    Money@Owned payout;
+
+    InsuranceBid@Owned(int c, int expiration, Money@Owned m) {
+        cost = c;
+        expirationTime = expiration;
+        payout = m;
+    }
+
+    transaction getCost() returns int {
+        return cost;
+    }
+
+    transaction getExpirationTime() returns int {
+        return expirationTime;
+    }
+
+    transaction getPayout() returns Money@Owned {
+        return payout;
+    }
+
+
+}

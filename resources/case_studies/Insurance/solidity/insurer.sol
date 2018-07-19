@@ -1,6 +1,6 @@
 pragma solidity ^0.4.0;
 import "./money.sol";
-import "./bidtokenpair.sol";
+import "./insurancebid.sol";
 import "./bank.sol";
 
 
@@ -9,17 +9,14 @@ contract Insurer {
     Bank public bank;
     address public owner;
     
-    constructor(Bank _bank) public {
+    constructor(Bank _bank, Money _money) public {
         bank = _bank;
+        mon = _money;
         owner = msg.sender;
     }
     
-    function addMoney(uint amount) public {
-        mon.addMoney(new Money(amount));
-    }
-    
     // TODO: Calculate bids using some needed information, for now just int
-    function requestBid(uint i) public returns (BidTokenPair) {
+    function requestBid(uint i) public returns (InsuranceBid) {
         uint costOfBid = i + 4;
         uint costOfPayout = i + 6;
 
@@ -29,13 +26,14 @@ contract Insurer {
 
         // buy token (to ensure money has been given)
         Money m = mon.getAmountOfMoney(costOfPayout);
-        Token token = bank.buyToken(m, owner, costOfPayout);
 
-        Bid bid = new Bid(expirationTime, costOfBid, costOfPayout);
+        InsuranceBid bid = new InsuranceBid(expirationTime, costOfBid, m);
 
-        return new BidTokenPair(bid, token);        
+        return bid;        
     }
     
-    // TODO return money for tokens??
     
+    function receiveRefund(Money m) public {
+        mon.addMoney(m);
+    }
 }

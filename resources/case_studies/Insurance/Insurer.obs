@@ -1,28 +1,22 @@
-import "resources/case_studies/Insurance/BidTokenPair.obs"
+import "resources/case_studies/Insurance/InsuranceBid.obs"
 import "resources/case_studies/Insurance/Bank.obs"
 import "resources/case_studies/Insurance/TimeService.obs"
-import "resources/case_studies/Insurance/Money.obs"
-
 
 // TODO : Collections
 
 main resource contract Insurer {
-    Money@Owned mon;
+    Money@Owned money;
     Bank@Shared bank;
     TimeService@Shared timeService;
 
-    Insurer@Owned(TimeService@Shared ts, Bank@Shared b) {
+    Insurer@Owned(TimeService@Shared ts, Bank@Shared b, Money@Owned m) {
         timeService = ts;
         bank = b;
-        mon = new Money(0); // 0 by default
+        money = m;
     }
 
-    transaction addMoney(int amount) {
-        mon.addMoney(new Money(amount));
-    }
-
-    // TODO : Calculate Bid(s) using some needed information, for now just int
-    transaction requestBids(int i) returns BidTokenPair@Owned {
+    // TODO : Calculate Bid using some needed information, for now just int
+    transaction requestBid(int i) returns InsuranceBid@Owned {
         int costOfBid = i + 4;
         int costOfPayout = i + 6;
 
@@ -30,18 +24,16 @@ main resource contract Insurer {
         int twentyFourHours = timeService.hoursToMillis(24);
         int expirationTime = timeService.getTime() + twentyFourHours;
 
-        // buy token (to ensure money has been given)
-        Money@Owned m = mon.getAmountOfMoney(costOfPayout);
-        Token@Owned t = bank.buyToken(m);
+        // get correct amount of money from owned money
+        Money@Owned m = money.getAmountOfMoney(costOfPayout);
 
-        Bid@Unpurchased b = new Bid(costOfBid, expirationTime);
+        InsuranceBid@Owned b = new InsuranceBid(costOfBid, expirationTime, m);
 
-        return new BidTokenPair(b, t);
+        return b;
     }
 
-    transaction returnToken(Token@Owned >> Unowned token) {
-        Money@Owned m = bank.tokenToMoney(token);
-        mon.addMoney(m);
+    transaction receiveRefund(Money@Owned >> Unowned m) {
+        money.addMoney(m);
     }
 
 }

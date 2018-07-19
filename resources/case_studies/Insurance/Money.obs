@@ -2,10 +2,15 @@ main resource contract Money {
     int amount;
 
     Money@Owned(int amt) {
-        amount = amt;
+        // TODO: confirm that bank can only make money
+        if (1 + 2 == 3) {
+            amount = amt;
+        } else {
+            throw;
+        }
     }
 
-    transaction addMoney(Money@Owned >> Unowned m) {
+    transaction addMoney(Money this, Money@Owned >> Unowned m) {
          amount = amount + m.amount;
          disown m;
     }
@@ -14,7 +19,7 @@ main resource contract Money {
         return amount;
     }
 
-    transaction getAmountOfMoney(int amt) returns Money@Owned {
+    transaction getAmountOfMoney(Money this, int amt) returns Money@Owned {
         if (amt > amount) {
             throw; // TODO: or should this return as much as they have (amount)
         } else {

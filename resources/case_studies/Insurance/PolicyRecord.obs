@@ -1,0 +1,32 @@
+import "resources/case_studies/Insurance/Policy.obs"
+
+main resource contract PolicyRecord {
+    Policy@Unowned policy;
+
+    state Pending {
+        Money@Owned payout;
+    }
+
+    state Active {
+        Money@Owned claim;
+    }
+
+    state Expired {}
+
+    PolicyRecord@Pending(Policy@Unowned p, Money@Owned m) {
+        policy = p;
+        ->Pending(payout = m);
+    }
+
+    transaction refund(PolicyRecord@Pending >> Expired this) returns Money@Owned{
+         Money@Owned refund = payout;
+         ->Expired;
+         return refund;
+    }
+
+    transaction activate(PolicyRecord@Pending >> Active this, Money@Owned >> Unowned policyCost) {
+         payout.addMoney(policyCost);
+         Active::claim = payout;
+         ->Active();
+    }
+}

@@ -3,26 +3,23 @@ import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/java-utilities/System.o
 
 main contract InsuranceClient {
 	transaction main(remote InsuranceService@Shared insService) {
-	     TimeService@Shared timeService = new TimeService();
-	     Bank@Shared bank = new Bank();
-	     Insurer@Owned insurer = new Insurer(timeService, bank);
-	     // give insurer some money
-	     insurer.addMoney(10);
+	    TimeService@Shared timeService = new TimeService();
+        Bank@Shared bank = new Bank();
+        // should be requesting money from bank, but can't call transactions from constructor
+        Money@Owned money = new Money(25);
+        Insurer@Owned insurers = new Insurer(timeService, bank, money);
 
-	     // ins. service needs reference to insurer
-	     insService.addInsurer(insurer);
+        insService.addInsurer(insurers);
 
-	     Bid@Unpurchased bid = insService.requestBids(3);
+	    Policy@Offered policy = insService.requestBids(3);
 
-         // test
-         System.println(bid.getCost());
+        // test
+        System.println(policy.getCost());
 
-         // now buy the bid with a token
-         Token@Owned token = bank.buyToken(new Money(bid.getCost()));
+        // now buy the policy
+        Money@Owned refund = insService.buyPolicy(policy, new Money(10));
 
-         System.println(bank.getMoneyAmount());
-
-         insService.buyBid(new ResultBid(bid), token);
+        System.println(refund.getAmount());
 
 	}
 }

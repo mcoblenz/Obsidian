@@ -1,5 +1,4 @@
 pragma solidity ^0.4.0;
-
 contract Money {
     uint public amount;
     address public owner;
