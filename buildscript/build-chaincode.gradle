@@ -19,7 +19,9 @@ repositories {
 sourceSets {
     main {
         java {
-            srcDirs = ["$codeDirectory", '../Obsidian Runtime/src/Runtime']
+            srcDirs = ["$codeDirectory", '../Obsidian Runtime/src/Runtime/']
+            exclude '**/*Mock.java'
+
         }
     }
 }

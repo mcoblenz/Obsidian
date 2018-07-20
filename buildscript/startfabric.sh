@@ -55,6 +55,9 @@ CCHAN=$(tput setaf 11)
 CINST=$(tput setaf 9)
 CCODE=$(tput setaf 10)
 
+PEERFLAGS=--cafile ${GOPATH}/src/github.com/hyperledger/fabric-ca/bin/ca-cert.pem
+
+
 echo $CNORM'======= START ORDERER ======='
 sleep $ENTER_PAUSE
 ORDERER_GENERAL_GENESISPROFILE=SampleDevModeSolo orderer 2>&1 | sed "s/^/$CORDR[-orderer-] /" &
@@ -73,7 +76,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'====== CREATE CHANNEL ======='
 sleep $ENTER_PAUSE
-peer channel create -c ch1 -o localhost:7050 2>&1 | sed "s/^/$CCHAN[make-chan] /"
+peer channel create $PEERFLAGS -c ch1 -o localhost:7050 2>&1 | sed "s/^/$CCHAN[make-chan] /"
 sleep 0.5
 echo $CNORM'====== CREATED CHANNEL ======'
 
@@ -81,7 +84,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'======= JOIN CHANNEL ========'
 sleep $ENTER_PAUSE
-peer channel join -b ch1.block -o localhost:7050 2>&1 | sed "s/^/$CCHAN[join-chan] /"
+peer channel join $PEERFLAGS -b ch1.block -o localhost:7050 2>&1 | sed "s/^/$CCHAN[join-chan] /"
 sleep 0.5
 echo $CNORM'====== JOINED CHANNEL ======='
 
@@ -89,7 +92,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'===== INSTALL CHAINCODE ====='
 sleep $ENTER_PAUSE
-peer chaincode install -l java -p $CCDIR -n $CCNAME -v $CCVERSION 2>&1 | sed "s/^/$CINST[-install-] /"
+peer chaincode install $PEERFLAGS -l java -p $CCDIR -n $CCNAME -v $CCVERSION 2>&1 | sed "s/^/$CINST[-install-] /"
 sleep 0.5
 echo $CNORM'==== CHAINCODE INSTALLED ===='
 

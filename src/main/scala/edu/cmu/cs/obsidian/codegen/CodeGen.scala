@@ -129,10 +129,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
     private def translateStubContract(contract: Contract,
                                       programPackage: JPackage): Unit = {
         var contractClass = programPackage._class(JMod.PUBLIC, classNameForStub(contract.name))
-        contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
+        val stubClassName = if (mockChaincode) "edu.cmu.cs.obsidian.client.ChaincodeClientStub" else "edu.cmu.cs.obsidian.client.HyperledgerClientStub"
+        contractClass._extends(model.directClass(stubClassName))
 
         val constructor = contractClass.constructor(JMod.PUBLIC)
-        val param = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
+        val paramType = if (mockChaincode) "edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager" else "edu.cmu.cs.obsidian.client.HyperledgerClientConnectionManager"
+        val param = constructor.param(model.directClass(paramType), "connectionManager")
         val superConstructorInvocation = constructor.body().invoke("super")
         superConstructorInvocation.arg(param)
 
@@ -613,7 +615,15 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         target match {
             case Client(mainContract) =>
                 if (aContract == mainContract) {
-                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
+                    val superclassName =
+                        if (mockChaincode) {
+                            "edu.cmu.cs.obsidian.client.ChaincodeClientBase"
+                        }
+                        else {
+                            "edu.cmu.cs.obsidian.client.HyperledgerClientBase"
+                        }
+
+                    newClass._extends(model.directClass(superclassName))
                     generateClientMainMethod(newClass)
                     generateInvokeClientMainMethod(aContract, newClass)
                 }
@@ -916,7 +926,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         val mainMeth = newClass.method(JMod.STATIC | JMod.PUBLIC, model.VOID, "main")
         val args = mainMeth.param(model.ref("String").array(), "args")
 
-        // main takes an address and a port of a server to connect to.
+        // In mock clients, main takes an address and a port of a server to connect to.
+        // In Hyperledger clients, main takes a list of addresses, ports, and contract identifiers.
 
         // newClass instance = new newClass();
         // instance.delegatedMain(args);

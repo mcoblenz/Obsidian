@@ -35,7 +35,7 @@ object Main {
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
-          |    --hyperledger                generate Java chaincode for Hyperledger Fabric
+          |    --hyperledger                use Hyperledger Fabric (rather than a local mock blockchain)
         """.stripMargin
 
     def parseOptions(args: List[String]): CompilerOptions = {
@@ -329,6 +329,7 @@ object Main {
             val mainName = findMainContractName(globalTable.ast)
 
             if (options.mockChaincode) {
+                // Build mock client
                 // invoke javac and make a jar from the result
                 val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
                 if (options.verbose) {
@@ -343,10 +344,17 @@ object Main {
                 }
                 else
                     return false
-            } else {
-                // invoke gradle buildscript to produce a jar file
-                val gradleInvoke = s"gradle build -b buildscript/build.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
+            }
+            else {
+                // Build Hyperledger
+                val gradleInvoke = if (options.buildClient) {
+                    s"gradle build -b buildscript/build-hyperledger-client.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
+                }
+                else {
+                    s"gradle build -b buildscript/build-chaincode.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
+                }
 
+                // invoke gradle buildscript to produce a jar file
                 val gradleExit = gradleInvoke.!
                 if (gradleExit != 0) {
                     println("`" + gradleInvoke + "` exited abnormally: " + gradleExit)
@@ -356,6 +364,7 @@ object Main {
                 if (options.verbose) {
                     println("gradle exited with value " + gradleExit)
                 }
+
             }
 
         } catch {
