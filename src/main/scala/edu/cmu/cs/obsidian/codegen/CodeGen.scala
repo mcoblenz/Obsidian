@@ -750,8 +750,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         if (mockChaincode) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
-        } else {
+        } else if (lazySerialization) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.HyperledgerChaincodeBase"))
+        } else {
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.HyperledgerStrictChaincodeBase"))
         }
 
         val stubType = if (mockChaincode) {
