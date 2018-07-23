@@ -33,6 +33,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     private final val stateField: String = "__state"
     private final val getStateMeth: String = "getState"
     private final val guidFieldName: String = "__guid"
+    private final val modifiedFieldName: String = "__modified"
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
     }
@@ -581,11 +582,40 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         translationContext
     }
 
-    private def generateLazySerializationCode(newClass: JDefinedClass,
+    private def generateLazySerializationCode(aContract: Contract,
+                                              newClass: JDefinedClass,
                                               translationContext: TranslationContext): Unit = {
-        newClass.field(JMod.PRIVATE, model.ref("String"), guidFieldName);
-        val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID");
-        getGUIDMeth.body()._return(newClass.fields get guidFieldName);
+        newClass.field(JMod.PRIVATE, model.ref("String"), guidFieldName)
+        newClass.field(JMod.PRIVATE, model.ref("boolean"), modifiedFieldName)
+        val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID")
+        getGUIDMeth.body()._return(newClass.fields get guidFieldName)
+
+        val setType = model.directClass("java.util.Set")
+                .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
+
+        /* set is abstract, so we need to use a specific *kind* of set
+         * in order to actually instantiate it */
+        val hashSetType = model.directClass("java.util.HashSet")
+                .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
+
+        val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__getModified")
+        val modBody = getModifiedMeth.body()
+
+        val returnSet = modBody.decl(setType, "result", JExpr._new(hashSetType));
+        for (decl <- aContract.declarations if decl.isInstanceOf[Field]) {
+            val field: Field = decl.asInstanceOf[Field]
+            if (field.typ.isInstanceOf[NonPrimitiveType]) {
+                /* it's a non-primitive type, so it won't be saved directly --
+                 * we also have to query it to see if it was modified. */
+                modBody.invoke(returnSet, "addAll").arg(JExpr.ref(field.name).invoke("__getModified"))
+            }
+        }
+
+        /* return ourselves if we were modified */
+        modBody._if(JExpr._this().ref(modifiedFieldName))._then()
+                    .invoke(returnSet, "add").arg(JExpr._this())
+
+        modBody._return(returnSet)
     }
 
 
@@ -633,9 +663,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                     newClass: JDefinedClass,
                     translationContext: TranslationContext) = {
 
+        /* If we're generating lazy serialization code, generate it here. */
         if (lazySerialization) {
             newClass._implements(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
-            generateLazySerializationCode(newClass, translationContext)
+            generateLazySerializationCode(aContract, newClass, translationContext)
         }
 
         var generated: Boolean = false
@@ -1700,6 +1731,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
                 meth.body().assign(newClass.fields get guidFieldName, generateUUID)
             }
+            /* When an object is newly created, we always mark it as modified. */
+            meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         }
 
         meth

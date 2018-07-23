@@ -16,15 +16,13 @@ import java.net.Socket;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Set;
 
 import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 
-public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
-    // Fields to be written out at the end of transaction invocation.
-    ObsidianSerialized[] dirtyFields;
-
+public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
@@ -37,8 +35,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
                     byte_args[i] = args[i].getBytes();
                 }
                 byte[] result = init(stub, byte_args);
-                byte worldState[] = __archiveBytes();
-                stub.putStringState("obsState", new String(worldState));
+                __saveModifiedData(stub);
                 return newSuccessResponse(result);
             } catch (Throwable e) {
                 return newErrorResponse(e);
@@ -70,7 +67,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
 
         try {
             byte result[] = run(stub, function, byte_args);
-            //__saveModifiedData(stub);
+            __saveModifiedData(stub);
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
             /* This will be returned when calling an invalid transaction
@@ -95,7 +92,21 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
         }
     }
 
+    /* Figure out what was modified and write it out to the blockchain.
+     * Only called for main transactions. */
+    public void __saveModifiedData(ChaincodeStub stub) {
+        Set<ObsidianSerialized> dirtyFields = __getModifiedData();
+        for (ObsidianSerialized field : dirtyFields) {
+            /* Find key and bytes to archive for each dirty field. */
+            String archiveKey = field.__getGUID();
+            String archiveValue = new String(field.__archiveBytes());
+            stub.putStringState(archiveKey, archiveValue);
+        }
+    }
+
     // Must be overridden in generated class.
+    public abstract Set<ObsidianSerialized> __getModifiedData();
+    public abstract String __getGUID();
     public abstract byte[] init(ChaincodeStub stub, byte[][] args)
             throws InvalidProtocolBufferException;
     public abstract byte[] run(ChaincodeStub stub, String transactionName, byte[][] args)
@@ -104,5 +115,4 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
-    //public abstract void __saveModifiedData(ChaincodeStub stub);
 }
