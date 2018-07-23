@@ -1124,13 +1124,20 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 println("Compilation error: unable to resolve type " + name)
             }
             else {
-                val archiveVariableTypeName = translationContext.getProtobufClassName(contract.get)
-                val archiveVariableType: AbstractJType = model.parseType(archiveVariableTypeName)
+                val archiveVariable = if (lazySerialization) {
+                    val archiveGUID = JExpr.invoke(fieldVar, "__getGUID");
+                    nonNullBody.decl(model.ref("String"),
+                        field.name + "ArchiveID",
+                        archiveGUID)
+                } else {
+                    val archiveVariableTypeName = translationContext.getProtobufClassName(contract.get)
+                    val archiveVariableType: AbstractJType = model.parseType(archiveVariableTypeName)
 
-                val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
-                val archiveVariable = nonNullBody.decl(archiveVariableType,
-                    field.name + "Archive",
-                    archiveVariableInvocation)
+                    val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
+                    nonNullBody.decl(archiveVariableType,
+                        field.name + "Archive",
+                        archiveVariableInvocation)
+                }
 
                 // generate: builder.setField(field);
                 val setterName: String = setterNameForField(field.name)

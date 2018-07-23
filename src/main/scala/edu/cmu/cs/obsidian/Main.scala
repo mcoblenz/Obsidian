@@ -307,7 +307,8 @@ object Main {
                 options.mockChaincode, options.lazySerialization)
             javaModel.build(srcDir.toFile)
 
-            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(globalTable.ast, sourceFilename)
+            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(globalTable.ast, sourceFilename,
+                                                                                  options.lazySerialization)
 
             // Each import results in a .proto file, which needs to be compiled.
             for (p <- protobufs) {

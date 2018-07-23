@@ -95,7 +95,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     /* Figure out what was modified and write it out to the blockchain.
      * Only called for main transactions. */
     public void __saveModifiedData(ChaincodeStub stub) {
-        Set<ObsidianSerialized> dirtyFields = __getModifiedData();
+        Set<ObsidianSerialized> dirtyFields = __getModified();
         for (ObsidianSerialized field : dirtyFields) {
             /* Find key and bytes to archive for each dirty field. */
             String archiveKey = field.__getGUID();
@@ -105,7 +105,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     }
 
     // Must be overridden in generated class.
-    public abstract Set<ObsidianSerialized> __getModifiedData();
+    public abstract Set<ObsidianSerialized> __getModified();
     public abstract String __getGUID();
     public abstract byte[] init(ChaincodeStub stub, byte[][] args)
             throws InvalidProtocolBufferException;
