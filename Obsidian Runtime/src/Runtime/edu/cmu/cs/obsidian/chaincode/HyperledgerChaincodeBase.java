@@ -5,6 +5,8 @@
  */
 package edu.cmu.cs.obsidian.chaincode;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.json.*;
 
@@ -22,19 +24,23 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
-        if (!function.equals("init")) {
-            return newErrorResponse("Unknown initialization function " + function);
-        }
-        try {
-            final String args[] = stub.getParameters().stream().toArray(String[]::new);
+        if (function.equals("init")) {
+            try {
+                final String args[] = stub.getParameters().stream().toArray(String[]::new);
 
-            byte byte_args[][] = new byte[args.length][];
-            for (int i = 0; i < args.length; i++) {
-                byte_args[i] = args[i].getBytes();
+                byte byte_args[][] = new byte[args.length][];
+                for (int i = 0; i < args.length; i++) {
+                    byte_args[i] = args[i].getBytes();
+                }
+                byte[] result = init(stub, byte_args);
+                byte worldState[] = __archiveBytes();
+                stub.putStringState("obsState", new String(worldState));
+                return newSuccessResponse(result);
+            } catch (Throwable e) {
+                return newErrorResponse(e);
             }
-            return newSuccessResponse(init(stub, byte_args));
-        } catch (Throwable e) {
-            return newErrorResponse(e);
+        } else {
+            return newErrorResponse("Unknown initialization function " + function);
         }
     }
 
@@ -49,7 +55,19 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
         }
 
         try {
+            byte[] bytes = stub.getStringState("obsState").getBytes(UTF_8);
+            __initFromArchiveBytes(bytes);
+        } catch (InvalidProtocolBufferException e) {
+            // Failed to deserialize. Bail.
+            return newErrorResponse("Blockchain does not contain a valid archive of this contract.");
+        } catch (Throwable e) {
+            return newErrorResponse(e);
+        }
+
+        try {
             byte result[] = run(stub, function, byte_args);
+            byte worldState[] = __archiveBytes();
+            stub.putStringState("obsState", new String(worldState));
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
             /* This will be returned when calling an invalid transaction
@@ -64,47 +82,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
     protected void invokeConstructor() {}; //to be overidden in generated code
 
     public void delegatedMain(String args[]) {
-        /* archive path */
-        String archivePathString = args[0];
-        java.nio.file.Path archivePath = java.nio.file.Paths.get(archivePathString);
-
-        try {
-            byte[] bytes = java.nio.file.Files.readAllBytes(archivePath);
-            __initFromArchiveBytes(bytes);
-        }
-        catch (InvalidProtocolBufferException e) {
-            // Failed to read the file. Bail.
-            System.err.println(archivePath + " is a file, but does not contain a valid archive of this contract.");
-            System.exit(1);
-        }
-        catch (IOException e) {
-            // If the file didn't exist, no problem; we'll create a new instance later.
-            invokeConstructor();
-        }
-
-        /* setup a hook that saves data to archive file on shutdown */
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("\nSaving to archive...");
-            byte[] newArchiveBytes = __archiveBytes();
-            try {
-                java.nio.file.Files.write(archivePath, newArchiveBytes,
-                        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
-            } catch (IOException e) {
-                System.err.println("Error: failed to write state to output file at " + archivePathString + ": " + e);
-                System.err.println("Data may be lost.");
-                System.exit(1);
-            }
-        }));
-
         /* spin up server */
         try {
-            /* Don't pass the first argument (archive path) to be processed
-             * by Hyperledger. Because arguments are an array, we have to copy
-             * all the remaining arguments into a new array. */
-            String[] less_args = new String[args.length - 1];
-            System.arraycopy(args, 1, less_args, 0, args.length-1);
-
-            start(less_args);
+            start(args);
         }
         catch (Exception e) {
             System.out.println("Error: Exception raised when running server: " + e);
@@ -118,6 +98,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase {
     public abstract byte[] run(ChaincodeStub stub, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
                    BadTransactionException, NoSuchTransactionException;
-    public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
+    public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes)
+        throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
 }
