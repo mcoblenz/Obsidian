@@ -34,6 +34,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     private final val getStateMeth: String = "getState"
     private final val guidFieldName: String = "__guid"
     private final val modifiedFieldName: String = "__modified"
+    private final val loadedFieldName: String = "__loaded"
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
     }
@@ -586,7 +587,17 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                                               newClass: JDefinedClass,
                                               translationContext: TranslationContext): Unit = {
         newClass.field(JMod.PRIVATE, model.ref("String"), guidFieldName)
+        // has it been modified/do we need to write it out at the end?
         newClass.field(JMod.PRIVATE, model.ref("boolean"), modifiedFieldName)
+        // is it loaded, or should it load itself lazily when we need it?
+        newClass.field(JMod.PRIVATE, model.ref("boolean"), loadedFieldName)
+
+        val guidConstructor = newClass.constructor(JMod.PUBLIC)
+        guidConstructor.param(model.ref("String"), "guid")
+        guidConstructor.body().assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
+        guidConstructor.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
+        guidConstructor.body().assign(JExpr.ref(guidFieldName), JExpr.ref("guid"))
+
         val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID")
         getGUIDMeth.body()._return(newClass.fields get guidFieldName)
 
@@ -606,7 +617,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             val field: Field = decl.asInstanceOf[Field]
             if (field.typ.isInstanceOf[NonPrimitiveType]) {
                 /* it's a non-primitive type, so it won't be saved directly --
-                 * we also have to query it to see if it was modified. */
+                 * we also have to query it to see if it was modified.
+                 * (and which of its sub-objects were modified if any) */
                 modBody.invoke(returnSet, "addAll").arg(JExpr.ref(field.name).invoke("__getModified"))
             }
         }
@@ -1302,9 +1314,18 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 // TODO
                 /* generate another method that takes the actual archive type
                  * so we don't have to uselessly convert to bytes here */
-                body.assign(fieldVar, JExpr._new(javaFieldType))
-                val init = body.invoke(fieldVar, "initFromArchive")
-                init.arg(archive.invoke(getterNameForField(javaFieldName)))
+                if (lazySerialization) {
+                    // Just initialize it with the GUID.
+                    // If it turns out we actually need it, we'll reconstitute it later
+                    // using said GUID.
+                    body.assign(fieldVar,
+                        JExpr._new(javaFieldType)
+                             .arg(archive.invoke(getterNameForField(javaFieldName))))
+                } else {
+                    body.assign(fieldVar, JExpr._new(javaFieldType))
+                    val init = body.invoke(fieldVar, "initFromArchive")
+                    init.arg(archive.invoke(getterNameForField(javaFieldName)))
+                }
             }
         }
 
@@ -1398,7 +1419,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
 
-
         fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
         fromBytesBody._return(JExpr._this())
     }
@@ -1432,6 +1452,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
         fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
+
+        if (lazySerialization) {
+            // If lazy loading, note that we loaded this object.
+            fromBytesBody.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
+        }
+
         fromBytesBody._return(JExpr._this())
 
         /* [initFromArchive] does most of the grunt work of mapping the protobuf message to
@@ -1740,8 +1766,9 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
                 meth.body().assign(newClass.fields get guidFieldName, generateUUID)
             }
-            /* When an object is newly created, we always mark it as modified. */
+            /* When an object is newly created, we always mark it as modified (and loaded). */
             meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
+            meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
         }
 
         meth
@@ -1862,7 +1889,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                               ): Unit = {
         localContext.get(name) match {
             case Some(variable) => body.assign(variable, newValue)
-            case None => translationContext.assignVariable(name, newValue, body)
+            case None =>
+                translationContext.assignVariable(name, newValue, body)
+                if (lazySerialization) {
+                    // This is a field, so mark that we're modified.
+                    body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
+                }
         }
     }
 
@@ -1936,6 +1968,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
                 translationContext.assignVariable(field, newValue, body)
+                if (lazySerialization) {
+                    // This is a field, so mark that we're modified.
+                    // (Note: since we can only assign to fields of 'this', we only need
+                    // to mark that we assigned here and in assignVariable if it's a field.)
+                    // TODO: don't generate this for every field we modify...
+                    body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
+                }
             }
             case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
