@@ -565,16 +565,25 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
 
         val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__getModified")
+        // add a list of things we've already checked so we don't get stuck in loops
+        getModifiedMeth.param(setType, "checked");
         val modBody = getModifiedMeth.body()
 
-        val returnSet = modBody.decl(setType, "result", JExpr._new(hashSetType));
+        modBody.invoke(JExpr.ref("checked"), "add").arg(JExpr._this())
+
+        val returnSet = modBody.decl(setType, "result", JExpr._new(hashSetType))
         for (decl <- aContract.declarations if decl.isInstanceOf[Field]) {
             val field: Field = decl.asInstanceOf[Field]
             if (field.typ.isInstanceOf[NonPrimitiveType]) {
                 /* it's a non-primitive type, so it won't be saved directly --
                  * we also have to query it to see if it was modified.
                  * (and which of its sub-objects were modified if any) */
-                modBody.invoke(returnSet, "addAll").arg(JExpr.ref(field.name).invoke("__getModified"))
+                /* But we have to make sure it wasn't already checked!
+                 * Otherwise we'll be foiled by circular data structures. */
+                modBody._if(JExpr.ref("checked").invoke("contains").arg(JExpr.ref(field.name)).not())
+                    ._then()
+                        .invoke(returnSet, "addAll").arg(
+                            JExpr.ref(field.name).invoke("__getModified").arg(JExpr.ref("checked")))
             }
         }
 
