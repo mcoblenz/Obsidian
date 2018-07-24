@@ -164,7 +164,7 @@ object Parser extends Parsers {
                         permission match {
                             case None =>
                                 val correctedType = t match {
-                                    case ContractReferenceType(ct, Inferred(), isRemote) => ContractReferenceType(ct, ReadOnlyState(), isRemote)
+                                    case ContractReferenceType(ct, Inferred(), isRemote) => ContractReferenceType(ct, Unowned(), isRemote)
                                     case _ => t
                                 }
                                 (correctedType, correctedType)
@@ -424,16 +424,6 @@ object Parser extends Parsers {
             case _ ~ s => EndsInState(s)
         }
 
-/*
-    private def parseFuncDecl = {
-        FunctionT() ~! parseId ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-            parseFuncOptions ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case f ~ name ~ _ ~ args ~ _ ~ funcOptions ~ _ ~ body ~ _ =>
-                Func(name._1, args, funcOptions.returnType, funcOptions.availableIn, body, Unowned()).setLoc(f)
-        }
-    }
-    */
-
     private def parseEnsures = {
         EnsuresT() ~! parseExpr ~! SemicolonT() ^^ {
             case ensures ~ expr ~ _ => Ensures(expr).setLoc(ensures)
@@ -452,9 +442,6 @@ object Parser extends Parsers {
         }
     }
 
-    case class FuncOptions (val returnType : Option[ObsidianType],
-                             val availableIn : Option[Set[Identifier]])
-
     case class AvailableIn (val identifiers: Set[Identifier])
     case class EndsInState (val identifiers: Set[Identifier])
 
@@ -468,14 +455,43 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
-        opt(StaticT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
-          opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
-            case static ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
-                val isStatic = static match {
-                    case None => false
-                    case Some(static) => true
+    case class TransactionOptions (isStatic: Boolean, isPrivate: Boolean)
+
+    private def parseTransactionOptions: Parser[TransactionOptions] = {
+        rep(StaticT() | PrivateT()) ^^ {
+            case opts =>
+                var options = TransactionOptions(false, false)
+
+                for (opt <- opts) {
+                    options =
+                        opt match {
+                            case StaticT() =>
+                                if (options.isStatic) {
+                                    return err("Duplicate static keyword in transaction declaration.")
+                                }
+                                else {
+                                    TransactionOptions(true, options.isPrivate)
+                                }
+                            case PrivateT() =>
+                                if (options.isPrivate) {
+                                    return err("Duplicate private keyword in transaction declaration.")
+                                }
+                                else {
+                                    TransactionOptions(options.isStatic, true)
+                                }
+                            case _ =>
+                                return err(s"Unexpected option found: $opt")
+                        }
                 }
+                options
+        }
+    }
+
+
+    private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
+        parseTransactionOptions ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+          opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
+            case opts ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
@@ -509,27 +525,7 @@ object Parser extends Parsers {
                 }
 
                 Transaction(nameString, filteredArgs, returns,
-                    ensures, body, isStatic, thisType, finalType.asInstanceOf[NonPrimitiveType]).setLoc(t)
-        }
-    }
-
-    //take union of availableIns
-    private def parseFuncOptions: Parser[FuncOptions] = {
-        opt(parseReturns) ~! rep(parseAvailableInAlt) ^^ { //use match to determine each
-            //check for repeats
-            case returns ~ optionsSeq =>
-                var options: FuncOptions = FuncOptions(returns, None)
-                for (option <- optionsSeq) {
-                    val newOption = option match {
-                        case a: AvailableIn => FuncOptions(None, Some(a.identifiers))
-                    }
-                    options = (newOption, options) match {
-                        case (FuncOptions(None, a), FuncOptions(t, None)) => FuncOptions(t, a)
-                        case (FuncOptions(None, Some(a)), FuncOptions(t, Some(a2))) => FuncOptions(t, Some(a ++ a2))
-                        case _ => options
-                    }
-                }
-                options
+                    ensures, body, opts.isStatic, opts.isPrivate, thisType, finalType.asInstanceOf[NonPrimitiveType]).setLoc(t)
         }
     }
 
@@ -554,7 +550,7 @@ object Parser extends Parsers {
     }
 
     private def parseDeclInState: Parser[Declaration] = {
-        parseFieldDecl | // parseFuncDecl |
+        parseFieldDecl |
         parseStateDecl | parseConstructor | parseContractDecl | failure("declaration expected")
     }
 

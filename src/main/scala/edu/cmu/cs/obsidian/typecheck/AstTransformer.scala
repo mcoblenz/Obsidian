@@ -50,10 +50,6 @@ object AstTransformer {
                     val (newTransaction, newErrors) = transformTransaction(table, cTable, d.asInstanceOf[Transaction])
                     errors = errors ++ newErrors
                     newTransaction
-                case FuncDeclTag =>
-                    val (newFunction, newErrors) = transformFunc(table, cTable, d.asInstanceOf[Func])
-                    errors = errors ++ newErrors
-                    newFunction
                 case ConstructorDeclTag =>
                     val (newConstructor, newErrors) = transformConstructor(table, cTable, d.asInstanceOf[Constructor])
                     errors = errors ++ newErrors
@@ -92,8 +88,6 @@ object AstTransformer {
             val (newDecl, newErrors) = d.tag match {
                 case TransactionDeclTag =>
                     transformTransaction(table, sTable, d.asInstanceOf[Transaction])
-                case FuncDeclTag =>
-                    transformFunc(table, sTable, d.asInstanceOf[Func])
                 case ConstructorDeclTag =>
                     transformConstructor(table, sTable, d.asInstanceOf[Constructor])
                 case FieldDeclTag =>
@@ -236,30 +230,6 @@ object AstTransformer {
         val errors = argsTransformErrors ++ bodyTransformErrors
 
         (c.copy(args = newArgs, body = newBody).setLoc(c), errors)
-    }
-
-    def transformFunc(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            f: Func): (Func, Seq[ErrorRecord]) = {
-
-        val (newArgs, argTransformErrors) = transformArgs(table, lexicallyInsideOf, f.args, f.thisPermission)
-        val context = startContext(lexicallyInsideOf, f.args, f.thisPermission)
-        val newRetType = f.retType.map(transformType(table, lexicallyInsideOf, context, _, f.loc))
-        var errors = List.empty[ErrorRecord]
-        val (transformedRetType, retTypeErrors) = newRetType match {
-            case None => (None, List.empty)
-            case Some(p) => (Some(p._1), p._2)
-        }
-
-        val (transformedBody, _, bodyTransformErrors) = transformBody(table, lexicallyInsideOf, context, f.body)
-        val transformedF = f.copy(retType = transformedRetType, args = newArgs,
-               body = transformedBody)
-
-        errors = retTypeErrors ++ argTransformErrors ++ bodyTransformErrors
-
-        (transformedF, errors)
-
     }
 
     def transformBody(

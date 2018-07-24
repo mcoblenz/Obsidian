@@ -29,10 +29,6 @@ case class GlobalFieldInfo(decl: Field) extends FieldInfo
 case class StateSpecificFieldInfo(declSeq: Seq[(State, Field)],
                                      getFunc: JMethod, setFunc: JMethod) extends FieldInfo
 
-sealed trait FuncInfo
-case class GlobalFuncInfo(decl: Func) extends FuncInfo
-case class StateSpecificFuncInfo(declSeq: Seq[(State, Func)], dynamicCheckMethod: JMethod) extends FuncInfo
-
 sealed trait TransactionInfo
 case class GlobalTransactionInfo(decl: Transaction) extends TransactionInfo
 case class StateSpecificTransactionInfo(declSeq: Seq[(State, Transaction)],
@@ -58,7 +54,6 @@ case class TranslationContext(
     /* aggregates information about [transaction/function/field] declarations:
      * maps the [tx/fun/field] name to useful data  */
     txLookup: Map[String, TransactionInfo],
-    funLookup: Map[String, FuncInfo],
     fieldLookup: Map[String, FieldInfo],
 
     // When we encounter a state initializer, we generate an instance of the inner class and set up its fields as requested.
@@ -98,26 +93,10 @@ case class TranslationContext(
             model.directClass(f).staticRef(StaticMemberReference)
     }
 
-    /* does one of the below; checks first to see which one is possible */
-    def invokeTransactionOrFunction(name: String): JInvocation = {
-        if (txLookup.get(name).isDefined) {
-            invokeTransaction(name)
-        } else {
-            invokeFunction(name)
-        }
-    }
-
     def invokeTransaction(name: String): JInvocation = {
         txLookup(name) match {
             case GlobalTransactionInfo(_) => JExpr.invoke(name)
             case StateSpecificTransactionInfo(_, meth) => JExpr.invoke(meth)
-        }
-    }
-
-    def invokeFunction(name: String): JInvocation = {
-        funLookup(name) match {
-            case GlobalFuncInfo(_) => JExpr.invoke(name)
-            case StateSpecificFuncInfo(_, meth) => JExpr.invoke(meth)
         }
     }
 

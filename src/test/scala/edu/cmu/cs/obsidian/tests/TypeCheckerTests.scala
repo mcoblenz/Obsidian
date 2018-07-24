@@ -137,10 +137,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
             (SubtypingError(BoolType(), IntType()), 38)
                 ::
-                (SubtypingError(
-                    ContractReferenceType(ContractType("C_Owned"), Owned(), false),
-                    ContractReferenceType(ContractType("C_Shared"), Shared(), false)),
-                    41)
+                (InconsistentContractTypeError("C_Shared", "C_Owned"), 41)
                 ::
                 (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared"), Shared(), false), "f2"), 20)
                 ::
@@ -151,8 +148,6 @@ class TypeCheckerTests extends JUnitSuite {
                 (AssignmentError(), 51)
                 ::
                 (InvalidNonThisFieldAssignment(), 54)
-                ::
-                (DereferenceError(IntType()), 54)
                 ::
                 Nil
         )
@@ -451,9 +446,9 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (UnusedOwnershipError("m"), 22)
                 ::
-                (SubtypingError(
+                (InvalidInconsistentFieldType("money",
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
-                    ContractReferenceType(ContractType("Money"), Owned(), false)), 28)
+                    ContractReferenceType(ContractType("Money"), Owned(), false)), 26)
                 ::
                 (SubtypingError(
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
@@ -486,12 +481,9 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
-            //                (TODO: https://github.com/mcoblenz/Obsidian/issues/134)
-            //                (InvalidOwnershipTransfer(ReferenceIdentifier("p"), ContractReferenceType(ContractType("Prescription"), Unowned())), 16)
-            //                ::
-            (SubtypingError(
+            (InvalidInconsistentFieldType("prescription",
                 ContractReferenceType(ContractType("Prescription"), Unowned(), false),
-                ContractReferenceType(ContractType("Prescription"), Owned(), false)), 16)
+                ContractReferenceType(ContractType("Prescription"), Owned(), false)), 15)
                 ::
                 Nil
         )
@@ -609,7 +601,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/ReadOnlyState.obs",
             (TransitionNotAllowedError(), 11) ::
                 (ReceiverTypeIncompatibleError("changeStateShared",
-                    ContractReferenceType(ContractType("C"), ReadOnlyState(), false),
+                    ContractReferenceType(ContractType("C"), Unowned(), false),
                     ContractReferenceType(ContractType("C"), Shared(), false)), 39) ::
                 (ReceiverTypeIncompatibleError("changeStateOwned",
                     ContractReferenceType(ContractType("C"), Shared(), false),
@@ -617,7 +609,15 @@ class TypeCheckerTests extends JUnitSuite {
                 (ReceiverTypeIncompatibleError("changeStateStateSpecified",
                     ContractReferenceType(ContractType("C"), Owned(), false),
                     StateType("C", Set("S1"), false)), 45) ::
+                (InvalidInconsistentFieldType("s1C", StateType("C", Set("S2"), false), StateType("C", Set("S1"), false)), 48) ::
                 Nil
+        )
+    }
+
+    @Test def fieldTypeMismatchTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/FieldTypeMismatch.obs",
+            (InvalidInconsistentFieldType("c", StateType("C", Set("S2"), false), StateType("C", Set("S1"), false)), 24) ::
+            Nil
         )
     }
 }

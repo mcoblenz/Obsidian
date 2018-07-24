@@ -14,7 +14,6 @@ case class IfT() extends Token { override def toString: String = "if" }
 case class ElseT() extends Token { override def toString: String = "else" }
 case class TransactionT() extends Token { override def toString: String = "transaction" }
 case class StaticT() extends Token { override def toString: String = "static" }
-case class FunctionT() extends Token { override def toString: String = "function" }
 case class TypeT() extends Token { override def toString: String = "type" }
 case class StateT() extends Token { override def toString: String = "state" }
 case class TryT() extends Token { override def toString: String = "try" }
@@ -47,6 +46,7 @@ case class EndsT() extends Token { override def toString: String = "ends" }
 case class InT() extends Token { override def toString: String = "in" }
 case class ResourceT() extends Token { override def toString: String = "resource" }
 case class DisownT() extends Token { override def toString: String = "disown" }
+case class PrivateT() extends Token { override def toString: String = "private" }
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }

@@ -144,11 +144,6 @@ class ParserTests extends JUnitSuite {
             """
               | main contract C {
               |     state S1 {
-//                        Disabled fuctions pending #159.
-//              |         function f() { return x; }
-//              |         function f(T x) { return x; }
-//              |         function f(T1 x, T2 y, T3 z) { return x; }
-              |
               |     }
               |     transaction t(C@S1 this) { return x; }
               |         transaction t(C@S1 this, T x) { return x; }
@@ -225,7 +220,8 @@ class ParserTests extends JUnitSuite {
         shouldSucceedFile("resources/tests/parser_tests/ValidTransactions.obs")
         shouldFail("resources/tests/parser_tests/BadTransactionOrdering.obs")
         shouldSucceedFile("resources/tests/parser_tests/AvailableInRepeats.obs")
-
+        shouldSucceedFile("resources/tests/parser_tests/TransactionOptions.obs")
+        shouldFail("resources/tests/parser_tests/BadTransactionOptions.obs")
     }
 
     @Test def invocationSpec() = {

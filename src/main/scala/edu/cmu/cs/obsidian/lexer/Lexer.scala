@@ -26,7 +26,6 @@ object Lexer extends RegexParsers {
         case "interface" => InterfaceT()
         case "transaction" => TransactionT()
         case "static" => StaticT()
-        case "function" => FunctionT()
         case "type" => TypeT()
         case "state" => StateT()
         case "try" => TryT()
@@ -59,6 +58,7 @@ object Lexer extends RegexParsers {
         case "in" => InT()
         case "resource" => ResourceT()
         case "disown" => DisownT()
+        case "private" => PrivateT()
         case id => IdentifierT(id)
     }
 

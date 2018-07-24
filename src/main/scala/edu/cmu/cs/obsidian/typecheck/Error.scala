@@ -248,3 +248,11 @@ case class TransitionNotAllowedError() extends Error {
 case class ReceiverTypeIncompatibleError(transactionName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
     val msg: String = s"Cannot invoke $transactionName on a receiver of type $actualType; a receiver of type $expectedType is required."
 }
+
+case class InconsistentContractTypeError(declaredContractName: String, actualContractName: String) extends Error {
+    val msg: String = s"Cannot assign a value of contract $actualContractName to a variable that requires a value of contract $declaredContractName."
+}
+
+case class InconsistentTypeAssignmentError(declaredType: ObsidianType, actualType: ObsidianType) extends Error {
+    val msg: String = s"Cannot assign a value of type $actualType to a variable of type $declaredType."
+}

@@ -28,7 +28,6 @@ object TypeDeclTag extends DeclarationTag
 object FieldDeclTag extends DeclarationTag
 object ContractDeclTag extends DeclarationTag
 object StateDeclTag extends DeclarationTag
-object FuncDeclTag extends DeclarationTag
 object ConstructorDeclTag extends DeclarationTag
 object TransactionDeclTag extends DeclarationTag
 
@@ -121,24 +120,19 @@ case class Constructor(name: String,
     val thisType: ObsidianType = resultType
     val isStatic: Boolean = false
 }
-case class Func(name: String,
-                args: Seq[VariableDeclWithSpec],
-                retType: Option[ObsidianType],
-                availableIn: Option[Set[String]],
-                body: Seq[Statement],
-                thisPermission: Permission) extends InvokableDeclaration with IsAvailableInStates {
-    val tag: DeclarationTag = FuncDeclTag
-    val thisType: ObsidianType = BottomType() // TODO: merge Func into Transaction (#159). This is bogus for now.
-    val isStatic: Boolean = false;
-}
+
 case class Transaction(name: String,
                        args: Seq[VariableDeclWithSpec],
                        retType: Option[ObsidianType],
                        ensures: Seq[Ensures],
                        body: Seq[Statement],
                        isStatic: Boolean,
+                       isPrivate: Boolean,
                        thisType: NonPrimitiveType,
-                       thisFinalType: NonPrimitiveType) extends InvokableDeclaration with IsAvailableInStates {
+                       thisFinalType: NonPrimitiveType,
+                       initialFieldTypes: Map[String, ObsidianType] = Map.empty, // populated after parsing
+                       finalFieldTypes: Map[String, ObsidianType] = Map.empty // populated after parsing
+                      ) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 
     def availableIn: Option[Set[String]] = thisType match {
