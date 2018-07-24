@@ -550,6 +550,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         guidConstructor.body().assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
         guidConstructor.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
         guidConstructor.body().assign(JExpr.ref(guidFieldName), JExpr.ref("__guid_"))
+        guidConstructor.body()
+            .directStatement("System.out.println(\"** Constructed new lazy "+aContract.name+" with guid \"+__guid_);")
 
         val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID")
         getGUIDMeth.body()._return(newClass.fields get guidFieldName)
@@ -580,7 +582,31 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         modBody._if(JExpr._this().ref(modifiedFieldName))._then()
                     .invoke(returnSet, "add").arg(JExpr._this())
 
+        /* once we call this (at the end of a transaction), we can assume
+         * this thing is going to be written out, so mark it as no longer
+         * modified. */
+        modBody.assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
+
         modBody._return(returnSet)
+
+        val restoreMeth = newClass.method(JMod.PUBLIC, model.VOID, "__restoreObject")
+        restoreMeth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")
+        restoreMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+                                    .asInstanceOf[AbstractJClass])
+
+        if (aContract.isMain) {
+            // If it's the main contract, we know its GUID already.
+            restoreMeth.body().assign(JExpr.ref(guidFieldName), JExpr.lit(aContract.name))
+        }
+
+        val ifNotLoaded = restoreMeth.body()._if(JExpr.ref(loadedFieldName).not())._then()
+        ifNotLoaded.directStatement("System.out.println(\"Loading object @ \"+__guid+\" from blockchain...\");")
+        ifNotLoaded.decl(model.ref("String"), "__archive_string",
+            JExpr.ref("stub").invoke("getStringState").arg(JExpr.ref(guidFieldName)))
+        ifNotLoaded.decl(model.BYTE.array(), "__archive_bytes", JExpr.ref("__archive_string").invoke("getBytes"))
+        ifNotLoaded.directStatement("System.out.println(\"Loading data: \"+__archive_string);")
+        ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes"))
+        ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
     }
 
 
@@ -1796,6 +1822,14 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
 
+        /* if lazy serialization, ensure the object is loaded before trying to do anything.
+         * (even checking the state!) */
+        if (lazySerialization) {
+            meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+                .asInstanceOf[AbstractJClass])
+            meth.body().invoke("__restoreObject").arg(JExpr.ref("stub"))
+        }
+
         // Dynamically check the state
         tx.thisType match {
             case StateType(_, states, _) => {
@@ -1848,17 +1882,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
-
-        /* if lazy serialization, ensure the object is loaded before trying to do something. */
-        if (lazySerialization) {
-            meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
-
-            val ifNotLoaded = jIf._else()._if(JExpr.ref(loadedFieldName).not())._then()
-            ifNotLoaded.decl(model.BYTE.array(), "__archive_",
-                JExpr.ref("stub").invoke("getStringState").arg(JExpr.ref(guidFieldName)).invoke("getBytes"))
-            ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_"))
-            ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
-        }
 
         /* add body */
         translateBody(jIf._else(), tx.body, translationContext, localContext)

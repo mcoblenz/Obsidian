@@ -56,16 +56,12 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
 
         try {
-            byte[] bytes = stub.getStringState("obsState").getBytes(UTF_8);
-            __initFromArchiveBytes(bytes);
-        } catch (InvalidProtocolBufferException e) {
-            // Failed to deserialize. Bail.
-            return newErrorResponse("Blockchain does not contain a valid archive of some contract.");
-        } catch (Throwable e) {
-            return newErrorResponse(e);
-        }
+            /* Try to restore ourselves (the root object) from the blockchain
+             * before we invoke a transaction. (This applies if we stopped the
+             * chaincode and restarted it -- we have to restore the state of
+             * the root object.) */
+            __restoreObject(stub);
 
-        try {
             byte result[] = run(stub, function, byte_args);
             __saveModifiedData(stub);
             return newSuccessResponse(result);
@@ -100,6 +96,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             /* Find key and bytes to archive for each dirty field. */
             String archiveKey = field.__getGUID();
             String archiveValue = new String(field.__archiveBytes());
+            System.out.println("Saving modified data: ("+archiveKey+" => "+archiveValue+")");
             stub.putStringState(archiveKey, archiveValue);
         }
     }
@@ -115,4 +112,6 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
+    public abstract void __restoreObject(ChaincodeStub stub)
+        throws InvalidProtocolBufferException;
 }
