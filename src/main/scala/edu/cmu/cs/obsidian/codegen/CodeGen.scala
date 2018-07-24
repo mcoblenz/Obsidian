@@ -593,10 +593,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         newClass.field(JMod.PRIVATE, model.ref("boolean"), loadedFieldName)
 
         val guidConstructor = newClass.constructor(JMod.PUBLIC)
-        guidConstructor.param(model.ref("String"), "guid")
+        guidConstructor.param(model.ref("String"), "__guid_")
         guidConstructor.body().assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
         guidConstructor.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
-        guidConstructor.body().assign(JExpr.ref(guidFieldName), JExpr.ref("guid"))
+        guidConstructor.body().assign(JExpr.ref(guidFieldName), JExpr.ref("__guid_"))
 
         val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID")
         getGUIDMeth.body()._return(newClass.fields get guidFieldName)
@@ -826,7 +826,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         mainConstructor.foreach(c =>  {
             val errorBlock: JBlock = new JBlock()
-            val invocation: JInvocation = initMeth.body().invoke(c)
+            val invocation: JInvocation =
+                if (lazySerialization) {
+                    // if lazy serialization, need to pass chaincode stub as argument to constructor
+                    initMeth.body().invoke(c).arg(JExpr.ref("stub"))
+                } else {
+                    initMeth.body().invoke(c)
+                }
 
             var runArgsIndex = 0
 
@@ -974,6 +980,11 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
                 for (txArg <- txArgsList.reverse) {
                     txInvoke.arg(txArg)
+                }
+
+                if (lazySerialization) {
+                    // Pass stub to transactions in lazy mode for deserialization of child objects.
+                    txInvoke.arg(JExpr.ref("stub"))
                 }
 
             }
@@ -1647,6 +1658,14 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val foldF = (inv: JInvocation, arg: Expression) =>
             inv.arg(translateExpr(arg, translationContext, localContext))
         args.foldLeft(inv)(foldF)
+
+        if (lazySerialization) {
+            // Pass chaincode stub to other invoked methods as well, in case
+            // an object needs to be restored from the blockchain.
+            inv.arg(JExpr.ref("stub"))
+        }
+
+        inv
     }
 
     /* returns an expr because exprs are built bottom-up (unlike everything else) */
@@ -1716,10 +1735,15 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     private def generateInvokeConstructor(newClass: JDefinedClass) = {
 
         val meth: JMethod = newClass.method(JMod.PROTECTED, model.VOID, "invokeConstructor")
+        if (lazySerialization) {
+            // Not sure this is actually required (if we're invoking the constructor we can't
+            // have any objects serialized yet), but needed for consistency with other constructors.
+            meth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")
+        }
         val name : String = "new_" + newClass.name()
         val body = meth.body()
         meth.annotate(model.directClass("java.lang.Override"))
-        body.invokeThis(name)
+        body.invokeThis(name).arg(JExpr.ref("stub"))
 
     }
 
@@ -1749,6 +1773,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
             (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
+
+        if (lazySerialization) {
+            // If lazy serialization, we need to pass in a stub as well since we might need
+            // to deserialize some objects in here (for example, if we call a method on a parameter
+            // that returns a property of one of its child objects which isn't yet loaded)
+            meth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")
+        }
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
@@ -1851,12 +1882,32 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         }
 
         /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
+        val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
             (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
 
+        val argList: Seq[(String, JVar)] =
+            if (lazySerialization) {
+                // We need to pass the ChaincodeStub to methods in lazy mode, so that the objects can
+                // restore themselves from the blockchain if need be.
+                ("stub", meth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")) +: jArgs
+            } else {
+                jArgs
+            }
+
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
+
+        /* if lazy serialization, ensure the object is loaded before trying to do something. */
+        if (lazySerialization) {
+            meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
+
+            val ifNotLoaded = jIf._else()._if(JExpr.ref(loadedFieldName).not())._then()
+            ifNotLoaded.decl(model.BYTE.array(), "__archive_",
+                JExpr.ref("stub").invoke("getStringState").arg(JExpr.ref(guidFieldName)).invoke("getBytes"))
+            ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_"))
+            ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
+        }
 
         /* add body */
         translateBody(jIf._else(), tx.body, translationContext, localContext)

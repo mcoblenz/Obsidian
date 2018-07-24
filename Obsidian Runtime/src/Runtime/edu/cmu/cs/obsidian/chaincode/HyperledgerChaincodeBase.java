@@ -60,7 +60,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             __initFromArchiveBytes(bytes);
         } catch (InvalidProtocolBufferException e) {
             // Failed to deserialize. Bail.
-            return newErrorResponse("Blockchain does not contain a valid archive of this contract.");
+            return newErrorResponse("Blockchain does not contain a valid archive of some contract.");
         } catch (Throwable e) {
             return newErrorResponse(e);
         }
@@ -79,7 +79,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
     }
 
-    protected void invokeConstructor() {}; //to be overidden in generated code
+    protected void invokeConstructor(ChaincodeStub stub) {}; //to be overidden in generated code
 
     public void delegatedMain(String args[]) {
         /* spin up server */
