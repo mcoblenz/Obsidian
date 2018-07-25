@@ -22,13 +22,18 @@ import java.util.HashSet;
 import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
+import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
+    private SerializationState st;
+
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
         if (function.equals("init")) {
             try {
+                st.setStub(stub);
+
                 final String args[] = stub.getParameters().stream().toArray(String[]::new);
 
                 System.out.println("Beginning init.");
@@ -38,7 +43,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                     byte_args[i] = args[i].getBytes();
                 }
                 System.out.println("Calling init function.");
-                byte[] result = init(stub, byte_args);
+                byte[] result = init(st, byte_args);
                 System.out.println("Saving data.");
                 __saveModifiedData(stub);
                 System.out.println("Done??");
@@ -62,13 +67,15 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
 
         try {
+            st.setStub(stub);
+
             /* Try to restore ourselves (the root object) from the blockchain
              * before we invoke a transaction. (This applies if we stopped the
              * chaincode and restarted it -- we have to restore the state of
              * the root object.) */
-            __restoreObject(stub);
+            __restoreObject(st);
 
-            byte result[] = run(stub, function, byte_args);
+            byte result[] = run(st, function, byte_args);
             __saveModifiedData(stub);
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
@@ -81,10 +88,11 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
     }
 
-    protected void invokeConstructor(ChaincodeStub stub) {}; //to be overidden in generated code
+    protected void invokeConstructor(SerializationState st) {}; //to be overidden in generated code
 
     public void delegatedMain(String args[]) {
         /* spin up server */
+        st = new SerializationState();
         try {
             start(args);
         }
@@ -116,14 +124,14 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     // Must be overridden in generated class.
     public abstract Set<ObsidianSerialized> __getModified(Set<ObsidianSerialized> checked);
     public abstract String __getGUID();
-    public abstract byte[] init(ChaincodeStub stub, byte[][] args)
+    public abstract byte[] init(SerializationState st, byte[][] args)
             throws InvalidProtocolBufferException;
-    public abstract byte[] run(ChaincodeStub stub, String transactionName, byte[][] args)
+    public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
                    BadTransactionException, NoSuchTransactionException;
-    public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes)
+    public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes, SerializationState __st)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
-    public abstract void __restoreObject(ChaincodeStub stub)
+    public abstract void __restoreObject(SerializationState st)
         throws InvalidProtocolBufferException;
 }

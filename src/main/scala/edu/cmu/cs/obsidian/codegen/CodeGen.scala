@@ -35,6 +35,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     private final val guidFieldName: String = "__guid"
     private final val modifiedFieldName: String = "__modified"
     private final val loadedFieldName: String = "__loaded"
+    private final val serializationParamName: String = "__st"
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
     }
@@ -599,7 +600,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         modBody._return(returnSet)
 
         val restoreMeth = newClass.method(JMod.PUBLIC, model.VOID, "__restoreObject")
-        restoreMeth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")
+        restoreMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         restoreMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException")
                                     .asInstanceOf[AbstractJClass])
 
@@ -611,10 +612,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val ifNotLoaded = restoreMeth.body()._if(JExpr.ref(loadedFieldName).not())._then()
         ifNotLoaded.directStatement("System.out.println(\"Loading object @ \"+__guid+\" from blockchain...\");")
         ifNotLoaded.decl(model.ref("String"), "__archive_string",
-            JExpr.ref("stub").invoke("getStringState").arg(JExpr.ref(guidFieldName)))
+            JExpr.ref(serializationParamName).invoke("getStub").invoke("getStringState").arg(JExpr.ref(guidFieldName)))
         ifNotLoaded.decl(model.BYTE.array(), "__archive_bytes", JExpr.ref("__archive_string").invoke("getBytes"))
         ifNotLoaded.directStatement("System.out.println(\"Loading data: \"+__archive_string);")
-        ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes"))
+        ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes")).arg(JExpr.ref(serializationParamName))
         ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
     }
 
@@ -758,6 +759,9 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         val stubType = if (mockChaincode) {
             model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
+        } else if (lazySerialization) {
+            model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState")
+            /* (also contains a ChaincodeStub) */
         } else {
             model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
         }
@@ -816,7 +820,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             val errorBlock: JBlock = new JBlock()
             val invocation: JInvocation =
                 if (lazySerialization) {
-                    // if lazy serialization, need to pass chaincode stub as argument to constructor
+                    // if lazy serialization, need to pass serialization state as arg to constructor
                     initMeth.body().invoke(c).arg(JExpr.ref("stub"))
                 } else {
                     initMeth.body().invoke(c)
@@ -971,7 +975,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 }
 
                 if (lazySerialization) {
-                    // Pass stub to transactions in lazy mode for deserialization of child objects.
+                    // Pass serialization state to transactions in lazy mode
+                    // for deserialization of child objects.
                     txInvoke.arg(JExpr.ref("stub"))
                 }
 
@@ -1314,12 +1319,29 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 /* generate another method that takes the actual archive type
                  * so we don't have to uselessly convert to bytes here */
                 if (lazySerialization) {
-                    // Just initialize it with the GUID.
+                    body.decl(model.ref("String"), javaFieldName + "ID",
+                        archive.invoke(getterNameForField(javaFieldName)))
+                    body.decl(javaFieldType, javaFieldName + "Val",
+                        JExpr.cast(javaFieldType,
+                            JExpr.ref(serializationParamName).invoke("getEntry").arg(JExpr.ref(javaFieldName+"ID"))))
+
+                    val checkForObj = body._if(JExpr.ref(javaFieldName + "Val").ne(JExpr._null()))
+
+                    // If we found the object in the map of loaded objects, assign it to the field.
+                    // We're good.
+                    checkForObj._then().assign(fieldVar, JExpr.ref(javaFieldName+"Val"))
+
+                    // if we didn't find the object in the map of already-loaded objects,
+                    // just initialize it with the GUID.
                     // If it turns out we actually need it, we'll reconstitute it later
                     // using said GUID.
-                    body.assign(fieldVar,
-                        JExpr._new(javaFieldType)
-                             .arg(archive.invoke(getterNameForField(javaFieldName))))
+                    checkForObj._else().assign(fieldVar,
+                        JExpr._new(javaFieldType).arg(JExpr.ref(javaFieldName + "ID")))
+                    // We also need to put this thing in the map of loaded objects,
+                    // so if someone else references it later, we get the same reference.
+                    checkForObj._else().invoke(JExpr.ref(serializationParamName), "putEntry")
+                        .arg(JExpr.ref(javaFieldName + "ID"))
+                        .arg(JExpr.ref(javaFieldName + "Val"))
                 } else {
                     body.assign(fieldVar, JExpr._new(javaFieldType))
                     val init = body.invoke(fieldVar, "initFromArchive")
@@ -1436,6 +1458,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         /* [initFromArchive] setup */
         val fromArchiveMeth = newClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
         val archive = fromArchiveMeth.param(archiveType, "archive")
+        if (lazySerialization) {
+            // If lazy serialization, also need the serialization-state b/c the object might
+            // already be loaded.
+            fromArchiveMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"),
+                serializationParamName)
+        }
         val fromArchiveBody = fromArchiveMeth.body()
 
         /* [__initFromArchiveBytes] declaration: this just parses the archive and
@@ -1445,14 +1473,19 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         fromBytesMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
+        if (lazySerialization) {
+            // Need serialization state in case we already loaded the object.
+            fromBytesMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
 
         val fromBytesBody = fromBytesMeth.body()
         val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
-        fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
+        val archiveInv = fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
 
         if (lazySerialization) {
+            archiveInv.arg(JExpr.ref(serializationParamName))
             // If lazy loading, note that we loaded this object.
             fromBytesBody.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
         }
@@ -1648,7 +1681,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         if (lazySerialization) {
             // Pass chaincode stub to other invoked methods as well, in case
             // an object needs to be restored from the blockchain.
-            inv.arg(JExpr.ref("stub"))
+            inv.arg(JExpr.ref(serializationParamName))
         }
 
         inv
@@ -1724,12 +1757,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         if (lazySerialization) {
             // Not sure this is actually required (if we're invoking the constructor we can't
             // have any objects serialized yet), but needed for consistency with other constructors.
-            meth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         }
         val name : String = "new_" + newClass.name()
         val body = meth.body()
         meth.annotate(model.directClass("java.lang.Override"))
-        body.invokeThis(name).arg(JExpr.ref("stub"))
+        body.invokeThis(name).arg(JExpr.ref(serializationParamName))
 
     }
 
@@ -1764,7 +1797,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             // If lazy serialization, we need to pass in a stub as well since we might need
             // to deserialize some objects in here (for example, if we call a method on a parameter
             // that returns a property of one of its child objects which isn't yet loaded)
-            meth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         }
 
         /* construct the local context from this list */
@@ -1836,7 +1869,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         if (lazySerialization) {
             meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException")
                 .asInstanceOf[AbstractJClass])
-            meth.body().invoke("__restoreObject").arg(JExpr.ref("stub"))
+            meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
         }
 
         // Dynamically check the state
@@ -1884,7 +1917,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             if (lazySerialization) {
                 // We need to pass the ChaincodeStub to methods in lazy mode, so that the objects can
                 // restore themselves from the blockchain if need be.
-                ("stub", meth.param(model.directClass("org.hyperledger.fabric.shim.ChaincodeStub"), "stub")) +: jArgs
+                (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
             } else {
                 jArgs
             }
