@@ -551,8 +551,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         guidConstructor.body().assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
         guidConstructor.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
         guidConstructor.body().assign(JExpr.ref(guidFieldName), JExpr.ref("__guid_"))
-        guidConstructor.body()
-            .directStatement("System.out.println(\"** Constructed new lazy "+aContract.name+" with guid \"+__guid_);")
 
         val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID")
         getGUIDMeth.body()._return(newClass.fields get guidFieldName)
@@ -615,13 +613,20 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         }
 
         val ifNotLoaded = restoreMeth.body()._if(JExpr.ref(loadedFieldName).not())._then()
-        ifNotLoaded.directStatement("System.out.println(\"Loading object @ \"+__guid+\" from blockchain...\");")
+        ifNotLoaded.directStatement("System.out.println(\"Loading "+aContract.name+" @ <\"+__guid+\"> from blockchain...\");")
         ifNotLoaded.decl(model.ref("String"), "__archive_string",
             JExpr.ref(serializationParamName).invoke("getStub").invoke("getStringState").arg(JExpr.ref(guidFieldName)))
         ifNotLoaded.decl(model.BYTE.array(), "__archive_bytes", JExpr.ref("__archive_string").invoke("getBytes"))
         ifNotLoaded.directStatement("System.out.println(\"Loading data: \"+__archive_string);")
         ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes")).arg(JExpr.ref(serializationParamName))
         ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
+
+        if (aContract.isMain) {
+            /* We want to set the main contract to 'not loaded' after each
+             * transaction, so it reloads data from the blockchain each time. */
+            val unloadMeth = newClass.method(JMod.PROTECTED, model.VOID, "__unload")
+            unloadMeth.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
+        }
     }
 
 

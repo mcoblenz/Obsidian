@@ -25,28 +25,22 @@ import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
-    private SerializationState st;
-
     @Override
     public Response init(ChaincodeStub stub) {
         final String function = stub.getFunction();
         if (function.equals("init")) {
             try {
+                SerializationState st = new SerializationState();
                 st.setStub(stub);
 
                 final String args[] = stub.getParameters().stream().toArray(String[]::new);
-
-                System.out.println("Beginning init.");
 
                 byte byte_args[][] = new byte[args.length][];
                 for (int i = 0; i < args.length; i++) {
                     byte_args[i] = args[i].getBytes();
                 }
-                System.out.println("Calling init function.");
                 byte[] result = init(st, byte_args);
-                System.out.println("Saving data.");
                 __saveModifiedData(stub);
-                System.out.println("Done??");
                 return newSuccessResponse(result);
             } catch (Throwable e) {
                 return newErrorResponse(e);
@@ -67,6 +61,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
 
         try {
+            SerializationState st = new SerializationState();
             st.setStub(stub);
 
             /* Try to restore ourselves (the root object) from the blockchain
@@ -92,7 +87,6 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
 
     public void delegatedMain(String args[]) {
         /* spin up server */
-        st = new SerializationState();
         try {
             start(args);
         }
@@ -105,20 +99,15 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     /* Figure out what was modified and write it out to the blockchain.
      * Only called for main transactions. */
     public void __saveModifiedData(ChaincodeStub stub) {
-        System.out.println("Begin saving data.");
         Set<ObsidianSerialized> dirtyFields = __getModified(new HashSet<ObsidianSerialized>());
-        System.out.println("Got modified fields to write...");
         for (ObsidianSerialized field : dirtyFields) {
-            System.out.println("Writing field "+field);
             /* Find key and bytes to archive for each dirty field. */
             String archiveKey = field.__getGUID();
-            System.out.println("Got GUID: "+archiveKey);
             String archiveValue = new String(field.__archiveBytes());
-            System.out.println("Saving modified data: ("+archiveKey+" => "+archiveValue+")");
+            System.out.println("Saving modified data: ("+field+" @ <"+archiveKey+"> => "+archiveValue+")");
             stub.putStringState(archiveKey, archiveValue);
-            System.out.println("Put string state.");
         }
-        System.out.println("Finished?");
+        __unload();
     }
 
     // Must be overridden in generated class.
@@ -134,4 +123,5 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract byte[] __archiveBytes();
     public abstract void __restoreObject(SerializationState st)
         throws InvalidProtocolBufferException;
+    protected abstract void __unload();
 }
