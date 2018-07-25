@@ -573,6 +573,11 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         modBody.invoke(JExpr.ref("checked"), "add").arg(JExpr._this())
 
         val returnSet = modBody.decl(setType, "result", JExpr._new(hashSetType))
+
+        // If we're not loaded, we can't have been modified, and we definitely shouldn't look
+        // at our own fields, because that will break everything.
+        modBody._if(JExpr.ref(loadedFieldName).not())._then()._return(returnSet);
+
         for (decl <- aContract.declarations if decl.isInstanceOf[Field]) {
             val field: Field = decl.asInstanceOf[Field]
             if (field.typ.isInstanceOf[NonPrimitiveType]) {
