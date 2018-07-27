@@ -597,9 +597,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
             statement match {
-                case Return() | ReturnExpr(_) => hasRet = true
+                case Return() | ReturnExpr(_) | Throw() => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
+               // case Switch(_, switchCases) =>
+                 //   hasRet = switchCases.foldRight(true)((sc : SwitchCase, res : Boolean) => hasReturnStatement(tx, sc.body) && res)
                 case _ => ()
             }
         }
@@ -1138,9 +1140,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 var contextPrime = context
+                val newFieldsVars = newFields.map(_._1)
                 if (updates.isDefined) {
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
-                        if (newFields.contains(f)) {
+                        if (newFieldsVars.contains(f)) {
                             val fieldAST = newStateTable.lookupField(f).get
                             val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e, true)
                             contextPrime = contextPrime2
@@ -1251,7 +1254,37 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         return contextPrime
                 }
 
-                var mergedContext = contextPrime
+                var mergedContext = cases.headOption match {
+                    case None => contextPrime
+                    case Some(SwitchCase(sName, body)) =>
+                        val newType: ObsidianType =
+
+                        contractTable.state(sName) match {
+                            case Some(stTable) =>
+                                StateType(contractTable.name, stTable.name, false)
+                            case None =>
+                                logError(s, StateUndefinedError(contractTable.name, sName))
+                                ContractReferenceType(contractTable.contractType, Owned(), false)
+                        }
+
+                        /* special case to allow types to change in the context if we match on a variable */
+                        val startContext = e match {
+                            case This() =>
+                                /* reading "this" as an expression takes the residual of "this",
+                             * so we want "this" in the context to have the old permission of
+                             * "this" with the new state information in the unpermissioned type */
+                                val newContextThisType =
+                                    newType // is this right?
+                                contextPrime.updated("this", newContextThisType)
+                            case ReferenceIdentifier(x) => contextPrime.updated(x, newType)
+                            case _ => contextPrime
+                        }
+
+                        val endContext = pruneContext(s,
+                            checkStatementSequence(decl, startContext, body),
+                            startContext)
+                        endContext
+                }
                 for (SwitchCase(sName, body) <- cases) {
                     val newType: ObsidianType =
 
