@@ -1800,15 +1800,22 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             mainConstructor = Some(meth)
         }
 
+        if (lazySerialization && aContract.isMain) {
+            // If lazy serialization, we need to pass in a stub as well since we might need
+            // to deserialize some objects in here (for example, if we call a method on a parameter
+            // that returns a property of one of its child objects which isn't yet loaded)
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
+
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
             (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
 
-        if (lazySerialization) {
-            // If lazy serialization, we need to pass in a stub as well since we might need
-            // to deserialize some objects in here (for example, if we call a method on a parameter
-            // that returns a property of one of its child objects which isn't yet loaded)
+        if (lazySerialization && !aContract.isMain) {
+            // Non-lazy/mock mode expect the stub to be the first parameter of the main
+            // constructor. But everything else expects it to be the last parameter of
+            // non-main constructors.
             meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         }
 
@@ -1843,6 +1850,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val name = "new_" + newClass.name()
 
         val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
+
+        if (lazySerialization) {
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
 
         val body: JBlock = meth.body()
 
