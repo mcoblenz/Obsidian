@@ -1120,7 +1120,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         }
     }
 
-    // "set" followed by lowercasing the field name.
+    // "get" followed by lowercasing the field name.
     private def getterNameForField(fieldName: String) = {
         if (fieldName.length < 1) {
             assert(false, "Bug: field name is empty")
@@ -1131,6 +1131,20 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             val firstChar = fieldName.substring(0, 1).toUpperCase(java.util.Locale.US)
             val rest = fieldName.substring(1)
             "get" + firstChar + rest
+        }
+    }
+
+    // "has" followed by lowercasing the field name.
+    private def hasNameForField(fieldName: String) = {
+        if (fieldName.length < 1) {
+            assert(false, "Bug: field name is empty")
+            "has"
+        }
+        else {
+            // Always use US locale, regardless of the user's locale, so that all code is compatible.
+            val firstChar = fieldName.substring(0, 1).toUpperCase(java.util.Locale.US)
+            val rest = fieldName.substring(1)
+            "has" + firstChar + rest
         }
     }
 
@@ -1353,8 +1367,9 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                         .arg(JExpr.ref(javaFieldName + "ID"))
                         .arg(JExpr.ref(javaFieldName + "Val"))
                 } else {
-                    body.assign(fieldVar, JExpr._new(javaFieldType))
-                    val init = body.invoke(fieldVar, "initFromArchive")
+                    val ifHas = body._if(archive.invoke(hasNameForField(javaFieldName)))._then()
+                    ifHas.assign(fieldVar, JExpr._new(javaFieldType))
+                    val init = ifHas.invoke(fieldVar, "initFromArchive")
                     init.arg(archive.invoke(getterNameForField(javaFieldName)))
                 }
             }
