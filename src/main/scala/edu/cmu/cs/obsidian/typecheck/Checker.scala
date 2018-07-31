@@ -456,6 +456,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  assertOperationType(e1, e2, IntType())
              case Multiply(e1: Expression, e2: Expression) =>
                  assertOperationType(e1, e2, IntType())
+             case Negate(e: Expression) =>
+                 assertTypeEquality(e, IntType(), context)
              case Equals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = inferAndCheckExpr(decl, context, e1, false)
                  val (t2, c2) = inferAndCheckExpr(decl, c1, e2, false)
