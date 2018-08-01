@@ -256,3 +256,7 @@ case class InconsistentContractTypeError(declaredContractName: String, actualCon
 case class InconsistentTypeAssignmentError(declaredType: ObsidianType, actualType: ObsidianType) extends Error {
     val msg: String = s"Cannot assign a value of type $actualType to a variable of type $declaredType."
 }
+
+case class ArgumentSubtypingError(tName: String, t1: ObsidianType, t2: ObsidianType) extends Error {
+    val msg: String = s"Found type '$t1' as an argument to '$tName', but expected something of type '$t2'."
+}

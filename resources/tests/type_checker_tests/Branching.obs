@@ -47,4 +47,12 @@ main contract C {
         }
         x = 3;
     }
+
+    transaction t5() returns int {
+        if (true) {
+            return 5;
+        } else {
+            throw;
+        }
+    }
 }

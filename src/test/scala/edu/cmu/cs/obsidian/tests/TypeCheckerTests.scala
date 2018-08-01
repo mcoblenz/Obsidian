@@ -211,7 +211,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(1, 2, "a"), 19)
                 ::
-                (SubtypingError(
+                (ArgumentSubtypingError("a",
                     StringType(),
                     IntType()), 21)
                 ::
@@ -225,7 +225,7 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("OtherContract"), Shared(), false),
                     "anotherMethod"), 31)
                 ::
-                (SubtypingError(
+                (ArgumentSubtypingError("otherMethod",
                     StringType(),
                     IntType()), 33)
                 ::
@@ -256,11 +256,11 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(0, 1, "constructor of Thing"), 37)
                 ::
-                (SubtypingError(
+                (ArgumentSubtypingError("Thing",
                     StringType(),
                     IntType()), 37)
                 ::
-                (SubtypingError(
+                (ArgumentSubtypingError("OtherThing",
                     StringType(),
                     IntType()), 37)
                 ::
@@ -270,13 +270,13 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(1, 3, "constructor of Thing"), 39)
                 ::
-                (WrongArityError(1, 3, "constructor of Thing"), 39)
+                (WrongArityError(1, 3, "constructor of OtherThing"), 39)
                 ::
-                (SubtypingError(
+                (ArgumentSubtypingError("Thing",
                     IntType(),
                     BoolType()), 39)
                 ::
-                (SubtypingError(
+                (ArgumentSubtypingError("Thing",
                     IntType(),
                     StringType()), 39)
                 ::
@@ -460,7 +460,7 @@ class TypeCheckerTests extends JUnitSuite {
                         "money",
                         None)), 43)
                 ::
-                (SubtypingError(
+                (ArgumentSubtypingError("discardMoney",
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
                     ContractReferenceType(ContractType("Money"), Owned(), false)),
                     56)
@@ -619,5 +619,9 @@ class TypeCheckerTests extends JUnitSuite {
             (InvalidInconsistentFieldType("c", StateType("C", Set("S2"), false), StateType("C", Set("S1"), false)), 24) ::
             Nil
         )
+    }
+
+    @Test def unownedReferenceTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/UnownedReference.obs", Nil)
     }
 }
