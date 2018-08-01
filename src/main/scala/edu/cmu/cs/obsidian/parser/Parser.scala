@@ -310,7 +310,8 @@ object Parser extends Parsers {
     private def parseSubtraction = parseBinary(MinusT(), Subtract.apply, parseMultiplication)
     private def parseMultiplication = parseBinary(StarT(), Multiply.apply, parseDivision)
     private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseNot)
-    private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseExprBottom)
+    private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseUnaryMinus)
+    private def parseUnaryMinus = parseUnary(MinusT(), Negate.apply, parseExprBottom)
 
 
     private val parseStringLiteral: Parser[StringLiteral] = {

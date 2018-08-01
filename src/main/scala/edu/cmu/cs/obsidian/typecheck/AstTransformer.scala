@@ -138,6 +138,8 @@ object AstTransformer {
                 Divide(transformExpression(d.e1), transformExpression(d.e2)).setLoc(d)
             case m: Multiply =>
                 Multiply(transformExpression(m.e1), transformExpression(m.e2)).setLoc(m)
+            case n: Negate =>
+                Negate(transformExpression(n.e)).setLoc(n)
             case eq: Equals =>
                 Equals(transformExpression(eq.e1), transformExpression(eq.e2)).setLoc(eq)
             case g: GreaterThan =>
