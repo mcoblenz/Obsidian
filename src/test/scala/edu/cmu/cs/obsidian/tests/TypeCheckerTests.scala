@@ -211,7 +211,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(1, 2, "a"), 19)
                 ::
-                (ArgumentSubtypingError("a",
+                (ArgumentSubtypingError("a", "x",
                     StringType(),
                     IntType()), 21)
                 ::
@@ -225,7 +225,7 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("OtherContract"), Shared(), false),
                     "anotherMethod"), 31)
                 ::
-                (ArgumentSubtypingError("otherMethod",
+                (ArgumentSubtypingError("otherMethod", "x",
                     StringType(),
                     IntType()), 33)
                 ::
@@ -256,11 +256,11 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(0, 1, "constructor of Thing"), 37)
                 ::
-                (ArgumentSubtypingError("Thing",
+                (ArgumentSubtypingError("Thing", "x",
                     StringType(),
                     IntType()), 37)
                 ::
-                (ArgumentSubtypingError("OtherThing",
+                (ArgumentSubtypingError("OtherThing", "x",
                     StringType(),
                     IntType()), 37)
                 ::
@@ -272,11 +272,11 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (WrongArityError(1, 3, "constructor of OtherThing"), 39)
                 ::
-                (ArgumentSubtypingError("Thing",
+                (ArgumentSubtypingError("Thing", "z",
                     IntType(),
                     BoolType()), 39)
                 ::
-                (ArgumentSubtypingError("Thing",
+                (ArgumentSubtypingError("Thing", "y",
                     IntType(),
                     StringType()), 39)
                 ::
@@ -460,7 +460,7 @@ class TypeCheckerTests extends JUnitSuite {
                         "money",
                         None)), 43)
                 ::
-                (ArgumentSubtypingError("discardMoney",
+                (ArgumentSubtypingError("discardMoney", "m",
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
                     ContractReferenceType(ContractType("Money"), Owned(), false)),
                     56)

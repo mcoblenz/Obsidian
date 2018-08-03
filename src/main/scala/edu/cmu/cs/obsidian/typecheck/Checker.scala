@@ -774,7 +774,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
 
                 if (isSubtype(argType, specType).isDefined) {
-                    val err = ArgumentSubtypingError(decl.name, argType, specType)
+                    val err = ArgumentSubtypingError(decl.name, spec(i).varName, argType, specType)
                     errList = (ast, err)::errList
                 }
 

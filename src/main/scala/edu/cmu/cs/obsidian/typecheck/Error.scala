@@ -257,6 +257,6 @@ case class InconsistentTypeAssignmentError(declaredType: ObsidianType, actualTyp
     val msg: String = s"Cannot assign a value of type $actualType to a variable of type $declaredType."
 }
 
-case class ArgumentSubtypingError(tName: String, t1: ObsidianType, t2: ObsidianType) extends Error {
-    val msg: String = s"Found type '$t1' as an argument to '$tName', but expected something of type '$t2'."
+case class ArgumentSubtypingError(tName: String, arg: String, t1: ObsidianType, t2: ObsidianType) extends Error {
+    val msg: String = s"Found type '$t1' as an argument to '$tName', but the argument '$arg' is expected something of type '$t2'."
 }
