@@ -1542,6 +1542,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             case Subtract(e1, e2) => recurse(e1).invoke("subtract").arg(recurse(e2))
             case Multiply(e1, e2) => recurse(e1).invoke("multiply").arg(recurse(e2))
             case Divide(e1, e2) => recurse(e1).invoke("divide").arg(recurse(e2))
+            case Negate(e) => recurse(e).invoke("negate")
             case Equals(e1, e2) => recurse(e1).invoke("equals").arg(recurse(e2))
             case GreaterThan(e1, e2) =>
                 recurse(e1).invoke("compareTo").arg(recurse(e2)).eq(JExpr.lit(1))
