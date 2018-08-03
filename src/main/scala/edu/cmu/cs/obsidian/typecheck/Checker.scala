@@ -1088,11 +1088,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 var contextPrime = context
                 if (updates.isDefined) {
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
-                        if (newFields.contains(f)) {
-                            val fieldAST = newStateTable.lookupField(f).get
+                        val fieldAST = newStateTable.lookupField(f)
+                        if (fieldAST.isDefined) {
                             val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e, true)
                             contextPrime = contextPrime2
-                            checkIsSubtype(s, t, fieldAST.typ)
+                            checkIsSubtype(s, t, fieldAST.get.typ)
                         }
                     }
                 }
