@@ -1,0 +1,57 @@
+main contract Stack {
+    state S1;
+
+    Stack@S1() {
+        ->S1;
+        head = new Node(0);
+    }
+
+    Node@Unowned head;
+
+    transaction push(Stack@Unowned this, int i) {
+        Node@Unowned front = new Node(i, head);
+        this.head = front;
+    }
+
+    transaction pop(Stack@Unowned this) returns int {
+        if (this.head.isEmpty()) {
+            throw;
+            return -1;
+        } else {
+            Node@Unowned old = head;
+            head = head.getNext();
+            return old.getValue();
+        }
+    }
+}
+
+contract Node {
+    state S1 {
+        int value;
+        Node@Unowned next;
+    }
+
+    bool empty;
+
+    Node@Unowned(int i) {
+        ->S1(value = i, next = this);
+        empty = true;
+    }
+
+    Node@Unowned(int i, Node@Unowned nextone) {
+        ->S1(value = i, next = nextone);
+        empty = false;
+    }
+
+    transaction getNext(Node@Unowned this) returns Node@Unowned {
+        return next;
+    }
+
+    transaction getValue(Node@Unowned this) returns int {
+        return value;
+    }
+
+    transaction isEmpty(Node@Unowned this) returns bool {
+        return this.empty;
+    }
+}
