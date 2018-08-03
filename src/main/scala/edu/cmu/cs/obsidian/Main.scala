@@ -177,7 +177,6 @@ object Main {
     def makeJar(
             printJavacOutput: Boolean,
             mainName: String,
-            outputJar: Path,
             bytecode: Path): Int  = {
 
         val manifest = s"Obsidian Runtime/manifest.mf"
@@ -352,8 +351,7 @@ object Main {
                     println("javac exited with value " + javacExit)
                 }
                 if (javacExit == 0) {
-                    val jarPath = outputPath.resolve(s"$mainName.jar")
-                    val jarExit = makeJar(options.verbose, mainName, jarPath, bytecodeDir)
+                    val jarExit = makeJar(options.verbose, mainName, bytecodeDir)
                     if (options.verbose) {
                         println("jar exited with value " + jarExit)
                     }
