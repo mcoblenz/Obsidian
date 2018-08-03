@@ -1,43 +1,43 @@
 resource contract NodeMaybe {
-    NodeMaybe(IntNode node) {
-        ->NodeSome({ node = node });
+    state NodeNone {}
+    state NodeSome {
+        IntNode@Shared node;
     }
 
-    NodeMaybe() {
+    NodeMaybe@NodeSome(IntNode@Shared node) {
+        ->NodeSome(node = node);
+    }
+
+    NodeMaybe@NodeNone() {
         ->NodeNone;
     }
 
-    state NodeSome {
-        IntNode node;
-    }
-    transaction getNode()
-        returns IntNode
-        available in NodeSome
-        {
-            return node;
-        }
 
-    transaction getValue() returns int {
+    transaction getNode(NodeMaybe@NodeSome this) returns IntNode@Unowned
+    {
+        return node;
+    }
+
+    transaction getValue(NodeMaybe@NodeSome this) returns int {
         return node.getValue();
     }
-
-    state NodeNone {}
 }
 
+
 resource contract IntNode {
-    IntNode(int elem, NodeMaybe next) {
+    int elem;
+    NodeMaybe@Owned next;
+
+    IntNode@Owned(int elem, NodeMaybe@Owned next) {
         this.elem = elem;
         this.next = next;
     }
 
-    int elem;
-    NodeMaybe next;
-
-    transaction getValue() returns int {
+    transaction getValue(IntNode this) returns int {
         return elem;
     }
 
-    transaction length() returns int {
+    transaction length(IntNode@Unowned this) returns int {
         int i = 1;
         switch next {
             case NodeSome {
@@ -47,12 +47,12 @@ resource contract IntNode {
         return i;
     }
 
-    transaction nth(int n) returns NodeMaybe {
+    transaction nth(int n) returns NodeMaybe@Unowned {
         if (n == 0) {
             return new NodeMaybe(this);
         }
 
-        NodeMaybe ret;
+        NodeMaybe@Unowned ret;
         switch next {
             case NodeSome {
                 ret = next.getNode().nth(n - 1);
@@ -78,6 +78,7 @@ resource contract IntNode {
     }
 }
 
+/*
 resource contract IntList {
 
     NodeMaybe first;
@@ -155,3 +156,4 @@ main contract UsesLinkedList {
         return i;
     }
 }
+*/
