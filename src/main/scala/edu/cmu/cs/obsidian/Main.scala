@@ -231,6 +231,12 @@ object Main {
     def compileProgram(args: Array[String]): Boolean = {
         val options = parseOptions(args.toList)
 
+        if (options.lazySerialization && options.mockChaincode) {
+            println("Lazy serialization is currently not supported for mock chaincode.")
+            println("Please re-run with the --hyperledger flag to generate lazy Hyperledger code.")
+            sys.exit(1)
+        }
+
         val tmpPath: Path = options.debugPath match {
             case Some(p) =>
                 val path = Paths.get(p)
