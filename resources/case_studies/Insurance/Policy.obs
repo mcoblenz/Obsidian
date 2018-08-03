@@ -29,4 +29,9 @@ main contract Policy {
         return cost;
     }
 
+    // TODO: Equality on Policies
+    transaction equals(Policy@Unowned this, Policy@Unowned p) returns bool {
+        return true;
+    }
+
 }

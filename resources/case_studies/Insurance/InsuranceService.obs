@@ -1,7 +1,7 @@
 import "resources/case_studies/Insurance/Insurer.obs"
 import "resources/case_studies/Insurance/PolicyRecord.obs"
-import "resources/case_studies/Insurance/PendingPolicyList.obs"
-import "resources/case_studies/Insurance/ActivePolicyList.obs"
+import "resources/case_studies/Insurance/PendingPolicyMap.obs"
+import "resources/case_studies/Insurance/ActivePolicyMap.obs"
 
 
 main resource contract InsuranceService {
@@ -11,15 +11,15 @@ main resource contract InsuranceService {
     TimeService@Shared timeService;
 
     // pending and active policies
-    PendingPolicyList@Shared pendingPolicies;
-    ActivePolicyList@Shared activePolicies;
+    PendingPolicyMap@Owned pendingPolicies;
+    ActivePolicyMap@Owned activePolicies;
 
     // for now have to have a reference to bank
     Bank@Shared bank;
 
     InsuranceService@Owned() {
-        pendingPolicies = new PendingPolicyList();
-        activePolicies = new ActivePolicyList();
+        pendingPolicies = new PendingPolicyMap();
+        activePolicies = new ActivePolicyMap();
     }
 
     transaction addInsurer(Insurer@Shared insurer) {
@@ -35,21 +35,18 @@ main resource contract InsuranceService {
         Money@Owned payout = insBid.getPayout();
 
         Policy@Offered policy = new Policy(cost, expiration);
-        Policy@Offered policyCopy = policy;
         PolicyRecord@Pending pendingPolicy = new PolicyRecord(policy, payout);
 
-        pendingPolicies.append(pendingPolicy);
+        pendingPolicies.set(policy, pendingPolicy);
 
-        return policyCopy;
+        return policy;
     }
 
     transaction buyPolicy(Policy@Offered >> (Active | Expired) policy, Money@Owned >> Unowned money) returns Money@Owned {
-        // make an unowned copy
-        Policy@Offered policyCopy = policy;
-        policy = policyCopy;
 
         if (timeService.getTime() > policy.getExpirationTime()) {
-            PolicyRecord@Pending pendingPolicy = pendingPolicies.remove(policyCopy);
+            PolicyRecord@Pending pendingPolicy = pendingPolicies.extract(policy);
+
             // refund insurer's payout
             Money@Owned insurerRefund = pendingPolicy.refund();
             insurers.receiveRefund(insurerRefund);
@@ -59,14 +56,14 @@ main resource contract InsuranceService {
             policy.expire();
             return money;
         } else {
-            PolicyRecord@Pending pendingPolicy = pendingPolicies.remove(policyCopy);
+            PolicyRecord@Pending pendingPolicy = pendingPolicies.extract(policy);
             // get payment
             int cost = policy.getCost();
             Money@Owned payment = money.getAmountOfMoney(cost);
 
             // activate policy record with payment
             pendingPolicy.activate(payment);
-            activePolicies.append(pendingPolicy);
+            activePolicies.set(policy, pendingPolicy);
 
             // activate policy and return any change
             policy.activate();

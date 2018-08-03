@@ -17,7 +17,8 @@ main resource contract PolicyRecord {
 
     PolicyRecord@Pending(Policy@Unowned p, Money@Owned m) {
         policy = p;
-        ->Pending(payout = m);
+        Pending::payout = m;
+        ->Pending;
     }
 
     transaction getPolicy(PolicyRecord this) returns Policy@Unowned {
@@ -32,7 +33,8 @@ main resource contract PolicyRecord {
 
     transaction activate(PolicyRecord@Pending >> Active this, Money@Owned >> Unowned policyCost) {
          payout.addMoney(policyCost);
-         ->Active(claim = payout);
+         Active::claim = payout;
+         ->Active;
     }
 
 }

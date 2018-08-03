@@ -580,8 +580,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case Return() | ReturnExpr(_) | Throw() => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
-               // case Switch(_, switchCases) =>
-                 //   hasRet = switchCases.foldRight(true)((sc : SwitchCase, res : Boolean) => hasReturnStatement(tx, sc.body) && res)
                 case _ => ()
             }
         }
@@ -1088,10 +1086,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 var contextPrime = context
-                val newFieldsVars = newFields.map(_._1)
                 if (updates.isDefined) {
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
-                        if (newFieldsVars.contains(f)) {
+                        if (newFields.contains(f)) {
                             val fieldAST = newStateTable.lookupField(f).get
                             val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e, true)
                             contextPrime = contextPrime2
@@ -1219,8 +1216,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val startContext = e match {
                             case This() =>
                                 /* reading "this" as an expression takes the residual of "this",
-                             * so we want "this" in the context to have the old permission of
-                             * "this" with the new state information in the unpermissioned type */
+                                * so we want "this" in the context to have the old permission of
+                                * "this" with the new state information in the unpermissioned type */
                                 val newContextThisType =
                                     newType // is this right?
                                 contextPrime.updated("this", newContextThisType)
@@ -1228,11 +1225,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case _ => contextPrime
                         }
 
-                        val endContext = pruneContext(s,
-                            checkStatementSequence(decl, startContext, body),
-                            startContext)
-                        endContext
+                        pruneContext(s, checkStatementSequence(decl, startContext, body), startContext)
                 }
+
                 for (SwitchCase(sName, body) <- cases) {
                     val newType: ObsidianType =
 
