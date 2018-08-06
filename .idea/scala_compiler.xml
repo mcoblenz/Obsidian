@@ -7,6 +7,9 @@
       <option name="deprecationWarnings" value="true" />
       <option name="explainTypeErrors" value="true" />
     </profile>
-    <profile name="sbt 1" modules="obsidian" />
+    <profile name="sbt 1" modules="obsidian">
+      <option name="deprecationWarnings" value="true" />
+      <option name="uncheckedWarnings" value="true" />
+    </profile>
   </component>
 </project>
