@@ -1,0 +1,45 @@
+main contract Stack {
+    Stack@Owned() {
+        head = new Node();
+    }
+
+    Node@Unowned head;
+
+    transaction push(Stack@Owned this, int i) {
+        Node@Unowned front = new Node(i, head);
+        this.head = front;
+    }
+
+    transaction pop(Stack@Unowned this) returns int {
+        int val = head.getValue();
+        head = head.getNext();
+        return val;
+    }
+}
+
+contract Node {
+    Node@Unowned next;
+
+    int value;
+
+    Node@Unowned() {
+        value = 0;
+    }
+
+    Node@Unowned(int i) {
+        value = i;
+    }
+
+    Node@Unowned(int i, Node@Unowned nextone) {
+        value = i;
+        next = nextone;
+    }
+
+    transaction getNext(Node@Unowned this) returns Node@Unowned {
+        return next;
+    }
+
+    transaction getValue(Node@Unowned this) returns int {
+        return value;
+    }
+}

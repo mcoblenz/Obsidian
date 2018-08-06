@@ -1,0 +1,13 @@
+main contract NegativeNumber {
+    int x;
+
+    NegativeNumber() {
+        x = -5;
+    }
+
+    transaction decrement() returns int {
+        int oldX = x;
+        x = x - 1;
+        return oldX;
+    }
+}
