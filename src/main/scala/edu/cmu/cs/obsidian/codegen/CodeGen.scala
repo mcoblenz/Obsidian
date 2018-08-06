@@ -12,10 +12,13 @@ import scala.collection.{mutable, _}
 import collection.JavaConverters._
 
 
-trait Target
+trait Target {
+    val generateDebugOutput: Boolean
+}
+
 // We have to keep track of which contract is the main client contract because some of the imported contracts may be main contracts for server processes.
-case class Client(mainContract: Contract) extends Target
-case class Server() extends Target
+case class Client(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
+case class Server(generateDebugOutput: Boolean = false) extends Target
 
 class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerialization: Boolean) {
 
@@ -540,6 +543,9 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     private def generateLazySerializationCode(aContract: Contract,
                                               newClass: JDefinedClass,
                                               translationContext: TranslationContext): Unit = {
+        // Generate fields.
+
+        // GUID field for this class.
         newClass.field(JMod.PRIVATE, model.ref("String"), guidFieldName)
         // has it been modified/do we need to write it out at the end?
         newClass.field(JMod.PRIVATE, model.ref("boolean"), modifiedFieldName)
@@ -563,7 +569,9 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val hashSetType = model.directClass("java.util.HashSet")
                 .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
 
-        val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__getModified")
+
+        // __resetModified collects the set of modified fields and resets the set of modified fields.
+        val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__resetModified")
         // add a list of things we've already checked so we don't get stuck in loops
         getModifiedMeth.param(setType, "checked");
         val modBody = getModifiedMeth.body()
@@ -587,7 +595,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 modBody._if(JExpr.ref("checked").invoke("contains").arg(JExpr.ref(field.name)).not())
                     ._then()
                         .invoke(returnSet, "addAll").arg(
-                            JExpr.ref(field.name).invoke("__getModified").arg(JExpr.ref("checked")))
+                            JExpr.ref(field.name).invoke("__resetModified").arg(JExpr.ref("checked")))
             }
         }
 
@@ -613,11 +621,15 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         }
 
         val ifNotLoaded = restoreMeth.body()._if(JExpr.ref(loadedFieldName).not())._then()
-        ifNotLoaded.directStatement("System.out.println(\"Loading "+aContract.name+" @ <\"+__guid+\"> from blockchain...\");")
+        if (target.generateDebugOutput) {
+            ifNotLoaded.directStatement("System.out.println(\"Loading " + aContract.name + " @ <\"+__guid+\"> from blockchain...\");")
+        }
         ifNotLoaded.decl(model.ref("String"), "__archive_string",
             JExpr.ref(serializationParamName).invoke("getStub").invoke("getStringState").arg(JExpr.ref(guidFieldName)))
         ifNotLoaded.decl(model.BYTE.array(), "__archive_bytes", JExpr.ref("__archive_string").invoke("getBytes"))
-        ifNotLoaded.directStatement("System.out.println(\"Loading data: \"+__archive_string);")
+        if (target.generateDebugOutput) {
+            ifNotLoaded.directStatement("System.out.println(\"Loading data: \"+__archive_string);")
+        }
         ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes")).arg(JExpr.ref(serializationParamName))
         ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
 
@@ -713,7 +725,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         generateReentrantFlag(newClass, translationContext)
 
         target match {
-            case Client(mainContract) =>
+            case Client(mainContract, _) =>
                 if (aContract == mainContract) {
                     newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
                     generateClientMainMethod(newClass)
@@ -722,7 +734,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 else {
                     generateSerialization(aContract, newClass, translationContext)
                 }
-            case Server() =>
+            case Server(_) =>
                 if (aContract.isMain) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
@@ -1940,11 +1952,11 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         jIf._else().assign(isInsideInvocationFlag(), JExpr.lit(true))
 
         target match {
-            case Client(mainContract) =>
+            case Client(mainContract, _) =>
                 if ((translationContext.contract == mainContract) && tx.name.equals("main")) {
                     meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
                 }
-            case Server() =>
+            case Server(_) =>
         }
 
         /* add args to method and collect them in a list */
