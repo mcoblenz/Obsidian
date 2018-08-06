@@ -1788,10 +1788,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val name : String = "new_" + newClass.name()
         val body = meth.body()
         meth.annotate(model.directClass("java.lang.Override"))
+        val invocation = body.invokeThis(name)
         if (lazySerialization) {
-            body.invokeThis(name).arg(JExpr.ref(serializationParamName))
+            invocation.arg(JExpr.ref(serializationParamName))
         }
-
     }
 
     /* the local context at the beginning of the method */
