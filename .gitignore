@@ -40,7 +40,6 @@ project/plugins/project/
 # IntelliJ
 /out/
 *.jar
-*.java
 *.proto
 .idea/libraries/
 
