@@ -12,12 +12,15 @@ import scala.collection.{mutable, _}
 import collection.JavaConverters._
 
 
-trait Target
-// We have to keep track of which contract is the main client contract because some of the imported contracts may be main contracts for server processes.
-case class Client(mainContract: Contract) extends Target
-case class Server() extends Target
+trait Target {
+    val generateDebugOutput: Boolean
+}
 
-class CodeGen (val target: Target, val mockChaincode: Boolean) {
+// We have to keep track of which contract is the main client contract because some of the imported contracts may be main contracts for server processes.
+case class Client(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
+case class Server(generateDebugOutput: Boolean = false) extends Target
+
+class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerialization: Boolean) {
 
     private val model: JCodeModel = new JCodeModel()
 
@@ -32,6 +35,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
     /* naming conventions for various generated Java constructs */
     private final val stateField: String = "__state"
     private final val getStateMeth: String = "getState"
+    private final val guidFieldName: String = "__guid"
+    private final val modifiedFieldName: String = "__modified"
+    private final val loadedFieldName: String = "__loaded"
+    private final val serializationParamName: String = "__st"
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
     }
@@ -535,6 +542,107 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         translationContext
     }
 
+    private def generateLazySerializationCode(aContract: Contract,
+                                              newClass: JDefinedClass,
+                                              translationContext: TranslationContext): Unit = {
+        // Generate fields.
+
+        // GUID field for this class.
+        newClass.field(JMod.PRIVATE, model.ref("String"), guidFieldName)
+        // has it been modified/do we need to write it out at the end?
+        newClass.field(JMod.PRIVATE, model.ref("boolean"), modifiedFieldName)
+        // is it loaded, or should it load itself lazily when we need it?
+        newClass.field(JMod.PRIVATE, model.ref("boolean"), loadedFieldName)
+
+        val guidConstructor = newClass.constructor(JMod.PUBLIC)
+        guidConstructor.param(model.ref("String"), "__guid_")
+        guidConstructor.body().assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
+        guidConstructor.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
+        guidConstructor.body().assign(JExpr.ref(guidFieldName), JExpr.ref("__guid_"))
+
+        val getGUIDMeth = newClass.method(JMod.PUBLIC, model.ref("String"), "__getGUID")
+        getGUIDMeth.body()._return(newClass.fields get guidFieldName)
+
+        val setType = model.directClass("java.util.Set")
+                .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
+
+        /* set is abstract, so we need to use a specific *kind* of set
+         * in order to actually instantiate it */
+        val hashSetType = model.directClass("java.util.HashSet")
+                .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
+
+
+        // __resetModified collects the set of modified fields and resets the set of modified fields.
+        val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__resetModified")
+        // add a list of things we've already checked so we don't get stuck in loops
+        getModifiedMeth.param(setType, "checked");
+        val modBody = getModifiedMeth.body()
+
+        modBody.invoke(JExpr.ref("checked"), "add").arg(JExpr._this())
+
+        val returnSet = modBody.decl(setType, "result", JExpr._new(hashSetType))
+
+        // If we're not loaded, we can't have been modified, and we definitely shouldn't look
+        // at our own fields, because that will break everything.
+        modBody._if(JExpr.ref(loadedFieldName).not())._then()._return(returnSet);
+
+        for (decl <- aContract.declarations if decl.isInstanceOf[Field]) {
+            val field: Field = decl.asInstanceOf[Field]
+            if (field.typ.isInstanceOf[NonPrimitiveType]) {
+                /* it's a non-primitive type, so it won't be saved directly --
+                 * we also have to query it to see if it was modified.
+                 * (and which of its sub-objects were modified if any) */
+                /* But we have to make sure it wasn't already checked!
+                 * Otherwise we'll be foiled by circular data structures. */
+                modBody._if(JExpr.ref("checked").invoke("contains").arg(JExpr.ref(field.name)).not())
+                    ._then()
+                        .invoke(returnSet, "addAll").arg(
+                            JExpr.ref(field.name).invoke("__resetModified").arg(JExpr.ref("checked")))
+            }
+        }
+
+        /* return ourselves if we were modified */
+        modBody._if(JExpr._this().ref(modifiedFieldName))._then()
+                    .invoke(returnSet, "add").arg(JExpr._this())
+
+        /* once we call this (at the end of a transaction), we can assume
+         * this thing is going to be written out, so mark it as no longer
+         * modified. */
+        modBody.assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
+
+        modBody._return(returnSet)
+
+        val restoreMeth = newClass.method(JMod.PUBLIC, model.VOID, "__restoreObject")
+        restoreMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        restoreMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+                                    .asInstanceOf[AbstractJClass])
+
+        if (aContract.isMain) {
+            // If it's the main contract, we know its GUID already.
+            restoreMeth.body().assign(JExpr.ref(guidFieldName), JExpr.lit(aContract.name))
+        }
+
+        val ifNotLoaded = restoreMeth.body()._if(JExpr.ref(loadedFieldName).not())._then()
+        if (target.generateDebugOutput) {
+            ifNotLoaded.directStatement("System.out.println(\"Loading " + aContract.name + " @ <\"+__guid+\"> from blockchain...\");")
+        }
+        ifNotLoaded.decl(model.ref("String"), "__archive_string",
+            JExpr.ref(serializationParamName).invoke("getStub").invoke("getStringState").arg(JExpr.ref(guidFieldName)))
+        ifNotLoaded.decl(model.BYTE.array(), "__archive_bytes", JExpr.ref("__archive_string").invoke("getBytes"))
+        if (target.generateDebugOutput) {
+            ifNotLoaded.directStatement("System.out.println(\"Loading data: \"+__archive_string);")
+        }
+        ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes")).arg(JExpr.ref(serializationParamName))
+        ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
+
+        if (aContract.isMain) {
+            /* We want to set the main contract to 'not loaded' after each
+             * transaction, so it reloads data from the blockchain each time. */
+            val unloadMeth = newClass.method(JMod.PROTECTED, model.VOID, "__unload")
+            unloadMeth.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
+        }
+    }
+
 
     private def generateStateHelpers(newClass: JDefinedClass,
                                      translationContext: TranslationContext): Unit = {
@@ -580,6 +688,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                     newClass: JDefinedClass,
                     translationContext: TranslationContext) = {
 
+        /* If we're generating lazy serialization code, generate it here. */
+        if (lazySerialization) {
+            newClass._implements(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
+            generateLazySerializationCode(aContract, newClass, translationContext)
+        }
+
         var generated: Boolean = false
 
         for (decl <- aContract.declarations) {
@@ -613,7 +727,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         generateReentrantFlag(newClass, translationContext)
 
         target match {
-            case Client(mainContract) =>
+            case Client(mainContract, _) =>
                 if (aContract == mainContract) {
                     val superclassName =
                         if (mockChaincode) {
@@ -630,7 +744,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 else {
                     generateSerialization(aContract, newClass, translationContext)
                 }
-            case Server() =>
+            case Server(_) =>
                 if (aContract.isMain) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
@@ -669,12 +783,17 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
         if (mockChaincode) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
-        } else {
+        } else if (lazySerialization) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.HyperledgerChaincodeBase"))
+        } else {
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.HyperledgerStrictChaincodeBase"))
         }
 
         val stubType = if (mockChaincode) {
             model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
+        } else if (lazySerialization) {
+            model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState")
+            /* (also contains a ChaincodeStub) */
         } else {
             model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
         }
@@ -731,7 +850,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
 
         mainConstructor.foreach(c =>  {
             val errorBlock: JBlock = new JBlock()
-            val invocation: JInvocation = initMeth.body().invoke(c)
+            val invocation: JInvocation =
+                if (lazySerialization) {
+                    // if lazy serialization, need to pass serialization state as arg to constructor
+                    initMeth.body().invoke(c).arg(JExpr.ref("stub"))
+                } else {
+                    initMeth.body().invoke(c)
+                }
 
             var runArgsIndex = 0
 
@@ -881,6 +1006,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                     txInvoke.arg(txArg)
                 }
 
+                if (lazySerialization) {
+                    // Pass serialization state to transactions in lazy mode
+                    // for deserialization of child objects.
+                    txInvoke.arg(JExpr.ref("stub"))
+                }
+
             }
             /* If we aren't in any of the states were we can use this transaction, we throw an exception */
             if (transactionIsConditional) {
@@ -1012,7 +1143,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         }
     }
 
-    // "set" followed by lowercasing the field name.
+    // "get" followed by lowercasing the field name.
     private def getterNameForField(fieldName: String) = {
         if (fieldName.length < 1) {
             assert(false, "Bug: field name is empty")
@@ -1023,6 +1154,20 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             val firstChar = fieldName.substring(0, 1).toUpperCase(java.util.Locale.US)
             val rest = fieldName.substring(1)
             "get" + firstChar + rest
+        }
+    }
+
+    // "has" followed by lowercasing the field name.
+    private def hasNameForField(fieldName: String) = {
+        if (fieldName.length < 1) {
+            assert(false, "Bug: field name is empty")
+            "has"
+        }
+        else {
+            // Always use US locale, regardless of the user's locale, so that all code is compatible.
+            val firstChar = fieldName.substring(0, 1).toUpperCase(java.util.Locale.US)
+            val rest = fieldName.substring(1)
+            "has" + firstChar + rest
         }
     }
 
@@ -1044,13 +1189,20 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 println("Compilation error: unable to resolve type " + name)
             }
             else {
-                val archiveVariableTypeName = translationContext.getProtobufClassName(contract.get)
-                val archiveVariableType: AbstractJType = model.parseType(archiveVariableTypeName)
+                val archiveVariable = if (lazySerialization) {
+                    val archiveGUID = JExpr.invoke(fieldVar, "__getGUID");
+                    nonNullBody.decl(model.ref("String"),
+                        field.name + "ArchiveID",
+                        archiveGUID)
+                } else {
+                    val archiveVariableTypeName = translationContext.getProtobufClassName(contract.get)
+                    val archiveVariableType: AbstractJType = model.parseType(archiveVariableTypeName)
 
-                val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
-                val archiveVariable = nonNullBody.decl(archiveVariableType,
-                    field.name + "Archive",
-                    archiveVariableInvocation)
+                    val archiveVariableInvocation = JExpr.invoke(fieldVar, "archive")
+                    nonNullBody.decl(archiveVariableType,
+                        field.name + "Archive",
+                        archiveVariableInvocation)
+                }
 
                 // generate: builder.setField(field);
                 val setterName: String = setterNameForField(field.name)
@@ -1213,9 +1365,36 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 // TODO
                 /* generate another method that takes the actual archive type
                  * so we don't have to uselessly convert to bytes here */
-                body.assign(fieldVar, JExpr._new(javaFieldType))
-                val init = body.invoke(fieldVar, "initFromArchive")
-                init.arg(archive.invoke(getterNameForField(javaFieldName)))
+                if (lazySerialization) {
+                    body.decl(model.ref("String"), javaFieldName + "ID",
+                        archive.invoke(getterNameForField(javaFieldName)))
+                    body.decl(javaFieldType, javaFieldName + "Val",
+                        JExpr.cast(javaFieldType,
+                            JExpr.ref(serializationParamName).invoke("getEntry").arg(JExpr.ref(javaFieldName+"ID"))))
+
+                    val checkForObj = body._if(JExpr.ref(javaFieldName + "Val").ne(JExpr._null()))
+
+                    // If we found the object in the map of loaded objects, assign it to the field.
+                    // We're good.
+                    checkForObj._then().assign(fieldVar, JExpr.ref(javaFieldName+"Val"))
+
+                    // if we didn't find the object in the map of already-loaded objects,
+                    // just initialize it with the GUID.
+                    // If it turns out we actually need it, we'll reconstitute it later
+                    // using said GUID.
+                    checkForObj._else().assign(fieldVar,
+                        JExpr._new(javaFieldType).arg(JExpr.ref(javaFieldName + "ID")))
+                    // We also need to put this thing in the map of loaded objects,
+                    // so if someone else references it later, we get the same reference.
+                    checkForObj._else().invoke(JExpr.ref(serializationParamName), "putEntry")
+                        .arg(JExpr.ref(javaFieldName + "ID"))
+                        .arg(JExpr.ref(javaFieldName + "Val"))
+                } else {
+                    val ifHas = body._if(archive.invoke(hasNameForField(javaFieldName)))._then()
+                    ifHas.assign(fieldVar, JExpr._new(javaFieldType))
+                    val init = ifHas.invoke(fieldVar, "initFromArchive")
+                    init.arg(archive.invoke(getterNameForField(javaFieldName)))
+                }
             }
         }
 
@@ -1309,7 +1488,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
 
-
         fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
         fromBytesBody._return(JExpr._this())
     }
@@ -1328,6 +1506,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         /* [initFromArchive] setup */
         val fromArchiveMeth = newClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
         val archive = fromArchiveMeth.param(archiveType, "archive")
+        if (lazySerialization) {
+            // If lazy serialization, also need the serialization-state b/c the object might
+            // already be loaded.
+            fromArchiveMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"),
+                serializationParamName)
+        }
         val fromArchiveBody = fromArchiveMeth.body()
 
         /* [__initFromArchiveBytes] declaration: this just parses the archive and
@@ -1337,12 +1521,23 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         fromBytesMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         val archiveBytes = fromBytesMeth.param(model.parseType("byte[]"), "archiveBytes")
+        if (lazySerialization) {
+            // Need serialization state in case we already loaded the object.
+            fromBytesMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
 
         val fromBytesBody = fromBytesMeth.body()
         val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
-        fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
+        val archiveInv = fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
+
+        if (lazySerialization) {
+            archiveInv.arg(JExpr.ref(serializationParamName))
+            // If lazy loading, note that we loaded this object.
+            fromBytesBody.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
+        }
+
         fromBytesBody._return(JExpr._this())
 
         /* [initFromArchive] does most of the grunt work of mapping the protobuf message to
@@ -1530,6 +1725,14 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         val foldF = (inv: JInvocation, arg: Expression) =>
             inv.arg(translateExpr(arg, translationContext, localContext))
         args.foldLeft(inv)(foldF)
+
+        if (lazySerialization) {
+            // Pass chaincode stub to other invoked methods as well, in case
+            // an object needs to be restored from the blockchain.
+            inv.arg(JExpr.ref(serializationParamName))
+        }
+
+        inv
     }
 
     /* returns an expr because exprs are built bottom-up (unlike everything else) */
@@ -1553,6 +1756,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             case Subtract(e1, e2) => recurse(e1).invoke("subtract").arg(recurse(e2))
             case Multiply(e1, e2) => recurse(e1).invoke("multiply").arg(recurse(e2))
             case Divide(e1, e2) => recurse(e1).invoke("divide").arg(recurse(e2))
+            case Negate(e) => recurse(e).invoke("negate")
             case Equals(e1, e2) => recurse(e1).invoke("equals").arg(recurse(e2))
             case GreaterThan(e1, e2) =>
                 recurse(e1).invoke("compareTo").arg(recurse(e2)).eq(JExpr.lit(1))
@@ -1599,11 +1803,18 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
     private def generateInvokeConstructor(newClass: JDefinedClass) = {
 
         val meth: JMethod = newClass.method(JMod.PROTECTED, model.VOID, "invokeConstructor")
+        if (lazySerialization) {
+            // Not sure this is actually required (if we're invoking the constructor we can't
+            // have any objects serialized yet), but needed for consistency with other constructors.
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
         val name : String = "new_" + newClass.name()
         val body = meth.body()
         meth.annotate(model.directClass("java.lang.Override"))
-        body.invokeThis(name)
-
+        val invocation = body.invokeThis(name)
+        if (lazySerialization) {
+            invocation.arg(JExpr.ref(serializationParamName))
+        }
     }
 
     /* the local context at the beginning of the method */
@@ -1628,16 +1839,45 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
             mainConstructor = Some(meth)
         }
 
+        if (lazySerialization && aContract.isMain) {
+            // If lazy serialization, we need to pass in a stub as well since we might need
+            // to deserialize some objects in here (for example, if we call a method on a parameter
+            // that returns a property of one of its child objects which isn't yet loaded)
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
+
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
             (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
+
+        if (lazySerialization && !aContract.isMain) {
+            // Non-lazy/mock mode expect the stub to be the first parameter of the main
+            // constructor. But everything else expects it to be the last parameter of
+            // non-main constructors.
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
 
         /* add body */
         translateBody(meth.body(), c.body, translationContext, localContext)
+
+        if (lazySerialization) {
+            /* Generate a GUID for the object when it's created. */
+            /* If it's a main contract, we use the contract name as an ID so we know
+             * how to find the root of the object graph. */
+            if (aContract.isMain) {
+                meth.body().assign(newClass.fields get guidFieldName, JExpr.lit(aContract.name))
+            } else {
+                val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
+                meth.body().assign(newClass.fields get guidFieldName, generateUUID)
+            }
+            /* When an object is newly created, we always mark it as modified (and loaded). */
+            meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
+            meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
+        }
 
         meth
     }
@@ -1649,6 +1889,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         val name = "new_" + newClass.name()
 
         val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
+
+        if (lazySerialization) {
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
 
         val body: JBlock = meth.body()
 
@@ -1682,6 +1926,14 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
 
+        /* if lazy serialization, ensure the object is loaded before trying to do anything.
+         * (even checking the state!) */
+        if (lazySerialization) {
+            meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException")
+                .asInstanceOf[AbstractJClass])
+            meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+        }
+
         // Dynamically check the state
         tx.thisType match {
             case StateType(_, states, _) => {
@@ -1711,17 +1963,26 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
         jIf._else().assign(isInsideInvocationFlag(), JExpr.lit(true))
 
         target match {
-            case Client(mainContract) =>
+            case Client(mainContract, _) =>
                 if ((translationContext.contract == mainContract) && tx.name.equals("main")) {
                     meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
                 }
-            case Server() =>
+            case Server(_) =>
         }
 
         /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
+        val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
             (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
+
+        val argList: Seq[(String, JVar)] =
+            if (lazySerialization) {
+                // We need to pass the ChaincodeStub to methods in lazy mode, so that the objects can
+                // restore themselves from the blockchain if need be.
+                (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
+            } else {
+                jArgs
+            }
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
@@ -1757,7 +2018,12 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                               ): Unit = {
         localContext.get(name) match {
             case Some(variable) => body.assign(variable, newValue)
-            case None => translationContext.assignVariable(name, newValue, body)
+            case None =>
+                translationContext.assignVariable(name, newValue, body)
+                if (lazySerialization) {
+                    // This is a field, so mark that we're modified.
+                    body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
+                }
         }
     }
 
@@ -1831,6 +2097,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean) {
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
                 translationContext.assignVariable(field, newValue, body)
+                if (lazySerialization) {
+                    // This is a field, so mark that we're modified.
+                    // (Note: since we can only assign to fields of 'this', we only need
+                    // to mark that we assigned here and in assignVariable if it's a field.)
+                    // TODO: don't generate this for every field we modify...
+                    body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
+                }
             }
             case Assignment(Dereference(eDeref, field), e) => {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?

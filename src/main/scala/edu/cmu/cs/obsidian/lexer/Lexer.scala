@@ -64,46 +64,42 @@ object Lexer extends RegexParsers {
 
     /* comment parser: must be parsed before [forwardSlashP] */
     private def longCommentP = {
-        val beginning = """/\*""".r ^^ { _ => () }
-
-        beginning ~! """((.|\n)*?)\*/""".r ^^ ( _ => CommentT() )
+        "/*" ~ rep(not("*/") ~ "(?s).".r) ~ "*/" ^^^ CommentT()
     }
 
 
     /* comment parser: must be parsed before [forwardSlashP] */
     private def commentP = {
-        val beginning = """//""".r ^^ { _ => () }
-
-        beginning ~! """.*""".r ^^ ( _ => CommentT() )
+        """//""".r ~! """.*""".r ^^^ CommentT()
     }
 
     /* Punctuation */
-    private def plusP = """\+""".r ^^ (_ => PlusT())
-    private def starP = """\*""".r ^^ (_ => StarT())
-    private def forwardSlashP = """/""".r ^^ (_ => ForwardSlashT())
-    private def minusP = """-""".r ^^ (_ => MinusT())
-    private def lBraceP = """\{""".r ^^ (_ => LBraceT())
-    private def rBraceP = """\}""".r ^^ (_ => RBraceT())
-    private def lParenP = """\(""".r ^^ (_ => LParenT())
-    private def rParenP = """\)""".r ^^ (_ => RParenT())
-    private def dotP = """\.""".r ^^ (_ => DotT())
-    private def commaP = """,""".r ^^ (_ => CommaT())
-    private def semicolonP = """;""".r ^^ (_ => SemicolonT())
-    private def eqP = """=""".r ^^ (_ => EqT())
-    private def notEqP = """!=""".r ^^ (_ => NotEqT())
-    private def ltP = """<""".r ^^ (_ => LtT())
-    private def gtP = """>""".r ^^ (_ => GtT())
-    private def gtEqP = """>=""".r ^^ (_ => GtEqT())
-    private def eqEqP = """==""".r ^^ (_ => EqEqT())
-    private def ltEqP = """<=""".r ^^ (_ => LtEqT())
-    private def rightArrowP = """->""".r ^^ (_ => RightArrowT())
-    private def bigRightArrowP = """=>""".r ^^ (_ => BigRightArrowT())
-    private def coloncolonP = """::""".r ^^ (_ => ColonColonT())
-    private def atP = """@""".r ^^ (_ => AtT())
-    private def lBracketP = """\[""".r ^^ (_ => LBracketT())
-    private def rBracketP = """\]""".r ^^ (_ => RBracketT())
-    private def pipeP = """\|""".r ^^ (_ => PipeT())
-    private def chevP = """>>""".r ^^ (_ => ChevT())
+    private def plusP = """\+""".r ^^^  PlusT()
+    private def starP = """\*""".r ^^^  StarT()
+    private def forwardSlashP = """/""".r ^^^  ForwardSlashT()
+    private def minusP = """-""".r ^^^  MinusT()
+    private def lBraceP = """\{""".r ^^^  LBraceT()
+    private def rBraceP = """\}""".r ^^^  RBraceT()
+    private def lParenP = """\(""".r ^^^  LParenT()
+    private def rParenP = """\)""".r ^^^  RParenT()
+    private def dotP = """\.""".r ^^^  DotT()
+    private def commaP = """,""".r ^^^  CommaT()
+    private def semicolonP = """;""".r ^^^  SemicolonT()
+    private def eqP = """=""".r ^^^  EqT()
+    private def notEqP = """!=""".r ^^^  NotEqT()
+    private def ltP = """<""".r ^^^  LtT()
+    private def gtP = """>""".r ^^^  GtT()
+    private def gtEqP = """>=""".r ^^^  GtEqT()
+    private def eqEqP = """==""".r ^^^  EqEqT()
+    private def ltEqP = """<=""".r ^^^  LtEqT()
+    private def rightArrowP = """->""".r ^^^  RightArrowT()
+    private def bigRightArrowP = """=>""".r ^^^  BigRightArrowT()
+    private def coloncolonP = """::""".r ^^^  ColonColonT()
+    private def atP = """@""".r ^^^  AtT()
+    private def lBracketP = """\[""".r ^^^  LBracketT()
+    private def rBracketP = """\]""".r ^^^  RBracketT()
+    private def pipeP = """\|""".r ^^^  PipeT()
+    private def chevP = """>>""".r ^^^  ChevT()
 
 
     private def oneToken: Parser[Token] =

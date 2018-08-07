@@ -20,11 +20,12 @@ ENTER_PAUSE=0.4
 BETWEEN_PAUSE=0.25
 
 if [ -z "$1" ] ; then
-    echo "Usage: $0 <path to chaincode.jar> [ clean ] [ <instantiation parameters> ]"
+    echo "Usage: $0 <path to chaincode.jar> [ clean | restore ] [ <instantiation parameters> ]"
     echo "       for example: $0 build/chaincode.jar clean '\"a\",\"200\",\"b\",\"100\"'"
     echo "!!!! Warning: the 'clean' option will delete everything in /var/hyperledger/production."
     echo "!!!! Please be careful with it."
     echo "(However, without it, this script probably won't work multiple times.)"
+    echo "Use the restore option to bring a chaincode back after shutting it down."
     exit 1
 fi
 
@@ -36,11 +37,15 @@ CCVERSION=0
 
 INIT_PARAMS=$2
 
+RESTORE=""
+
 if [ "$2" == "clean" ]; then
     rm -f ch1.block
-    rm -f chaincode_archive
     rm -rf /var/hyperledger/production
     mkdir /var/hyperledger/production
+    INIT_PARAMS=$3
+elif [ "$2" == "restore" ]; then
+    RESTORE="yes"
     INIT_PARAMS=$3
 fi
 
@@ -74,27 +79,27 @@ echo $CNORM'======= PEER STARTED ========'
 
 sleep $BETWEEN_PAUSE
 
-echo $CNORM'====== CREATE CHANNEL ======='
-sleep $ENTER_PAUSE
-peer channel create $PEERFLAGS -c ch1 -o localhost:7050 2>&1 | sed "s/^/$CCHAN[make-chan] /"
-sleep 0.5
-echo $CNORM'====== CREATED CHANNEL ======'
+if [ -z "$RESTORE" ]; then
+    echo $CNORM'====== CREATE CHANNEL ======='
+    sleep $ENTER_PAUSE
+    peer channel create -c ch1 -o localhost:7050 2>&1 | sed "s/^/$CCHAN[make-chan] /"
+    sleep 0.5
+    echo $CNORM'====== CREATED CHANNEL ======'
+    sleep $BETWEEN_PAUSE
 
-sleep $BETWEEN_PAUSE
+    echo $CNORM'======= JOIN CHANNEL ========'
+    sleep $ENTER_PAUSE
+    peer channel join -b ch1.block -o localhost:7050 2>&1 | sed "s/^/$CCHAN[join-chan] /"
+    sleep 0.5
+    echo $CNORM'====== JOINED CHANNEL ======='
+    sleep $BETWEEN_PAUSE
 
-echo $CNORM'======= JOIN CHANNEL ========'
-sleep $ENTER_PAUSE
-peer channel join $PEERFLAGS -b ch1.block -o localhost:7050 2>&1 | sed "s/^/$CCHAN[join-chan] /"
-sleep 0.5
-echo $CNORM'====== JOINED CHANNEL ======='
-
-sleep $BETWEEN_PAUSE
-
-echo $CNORM'===== INSTALL CHAINCODE ====='
-sleep $ENTER_PAUSE
-peer chaincode install $PEERFLAGS -l java -p $CCDIR -n $CCNAME -v $CCVERSION 2>&1 | sed "s/^/$CINST[-install-] /"
-sleep 0.5
-echo $CNORM'==== CHAINCODE INSTALLED ===='
+    echo $CNORM'===== INSTALL CHAINCODE ====='
+    sleep $ENTER_PAUSE
+    peer chaincode install -l java -p $CCDIR -n $CCNAME -v $CCVERSION 2>&1 | sed "s/^/$CINST[-install-] /"
+    sleep 0.5
+    echo $CNORM'==== CHAINCODE INSTALLED ===='
+fi
 
 sleep $BETWEEN_PAUSE
 
@@ -106,7 +111,7 @@ sleep $BETWEEN_PAUSE
 
 echo $CNORM'======= RUN CHAINCODE ======='
 sleep $ENTER_PAUSE
-java -jar $CCPATH chaincode_archive -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
+java -jar $CCPATH -a $ip:7052 -i $CCNAME:$CCVERSION 2>&1 | sed "s/^/$CCODE[chaincode] /" &
 sleep 5
 echo $CNORM'===== CHAINCODE RUNNING ====='
 

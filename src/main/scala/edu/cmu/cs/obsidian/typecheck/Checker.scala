@@ -356,16 +356,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
             // check arguments
-            val (argTypes, contextAfterArgs) = inferAndCheckExprs(decl, contextAfterReceiver, args)
-            val specList = (invokable.args, invokable)::Nil
+            val spec = invokable.args
+            val specList = (spec, invokable)::Nil
 
-            val (correctInvokable, calleeToCaller) =
-                checkArgs(e, name, contextAfterArgs, specList, receiver, argTypes) match {
-                    case None => return (BottomType(), contextAfterArgs)
+            val (contextAfterArgs, correctInvokable) =
+                checkArgs(e, contextAfterReceiver, specList, args) match {
+                    case None => return (BottomType(), contextAfterReceiver)
                     case Some(x) => x
                 }
-
-            val spec = correctInvokable.args
 
             val resultType = correctInvokable.retType match {
                 case None => UnitType()
@@ -456,6 +454,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  assertOperationType(e1, e2, IntType())
              case Multiply(e1: Expression, e2: Expression) =>
                  assertOperationType(e1, e2, IntType())
+             case Negate(e: Expression) =>
+                 assertTypeEquality(e, IntType(), context)
              case Equals(e1: Expression, e2: Expression) =>
                  val (t1, c1) = inferAndCheckExpr(decl, context, e1, false)
                  val (t2, c2) = inferAndCheckExpr(decl, c1, e2, false)
@@ -514,20 +514,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  val ctTableOfConstructed = tableLookup.get
 
-
-                 val (argTypes, contextPrime) = inferAndCheckExprs(decl, context, args)
                  val constrSpecs = ctTableOfConstructed
                                     .constructors
                                     .map(constr => (constr.args, constr))
 
-                 // todo : should this have a receiver
-                 val result =
-                     checkArgs(e, s"constructor of $name", context, constrSpecs, This(), argTypes)
+                 val result = checkArgs(e, context, constrSpecs, args)
 
-                 val simpleType = result match {
+                 val (simpleType, contextPrime) = result match {
                      // Even if the args didn't check, we can still output a type
-                     case None => ContractReferenceType(ctTableOfConstructed.contractType, Owned(), false)
-                     case Some((constr, _)) => constr.resultType
+                     case None => (ContractReferenceType(ctTableOfConstructed.contractType, Owned(), false), context)
+                     case Some((cntxt, constr)) => (constr.asInstanceOf[Constructor].resultType, cntxt)
                  }
 
                  (simpleType, contextPrime)
@@ -568,22 +564,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
 
-    private def inferAndCheckExprs(
-                                    decl: InvokableDeclaration,
-                                    context: Context,
-                                    es: Seq[Expression]
-                                ): (Seq[(ObsidianType, Expression)], Context) = {
-        val types = new ListBuffer[(ObsidianType, Expression)]()
-        var contextPrime = context
-        for (e <- es) {
-            val (t, contextPrime2) =
-                inferAndCheckExpr(decl, contextPrime, e, true)
-            contextPrime = contextPrime2
-            types.append((t, e))
-        }
-        (types, contextPrime)
-    }
-
     /* returns true if the sequence of statements includes a return statement, or an if/else statement
      * where both branches have return statements, and false otherwise
      */
@@ -597,7 +577,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
             statement match {
-                case Return() | ReturnExpr(_) => hasRet = true
+                case Return() | ReturnExpr(_) | Throw() => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
                 case _ => ()
@@ -762,96 +742,64 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    /* Returns [Left(p.head)] where [p] is the head of the path if failure,
-     * otherwise [Right(t)] where [t] is the type from the perspective of the caller */
-    private def toCallerPoV(
-            calleeToCaller: Map[String, Expression],
-            tr: NonPrimitiveType): Either[(String, Expression), NonPrimitiveType] = {
-        Right(tr)
-    }
-
-    /* removes unnecessary instances of "parent" from a type: e.g. if [x : y.T1],
-     * then the type [x.parent.T2] is converted to [y.T2] */
-    private def fixSimpleType(context: Context, tr: NonPrimitiveType): NonPrimitiveType = {
-        tr match {
-            case _ => tr
-        }
-    }
-
-    /* returns [Left(errs)] if [spec] and [args] don't match,
-     * and returns [Right(mapping)] if they do, where [mapping] maps argument names
-     * (from the callee's PoV) to expressions (from the caller's PoV).
-     * This function is special in that it doesn't immediately call [logError], but
-     * rather returns a set of errors. This is because, even if checking for this
-     * particular spec fails, another spec may match. */
-    private def checkArgs(
+    // Returns [Left(errs)] if [spec] and [args] don't match, and returns [Right(context)] if they do.
+    // Typechecks the arguments, and transfers ownership unless the spec is Unowned
+    private def checkArgsWithSpec(
             ast: AST,
-            methName: String,
+            decl: InvokableDeclaration,
             context: Context,
             spec: Seq[VariableDeclWithSpec],
-            receiver: Expression,
-            args: Seq[(ObsidianType, Expression)]): Either[Seq[(AST, Error)], Map[String, Expression]] = {
+            args: Seq[Expression]): Either[Seq[(AST, Error)], Context] = {
 
+        var errList: List[(AST, Error)] = Nil
         val (specL, argsL) = (spec.length, args.length)
 
         if (specL != argsL) {
-            Left((ast, WrongArityError(specL, argsL, methName))::Nil)
+            val name = if (decl.isInstanceOf[Constructor]) s"constructor of ${decl.name}" else decl.name
+            Left((ast, WrongArityError(specL, argsL, name))::errList)
         } else {
 
-            // Make the mapping
-            var calleeToCaller = TreeMap[String, Expression]()
+            val specTypes = spec.map(_.typIn)
+
+            var contextAfterArgs = context
             for (i <- args.indices) {
-                calleeToCaller = calleeToCaller.updated(spec(i).varName, args(i)._2)
-            }
-            calleeToCaller = calleeToCaller.updated("this", receiver)
+                val arg = args(i)
+                val specType = specTypes(i)
 
-            val specCallerPoV: Seq[ObsidianType] = spec.map(arg => {
-                arg.typIn match {
-                    case prim: PrimitiveType => prim
-                    case np: NonPrimitiveType =>
-                        toCallerPoV(calleeToCaller, np) match {
-                            case Left((head, e)) =>
-                                return Left((ast, CannotConvertPathError(head, e, np))::Nil)
-                            case Right(trNew) => fixSimpleType(context, trNew)
-                        }
-                    case BottomType() => BottomType()
-                    case u@UnresolvedNonprimitiveType(_, _) => assert(false); u
-                }
-            })
+                val transferOwnership: Boolean =
+                    specType match {
+                        case np: NonPrimitiveType => np.permission != Unowned()
+                        case _ => true
+                    }
 
-            var errList: List[(AST, Error)] = Nil
-            for (i <- args.indices) {
-                val (argTypeCallerPoV, _) = args(i)
-                val specTypeCallerPoV = specCallerPoV(i)
+                val (argType, contextAfterArg) = inferAndCheckExpr(decl, contextAfterArgs, arg, transferOwnership)
 
-                if (isSubtype(argTypeCallerPoV, specTypeCallerPoV).isDefined) {
-                    val err = SubtypingError(argTypeCallerPoV, specTypeCallerPoV)
+
+                if (isSubtype(argType, specType).isDefined) {
+                    val err = ArgumentSubtypingError(decl.name, spec(i).varName, argType, specType)
                     errList = (ast, err)::errList
                 }
+
+                contextAfterArgs = contextAfterArg
             }
-            if (errList.isEmpty) Right(calleeToCaller)
+
+            if (errList.isEmpty) Right(contextAfterArgs)
             else Left(errList)
         }
     }
 
-    /* takes multiple declarations ([specs]) for a transaction/function/constructor,
-     * ensuring that at least one matches the argument types given in [args].
-     * [ast] and [methName] are passed in order to generate helpful errors.
-     * A member of [U] is attached to each spec to indicate which spec matches.
-     * The return value from the successful call to [checkArgs] is also returned */
-    private def checkArgs[U](
+    // checks the arguments based on possibly many specifications, such as multiple constructors
+    // logs all errors at the end
+    private def checkArgs(
             ast: AST,
-            methName: String,
             context: Context,
-            specs: Seq[(Seq[VariableDeclWithSpec], U)],
-            receiver: Expression,
-            args: Seq[(ObsidianType, Expression)]): Option[(U, Map[String, Expression])] = {
+            specs: Seq[(Seq[VariableDeclWithSpec], InvokableDeclaration)],
+            args: Seq[Expression]): Option[(Context, InvokableDeclaration)] = {
 
         var errs: List[(AST, Error)] = Nil
-        for ((spec, extraData) <- specs) {
-            checkArgs(ast, methName, context, spec, receiver, args) match {
-                case Right(calleeToCaller) =>
-                    return Some((extraData, calleeToCaller))
+        for ((spec, invokable) <- specs) {
+            checkArgsWithSpec(ast, invokable, context, spec, args) match {
+                case Right(context) => return Some((context, invokable))
                 case Left(newErrs) =>
                     errs = newErrs.toList ++ errs
             }
@@ -1140,11 +1088,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 var contextPrime = context
                 if (updates.isDefined) {
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
-                        if (newFields.contains(f)) {
-                            val fieldAST = newStateTable.lookupField(f).get
+                        val fieldAST = newStateTable.lookupField(f)
+                        if (fieldAST.isDefined) {
                             val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e, true)
                             contextPrime = contextPrime2
-                            checkIsSubtype(s, t, fieldAST.typ)
+                            checkIsSubtype(s, t, fieldAST.get.typ)
                         }
                     }
                 }
@@ -1251,15 +1199,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         return contextPrime
                 }
 
-                var mergedContext = contextPrime
-                for (SwitchCase(sName, body) <- cases) {
+                def contextForSwitchCase(sc: SwitchCase) = {
                     val newType: ObsidianType =
-
-                        contractTable.state(sName) match {
+                        contractTable.state(sc.stateName) match {
                             case Some(stTable) =>
                                 StateType(contractTable.name, stTable.name, false)
                             case None =>
-                                logError(s, StateUndefinedError(contractTable.name, sName))
+                                logError(s, StateUndefinedError(contractTable.name, sc.stateName))
                                 ContractReferenceType(contractTable.contractType, Owned(), false)
                         }
 
@@ -1276,10 +1222,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         case _ => contextPrime
                     }
 
-                    val endContext = pruneContext(s,
-                        checkStatementSequence(decl, startContext, body),
-                        startContext)
-                    mergedContext = mergeContext(s, mergedContext, endContext)
+                    pruneContext(s, checkStatementSequence(decl, startContext, sc.body), startContext)
+                }
+
+                val mergedContext: Context = cases.headOption match {
+                    case None => contextPrime
+                    case Some(switchCase) =>
+                        val initialContext = contextForSwitchCase(switchCase)
+                        val restCases = cases.tail
+                        restCases.foldLeft(initialContext)((prevContext: Context, sc: SwitchCase) =>
+                                mergeContext(s, prevContext, contextForSwitchCase(sc)))
                 }
 
                 mergedContext
