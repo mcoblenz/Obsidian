@@ -1199,43 +1199,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         return contextPrime
                 }
 
-                var mergedContext = cases.headOption match {
-                    case None => contextPrime
-                    case Some(SwitchCase(sName, body)) =>
-                        val newType: ObsidianType =
-
-                        contractTable.state(sName) match {
-                            case Some(stTable) =>
-                                StateType(contractTable.name, stTable.name, false)
-                            case None =>
-                                logError(s, StateUndefinedError(contractTable.name, sName))
-                                ContractReferenceType(contractTable.contractType, Owned(), false)
-                        }
-
-                        /* special case to allow types to change in the context if we match on a variable */
-                        val startContext = e match {
-                            case This() =>
-                                /* reading "this" as an expression takes the residual of "this",
-                                * so we want "this" in the context to have the old permission of
-                                * "this" with the new state information in the unpermissioned type */
-                                val newContextThisType =
-                                    newType // is this right?
-                                contextPrime.updated("this", newContextThisType)
-                            case ReferenceIdentifier(x) => contextPrime.updated(x, newType)
-                            case _ => contextPrime
-                        }
-
-                        pruneContext(s, checkStatementSequence(decl, startContext, body), startContext)
-                }
-
-                for (SwitchCase(sName, body) <- cases) {
+                def contextForSwitchCase(sc: SwitchCase) = {
                     val newType: ObsidianType =
-
-                        contractTable.state(sName) match {
+                        contractTable.state(sc.stateName) match {
                             case Some(stTable) =>
                                 StateType(contractTable.name, stTable.name, false)
                             case None =>
-                                logError(s, StateUndefinedError(contractTable.name, sName))
+                                logError(s, StateUndefinedError(contractTable.name, sc.stateName))
                                 ContractReferenceType(contractTable.contractType, Owned(), false)
                         }
 
@@ -1252,10 +1222,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         case _ => contextPrime
                     }
 
-                    val endContext = pruneContext(s,
-                        checkStatementSequence(decl, startContext, body),
-                        startContext)
-                    mergedContext = mergeContext(s, mergedContext, endContext)
+                    pruneContext(s, checkStatementSequence(decl, startContext, sc.body), startContext)
+                }
+
+                val mergedContext: Context = cases.headOption match {
+                    case None => contextPrime
+                    case Some(switchCase) =>
+                        val initialContext = contextForSwitchCase(switchCase)
+                        val restCases = cases.tail
+                        restCases.foldLeft(initialContext)((prevContext: Context, sc: SwitchCase) =>
+                                mergeContext(s, prevContext, contextForSwitchCase(sc)))
                 }
 
                 mergedContext
