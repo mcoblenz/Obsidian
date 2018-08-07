@@ -1,0 +1,145 @@
+import "resources/case_studies/Insurance/PolicyRecord.obs"
+
+contract ActiveMaybePair {
+
+    ActiveMaybePair@Some(ActivePolicyPair@Shared p) {
+        ->Some(pair = p);
+    }
+
+    ActiveMaybePair@None() {
+        ->None;
+    }
+
+    state Some {
+        ActivePolicyPair@Shared pair;
+    }
+
+    state None {}
+
+    transaction getPair(ActiveMaybePair@Some this) returns ActivePolicyPair@Shared {
+        return pair;
+    }
+
+   // transaction getValue(NodeMaybe@Some this) returns PolicyRecord@Unowned {
+   //     return node.getValue();
+   // }
+
+}
+
+resource contract ActivePolicyPair {
+    Policy@Unowned key;
+    PolicyRecord@Active val;
+    ActiveMaybePair@Owned next;
+
+    ActivePolicyPair@Owned(Policy key, PolicyRecord@Active >> Unowned val, ActiveMaybePair@Owned next) {
+        this.key = key;
+        this.val = val;
+        this.next = next;
+    }
+
+    transaction setNext(ActiveMaybePair@Owned >> Unowned newNext) {
+        next = newNext;
+    }
+
+    transaction getKey() returns Policy@Unowned {
+        return key;
+    }
+
+    transaction getValue() returns PolicyRecord@Unowned {
+        PolicyRecord@Active valCopy = val;
+        val = valCopy;
+        return valCopy;
+    }
+
+    transaction getValueOwned() returns PolicyRecord@Active {
+        PolicyRecord@Active valCopy = val;
+        val = new PolicyRecord(val.getPolicy(), new Money(0));
+        val.activate(new Money(0));
+        return valCopy;
+    }
+
+
+    transaction set(Policy@Unowned k, PolicyRecord@Active >> Unowned v) {
+        switch next {
+            case Some {
+                next.getPair().set(k, v);
+            }
+            case None {
+                next = new ActiveMaybePair(new ActivePolicyPair(k, v, new ActiveMaybePair()));
+            }
+        }
+    }
+
+    // get and remove the pair with the given Policy as a key
+    transaction extract(Policy@Unowned policy, ActivePolicyPair@Shared prevNode) returns PolicyRecord@Active {
+        PolicyRecord@Active removed;
+
+        if (key.equals(policy)) {
+            prevNode.setNext(next);
+            removed = getValueOwned();
+        } else {
+            switch next {
+                case Some {
+                    removed = next.getPair().extract(policy, this);
+                }
+
+                case None {
+                    throw; // TODO : element not in map?
+                }
+            }
+
+        }
+
+        return removed;
+
+    }
+
+}
+
+
+main contract ActivePolicyMap {
+
+    ActiveMaybePair@Owned first;
+
+    ActivePolicyMap@Owned() {
+        first = new ActiveMaybePair();
+    }
+
+    transaction set(ActivePolicyMap@Owned this, Policy@Unowned key, PolicyRecord@Active >> Unowned val) {
+        switch first {
+            case Some {
+                first.getPair().set(key, val);
+            }
+            case None {
+                first = new ActiveMaybePair(new ActivePolicyPair(key, val, new ActiveMaybePair()));
+            }
+        }
+    }
+
+    // remove and return value of the pair with the given policy as a key
+    transaction extract(ActivePolicyMap@Owned this, Policy@Unowned policy) returns PolicyRecord@Active {
+        PolicyRecord@Active removed;
+
+        switch first {
+            case Some {
+                ActivePolicyPair@Shared pair = first.getPair();
+
+                if(pair.getKey().equals(policy)) {
+                    first = new ActiveMaybePair();
+                    removed = pair.getValueOwned();
+                } else {
+                    removed = pair.extract(policy, pair);
+                }
+            }
+            case None {
+                throw; //TODO : element not in map?
+            }
+        }
+
+        return removed;
+
+    }
+
+}
+
+

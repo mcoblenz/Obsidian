@@ -1199,15 +1199,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         return contextPrime
                 }
 
-                var mergedContext = contextPrime
-                for (SwitchCase(sName, body) <- cases) {
+                def contextForSwitchCase(sc: SwitchCase) = {
                     val newType: ObsidianType =
-
-                        contractTable.state(sName) match {
+                        contractTable.state(sc.stateName) match {
                             case Some(stTable) =>
                                 StateType(contractTable.name, stTable.name, false)
                             case None =>
-                                logError(s, StateUndefinedError(contractTable.name, sName))
+                                logError(s, StateUndefinedError(contractTable.name, sc.stateName))
                                 ContractReferenceType(contractTable.contractType, Owned(), false)
                         }
 
@@ -1224,10 +1222,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         case _ => contextPrime
                     }
 
-                    val endContext = pruneContext(s,
-                        checkStatementSequence(decl, startContext, body),
-                        startContext)
-                    mergedContext = mergeContext(s, mergedContext, endContext)
+                    pruneContext(s, checkStatementSequence(decl, startContext, sc.body), startContext)
+                }
+
+                val mergedContext: Context = cases.headOption match {
+                    case None => contextPrime
+                    case Some(switchCase) =>
+                        val initialContext = contextForSwitchCase(switchCase)
+                        val restCases = cases.tail
+                        restCases.foldLeft(initialContext)((prevContext: Context, sc: SwitchCase) =>
+                                mergeContext(s, prevContext, contextForSwitchCase(sc)))
                 }
 
                 mergedContext

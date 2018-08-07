@@ -1,43 +1,75 @@
 import "resources/case_studies/Insurance/Insurer.obs"
+import "resources/case_studies/Insurance/PolicyRecord.obs"
+import "resources/case_studies/Insurance/PendingPolicyMap.obs"
+import "resources/case_studies/Insurance/ActivePolicyMap.obs"
+
 
 main resource contract InsuranceService {
-    // TODO: Collection of Insurer, Token
+    // TODO: Collection of Insurer
     // TODO: Keys of trusted banks
-    Insurer ins;
-    Token@Owned tokens;
+    Insurer@Shared insurers;
+    TimeService@Shared timeService;
 
-    InsuranceService@Owned() {}
+    // pending and active policies
+    PendingPolicyMap@Owned pendingPolicies;
+    ActivePolicyMap@Owned activePolicies;
 
+    // for now have to have a reference to bank
+    Bank@Shared bank;
 
-    transaction addInsurer(Insurer insurer) {
-        ins = insurer;
+    InsuranceService@Owned() {
+        pendingPolicies = new PendingPolicyMap();
+        activePolicies = new ActivePolicyMap();
     }
 
-    transaction connectBankAndInsurer(Bank bank) {
-        // TODO: check that bank key is in trusted keys
-        if (true) {
-            ins.addBank(bank);
-        }
+    transaction addInsurer(Insurer@Shared insurer) {
+        insurers = insurer;
     }
 
     // TODO: information to calculate bids, Collection of Bid and Token
-    transaction requestBids(int i) returns Bid@Available {
-        BidTokenPair bidAndTokens = ins.requestBids(i);
+    transaction requestBids(int i) returns Policy@Offered {
+        InsuranceBid@Owned insBid = insurers.requestBid(i);
 
-        // TODO: add Tokens from bidAndTokens to Tokens
-        // TODO: how to keep track of tokens for each client?
-        tokens = bidAndTokens.getToken();
-        Bid@Available bid = bidAndTokens.getBid();
+        int cost = insBid.getCost();
+        int expiration = insBid.getExpirationTime();
+        Money@Owned payout = insBid.getPayout();
 
-        return bid;
+        Policy@Offered policy = new Policy(cost, expiration);
+        PolicyRecord@Pending pendingPolicy = new PolicyRecord(policy, payout);
+
+        pendingPolicies.set(policy, pendingPolicy);
+
+        return policy;
     }
 
-    // TODO: return Bid@Sold (issue 140)
-    transaction buyBid(Bid@Available bid, Token@Owned token) returns Bid@Available {
-        // TODO: collect all tokens together (ones given by insurer and insuree) (for now just disown)
-        disown token;
-        // TODO: switch bid states with bid.buy();
-        return bid;
+    transaction buyPolicy(Policy@Offered >> (Active | Expired) policy, Money@Owned >> Unowned money) returns Money@Owned {
+
+        if (timeService.getTime() > policy.getExpirationTime()) {
+            PolicyRecord@Pending pendingPolicy = pendingPolicies.extract(policy);
+
+            // refund insurer's payout
+            Money@Owned insurerRefund = pendingPolicy.refund();
+            insurers.receiveRefund(insurerRefund);
+
+            // expire policy and return money
+            disown pendingPolicy;
+            policy.expire();
+            return money;
+        } else {
+            PolicyRecord@Pending pendingPolicy = pendingPolicies.extract(policy);
+            // get payment
+            int cost = policy.getCost();
+            Money@Owned payment = money.getAmountOfMoney(cost);
+
+            // activate policy record with payment
+            pendingPolicy.activate(payment);
+            activePolicies.set(policy, pendingPolicy);
+
+            // activate policy and return any change
+            policy.activate();
+            return money;
+        }
+
     }
 
 }

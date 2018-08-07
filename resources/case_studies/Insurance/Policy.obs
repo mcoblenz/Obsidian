@@ -1,0 +1,37 @@
+main contract Policy {
+
+    state Offered {
+        int cost;
+        int expirationTime;
+    }
+
+    state Active {}
+
+    state Expired {}
+
+    Policy@Offered(int c, int expiration) {
+        ->Offered(cost = c, expirationTime = expiration);
+    }
+
+    transaction activate(Policy@Offered >> Active this) {
+        ->Active;
+    }
+
+    transaction expire(Policy@Offered >> Expired this) {
+        ->Expired;
+    }
+
+    transaction getExpirationTime(Policy@Offered this) returns int {
+        return expirationTime;
+    }
+
+    transaction getCost(Policy@Offered this) returns int {
+        return cost;
+    }
+
+    // TODO: Equality on Policies
+    transaction equals(Policy@Unowned this, Policy@Unowned p) returns bool {
+        return true;
+    }
+
+}

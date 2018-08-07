@@ -1,30 +1,39 @@
-import "resources/case_studies/Insurance/BidTokenPair.obs"
+import "resources/case_studies/Insurance/InsuranceBid.obs"
 import "resources/case_studies/Insurance/Bank.obs"
-// import "resources/case_studies/Insurance/Money.obs"
-
+import "resources/case_studies/Insurance/TimeService.obs"
 
 // TODO : Collections
 
-main contract Insurer {
-    //TODO: owned Money mon;
-    Bank bank;
+main resource contract Insurer {
+    Money@Owned money;
+    Bank@Shared bank;
+    TimeService@Shared timeService;
 
-    Insurer() {}
-
-    transaction addBank(Bank b) {
+    Insurer@Owned(TimeService@Shared ts, Bank@Shared b, Money@Owned m) {
+        timeService = ts;
         bank = b;
+        money = m;
     }
 
-    // TODO : Calculate Bid(s) using some needed information, for now just int
-    transaction requestBids(int i) returns BidTokenPair@Owned {
-        int cost = i + 4;
-        // TODO : Proper timing
-        int timeAvailable = 100;
-        // TODO : give Money to Bank for Token
-        Token@Owned t = bank.buyToken();
-        Bid@Available b = new Bid(cost, timeAvailable);
+    // TODO : Calculate Bid using some needed information, for now just int
+    transaction requestBid(int i) returns InsuranceBid@Owned {
+        int costOfBid = i + 4;
+        int costOfPayout = i + 6;
 
-        return new BidTokenPair(b, t);
+        // available for 24 hours
+        int twentyFourHours = timeService.hoursToMillis(24);
+        int expirationTime = timeService.getTime() + twentyFourHours;
+
+        // get correct amount of money from owned money
+        Money@Owned m = money.getAmountOfMoney(costOfPayout);
+
+        InsuranceBid@Owned b = new InsuranceBid(costOfBid, expirationTime, m);
+
+        return b;
+    }
+
+    transaction receiveRefund(Money@Owned >> Unowned m) {
+        money.addMoney(m);
     }
 
 }
