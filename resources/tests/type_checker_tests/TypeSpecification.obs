@@ -56,7 +56,6 @@ main contract C {
     transaction badChangeA2(A@Available a) {
         a.makeUnavailable();
     }
-
 }
 
 contract A {

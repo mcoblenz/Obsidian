@@ -239,4 +239,25 @@ class ParserTests extends JUnitSuite {
     @Test def unclosedContract() = {
         shouldFailFile("resources/tests/parser_tests/UnclosedContract.obs")
     }
+
+    @Test def thisArgument(): Unit = {
+        shouldFail(
+          """main contract C {
+            | transaction t(int this) { }
+            | }
+          """.stripMargin
+          )
+        shouldFail(
+            """main contract C {
+              | transaction t(Foo this) { }
+              | }
+            """.stripMargin
+        )
+        shouldSucceed(
+            """main contract C {
+              | transaction t(C this) { }
+              | }
+            """.stripMargin
+        )
+    }
 }

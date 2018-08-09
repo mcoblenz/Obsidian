@@ -149,10 +149,33 @@ object Parser extends Parsers {
 
     private def parseArgList: Parser[Seq[Expression]] = repsep(parseExpr, CommaT())
 
-    private def parseArgDefList: Parser[Seq[VariableDeclWithSpec]] = {
-        val oneDecl = parseArgumentSpec ~ parseId ^^ {
-            case (typIn, typOut) ~ name => VariableDeclWithSpec(typIn, typOut, name._1).setLoc(name)
+    private def parseArgDefList(contractName: String): Parser[Seq[VariableDeclWithSpec]] = {
+        val processOneArg = new PartialFunction[(ObsidianType, ObsidianType) ~ Identifier, VariableDeclWithSpec] {
+            def apply(x: (ObsidianType, ObsidianType) ~ Identifier): VariableDeclWithSpec = {
+                x match {
+                    case (typIn, typOut) ~ name => VariableDeclWithSpec(typIn, typOut, name._1).setLoc(name)
+                }
+            }
+            def isDefinedAt(x: (ObsidianType, ObsidianType) ~ Identifier): Boolean = {
+                x match {
+                    case ((typIn, typOut) ~ name) =>
+                        if (name._1 == "this") {
+                            typIn match {
+                                case n: NonPrimitiveType => n.contractName == contractName
+                                case _ => false
+                            }
+                        }
+                        else {
+                            true
+                        }
+
+                    case _ => false
+                }
+            }
         }
+
+        val oneDecl = (parseArgumentSpec ~ parseId) ^? (processOneArg, (_ => "error message"))
+
         repsep(oneDecl, CommaT())
     }
 
@@ -490,7 +513,7 @@ object Parser extends Parsers {
 
 
     private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
-        parseTransactionOptions ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList ~! RParenT() ~!
+        parseTransactionOptions ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! (parseArgDefList(contractName)) ~! RParenT() ~!
           opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
             case opts ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
                 val nameString = name match {
@@ -502,12 +525,7 @@ object Parser extends Parsers {
                     case None => (None, args)
                     case Some(v) =>
                         if (v.varName == "this") {
-                            if (!v.typIn.isInstanceOf[NonPrimitiveType]) {
-                                return err("Type of 'this' must be a contract type.")
-                            }
-                            else {
-                                (Some(v), args.tail)
-                            }
+                            (Some(v), args.tail)
                         } else {
                             (None, args)
                         }
@@ -518,7 +536,6 @@ object Parser extends Parsers {
                     case Some(v) => v.typOut
                 }
 
-                // contract name is THIS as there is no way to access it at the moment
                 val thisType = thisArg match {
                     case None => ContractReferenceType(ContractType(contractName), Shared(), false)
                     case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType]
@@ -542,7 +559,7 @@ object Parser extends Parsers {
 
     // maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor = {
-        parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+        parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
                 val resultType = extractTypeFromPermission(permission, name._1, isRemote = false)
 
