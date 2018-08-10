@@ -469,7 +469,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         /* setup the state enum */
         val stateDeclarations: Seq[State] =
             aContract.declarations.filter((d: Declaration) => d match {
-                case State(_, _) => true
+                case State(_, _, _) => true
                 case _ => false
             }).map({ s => s.asInstanceOf[State] })
 
@@ -480,7 +480,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             stateEnumOption = Some(stateEnum)
 
             /* Declare the states in the enum */
-            for (State(name, _) <- stateDeclarations) {
+            for (State(name, _, _) <- stateDeclarations) {
                 stateEnum.enumConstant(name)
             }
 
@@ -1592,7 +1592,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 if (aContract.isMain) {
                     mainTransactions.add(t)
                 }
-            case (s@State(_, _)) =>
+            case (s@State(_, _, _)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
             case (c@Contract(_, _, _,_)) => translateInnerContract(c, newClass, translationContext)
             case t: TypeDecl =>
