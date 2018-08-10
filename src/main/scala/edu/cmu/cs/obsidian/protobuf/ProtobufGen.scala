@@ -38,7 +38,7 @@ object ProtobufGen {
 
         val stateNames: List[String] = aContract.declarations.foldRight(Nil: List[String])((decl, states) => decl match
             {
-                case State(name, _) => name::states
+                case State(name, _, _) => name::states
                 case _ => states
             }
         )
