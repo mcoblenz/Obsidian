@@ -1,9 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Client" type="SbtRunConfiguration" factoryName="SBT Task">
-    <setting name="tasks" value="&quot;run --verbose --build-client --dump-debug obs_output --output-path obs_output resources/tests/&quot;" />
-    <setting name="vmparams" value="-Xms512M -Xmx1024M -Xss8M -XX:+CMSClassUnloadingEnabled" />
-    <setting name="workingDir" value="$PROJECT_DIR$" />
-    <envs />
-    <method />
-  </configuration>
-</component>

@@ -1,133 +1,97 @@
 import "resources/case_studies/Insurance/PolicyRecord.obs"
 
-contract PendingMaybePair {
-
-    PendingMaybePair@Some(PendingPolicyPair@Shared p) {
-        ->Some(pair = p);
+// This implements a mutable linked list of pending policies.
+resource contract PendingPolicyList {
+    state HasNext {
+        Policy@Unowned key;
+        PolicyRecord@Pending val;
+        PendingPolicyList@Owned next;
     }
 
-    PendingMaybePair@None() {
-        ->None;
+    state Empty {
     }
 
-    state Some {
-        PendingPolicyPair@Shared pair;
+    PendingPolicyList@Empty() {
+        ->Empty;
     }
 
-    state None {}
-
-    transaction getPair(PendingMaybePair@Some this) returns PendingPolicyPair@Shared {
-        return pair;
-    }
-
-   // transaction getValue(NodeMaybe@Some this) returns PolicyRecord@Unowned {
-   //     return node.getValue();
-   // }
-
-}
-
-resource contract PendingPolicyPair {
-    Policy@Unowned key;
-    PolicyRecord@Pending val;
-    PendingMaybePair@Owned next;
-
-    PendingPolicyPair@Owned(Policy key, PolicyRecord@Pending >> Unowned val, PendingMaybePair@Owned next) {
-        this.key = key;
-        this.val = val;
-        this.next = next;
-    }
-
-    transaction setNext(PendingMaybePair@Owned >> Unowned newNext) {
+    private transaction setNext(PendingPolicyList@HasNext this, PendingPolicyList@Owned >> Unowned newNext) {
         next = newNext;
     }
 
-    transaction getKey() returns Policy@Unowned {
+    transaction getKey(PendingPolicyList@HasNext this) returns Policy@Unowned {
         return key;
     }
 
-    transaction getValue() returns PolicyRecord@Unowned {
+    transaction getValue(PendingPolicyList@HasNext this) returns PolicyRecord@Unowned {
         PolicyRecord@Pending valCopy = val;
         val = valCopy;
         return valCopy;
     }
 
-    transaction getValueOwned() returns PolicyRecord@Pending {
+    transaction getValueCopy() returns PolicyRecord@Pending {
         PolicyRecord@Pending valCopy = val;
         val = new PolicyRecord(val.getPolicy(), new Money(0));
         return valCopy;
     }
 
 
-    transaction set(Policy@Unowned k, PolicyRecord@Pending >> Unowned v) {
-        switch next {
-            case Some {
-                next.getPair().set(k, v);
+    transaction append(Policy@Unowned k, PolicyRecord@Pending >> Unowned v) {
+        switch this {
+            case HasNext {
+                next.set(k, v);
             }
             case None {
-                next = new PendingMaybePair(new PendingPolicyPair(k, v, new PendingMaybePair()));
+                ->HasNext(key = k, val = v, next = new PendingPolicyList());
             }
         }
     }
 
     // get and remove the pair with the given Policy as a key
-    transaction extract(Policy@Unowned policy, PendingPolicyPair@Shared prevNode) returns PolicyRecord@Pending {
+    transaction remove(Policy@Unowned policy, PendingPolicyList@Shared prevNode) returns PolicyRecord@Pending {
         PolicyRecord@Pending removed;
-
-        if (key.equals(policy)) {
-            prevNode.setNext(next);
-            removed = getValueOwned();
-        } else {
-            switch next {
-                case Some {
-                    removed = next.getPair().extract(policy, this);
+        switch this {
+            case Empty {
+                throw; // TODO : element not in map?
+            }
+            case HasNext {
+                if (key.equals(policy)) {
+                    prevNode.setNext(next);
+                    removed = getValueOwned();
                 }
-
-                case None {
-                    throw; // TODO : element not in map?
+                else {
+                    removed = next.remove(policy, this);
                 }
             }
-
         }
 
         return removed;
-
     }
-
 }
 
 
 main contract PendingPolicyMap {
-
-    PendingMaybePair@Owned first;
+    PendingPolicyList@Owned list;
 
     PendingPolicyMap@Owned() {
-        first = new PendingMaybePair();
+        list = new PendingPolicyList(); // Start with an empty list.
     }
 
     transaction set(PendingPolicyMap@Owned this, Policy@Unowned key, PolicyRecord@Pending >> Unowned val) {
-        switch first {
-            case Some {
-                first.getPair().set(key, val);
-            }
-            case None {
-                first = new PendingMaybePair(new PendingPolicyPair(key, val, new PendingMaybePair()));
-            }
-        }
+        list.append(key, val);
     }
 
     // remove and return value of the pair with the given policy as a key
     transaction extract(PendingPolicyMap@Owned this, Policy@Unowned policy) returns PolicyRecord@Pending {
         PolicyRecord@Pending removed;
 
-        switch first {
-            case Some {
-                PendingPolicyPair@Shared pair = first.getPair();
-
-                if(pair.getKey().equals(policy)) {
-                    first = new PendingMaybePair();
-                    removed = pair.getValueOwned();
+        switch list {
+            case HasNext {
+                if(list.getKey().equals(policy)) {
+                    removed = list.getValueCopy();
+                    first = new PendingPolicyList();
                 } else {
-                    removed = pair.extract(policy, pair);
+                    removed = list.remove(policy, list);
                 }
             }
             case None {

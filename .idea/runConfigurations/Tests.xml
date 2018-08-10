@@ -1,9 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Tests" type="SbtRunConfiguration" factoryName="SBT Task">
-    <setting name="tasks" value="test" />
-    <setting name="vmparams" value="-Xms512M -Xmx1024M -Xss8M -XX:+CMSClassUnloadingEnabled" />
-    <setting name="workingDir" value="$PROJECT_DIR$" />
-    <envs />
-    <method />
-  </configuration>
-</component>
