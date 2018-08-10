@@ -143,7 +143,7 @@ case class Transaction(name: String,
 }
 
 
-case class State(name: String, fields: Seq[Field]) extends Declaration {
+case class State(name: String, fields: Seq[Field], isResource: Boolean) extends Declaration {
     val tag: DeclarationTag = StateDeclTag
 }
 

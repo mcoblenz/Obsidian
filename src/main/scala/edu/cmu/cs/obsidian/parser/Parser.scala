@@ -560,11 +560,11 @@ object Parser extends Parsers {
     }
 
     private def parseStateDecl = {
-        StateT() ~! parseId ~! opt(LBraceT() ~! rep(parseFieldDecl) ~! RBraceT()) ~ opt(SemicolonT()) ^^ {
-            case st ~ name ~ maybeDefs ~ _ =>
+        opt(ResourceT()) ~ StateT() ~! parseId ~! opt(LBraceT() ~! rep(parseFieldDecl) ~! RBraceT()) ~ opt(SemicolonT()) ^^ {
+            case isResource ~ st ~ name ~ maybeDefs ~ _ =>
                 maybeDefs match {
-                    case None => State(name._1, Seq.empty).setLoc(st)
-                    case Some (_ ~ defs ~ _)  => State(name._1, defs).setLoc(st)
+                    case None => State(name._1, Seq.empty, isResource.isDefined).setLoc(st)
+                    case Some (_ ~ defs ~ _)  => State(name._1, defs, isResource.isDefined).setLoc(st)
                 }
         }
     }

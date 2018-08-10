@@ -193,7 +193,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case np3: NonPrimitiveType =>
                                 (np3.permission == Unowned()) ||
                                   (np1.permission == Shared() && np2.permission == Shared() && np3.permission == Shared()) ||
-                                  (np1.permission == Owned() && np2.permission == Shared() && np3.permission == Shared() && !np1.isResourceReference(contextContractTable))
+                                  (np1.permission == Owned() && np2.permission == Shared() && np3.permission == Shared() && np1.isResourceReference(contextContractTable) == No())
                             case _ => false // can't split non-reference types
                         }
                     case _ => false // can't split non-reference types
@@ -727,7 +727,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
         typ match {
             case t: NonPrimitiveType =>
-                if (t.isOwned && t.isResourceReference(context.contractTable)) logError(ast, UnusedOwnershipError(variable))
+                if (t.isOwned && t.isResourceReference(context.contractTable) != No()) logError(ast, UnusedOwnershipError(variable))
             case _ => ()
         }
     }
@@ -1156,7 +1156,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val toCheckForDroppedResources = maybeOldFields.diff(newFields.toSet) // fields that we might currently have minus fields we're initializing now
                 for (oldField <- toCheckForDroppedResources) {
                     val fieldType = contextPrime.thisFieldTypes.getOrElse(oldField._1, oldField._2)
-                    if (fieldType.isResourceReference(thisTable) && fieldType.isOwned) {
+                    if (fieldType.isResourceReference(thisTable) != No() && fieldType.isOwned) {
                         logError(s, PotentiallyUnusedOwnershipError(oldField._1))
                     }
                 }
@@ -1357,12 +1357,33 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def checkField(field: Field, lexicallyInsideOf: ContractTable): Unit = {
+    private def checkField(field: Field, lexicallyInsideOf: ContractTable, containingState: Option[State]): Unit = {
+        val contractIsResource = lexicallyInsideOf.contract.modifiers.contains(IsResource())
+
+        val containerIsResource = containingState match {
+            case None =>
+                // This field is lexically inside a contract, not in a state, but it might be available in a particular set of states.
+
+                // If the field is in a contract that was declared as a resource, the settings on the individual states don't matter.
+                if (contractIsResource) {
+                    true
+                }
+                else if (field.availableIn.isDefined) {
+                    val availableStateNames = field.availableIn.get
+                    val availableStates = availableStateNames.map((stateName: String) => lexicallyInsideOf.state(stateName))
+                    availableStates.foldLeft(true)((allResourcesSoFar: Boolean, state: Option[StateTable]) => allResourcesSoFar && state.isDefined && state.get.ast.isResource)
+                }
+                else {
+                    contractIsResource
+                }
+            case Some(state) => contractIsResource || state.isResource
+        }
+
         field.typ match {
             case typ: NonPrimitiveType =>
                 if (typ.isOwned) {
                     // Only resources can own other resources (since otherwise they might go out of scope improperly).
-                    if (typ.isResourceReference(lexicallyInsideOf) && !lexicallyInsideOf.contract.modifiers.contains(IsResource())) {
+                    if (typ.isResourceReference(lexicallyInsideOf) != No() && !containerIsResource) {
                         logError(field, NonResourceOwningResourceError(lexicallyInsideOf.name, field))
                     }
                 }
@@ -1551,7 +1572,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def checkState(lexicallyInsideOf: ContractTable, state: State): Unit = {
         val table = lexicallyInsideOf.state(state.name).get
         for (field <- state.fields) {
-            checkField(field, table.contractTable)
+            checkField(field, table.contractTable, Some(state))
             checkStateFieldShadowing(lexicallyInsideOf, field, state)
         }
     }
@@ -1648,7 +1669,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case t: Transaction => checkTransaction(t, table)
                 case s: State => checkState(table, s)
                 case f: Field => {
-                    checkField(f, table)
+                    checkField(f, table, None)
                     checkContractFieldRepeats(f, contract)
                 }
                 case c: Constructor => checkConstructor(c, table, table.stateLookup.nonEmpty)

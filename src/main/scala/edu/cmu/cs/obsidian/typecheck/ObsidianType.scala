@@ -48,6 +48,11 @@ case class ContractType(contractName: String) {
     override def toString: String = contractName
 }
 
+trait Possibility
+case class Yes() extends Possibility
+case class Maybe() extends Possibility
+case class No() extends Possibility
+
 /* Invariant: [stateNames] is missing at least one of the states of the
  * contract (i.e. it is more specific than [ContractReferenceType(contractName)],
  * but has at least 2 distinct states
@@ -71,6 +76,29 @@ case class StateType(contractName: String, stateNames: Set[String], override val
     override val residualType: NonPrimitiveType = ContractReferenceType(ContractType(contractName), Unowned(), isRemote).setLoc(this)
 
     override val topPermissionType: NonPrimitiveType = this
+
+    override def isResourceReference(contextContractTable: ContractTable): Possibility = {
+        val contract = contextContractTable.lookupContract(contractName)
+
+        if (contract.isDefined && contract.get.contract.isResource) {
+            return Yes()
+        }
+
+        val stateIsResource = contract match {
+            case None => No() // This will result in an error elsewhere.
+            case Some(contractTable) =>
+                val statesAreResources = stateNames.map((sn: String) =>
+                    contractTable.state(sn) match
+                {
+                    case None => No()
+                    case Some(stateTable) => if(stateTable.ast.isResource) Yes() else No()
+                })
+                statesAreResources.reduce((p1: Possibility, p2: Possibility) => if (p1 == p2) p1 else Maybe())
+        }
+
+        stateIsResource
+    }
+
 }
 
 object StateType {
@@ -101,7 +129,7 @@ sealed trait ObsidianType extends HasLocation {
 
     def isOwned = false
 
-    def isResourceReference(contextContractTable: ContractTable) = false
+    def isResourceReference(contextContractTable: ContractTable): Possibility = No()
 
 }
 
@@ -149,9 +177,14 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     def topPermissionType = this
 
-    override def isResourceReference(contextContractTable: ContractTable): Boolean = {
+    override def isResourceReference(contextContractTable: ContractTable): Possibility = {
         val contract = contextContractTable.lookupContract(contractName)
-        contract.isDefined && contract.get.contract.isResource
+        if (contract.isDefined && contract.get.contract.isResource) {
+            Yes()
+        }
+        else {
+            No()
+        }
     }
 }
 

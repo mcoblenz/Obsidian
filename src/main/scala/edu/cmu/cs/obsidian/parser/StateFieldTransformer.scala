@@ -41,6 +41,6 @@ object StateFieldTransformer {
             )
         val remainingStateDecls = state.fields.filterNot((d: Declaration) => d.isInstanceOf[Field])
 
-        new State(state.name, remainingStateDecls) +: transformedStateFields
+        new State(state.name, remainingStateDecls, state.isResource) +: transformedStateFields
     }
 }
