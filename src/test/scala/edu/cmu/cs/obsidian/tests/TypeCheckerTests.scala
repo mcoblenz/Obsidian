@@ -461,7 +461,7 @@ class TypeCheckerTests extends JUnitSuite {
                         None)), 43)
                 ::
                 (ArgumentSubtypingError("discardMoney", "m",
-                    ContractReferenceType(ContractType("Money"), Unowned(), false),
+                    ContractReferenceType(ContractType("Money"), Shared(), false),
                     ContractReferenceType(ContractType("Money"), Owned(), false)),
                     56)
                 ::
@@ -470,7 +470,7 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedOwnershipError("bad"), 52)
                 ::
                 (SubtypingError(
-                    ContractReferenceType(ContractType("Money"), Unowned(), false),
+                    ContractReferenceType(ContractType("Money"), Shared(), false),
                     ContractReferenceType(ContractType("Money"), Owned(), false)), 59)
                 ::
                 (UnusedOwnershipError("m"), 75)

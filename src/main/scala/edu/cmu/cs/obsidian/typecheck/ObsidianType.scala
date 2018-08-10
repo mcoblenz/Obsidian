@@ -18,7 +18,10 @@ case class Inferred() extends Permission {
     override def toString: String = "Inferred"
 } // For local variables
 
-
+trait OwnershipConsumptionMode
+case class ConsumingOwnedGivesShared() extends OwnershipConsumptionMode
+case class ConsumingOwnedGivesUnowned() extends OwnershipConsumptionMode
+case class NoOwnershipConsumption() extends OwnershipConsumptionMode
 
 // Type of references to contracts.
 case class ContractReferenceType(contractType: ContractType, permission: Permission, override val isRemote: Boolean) extends NonPrimitiveType {
@@ -27,9 +30,16 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
 
     override def isOwned = permission == Owned()
 
-    override val residualType: NonPrimitiveType = {
+    override def residualType(mode: OwnershipConsumptionMode): NonPrimitiveType = {
         if (permission == Owned()) {
-            this.copy(permission = Unowned()).setLoc(this)
+            val newPermission =
+                mode match {
+                    case ConsumingOwnedGivesShared() => Shared()
+                    case ConsumingOwnedGivesUnowned() => Unowned()
+                    case NoOwnershipConsumption() => Owned()
+                }
+
+            this.copy(permission = newPermission).setLoc(this)
         }
         else {
             this
@@ -73,8 +83,21 @@ case class StateType(contractName: String, stateNames: Set[String], override val
 
     override def isOwned = true
 
-    override val residualType: NonPrimitiveType = ContractReferenceType(ContractType(contractName), Unowned(), isRemote).setLoc(this)
+    override def residualType(mode: OwnershipConsumptionMode): NonPrimitiveType = {
+        if (mode == NoOwnershipConsumption()) {
+            this
+        }
+        else {
+            val newPermission =
+                mode match {
+                    case ConsumingOwnedGivesShared() => Shared()
+                    case ConsumingOwnedGivesUnowned() => Unowned()
+                    case NoOwnershipConsumption() => Owned()
+                }
 
+            ContractReferenceType(ContractType(contractName), newPermission, isRemote).setLoc(this)
+        }
+    }
     override val topPermissionType: NonPrimitiveType = this
 
     override def isResourceReference(contextContractTable: ContractTable): Possibility = {
@@ -123,7 +146,7 @@ sealed trait ObsidianType extends HasLocation {
     /* the permission system doesn't allow arbitrary aliasing of a reference
      * typed as [t]: aliasing forces one of the resulting types to be
      * [residualType(t)] instead */
-    val residualType: ObsidianType
+    def residualType(mode: OwnershipConsumptionMode): ObsidianType
 
     def topPermissionType: ObsidianType
 
@@ -136,7 +159,7 @@ sealed trait ObsidianType extends HasLocation {
 /* int, bool, or string */
 sealed trait PrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
-    override val residualType: ObsidianType = this
+    override def residualType(mode: OwnershipConsumptionMode): ObsidianType = this
     override val topPermissionType: ObsidianType = this
 }
 
@@ -173,7 +196,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
     //    val residualType: ObsidianType = if (modifiers.contains(IsOwned()))
     //        NonPrimitiveType(t, modifiers - IsOwned() + IsReadOnlyState())
     //    else this
-    val residualType = this
 
     def topPermissionType = this
 
@@ -207,7 +229,7 @@ case class UnitType() extends PrimitiveType {
  * otherwise be inferred */
 case class BottomType() extends ObsidianType {
     val isBottom: Boolean = true
-    override val residualType: ObsidianType = this
+    override def residualType(mode: OwnershipConsumptionMode): ObsidianType = this
     override def topPermissionType: ObsidianType = this
 }
 
@@ -218,14 +240,14 @@ case class UnresolvedNonprimitiveType(identifiers: Seq[String], permission: Perm
     override def toString: String  = identifiers.mkString(".")
 
 
-    override val residualType: ObsidianType = this // Should never be invoked
+    override def residualType(mode: OwnershipConsumptionMode): ObsidianType = this // Should never be invoked
     override def topPermissionType: ObsidianType = this
 }
 
 case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
     override val isBottom: Boolean = false
-    override val residualType: NonPrimitiveType = this
+    override def residualType(mode: OwnershipConsumptionMode): NonPrimitiveType = this
     override def topPermissionType: NonPrimitiveType = this
     override val contractName: String = name
     override val permission: Permission = simpleType.permission

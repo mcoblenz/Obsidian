@@ -52,10 +52,10 @@ contract Disowning {
 	 transaction discardMoney (Money@Owned >> Unowned m) {
      	 	 disown m;
 
-     	 	 // Error: m is unowned
+     	 	 // Error: m is shared.
      	 	 discardMoney(m);
 
-             // Error: m is unowned. Want to make sure we can't consume m twice.
+             // Error: m is shared. Want to make sure we can't consume m twice.
      	 	 Money@Owned bad = m;
      }
 
