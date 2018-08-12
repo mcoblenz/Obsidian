@@ -1,0 +1,97 @@
+// Money is shared, trusted code -- but it only has to be written once.
+resource contract Money {
+    int value;
+
+    Money@Owned(int v) {
+        value = v;
+    }
+
+    transaction getValue(Money@Unowned this) returns int {
+        return value;
+    }
+
+    transaction split(Money@Owned this, int v) returns Money@Owned {
+        if (v > value) {
+            throw;
+        }
+        value = value - v;
+        Money@Owned result = new Money(v);
+        return result;
+    }
+
+    transaction merge(Money@Owned this, Money@Owned >> Unowned other) {
+        value = value + other.getValue();
+        disown other;
+    }
+}
+
+resource contract Account {
+    Money@Owned value;
+    int address;
+
+    Account@Owned(Money@Owned v, int a) {
+        value = v;
+        address = a;
+    }
+
+    transaction withdraw(Account@Unowned this, int amount) returns Money@Owned {
+        Money@Owned withdrawal = value.split(amount);
+        return withdrawal;
+    }
+
+    transaction deposit(Account@Unowned this, Money@Owned >> Unowned money) {
+        value.merge(money);
+    }
+}
+
+contract AccountList {
+    state Empty {
+    }
+
+    resource state HasNext {
+        Account@Owned account;
+        AccountList@Owned next;
+    }
+
+    AccountList@Owned() {
+        ->Empty;
+    }
+
+    AccountList@Owned(Account@Owned a) {
+        ->HasNext(account = a, next = new AccountList());
+    }
+
+    transaction find(AccountList this, int addressToFind) returns Account@Unowned {
+        switch this {
+            case Empty {
+                throw;
+            }
+            case HasNext {
+                if (account.address == addressToFind) {
+                    return account;
+                }
+                else {
+                    return next.find(addressToFind);
+                }
+            }
+        }
+    }
+}
+
+
+main contract StandardToken {
+    AccountList@Owned accounts;
+
+    transaction transferFrom(int fromAddress, int toAddress, Money@Unowned amount) {
+        Account@Unowned fromAccount = accounts.find(fromAddress);
+        Account@Unowned toAccount = accounts.find(toAddress);
+
+
+        // Original Solidity code:
+        // balances[from] -= value;
+        // balances[to] =+ value;
+        Money@Owned money = fromAccount.withdraw(amount.getValue());
+        toAccount.deposit(money);
+    }
+
+}
