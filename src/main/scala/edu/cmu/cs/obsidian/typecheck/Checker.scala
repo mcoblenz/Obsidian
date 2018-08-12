@@ -620,6 +620,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case Return() | ReturnExpr(_) | Throw() => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
+                case Switch(e, cases) =>
+                    hasRet = cases.foldLeft(true)((prev, aCase) => prev && hasReturnStatement(tx, aCase.body))
                 case _ => ()
             }
         }
@@ -1319,7 +1321,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                     val contextFromBody = checkStatementSequence(decl, startContext, sc.body)
                     val prunedContext = pruneContext(s, contextFromBody, startContext)
-                    println(s"context for case $sc is $prunedContext")
                     prunedContext
                 }
 
