@@ -1302,7 +1302,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case Some(stTable) =>
                                 StateType(contractTable.name, stTable.name, false)
                             case None =>
-                                logError(s, StateUndefinedError(contractTable.name, sc.stateName))
+                                logError(sc, StateUndefinedError(contractTable.name, sc.stateName))
                                 ContractReferenceType(contractTable.contractType, Owned(), false)
                         }
 

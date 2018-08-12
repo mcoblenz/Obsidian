@@ -295,7 +295,7 @@ object AstTransformer {
                 val newCases = cases.map(_case => {
                     val (newBody, newContext, newErrors) = transformBody(table, lexicallyInsideOf, context, _case.body)
                     errors = errors ++ newErrors;
-                    _case.copy(body = newBody).setLoc(oldSwitch)
+                    _case.copy(body = newBody).setLoc(_case)
                 })
                 val newSwitch = oldSwitch.copy(e = transformExpression(e),
                                                cases = newCases).setLoc(oldSwitch)
