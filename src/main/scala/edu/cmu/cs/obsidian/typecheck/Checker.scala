@@ -1484,7 +1484,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkForUnusedStateInitializers(outputContext)
 
         if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
-            logError(tx.body.last, MustReturnError(tx.name))
+            val ast =
+                if (tx.body.length > 0) {
+                    tx.body.last
+                }
+                else {
+                    tx
+                }
+            logError(ast, MustReturnError(tx.name))
         }
         else if (!tx.retType.isDefined) {
             // We check for unused ownership errors at each return; if there isn't guaranteed to be one at the end, check separately.
