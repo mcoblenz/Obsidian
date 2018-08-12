@@ -444,8 +444,6 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Resources.obs",
             (ResourceContractConstructorError("BogusMoney"), 5)
                 ::
-                (UnusedOwnershipError("m"), 22)
-                ::
                 (InvalidInconsistentFieldType("money",
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
                     ContractReferenceType(ContractType("Money"), Owned(), false)), 26)

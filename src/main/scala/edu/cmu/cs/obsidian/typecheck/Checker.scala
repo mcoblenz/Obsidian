@@ -1057,13 +1057,22 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnership)
 
-                val variablesToExcludeFromOwnershipCheck = e match {
+                val thisSetToExclude = e match {
                     case ReferenceIdentifier(xOther)
                         if retTypeOpt.isDefined && retTypeOpt.get.isOwned => Set(xOther, "this")
                     case _ => Set("this")
                 }
 
-                checkForUnusedOwnershipErrors(s, contextPrime, variablesToExcludeFromOwnershipCheck)
+
+                val argsSetToExclude =
+                 decl match {
+                     case tx: Transaction =>
+                         val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
+                         ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
+                     case _ => Set.empty
+                 }
+
+                checkForUnusedOwnershipErrors(s, contextPrime, thisSetToExclude ++ argsSetToExclude)
 
                 if (retTypeOpt.isDefined && !retTypeOpt.get.isBottom) checkIsSubtype(s, typ, retTypeOpt.get)
                 contextPrime.makeThrown
@@ -1495,7 +1504,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
         else if (!tx.retType.isDefined) {
             // We check for unused ownership errors at each return; if there isn't guaranteed to be one at the end, check separately.
-            checkForUnusedOwnershipErrors(tx, outputContext, Set("this"))
+            // Every arg whose output type is owned should be owned at the end.
+            val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
+            val ownedArgNames = ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
+            checkForUnusedOwnershipErrors(tx, outputContext, Set("this") ++ ownedArgNames)
         }
 
         // Check to make sure all the field types are consistent with their declarations.

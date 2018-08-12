@@ -29,7 +29,7 @@ resource contract PendingPolicyList {
         return valCopy;
     }
 
-    transaction getValueCopy() returns PolicyRecord@Pending {
+    transaction getValueCopy(PendingPolicyList@HasNext this) returns PolicyRecord@Pending {
         PolicyRecord@Pending valCopy = val;
         val = new PolicyRecord(val.getPolicy(), new Money(0));
         return valCopy;
@@ -39,16 +39,16 @@ resource contract PendingPolicyList {
     transaction append(Policy@Unowned k, PolicyRecord@Pending >> Unowned v) {
         switch this {
             case HasNext {
-                next.set(k, v);
+                next.append(k, v);
             }
-            case None {
+            case Empty {
                 ->HasNext(key = k, val = v, next = new PendingPolicyList());
             }
         }
     }
 
     // get and remove the pair with the given Policy as a key
-    transaction remove(Policy@Unowned policy, PendingPolicyList@Shared prevNode) returns PolicyRecord@Pending {
+    transaction remove(PendingPolicyList@Owned this, Policy@Unowned policy, PendingPolicyList@HasNext prevNode) returns PolicyRecord@Pending {
         PolicyRecord@Pending removed;
         switch this {
             case Empty {
@@ -57,7 +57,7 @@ resource contract PendingPolicyList {
             case HasNext {
                 if (key.equals(policy)) {
                     prevNode.setNext(next);
-                    removed = getValueOwned();
+                    removed = getValueCopy();
                 }
                 else {
                     removed = next.remove(policy, this);
@@ -70,7 +70,7 @@ resource contract PendingPolicyList {
 }
 
 
-main contract PendingPolicyMap {
+main resource contract PendingPolicyMap {
     PendingPolicyList@Owned list;
 
     PendingPolicyMap@Owned() {
@@ -89,12 +89,12 @@ main contract PendingPolicyMap {
             case HasNext {
                 if(list.getKey().equals(policy)) {
                     removed = list.getValueCopy();
-                    first = new PendingPolicyList();
+                    list = new PendingPolicyList();
                 } else {
                     removed = list.remove(policy, list);
                 }
             }
-            case None {
+            case Empty {
                 throw; //TODO : element not in map?
             }
         }

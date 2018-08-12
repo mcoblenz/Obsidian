@@ -20,7 +20,7 @@ resource contract Wallet {
     }
 
     transaction loseMoney (Money@Owned m) {
-        // Error: m is linear
+        // OK: m's ownership is returned to the caller
     }
 
     transaction stealMoney (Money@Unowned m) {
@@ -70,7 +70,7 @@ contract Disowning {
 }
 
 contract LosingResource {
-    transaction bogus (Money@Owned m) returns Money@Unowned {
+    transaction bogus (Money@Owned >> Unowned m) returns Money@Unowned {
         // Error: losing m.
         return m;
     }
