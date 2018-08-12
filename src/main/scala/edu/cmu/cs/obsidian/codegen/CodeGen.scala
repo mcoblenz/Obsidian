@@ -1696,10 +1696,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
         val initializer = fieldInitializerForType(decl.typ)
         if (initializer.isDefined) {
-            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.name, initializer.get)
+            newClass.field(JMod.PUBLIC, resolveType(decl.typ), decl.name, initializer.get)
         }
         else {
-            newClass.field(JMod.PRIVATE, resolveType(decl.typ), decl.name)
+            newClass.field(JMod.PUBLIC, resolveType(decl.typ), decl.name)
         }
     }
 
@@ -2151,6 +2151,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                     jPrev = jPrev._elseif(eqState(_case.stateName))
                     translateBody(jPrev._then(), _case.body, translationContext, localContext)
                 }
+                // If no cases matched, this indicates a bug. Abort.
+                jPrev._else()._throw(JExpr._new(model.ref("RuntimeException")))
             case LocalInvocation(methName, args) =>
                 addArgs(translationContext.invokeTransaction(methName),
                         args, translationContext, localContext)
