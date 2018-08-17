@@ -75,7 +75,7 @@ object AstTransformer {
 
         newDecls = newDecls.reverse
 
-        val newContract = Contract(cTable.contract.modifiers, cTable.contract.name, newDecls, cTable.contract.isInterface).setLoc(cTable.contract)
+        val newContract = Contract(cTable.contract.modifiers, cTable.contract.name, newDecls, cTable.contract.transitions, cTable.contract.isInterface).setLoc(cTable.contract)
 
         (newContract, errors.reverse)
     }

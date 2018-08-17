@@ -147,6 +147,9 @@ case class Transaction(name: String,
     }
 }
 
+case class FSMEdge (fromState: Identifier, toState: Identifier) extends AST;
+case class Transitions(edges: Seq[FSMEdge]) extends AST;
+
 
 case class State(name: String, fields: Seq[Field], isResource: Boolean) extends Declaration {
     val tag: DeclarationTag = StateDeclTag
@@ -164,6 +167,7 @@ case class Import(name: String) extends AST
 case class Contract(modifiers: Set[ContractModifier],
                     name: String,
                     declarations: Seq[Declaration],
+                    transitions: Option[Transitions],
                     isInterface: Boolean) extends Declaration {
     val tag: DeclarationTag = ContractDeclTag
 

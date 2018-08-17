@@ -240,6 +240,10 @@ class ParserTests extends JUnitSuite {
         shouldFailFile("resources/tests/parser_tests/UnclosedContract.obs")
     }
 
+    @Test def FSMs() = {
+        shouldSucceedFile("resources/tests/parser_tests/FSMs.obs")
+    }
+
     @Test def thisArgument(): Unit = {
         shouldFail(
           """main contract C {

@@ -1,5 +1,6 @@
 package edu.cmu.cs.obsidian.parser
 
+import edu.cmu.cs.obsidian.lexer
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.typecheck._
 
@@ -589,14 +590,53 @@ object Parser extends Parsers {
         mainP | resourceP
     }
 
+    private def parseFSMEdgeLine: Parser[Seq[FSMEdge]] = {
+        parseId ~ RightArrowT() ~ repsep(parseId, CommaT()) ~ SemicolonT() ^^ {
+            case fromState ~ _ ~ toStates ~ _ =>
+                toStates.map(toState => FSMEdge(fromState, toState))
+        }
+    }
+
+    private def parseTransitions: Parser[Transitions] = {
+        TransitionsT() ~! LBraceT() ~ rep(parseFSMEdgeLine) ~ RBraceT() ^^ {
+            case transitions ~ _ ~ edges ~ _ =>
+                val allEdges = edges.reduce((e1, e2) => e1 ++ e2)
+                Transitions(allEdges).setLoc(transitions)
+        }
+    }
+
     private def parseContractDecl = {
         rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseId >> {
             case mod ~ ct ~ name =>
                 val isInterface = ct == InterfaceT()
 
-                LBraceT() ~! rep(parseDeclInContract(isInterface)(name._1)) ~! RBraceT() ^^ {
-                case _ ~ defs ~ _ =>
-                    Contract(mod.toSet, name._1, defs, isInterface).setLoc(ct)
+                LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface)(name._1)) ~! RBraceT() ^^ {
+                case _ ~ contents ~ _ =>
+                    // Make sure there's only one transition diagram.
+                    val separateTransitions = contents.filter({
+                        case t: Transitions => true
+                        case _ => false
+                    }).map(_.asInstanceOf[Transitions])
+
+                    // For now, combine all the state transitions from all the different
+                    // transitions blocks.
+                    // Maybe eventually require that there is only one transitions block.
+                    val transitionsEdges = separateTransitions.foldLeft(List.empty[FSMEdge])((edges, t) => edges ++ t.edges)
+
+                    val transitions =
+                        if (transitionsEdges.isEmpty) {
+                            None
+                        }
+                        else {
+                            Some(Transitions(transitionsEdges))
+                        }
+
+                    val decls = contents.filter({
+                        case d: Declaration => true
+                        case _ => false
+                    }).map(_.asInstanceOf[Declaration])
+
+                    Contract(mod.toSet, name._1, decls, transitions, isInterface).setLoc(ct)
             }
         }
     }

@@ -59,6 +59,7 @@ object Lexer extends RegexParsers {
         case "resource" => ResourceT()
         case "disown" => DisownT()
         case "private" => PrivateT()
+        case "transitions" => TransitionsT()
         case id => IdentifierT(id)
     }
 

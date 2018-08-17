@@ -55,7 +55,7 @@ object ImportProcessor {
     def filterTags(contracts: Seq[Contract]): Seq[Contract] = {
         contracts.map(c => {
             val newMods = c.modifiers - IsMain() + IsImport()
-            val newC = Contract(newMods, c.name, c.declarations, c.isInterface)
+            val newC = Contract(newMods, c.name, c.declarations, c.transitions, c.isInterface)
             newC
         })
     }
