@@ -42,6 +42,12 @@ resource contract Account {
     transaction deposit(Account@Unowned this, Money@Owned >> Unowned money) {
         value.merge(money);
     }
+
+    transaction setBalance(Account@Unowned this, Money@Owned >> Unowned money) returns Money@Owned {
+        Money@Owned result = value;
+        value = money;
+        return result;
+    }
 }
 
 contract AccountList {
@@ -91,7 +97,11 @@ main contract StandardToken {
         // balances[from] -= value;
         // balances[to] =+ value;
         Money@Owned money = fromAccount.withdraw(amount.getValue());
-        toAccount.deposit(money);
+        //toAccount.setBalance(money);
+// Correct code:
+             toAccount.deposit(money);
+
+
     }
 
 }
