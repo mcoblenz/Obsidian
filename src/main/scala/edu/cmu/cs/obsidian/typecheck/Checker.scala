@@ -1324,12 +1324,21 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             val newContextThisType =
                                 newType // is this right?
                             contextPrime.updated("this", newContextThisType)
-                        case ReferenceIdentifier(x) => contextPrime.updated(x, newType)
+                        case ReferenceIdentifier(x) =>
+                            if (contextPrime.get(x).isDefined) {
+                                // We're switching on a local variable or formal parameter.
+                                contextPrime.updated(x, newType)
+                            }
+                            else {
+                                // This must be a field.
+                                contextPrime.updatedThisFieldType(x, newType)
+                            }
                         case _ => contextPrime
                     }
 
                     val contextFromBody = checkStatementSequence(decl, startContext, sc.body)
                     val prunedContext = pruneContext(s, contextFromBody, startContext)
+
                     prunedContext
                 }
 
