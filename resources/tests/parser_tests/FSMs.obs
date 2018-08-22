@@ -1,0 +1,14 @@
+main contract SimpleFSM {
+    state S1;
+    state S2;
+    state S3;
+
+    SimpleFSM() {
+        ->S1;
+    }
+
+    transitions {
+        S1 -> S2, S3;
+        S2 -> S1;
+    }
+}
