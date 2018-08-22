@@ -5,11 +5,11 @@ import "resources/case_studies/Insurance/Money.obs"
 main contract PolicyRecord {
     Policy@Unowned policy;
 
-    resource state Pending {
+    asset state Pending {
         Money@Owned payout;
     }
 
-    resource state Active {
+    asset state Active {
         Money@Owned claim;
     }
 

@@ -7,14 +7,14 @@ contract C1 {
   state S {}
 }
 
-resource contract C2 {
+asset contract C2 {
   C2@S(){
     ->S;
   }
   state S {}
 }
 
-main resource contract C {
+main asset contract C {
     // okay
 
     C2@S f3;

@@ -1,4 +1,4 @@
-// This test focuses on ownership of non-resource objects.
+// This test focuses on ownership of non-asset objects.
 
 contract Prescription {
 
@@ -19,6 +19,6 @@ main contract Pharmacy {
     }
 
     transaction dropPrescription(Prescription@Owned p) {
-        // OK, since Prescription is not a resource.
+        // OK, since Prescription is not a asset.
     }
 }

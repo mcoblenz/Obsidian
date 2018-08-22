@@ -27,9 +27,9 @@ main contract FieldTypeMismatch {
     }
 }
 
-resource contract Money {}
+asset contract Money {}
 
-resource contract Wallet {
+asset contract Wallet {
     Wallet@Empty () {
         ->Empty;
     }

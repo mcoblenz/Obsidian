@@ -56,7 +56,7 @@ object Lexer extends RegexParsers {
         case "available" => AvailableT()
         case "ends" => EndsT()
         case "in" => InT()
-        case "resource" => ResourceT()
+        case "asset" => AssetT()
         case "disown" => DisownT()
         case "private" => PrivateT()
         case "transitions" => TransitionsT()

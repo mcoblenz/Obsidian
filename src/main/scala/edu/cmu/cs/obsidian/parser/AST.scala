@@ -151,14 +151,14 @@ case class FSMEdge (fromState: Identifier, toState: Identifier) extends AST;
 case class Transitions(edges: Seq[FSMEdge]) extends AST;
 
 
-case class State(name: String, fields: Seq[Field], isResource: Boolean) extends Declaration {
+case class State(name: String, fields: Seq[Field], isAsset: Boolean) extends Declaration {
     val tag: DeclarationTag = StateDeclTag
 }
 
 case class Ensures(expr: Expression) extends AST
 
 sealed abstract trait ContractModifier extends HasLocation
-case class IsResource() extends ContractModifier
+case class IsAsset() extends ContractModifier
 case class IsMain() extends ContractModifier
 case class IsImport() extends ContractModifier
 
@@ -171,7 +171,7 @@ case class Contract(modifiers: Set[ContractModifier],
                     isInterface: Boolean) extends Declaration {
     val tag: DeclarationTag = ContractDeclTag
 
-    val isResource = modifiers.contains(IsResource())
+    val isAsset = modifiers.contains(IsAsset())
     val isMain = modifiers.contains(IsMain())
     val isImport = modifiers.contains(IsImport())
 }

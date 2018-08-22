@@ -1,6 +1,6 @@
 import "resources/case_studies/Insurance/Money.obs"
 
-main resource contract InsuranceBid {
+main asset contract InsuranceBid {
     int cost;
     int expirationTime;
     Money@Owned payout;

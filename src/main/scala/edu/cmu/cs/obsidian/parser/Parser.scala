@@ -561,11 +561,11 @@ object Parser extends Parsers {
     }
 
     private def parseStateDecl = {
-        opt(ResourceT()) ~ StateT() ~! parseId ~! opt(LBraceT() ~! rep(parseFieldDecl) ~! RBraceT()) ~ opt(SemicolonT()) ^^ {
-            case isResource ~ st ~ name ~ maybeDefs ~ _ =>
+        opt(AssetT()) ~ StateT() ~! parseId ~! opt(LBraceT() ~! rep(parseFieldDecl) ~! RBraceT()) ~ opt(SemicolonT()) ^^ {
+            case isAsset ~ st ~ name ~ maybeDefs ~ _ =>
                 maybeDefs match {
-                    case None => State(name._1, Seq.empty, isResource.isDefined).setLoc(st)
-                    case Some (_ ~ defs ~ _)  => State(name._1, defs, isResource.isDefined).setLoc(st)
+                    case None => State(name._1, Seq.empty, isAsset.isDefined).setLoc(st)
+                    case Some (_ ~ defs ~ _)  => State(name._1, defs, isAsset.isDefined).setLoc(st)
                 }
         }
     }
@@ -586,7 +586,7 @@ object Parser extends Parsers {
 
     private def parseContractModifier = {
         val mainP: Parser[ContractModifier] = MainT() ^^ (t => IsMain().setLoc(t))
-        val resourceP: Parser[ContractModifier] = ResourceT() ^^ (t => IsResource().setLoc(t))
+        val resourceP: Parser[ContractModifier] = AssetT() ^^ (t => IsAsset().setLoc(t))
         mainP | resourceP
     }
 

@@ -1,6 +1,6 @@
-resource contract Money {}
+asset contract Money {}
 
-main resource contract Wallet {
+main asset contract Wallet {
 	 Wallet@Owned() {
 	 	  ->Empty;
 	 }

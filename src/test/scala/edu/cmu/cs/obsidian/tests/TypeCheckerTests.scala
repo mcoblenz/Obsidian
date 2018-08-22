@@ -441,8 +441,8 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def resourcesTest(): Unit = {
-        runTest("resources/tests/type_checker_tests/Resources.obs",
-            (ResourceContractConstructorError("BogusMoney"), 5)
+        runTest("resources/tests/type_checker_tests/Assets.obs",
+            (AssetContractConstructorError("BogusMoney"), 5)
                 ::
                 (InvalidInconsistentFieldType("money",
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
@@ -452,7 +452,7 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
                     ContractReferenceType(ContractType("Money"), Owned(), false)), 37)
                 ::
-                (NonResourceOwningResourceError("BadWallet",
+                (NonAssetOwningAssetError("BadWallet",
                     Field(false,
                         ContractReferenceType(ContractType("Money"), Owned(), false),
                         "money",
@@ -499,8 +499,8 @@ class TypeCheckerTests extends JUnitSuite {
         )
     }
 
-    @Test def droppedResourcesTest(): Unit = {
-        runTest("resources/tests/type_checker_tests/MaybeDroppedResource.obs",
+    @Test def droppedAssetsTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/MaybeDroppedAsset.obs",
             (PotentiallyUnusedOwnershipError("m"), 17)
                 ::
                 Nil

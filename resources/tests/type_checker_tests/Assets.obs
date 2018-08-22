@@ -1,18 +1,18 @@
 // This file tests ownership transfer and linearity.
 
-main resource contract BogusMoney {
+main asset contract BogusMoney {
 	 // Error: constructor must return an owned reference
 	 BogusMoney() {
 	 }
 }
 
-resource contract Money {
+asset contract Money {
     Money@Owned() {
 
     }
 }
 
-resource contract Wallet {
+asset contract Wallet {
     Money@Owned money;
 
     Wallet@Owned(Money@Owned m) {
@@ -39,7 +39,7 @@ resource contract Wallet {
 }
 
 contract BadWallet {
-    // Error: can't own a resource in a non-resource contract.
+    // Error: can't own a asset in a non-asset contract.
     Money@Owned money;
 }
 

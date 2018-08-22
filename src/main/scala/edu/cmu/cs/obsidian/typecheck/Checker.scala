@@ -208,7 +208,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case np3: NonPrimitiveType =>
                                 (np3.permission == Unowned()) ||
                                   (np1.permission == Shared() && np2.permission == Shared() && np3.permission == Shared()) ||
-                                  (np1.permission == Owned() && np2.permission == Shared() && np3.permission == Shared() && np1.isResourceReference(contextContractTable) == No())
+                                  (np1.permission == Owned() && np2.permission == Shared() && np3.permission == Shared() && np1.isAssetReference(contextContractTable) == No())
                             case _ => false // can't split non-reference types
                         }
                     case _ => false // can't split non-reference types
@@ -755,7 +755,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
         typ match {
             case t: NonPrimitiveType =>
-                if (t.isOwned && t.isResourceReference(context.contractTable) != No()) logError(ast, UnusedOwnershipError(variable))
+                if (t.isOwned && t.isAssetReference(context.contractTable) != No()) logError(ast, UnusedOwnershipError(variable))
             case _ => ()
         }
     }
@@ -1204,10 +1204,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 // Check for potentially-dropped resources.
-                val toCheckForDroppedResources = maybeOldFields.diff(newFields.toSet) // fields that we might currently have minus fields we're initializing now
-                for (oldField <- toCheckForDroppedResources) {
+                val toCheckForDroppedAssets = maybeOldFields.diff(newFields.toSet) // fields that we might currently have minus fields we're initializing now
+                for (oldField <- toCheckForDroppedAssets) {
                     val fieldType = contextPrime.thisFieldTypes.getOrElse(oldField._1, oldField._2)
-                    if (fieldType.isResourceReference(thisTable) != No() && fieldType.isOwned) {
+                    if (fieldType.isAssetReference(thisTable) != No() && fieldType.isOwned) {
                         logError(s, PotentiallyUnusedOwnershipError(oldField._1))
                     }
                 }
@@ -1422,33 +1422,33 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def checkField(field: Field, lexicallyInsideOf: ContractTable, containingState: Option[State]): Unit = {
-        val contractIsResource = lexicallyInsideOf.contract.modifiers.contains(IsResource())
+        val contractIsAsset = lexicallyInsideOf.contract.modifiers.contains(IsAsset())
 
-        val containerIsResource = containingState match {
+        val containerIsAsset = containingState match {
             case None =>
                 // This field is lexically inside a contract, not in a state, but it might be available in a particular set of states.
 
-                // If the field is in a contract that was declared as a resource, the settings on the individual states don't matter.
-                if (contractIsResource) {
+                // If the field is in a contract that was declared as a asset, the settings on the individual states don't matter.
+                if (contractIsAsset) {
                     true
                 }
                 else if (field.availableIn.isDefined) {
                     val availableStateNames = field.availableIn.get
                     val availableStates = availableStateNames.map((stateName: String) => lexicallyInsideOf.state(stateName))
-                    availableStates.foldLeft(true)((allResourcesSoFar: Boolean, state: Option[StateTable]) => allResourcesSoFar && state.isDefined && state.get.ast.isResource)
+                    availableStates.foldLeft(true)((allAssetsSoFar: Boolean, state: Option[StateTable]) => allAssetsSoFar && state.isDefined && state.get.ast.isAsset)
                 }
                 else {
-                    contractIsResource
+                    contractIsAsset
                 }
-            case Some(state) => contractIsResource || state.isResource
+            case Some(state) => contractIsAsset || state.isAsset
         }
 
         field.typ match {
             case typ: NonPrimitiveType =>
                 if (typ.isOwned) {
                     // Only resources can own other resources (since otherwise they might go out of scope improperly).
-                    if (typ.isResourceReference(lexicallyInsideOf) != No() && !containerIsResource) {
-                        logError(field, NonResourceOwningResourceError(lexicallyInsideOf.name, field))
+                    if (typ.isAssetReference(lexicallyInsideOf) != No() && !containerIsAsset) {
+                        logError(field, NonAssetOwningAssetError(lexicallyInsideOf.name, field))
                     }
                 }
             case _ => ()
@@ -1660,8 +1660,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(constr, ConstructorNameError(table.name))
         }
 
-        if (table.contract.isResource && !constr.resultType.isOwned) {
-            logError(constr, ResourceContractConstructorError(table.name))
+        if (table.contract.isAsset && !constr.resultType.isOwned) {
+            logError(constr, AssetContractConstructorError(table.name))
         }
 
         // first create this unchecked context so we can resolve types

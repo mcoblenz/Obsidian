@@ -189,16 +189,16 @@ case class NoParentError(cName: String) extends Error {
     val msg: String = s"Contract $cName has no parent contract"
 }
 
-case class ResourceContractConstructorError(contractName: String) extends Error {
-    val msg: String = s"Constructors in resource contract $contractName must return owned references."
+case class AssetContractConstructorError(contractName: String) extends Error {
+    val msg: String = s"Constructors in asset contract $contractName must return owned references."
 }
 
 case class OwnershipSubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
     val msg: String = s"Can't transfer ownership to type '$t2' from unowned type '$t1'."
 }
 
-case class NonResourceOwningResourceError(contractName: String, f: Field) extends Error {
-    val msg: String = s"Non-resource contract '$contractName' cannot own resource field '${f.name}' of type '${f.typ}'."
+case class NonAssetOwningAssetError(contractName: String, f: Field) extends Error {
+    val msg: String = s"Non-asset contract '$contractName' cannot own asset field '${f.name}' of type '${f.typ}'."
 }
 
 case class DisownUnowningExpressionError(e: Expression) extends Error {

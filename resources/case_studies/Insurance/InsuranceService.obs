@@ -4,7 +4,7 @@ import "resources/case_studies/Insurance/PendingPolicyMap.obs"
 import "resources/case_studies/Insurance/ActivePolicyMap.obs"
 
 
-main resource contract InsuranceService {
+main asset contract InsuranceService {
     // TODO: Collection of Insurer
     // TODO: Keys of trusted banks
     Insurer@Shared insurers;

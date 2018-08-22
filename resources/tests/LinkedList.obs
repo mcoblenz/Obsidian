@@ -1,4 +1,4 @@
-resource contract NodeMaybe {
+asset contract NodeMaybe {
     state NodeNone {}
     state NodeSome {
         IntNode@Shared node;
@@ -24,7 +24,7 @@ resource contract NodeMaybe {
 }
 
 
-resource contract IntNode {
+asset contract IntNode {
     int elem;
     NodeMaybe@Owned next;
 
@@ -79,7 +79,7 @@ resource contract IntNode {
 }
 
 /*
-resource contract IntList {
+asset contract IntList {
 
     NodeMaybe first;
 

@@ -220,15 +220,15 @@ The \texttt{\small{->}} operator indicates a state transition.
 
 \subsection{Linear Resources}
 
-Blockchain programs may manage some kind of resource, like a cryptocurrency, or a token 
+Blockchain programs may manage some kind of asset, like a cryptocurrency, or a token
 indicating a more complicated right (e.g. ownership of a financial option). Linear types \cite{Wadler} are an existing approach that allow the compiler to
 enforce a safe, clean programming model: resources cannot be used more than once, but must be 
-used before leaving the current scope (thus ensuring that a resource is not lost accidentally). 
+used before leaving the current scope (thus ensuring that a asset is not lost accidentally).
 
 \begin{lstlisting}[caption={Linear resources in Obsidian}, captionpos = b, label = treasury]
 contract Treasury {
-   // Money is a resource of Treasury
-   resource contract Money { ... }
+   // Money is a asset of Treasury
+   asset contract Money { ... }
 
     transaction t1(Money m) {
         spendMoney(m);
@@ -245,7 +245,7 @@ contract Treasury {
 
 \subsection{Path-Dependent Types}
 
-There are certain cases in blockchain programs in which a programmer may want a resource to
+There are certain cases in blockchain programs in which a programmer may want a asset to
 be dependent upon a specific contract. For example, we may want each instance of the 
 \texttt{\small{Treasury}} contract in Fig. \ref{treasury} to mint its own kind of money. If money \texttt{\small{m1}} from treasury \texttt{\small{t1}} is used with a distinct treasury \texttt{\small{t2}}, we would like the compiler to give an error message. Obsidian supports this via the inclusion of path-dependent types \cite{Amin}, wherein values can have type members. In the 
 above example, the type of Money is dependent upon a specific value of Treasury; put another way, 
@@ -567,7 +567,7 @@ more easily which state an object is currently in and which transactions and fie
 The responses we received from participants in the lottery ticket exercise reveal that nesting contracts is likely not the most understandable
 way to express a dependency relationship. Three participants made comments about this, and those who did not were not 
 able to identify path-dependent types correctly. An alternative to this approach would be to prohibit nesting and instead use a keyword
-to denote this relationship (e.g. \texttt{\small{"resource contract LotteryTicket depends on Lottery"}}).
+to denote this relationship (e.g. \texttt{\small{"asset contract LotteryTicket depends on Lottery"}}).
 
 \section{Future Work}
 

@@ -1,5 +1,5 @@
 // Money is shared, trusted code -- but it only has to be written once.
-resource contract Money {
+asset contract Money {
     int value;
 
     Money@Owned(int v) {
@@ -25,7 +25,7 @@ resource contract Money {
     }
 }
 
-resource contract Account {
+asset contract Account {
     Money@Owned value;
     int address;
 
@@ -54,7 +54,7 @@ contract AccountList {
     state Empty {
     }
 
-    resource state HasNext {
+    asset state HasNext {
         Account@Owned account;
         AccountList@Owned next;
     }

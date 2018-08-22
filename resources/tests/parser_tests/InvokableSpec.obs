@@ -1,7 +1,7 @@
 
 // NOTE: this file should parse, but not type-check
 
-resource contract C_Owned {}
+asset contract C_Owned {}
 contract C {
     state S1 {}
     state S2 {}

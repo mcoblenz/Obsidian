@@ -1,7 +1,7 @@
 /* checks type-checking of return statements and various flow-sensitive
  * properties about statement sequences w.r.t. returns */
 
-resource contract C_Owned {
+asset contract C_Owned {
   C_Owned@Owned() {
     ->S;
   }

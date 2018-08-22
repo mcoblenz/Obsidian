@@ -1,6 +1,6 @@
 import "resources/case_studies/Insurance/Money.obs"
 
-main resource contract Bank {
+main asset contract Bank {
     Money@Owned mon;
     // the bank's private key for making tokens
     int key;

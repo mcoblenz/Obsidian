@@ -4,7 +4,7 @@ import "resources/case_studies/Insurance/TimeService.obs"
 
 // TODO : Collections
 
-main resource contract Insurer {
+main asset contract Insurer {
     Money@Owned money;
     Bank@Shared bank;
     TimeService@Shared timeService;

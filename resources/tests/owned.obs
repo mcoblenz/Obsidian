@@ -1,4 +1,4 @@
-resource contract IsOwned {
+asset contract IsOwned {
     int x;
 
     transaction setX(int y) {

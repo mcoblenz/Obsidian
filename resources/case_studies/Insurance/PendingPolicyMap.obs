@@ -1,7 +1,7 @@
 import "resources/case_studies/Insurance/PolicyRecord.obs"
 
 // This implements a mutable linked list of pending policies.
-resource contract PendingPolicyList {
+asset contract PendingPolicyList {
     state HasNext {
         Policy@Unowned key;
         PolicyRecord@Pending val;
@@ -70,7 +70,7 @@ resource contract PendingPolicyList {
 }
 
 
-main resource contract PendingPolicyMap {
+main asset contract PendingPolicyMap {
     PendingPolicyList@Owned list;
 
     PendingPolicyMap@Owned() {
