@@ -23,7 +23,6 @@ main contract Construct {
       int b = thing1.w;
       // should fail: not dereferenceable
       string c = "hi".y;
-
     }
 
 }

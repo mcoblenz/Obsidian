@@ -520,7 +520,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
 
              case Dereference(eDeref: Expression, fieldName) =>
-                 val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref, ConsumingOwnedGivesUnowned())
+                 val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref, ownershipConsumptionMode)
                  if (derefType.isBottom) {
                      return (BottomType(), contextPrime)
                  }
