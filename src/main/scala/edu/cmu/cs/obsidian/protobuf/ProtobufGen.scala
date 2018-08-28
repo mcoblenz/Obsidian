@@ -86,7 +86,6 @@ object ProtobufGen {
                     ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(np.contractName), f.name)
                 }
             case BottomType() => assert(false, "Bottom type should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
-            case u@UnresolvedNonprimitiveType(_, _) => assert(false, "Unresolved types should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
             case UnitType() => assert(false, "Fields should not be of unit type."); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
         }
     }

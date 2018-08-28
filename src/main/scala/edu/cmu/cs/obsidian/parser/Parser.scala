@@ -83,35 +83,6 @@ object Parser extends Parsers {
             }
         }
 
-
-
-        //        val parseNonPrimitive: Parser[NonPrimitiveType] =
-        //            rep(parseTypeModifier) ~ (parseId | ThisT() | ParentT()) ~ opt(parseDotPath) ^^ {
-        //                case mods ~ id ~ path => {
-        //                    val (identString, position: Position) = id match {
-        //                        case t: Token => (t.toString, t.pos)
-        //                        // For obscure type erasure reasons, a pattern match on Identifier type doesn't work.
-        //                        case ident => (ident.asInstanceOf[Identifier]._1, ident.asInstanceOf[Identifier]._2)
-        //                    }
-        //                    path match {
-        //                        case Some(idents) =>
-        //                            val pathStrings = List(identString) ++ idents.map(ident => ident._1)
-        //                            UnresolvedNonprimitiveType(pathStrings, mods.toSet, Shared()).setLoc(position)
-        //                        case None =>
-        //                            val permission =
-        //                                if (mods.contains(IsOwned())) {
-        //                                    Owned()
-        //                                }
-        //                                else {
-        //                                    Shared()
-        //                                }
-        //
-        //                            UnresolvedNonprimitiveType(List(identString), mods.toSet, permission).setLoc(position)
-        //                    }
-        //
-        //                }
-        // For now, support only one state specification
-
         val parseNonPrimitive: Parser[NonPrimitiveType] = {
              opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseIdAlternatives) ^^ {
                 case remote ~ id ~ permissionToken => {

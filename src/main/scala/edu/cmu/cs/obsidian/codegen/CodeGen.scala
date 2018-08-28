@@ -1416,7 +1416,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 ifNonempty._then().assign(fieldVar, getCall)
             }
             case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
-            case _: UnresolvedNonprimitiveType => assert(false, "Unresolved types should not occur at codegen.")
             case _: BottomType => assert(false, "Bottom type should not occur at codegen.")
             case UnitType() => assert(false, "Fields must not be of unit type.")
         }

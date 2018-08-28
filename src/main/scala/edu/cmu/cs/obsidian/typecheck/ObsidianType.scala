@@ -233,17 +233,6 @@ case class BottomType() extends ObsidianType {
     override def topPermissionType: ObsidianType = this
 }
 
-// Only appears before running resolution, which happens right after parsing.
-case class UnresolvedNonprimitiveType(identifiers: Seq[String], permission: Permission) extends ObsidianType {
-    val isBottom: Boolean = false
-
-    override def toString: String  = identifiers.mkString(".")
-
-
-    override def residualType(mode: OwnershipConsumptionMode): ObsidianType = this // Should never be invoked
-    override def topPermissionType: ObsidianType = this
-}
-
 case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
     override val isBottom: Boolean = false

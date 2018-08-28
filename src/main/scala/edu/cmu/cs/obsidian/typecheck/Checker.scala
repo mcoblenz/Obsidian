@@ -344,7 +344,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case UnitType() | IntType() | BoolType() | StringType() =>
                     logError(e, NonInvokeableError(receiverType))
                     return (BottomType(), contextAfterReceiver)
-                case u: UnresolvedNonprimitiveType => assert(false, "Should have resolved unresolved types already"); return (BottomType(), contextAfterReceiver)
                 case np: NonPrimitiveType => np
             }
 
@@ -1410,8 +1409,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         allowedStatesOrPermissions.toSet.foreach((stateName: Identifier) => checkStateOrPermissionValid(stateType.contractName, stateName))
 
                     case InterfaceContractType(name, _) => assert(false, "Should have already eliminated this case")
-                    case u: UnresolvedNonprimitiveType =>
-                        assert(false, "Should not encounter unresolved nonprimitive types in the typechecker")
                 }
 
                 context // Not contextPrime!
