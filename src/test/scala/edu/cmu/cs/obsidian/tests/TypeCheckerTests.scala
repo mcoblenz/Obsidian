@@ -27,7 +27,7 @@ class TypeCheckerTests extends JUnitSuite {
         val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
         val table = new SymbolTable(fieldsLiftedAst)
-        val (globalTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
+        val (globalTable: SymbolTable, transformErrors) = StateNameValidator.transformProgram(table)
 
         val checker = new Checker(globalTable)
         val errs = (checker.checkProgram() ++ transformErrors).sorted

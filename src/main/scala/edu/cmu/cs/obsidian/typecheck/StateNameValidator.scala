@@ -9,15 +9,13 @@ import scala.collection.Map
 import scala.util.parsing.input.Position
 import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
 
-/* The only purpose of this compilation phase at the moment is to disambiguate
- * path-types. For example, If [T] is defined as a dependent type of [C], then
- * inside of [C], the types [T] and [this.T] refer to the same thing. This
- * must be clarified. */
 
 /* Important Note: be sure to take into account the fact that AST nodes need a location.
  * To construct a new AST node in this file, explicitly set the location using [setLoc] */
 
-object AstTransformer extends IdentityAstTransformer {
+
+// Checks to make sure all state names mentioned in type names are actually valid states.
+object StateNameValidator extends IdentityAstTransformer {
 
     override def transformType(
             table: SymbolTable,
@@ -25,8 +23,6 @@ object AstTransformer extends IdentityAstTransformer {
             context: Context,
             t: ObsidianType,
             pos: Position): (ObsidianType, List[ErrorRecord]) = {
-
-        // We should only be transforming potentially-unresolved types, but we can't specify that statically because ASTs are used for resolved types too.
 
         t match {
             case np: NonPrimitiveType =>

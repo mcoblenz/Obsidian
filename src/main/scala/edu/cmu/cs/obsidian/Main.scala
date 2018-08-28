@@ -8,7 +8,7 @@ import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.protobuf._
-import edu.cmu.cs.obsidian.typecheck.{AstTransformer, Checker, InferTypes}
+import edu.cmu.cs.obsidian.typecheck.{StateNameValidator, Checker, InferTypes}
 import edu.cmu.cs.obsidian.util._
 
 import scala.sys.process._
@@ -280,13 +280,7 @@ object Main {
             val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
             val table = new SymbolTable(fieldsLiftedAst)
-            val (transformedTable: SymbolTable, transformErrors) = AstTransformer.transformProgram(table)
-
-            if (options.printAST) {
-                println("Transformed AST:")
-                println(transformedTable.ast)
-                println()
-            }
+            val (transformedTable: SymbolTable, transformErrors) = StateNameValidator.transformProgram(table)
 
             val inferTypes = new InferTypes(transformedTable)
             val inferredTypesProgram = inferTypes.inferTypesInProgram()
