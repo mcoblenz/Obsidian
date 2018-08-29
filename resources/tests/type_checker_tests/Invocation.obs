@@ -24,7 +24,8 @@ main contract Invocation {
         // should fail: int not invokable
         int f = 5.otherMethod(1);
 
-        OtherContract@Shared other = new OtherContract();
+        OtherContract other = new OtherContract();
+        [other@Owned];
 
         int g = other.otherMethod(3);
         // should fail: method undefined

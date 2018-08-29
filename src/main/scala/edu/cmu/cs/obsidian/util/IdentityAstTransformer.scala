@@ -295,7 +295,6 @@ class IdentityAstTransformer {
             case oldAssert@StaticAssert(e, l) =>
                 (StaticAssert(transformExpression(e), l).setLoc(oldAssert), context, Seq())
             case e: Expression => (transformExpression(e), context, Seq())
-
         }
     }
 

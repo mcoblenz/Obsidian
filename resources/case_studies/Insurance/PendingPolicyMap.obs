@@ -24,13 +24,11 @@ asset contract PendingPolicyList {
     }
 
     transaction getValue(PendingPolicyList@HasNext this) returns PolicyRecord@Unowned {
-        PolicyRecord@Pending valCopy = val;
-        val = valCopy;
-        return valCopy;
+        return val;
     }
 
-    transaction getValueCopy(PendingPolicyList@HasNext this) returns PolicyRecord@Pending {
-        PolicyRecord@Pending valCopy = val;
+    transaction removeValue(PendingPolicyList@HasNext this) returns PolicyRecord@Pending {
+        PolicyRecord valCopy = val;
         val = new PolicyRecord(val.getPolicy(), new Money(0));
         return valCopy;
     }
@@ -57,7 +55,7 @@ asset contract PendingPolicyList {
             case HasNext {
                 if (key.equals(policy)) {
                     prevNode.setNext(next);
-                    removed = getValueCopy();
+                    removed = removeValue();
                 }
                 else {
                     removed = next.remove(policy, this);
@@ -88,7 +86,7 @@ main asset contract PendingPolicyMap {
         switch list {
             case HasNext {
                 if(list.getKey().equals(policy)) {
-                    removed = list.getValueCopy();
+                    removed = list.removeValue();
                     list = new PendingPolicyList();
                 } else {
                     removed = list.remove(policy, list);

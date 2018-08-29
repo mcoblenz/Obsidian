@@ -45,18 +45,15 @@ contract BadWallet {
 
 contract Disowning {
 	 transaction bogusDiscardMoney (Money@Unowned m) {
-	 	     // Error: m is unowned
-	 	     disown m;
+	 	 // Error: m is unowned
+	 	 disown m;
 	 }
 
 	 transaction discardMoney (Money@Owned >> Unowned m) {
-     	 	 disown m;
+        disown m;
 
-     	 	 // Error: m is shared.
-     	 	 discardMoney(m);
-
-             // Error: m is shared. Want to make sure we can't consume m twice.
-     	 	 Money@Owned bad = m;
+     	// Error: m is shared.
+     	discardMoney(m);
      }
 
      transaction getMoney() returns Money@Owned {
@@ -65,7 +62,7 @@ contract Disowning {
 
      transaction discardMoneyCall () {
         disown getMoney();
-        Money@Unowned m = disown getMoney(); // disown is an expression, not just a statement
+        Money m = disown getMoney(); // disown is an expression, not just a statement
      }
 }
 

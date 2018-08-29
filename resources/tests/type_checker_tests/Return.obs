@@ -24,8 +24,8 @@ main contract C {
 
     transaction t_ret_nonprimitive() returns C_Owned@Owned {
         return new C_Owned();
-        // should fail twice, once for subtyping and again for unreachable code
-        C_Owned@S cs = new C_Owned();
+        // should fail: unreachable code
+        C_Owned cs = new C_Owned();
         return cs;
         // should fail: no return value
         return;

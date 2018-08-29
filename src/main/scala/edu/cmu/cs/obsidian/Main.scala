@@ -282,12 +282,12 @@ object Main {
             val table = new SymbolTable(fieldsLiftedAst)
             val (transformedTable: SymbolTable, transformErrors) = StateNameValidator.transformProgram(table)
 
-            val inferTypes = new InferTypes(transformedTable)
-            val inferredTypesProgram = inferTypes.inferTypesInProgram()
+            //val inferTypes = new InferTypes(transformedTable)
+            //val inferredTypesProgram = inferTypes.inferTypesInProgram()
             // TODO: dispense with unnecessary symbol table re-creation
-            val inferredTable = new SymbolTable(inferredTypesProgram)
+//            val inferredTable = new SymbolTable(transformedTable.ast)
 
-            val checker = new Checker(inferredTable, options.typeCheckerDebug)
+            val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val typecheckingErrors = checker.checkProgram()
 
             val allSortedErrors = (transformErrors ++ typecheckingErrors).sorted
@@ -305,13 +305,13 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(inferredTable.ast, protobufOuterClassName,
+            val javaModel = if (options.buildClient) translateClientASTToJava(transformedTable.ast, protobufOuterClassName,
                 options.mockChaincode, options.lazySerialization)
-            else translateServerASTToJava(inferredTable.ast, protobufOuterClassName,
+            else translateServerASTToJava(transformedTable.ast, protobufOuterClassName,
                 options.mockChaincode, options.lazySerialization)
             javaModel.build(srcDir.toFile)
 
-            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(inferredTable.ast, sourceFilename,
+            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(transformedTable.ast, sourceFilename,
                                                                                   options.lazySerialization)
 
             // Each import results in a .proto file, which needs to be compiled.
@@ -341,7 +341,7 @@ object Main {
                 }
             }
 
-            val mainName = findMainContractName(inferredTable.ast)
+            val mainName = findMainContractName(transformedTable.ast)
 
             if (options.mockChaincode) {
                 // invoke javac and make a jar from the result

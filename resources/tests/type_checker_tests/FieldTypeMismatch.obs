@@ -40,7 +40,7 @@ asset contract Wallet {
     }
 
     transaction removeMoney(Wallet@Full >> Empty this) returns Money@Owned {
-        Money@Owned m = money; // TODO: remove ownership annotation
+        Money m = money;
         ->Empty;
         return m;
     }

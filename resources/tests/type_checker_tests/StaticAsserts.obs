@@ -18,7 +18,7 @@ main contract C {
     }
 
     transaction t() {
-        C@Owned ow = new C();
+        C ow = new C();
         [ow @ Owned];
 
         [ow @ Unowned]; // should fail

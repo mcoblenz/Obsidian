@@ -32,11 +32,11 @@ contract Thing {
 main contract Construct {
 
     transaction constructThings() {
-        Thing@Owned thing1 = new Thing();
+        Thing thing1 = new Thing();
         // should fail for each constructor above
-        Thing@Owned thing2 = new Thing("hi");
+        Thing thing2 = new Thing("hi");
         // should fail for each constructor above
-        Thing@Owned thing3 = new Thing(1, 2, 3);
+        Thing thing3 = new Thing(1, 2, 3);
         // should fail twice: undefined contract
         Stuff stuff = new Stuff();
     }

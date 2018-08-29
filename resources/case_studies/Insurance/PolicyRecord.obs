@@ -26,7 +26,7 @@ main contract PolicyRecord {
     }
 
     transaction refund(PolicyRecord@Pending >> Expired this) returns Money@Owned{
-         Money@Owned refund = payout;
+         Money refund = payout;
          ->Expired;
          return refund;
     }

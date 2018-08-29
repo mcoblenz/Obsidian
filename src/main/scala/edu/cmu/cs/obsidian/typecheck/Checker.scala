@@ -267,25 +267,54 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     //-------------------------------------------------------------------------
     private def nonPrimitiveMergeTypes(
             t1: NonPrimitiveType,
-            t2: NonPrimitiveType): Option[NonPrimitiveType] = {
+            t2: NonPrimitiveType,
+            contractTable: ContractTable): Option[NonPrimitiveType] = {
         if (t1.contractName != t2.contractName) return None
+
         (t1, t2) match {
-            case (ContractReferenceType(_, p1, _), ContractReferenceType(_, p2, _)) =>
+            case (ContractReferenceType(contractType, p1, isRemote), ContractReferenceType(_, p2, _)) =>
                 if (p1 == p2) {
                     Some(t1)
                 }
                 else {
+                    val typeForMismatchedPermissions =
+                        if (t1.isAssetReference(contractTable) != No()) {
+                            None
+                        }
+                        else {
+                            Some(ContractReferenceType(contractType, Unowned(), isRemote))
+                        }
                     p1 match {
-                        case Owned() => None
-                        case Unowned() => if (p2 == Shared()) Some(t2) else None
-                        case Shared() => if (p2 == Unowned()) Some(t1) else None
+                        case Owned() => typeForMismatchedPermissions
+                        case Unowned() => if (p2 == Shared()) Some(t2) else typeForMismatchedPermissions
+                        case Shared() => if (p2 == Unowned()) Some(t1) else typeForMismatchedPermissions
                         case Inferred() => assert(false, "Inferred types should be removed"); None
                     }
                 }
-            case (ContractReferenceType(_, Owned(), _), StateType(_, _, _)) =>
-                Some(t1)
-            case (StateType(_, _, _), ContractReferenceType(_, Owned(), _)) =>
-                Some(t2)
+            case (ContractReferenceType(contractType, permission, isRemote), StateType(_, _, _)) =>
+                if (permission == Owned()) {
+                    Some(t1)
+                }
+                else {
+                    if (t1.isAssetReference(contractTable) != No()) {
+                        None
+                    }
+                    else {
+                        Some(ContractReferenceType(contractType, Unowned(), isRemote))
+                    }
+                }
+            case (StateType(_, _, _), ContractReferenceType(contractType, permission, isRemote)) =>
+                if (permission == Owned()) {
+                    Some(t2)
+                }
+                else {
+                    if (t1.isAssetReference(contractTable) != No()) {
+                        None
+                    }
+                    else {
+                        Some(ContractReferenceType(contractType, Unowned(), isRemote))
+                    }
+                }
             case (StateType(_, ss1, _), StateType(_, ss2, _)) =>
                 val c = t1.contractName
                 val unionStates = ss1.union(ss2)
@@ -294,13 +323,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def mergeTypes(t1: ObsidianType, t2: ObsidianType): Option[ObsidianType] = {
+    private def mergeTypes(t1: ObsidianType, t2: ObsidianType, contractTable: ContractTable): Option[ObsidianType] = {
         (t1, t2) match {
             case (IntType(), IntType()) => Some(IntType())
             case (BoolType(), BoolType()) => Some(BoolType())
             case (StringType(), StringType()) => Some(StringType())
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
-                nonPrimitiveMergeTypes(np1, np2).flatMap(s => Some(s))
+                nonPrimitiveMergeTypes(np1, np2, contractTable).flatMap(s => Some(s))
             case _ => None
         }
     }
@@ -778,7 +807,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             for (x <- inBoth) {
                 val t1 = map1(x)
                 val t2 = map2(x)
-                mergeTypes(t1, t2) match {
+                mergeTypes(t1, t2, context1.contractTable) match {
                     case Some(u) => mergedMap = mergedMap.updated(x, u)
                     case None =>
                         logError(ast, MergeIncompatibleError(x, t1, t2))
@@ -1008,26 +1037,47 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 context.updated(name, typ)
 
             case VariableDeclWithInit(typ: ObsidianType, name, e: Expression) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
-                val tDecl = typ match {
+                val (exprType, contextPrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
+                val declaredType = typ match {
                     case np: NonPrimitiveType =>
-                        val contractName = np.contractName
+                        val declaredContractName = np.contractName
 
-                        val tableLookup = context.contractTable.lookupContract(contractName)
+                        val tableLookup = context.contractTable.lookupContract(declaredContractName)
 
-                        tableLookup match {
+                        val resolvedType = tableLookup match {
                             case None =>
-                                logError(s, ContractUndefinedError(contractName))
+                                logError(s, ContractUndefinedError(declaredContractName))
                                 BottomType()
-                            case Some(_) => typ
+                            case Some(_) =>
+                                exprType match {
+                                    case exprNonPrimitiveType: NonPrimitiveType =>
+                                        if (exprNonPrimitiveType.contractName == declaredContractName) {
+                                            exprType
+                                        }
+                                        else {
+                                            logError(s, InconsistentContractTypeError(declaredContractName, exprNonPrimitiveType.contractName))
+                                            np // Just go with the declaration
+                                        }
+                                    case _ =>
+                                        logError(s, InconsistentTypeAssignmentError(typ, exprType))
+                                        np // Just go with the declaration
+
+                                }
+                        }
+
+                        np.permission match {
+                            case Inferred() => resolvedType
+                            case _ =>
+                                logError(s, (InvalidLocalVariablePermissionDeclarationError()))
+                                BottomType()
                         }
                     case BottomType() => BottomType()
-                    case t => t
+                    case _ =>
+                        checkIsSubtype(s, exprType, typ)
+                        typ
                 }
-                if (tDecl != BottomType()) {
-                    checkIsSubtype(s, t, tDecl)
-                }
-                contextPrime.updated(name, tDecl)
+
+                contextPrime.updated(name, declaredType)
 
             case Return() =>
                 decl match {

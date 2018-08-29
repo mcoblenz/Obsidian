@@ -1,40 +1,53 @@
 /* This test checks various aspects of type-checking related to branching that
  * is, if/else statements */
 
-contract Sh/*ared*/ {
+contract StructuralContract {
 }
 
-asset contract Ow/*ned*/ {
+asset contract LinearContract {
 
+}
+
+contract StatefulContract {
+    state S1;
+    state S2;
+
+    StatefulContract@S1() {
+        ->S1;
+    }
+
+    transaction toS2(StatefulContract@S1 >> S2 this) {
+        ->S2;
+    }
 }
 
 main contract C {
     transaction t() {
-        Ow@Owned o1 = new Ow();
-        Sh@Shared s1 = new Sh();
+        LinearContract o1 = new LinearContract();
+        StructuralContract s1 = new StructuralContract();
         // [o1] is incompatible after the branch because it's used in only one
         if (true) {
-            Ow@Owned o2 = o1;
-            Sh@Shared s2 = s1;
+            LinearContract o2 = o1;
+            StructuralContract s2 = s1;
         } else {
             int x = 5;
         }
     }
 
     transaction t2() {
-        Ow@Owned o1 = new Ow();
+        LinearContract o1 = new LinearContract();
         // shouldn't cause a merge incompatibility because of the exception
         if (true) {
-            Ow@Owned o2 = o1;
+            LinearContract o2 = o1;
         } else {
             throw;
         }
     }
 
     transaction t3() {
-        Ow@Owned o1 = new Ow();
+        LinearContract o1 = new LinearContract();
         if (true) {
-            Ow@Owned o2 = o1;
+            LinearContract o2 = o1;
         }
     }
 
@@ -54,5 +67,31 @@ main contract C {
         } else {
             throw;
         }
+    }
+
+    transaction t6() {
+        StatefulContract s1 = new StatefulContract();
+        if (true) {
+            s1.toS2();
+        }
+        [s1@(S1|S2)];
+    }
+
+    transaction t7() {
+        StatefulContract s1 = new StatefulContract();
+        if (true) {
+            disown s1;
+        }
+        [s1@Unowned];
+    }
+
+    transaction t7() {
+        StatefulContract s1 = new StatefulContract();
+        if (true) {
+        }
+        else {
+            disown s1;
+        }
+        [s1@Unowned];
     }
 }

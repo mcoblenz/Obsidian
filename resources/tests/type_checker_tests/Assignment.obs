@@ -36,12 +36,12 @@ contract C {
         b = 1;
         // should fail: bool is not int
         b = true;
-        C_Shared@Shared c = new C_Shared();
+        C_Shared c = new C_Shared();
         // should fail: C_Owned is not C_Shared
         c = new C_Owned();
         c.setFields1();
 
-        C_Shared@S cs = new C_Shared();
+        C_Shared cs = new C_Shared();
         cs.setFields2();
         i = 3;
         this.i = 3;

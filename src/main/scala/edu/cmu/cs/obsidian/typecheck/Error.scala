@@ -272,3 +272,7 @@ case class InvalidFinalFieldTypeDeclarationError(fieldName: String) extends Erro
 case class FieldSubtypingError(fieldName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
     val msg: String = s"Field $fieldName needs to be of type $expectedType but is actually of type $actualType."
 }
+
+case class InvalidLocalVariablePermissionDeclarationError() extends Error {
+    val msg: String = s"Local variable declarations cannot include states or permissions. They must be inferred from the type of the assigned value."
+}

@@ -163,11 +163,6 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (UnreachableCodeError(), 22)
                 ::
-                (SubtypingError(
-                    ContractReferenceType(ContractType("C_Owned"), Owned(), false),
-                    StateType("C_Owned", "S", false)),
-                    28)
-                ::
                 (UnreachableCodeError(), 28)
                 ::
                 (MustReturnError("t_ret_nonprimitive"), 31)
@@ -223,13 +218,13 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (MethodUndefinedError(
                     ContractReferenceType(ContractType("OtherContract"), Shared(), false),
-                    "anotherMethod"), 31)
+                    "anotherMethod"), 32)
                 ::
                 (ArgumentSubtypingError("otherMethod", "x",
                     StringType(),
-                    IntType()), 33)
+                    IntType()), 34)
                 ::
-                (ContractUndefinedError("Bogus"), 36)
+                (ContractUndefinedError("Bogus"), 37)
                 ::
                 Nil
         )
@@ -291,20 +286,20 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             (MergeIncompatibleError("o1",
-                ContractReferenceType(ContractType("Ow"), Owned(), false),
-                ContractReferenceType(ContractType("Ow"), Unowned(), false)), 16)
+                ContractReferenceType(ContractType("LinearContract"), Owned(), false),
+                ContractReferenceType(ContractType("LinearContract"), Unowned(), false)), 29)
                 ::
-                (UnusedOwnershipError("o2"), 16)
+                (UnusedOwnershipError("o2"), 29)
                 ::
-                (UnusedOwnershipError("o2"), 27)
+                (UnusedOwnershipError("o2"), 40)
                 ::
                 (MergeIncompatibleError("o1",
-                    ContractReferenceType(ContractType("Ow"), Owned(), false),
-                    ContractReferenceType(ContractType("Ow"), Unowned(), false)), 36)
+                    ContractReferenceType(ContractType("LinearContract"), Owned(), false),
+                    ContractReferenceType(ContractType("LinearContract"), Unowned(), false)), 49)
                 ::
-                (UnusedOwnershipError("o2"), 36)
+                (UnusedOwnershipError("o2"), 49)
                 ::
-                (VariableUndefinedError("x", null), 48)
+                (VariableUndefinedError("x", null), 61)
                 ::
                 Nil)
     }
@@ -465,13 +460,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (DisownUnowningExpressionError(ReferenceIdentifier("m")), 49)
                 ::
-                (UnusedOwnershipError("bad"), 52)
-                ::
-                (SubtypingError(
-                    ContractReferenceType(ContractType("Money"), Shared(), false),
-                    ContractReferenceType(ContractType("Money"), Owned(), false)), 59)
-                ::
-                (UnusedOwnershipError("m"), 75)
+                (UnusedOwnershipError("m"), 72)
                 ::
                 Nil
         )
