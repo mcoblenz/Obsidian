@@ -168,7 +168,8 @@ case class Contract(modifiers: Set[ContractModifier],
                     name: String,
                     declarations: Seq[Declaration],
                     transitions: Option[Transitions],
-                    isInterface: Boolean) extends Declaration {
+                    isInterface: Boolean,
+                    sourcePath: String) extends Declaration {
     val tag: DeclarationTag = ContractDeclTag
 
     val isAsset = modifiers.contains(IsAsset())

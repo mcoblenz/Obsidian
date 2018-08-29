@@ -19,7 +19,7 @@ class ParserTests extends JUnitSuite {
             case Right(res) => res
         }
         assertTrue(result.isRight)
-        Parser.parseProgram(tokens)
+        Parser.parseProgram(tokens, "")
     }
 
     private def readFile(fileName: String): String = {

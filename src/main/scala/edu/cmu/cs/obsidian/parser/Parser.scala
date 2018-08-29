@@ -551,8 +551,8 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseDeclInContract(isInterface:Boolean)(contractName: String):  Parser[Declaration] = {
-        parseFieldDecl | parseStateDecl | parseConstructor | parseContractDecl | parseTransDecl(isInterface)(contractName)
+    private def parseDeclInContract(isInterface:Boolean, sourcePath: String)(contractName: String):  Parser[Declaration] = {
+        parseFieldDecl | parseStateDecl | parseConstructor | parseContractDecl(sourcePath) | parseTransDecl(isInterface)(contractName)
     }
 
     private def parseContractModifier = {
@@ -576,12 +576,12 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseContractDecl = {
+    private def parseContractDecl(srcPath: String) = {
         rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseId >> {
             case mod ~ ct ~ name =>
                 val isInterface = ct == InterfaceT()
 
-                LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface)(name._1)) ~! RBraceT() ^^ {
+                LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface, srcPath)(name._1)) ~! RBraceT() ^^ {
                 case _ ~ contents ~ _ =>
                     // Make sure there's only one transition diagram.
                     val separateTransitions = contents.filter({
@@ -607,7 +607,7 @@ object Parser extends Parsers {
                         case _ => false
                     }).map(_.asInstanceOf[Declaration])
 
-                    Contract(mod.toSet, name._1, decls, transitions, isInterface).setLoc(ct)
+                    Contract(mod.toSet, name._1, decls, transitions, isInterface, srcPath).setLoc(ct)
             }
         }
     }
@@ -618,15 +618,15 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseProgram = {
-        phrase(rep(parseImport) ~ rep1(parseContractDecl)) ^^ {
+    private def parseProgram(srcPath: String) = {
+        phrase(rep(parseImport) ~ rep1(parseContractDecl(srcPath))) ^^ {
             case imports ~ contracts => Program(imports, contracts).setLoc(contracts.head)
         }
     }
 
-    def parseProgram(tokens: Seq[Token]): Either[String, Program] = {
+    def parseProgram(tokens: Seq[Token], srcPath: String): Either[String, Program] = {
         val reader = new TokenReader(tokens)
-        parseProgram(reader) match {
+        parseProgram(srcPath)(reader) match {
             case Success(result, _) => Right(result)
             case Failure(msg , _) => Left(s"PARSER FAILURE: $msg")
             case Error(msg , next) =>
@@ -656,7 +656,7 @@ object Parser extends Parsers {
             println()
         }
 
-        val ast: Program = parseProgram(tokens) match {
+        val ast: Program = parseProgram(tokens, srcPath) match {
             case Left(msg) => throw new ParseException(msg + " in " + srcPath)
             case Right(tree) => tree
         }

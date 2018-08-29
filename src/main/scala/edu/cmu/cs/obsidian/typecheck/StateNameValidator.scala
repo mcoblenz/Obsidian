@@ -33,7 +33,7 @@ object StateNameValidator extends IdentityAstTransformer {
                                 var errors = List.empty[ErrorRecord]
                                 for (stateName <- stateNames) {
                                     if (ct.state(stateName).isEmpty) {
-                                        errors = ErrorRecord(StateUndefinedError(np.contractName, stateName), pos) +: errors
+                                        errors = ErrorRecord(StateUndefinedError(np.contractName, stateName), pos, currentContractSourcePath) +: errors
                                     }
                                 }
                                 if (errors.isEmpty) {
@@ -44,7 +44,7 @@ object StateNameValidator extends IdentityAstTransformer {
                                 }
                             case _ => (np, List.empty)
                         }
-                    case None => (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos)))
+                    case None => (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                 }
             case _ => (t, List.empty)
         }

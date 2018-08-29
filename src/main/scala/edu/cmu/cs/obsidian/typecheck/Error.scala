@@ -10,9 +10,9 @@ abstract class Error {
     val msg: String
 }
 
-case class ErrorRecord (error: Error, pos: scala.util.parsing.input.Position) extends Ordered[ErrorRecord] {
+case class ErrorRecord (error: Error, pos: scala.util.parsing.input.Position, srcPath: String) extends Ordered[ErrorRecord] {
     def printMessage(): Unit = {
-        println(s"At $pos: ${error.msg}")
+        println(s"$srcPath $pos: ${error.msg}")
     }
 
     def compare(that: ErrorRecord): Int = {

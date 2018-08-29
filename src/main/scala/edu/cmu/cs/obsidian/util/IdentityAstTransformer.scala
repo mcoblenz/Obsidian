@@ -13,6 +13,8 @@ class IdentityAstTransformer {
     type Context = Map[String, ObsidianType]
     val emptyContext = new TreeMap[String, ObsidianType]()
 
+    var currentContractSourcePath = ""
+
     def transformProgram(table: SymbolTable): (SymbolTable, Seq[ErrorRecord]) = {
         var errorRecords = List.empty[ErrorRecord]
         var contracts = List.empty[Contract]
@@ -32,6 +34,8 @@ class IdentityAstTransformer {
     }
 
     def transformContract(table: SymbolTable, cTable: ContractTable): (Contract, Seq[ErrorRecord]) = {
+        currentContractSourcePath = cTable.contract.sourcePath
+
         var newDecls: Seq[Declaration] = Nil
         var errors = List.empty[ErrorRecord]
         for (d <- cTable.contract.declarations) {
@@ -65,7 +69,16 @@ class IdentityAstTransformer {
 
         newDecls = newDecls.reverse
 
-        val newContract = Contract(cTable.contract.modifiers, cTable.contract.name, newDecls, cTable.contract.transitions, cTable.contract.isInterface).setLoc(cTable.contract)
+        val oldContract = cTable.contract
+        val newContract =
+            Contract(
+                oldContract.modifiers,
+                oldContract.name,
+                newDecls,
+                oldContract.transitions,
+                oldContract.isInterface,
+                oldContract.sourcePath
+            ).setLoc(cTable.contract)
 
         (newContract, errors.reverse)
     }

@@ -177,11 +177,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     val errors = new collection.mutable.ArrayStack[ErrorRecord]()
+    var currentContractSourcePath: String = ""
 
     /* an error is associated with an AST node to indicate where the error took place */
     private def logError(where: AST, err: Error): Unit = {
         assert(where.loc.line >= 1)
-        errors.push(ErrorRecord(err, where.loc))
+        errors.push(ErrorRecord(err, where.loc, currentContractSourcePath))
 
         /* this is helpful for debugging (to find out what function generated an error */
         if (verbose) {
@@ -1786,6 +1787,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def checkContract(contract: Contract): Unit = {
+        currentContractSourcePath = contract.sourcePath
+
         val table = globalTable.contractLookup(contract.name)
         for (decl <- contract.declarations) {
             decl match {
