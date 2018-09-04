@@ -160,6 +160,10 @@ case class PotentiallyUnusedOwnershipError(name: String) extends Error {
     val msg: String = s"Variable '$name' holds ownership, but may be unused at the end of its scope."
 }
 
+case class OverwrittenOwnershipError(name: String) extends Error {
+    val msg: String = s"Variable '$name' is an owning reference to an asset, so it cannot be overwritten."
+}
+
 case class ConstructorNameError(contractName: String) extends Error {
     val msg: String = s"Invalid constructor name for contract '$contractName'"
 }
@@ -228,7 +232,7 @@ case class StaticAssertInvalidState(contractName: String, stateOrPermission: Str
 }
 
 case class ArgumentSpecificationError(arg: String, transactionName: String, t1: ObsidianType, t2: ObsidianType) extends Error {
-    val msg: String = s"The argument '$arg' in transaction '$transactionName' was specified to end as type '$t1', " +
+    val msg: String = s"The argument '$arg' in '$transactionName' was specified to end as type '$t1', " +
         s"but actually ends as type '$t2'."
 }
 

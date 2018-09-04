@@ -5,7 +5,7 @@ main asset contract InsuranceBid {
     int expirationTime;
     Money@Owned payout;
 
-    InsuranceBid@Owned(int c, int expiration, Money@Owned m) {
+    InsuranceBid@Owned(int c, int expiration, Money@Owned >> Unowned m) {
         cost = c;
         expirationTime = expiration;
         payout = m;
@@ -20,8 +20,8 @@ main asset contract InsuranceBid {
     }
 
     transaction getPayout() returns Money@Owned {
-        Money@Owned zeroMoney = new Money(0);
-        Money@Owned payoutCopy = payout;
+        Money zeroMoney = new Money(0);
+        Money payoutCopy = payout;
         payout = zeroMoney;
         return payoutCopy;
     }

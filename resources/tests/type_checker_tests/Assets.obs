@@ -15,7 +15,7 @@ asset contract Money {
 asset contract Wallet {
     Money@Owned money;
 
-    Wallet@Owned(Money@Owned m) {
+    Wallet@Owned(Money@Owned >> Unowned m) {
         money = m;
     }
 

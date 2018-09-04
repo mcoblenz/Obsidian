@@ -1,137 +1,106 @@
 import "resources/case_studies/Insurance/PolicyRecord.obs"
 
-contract ActiveMaybePair {
-
-    ActiveMaybePair@Some(ActivePolicyPair@Shared p) {
-        ->Some(pair = p);
+// This implements a mutable linked list of Active policies.
+asset contract ActivePolicyList {
+    state HasNext {
+        Policy@Unowned key;
+        PolicyRecord@Active val;
+        ActivePolicyList@Owned next;
     }
 
-    ActiveMaybePair@None() {
-        ->None;
+    state Empty {
     }
 
-    state Some {
-        ActivePolicyPair@Shared pair;
+    ActivePolicyList@Empty() {
+        ->Empty;
     }
 
-    state None {}
-
-    transaction getPair(ActiveMaybePair@Some this) returns ActivePolicyPair@Shared {
-        return pair;
-    }
-
-   // transaction getValue(NodeMaybe@Some this) returns PolicyRecord@Unowned {
-   //     return node.getValue();
-   // }
-
-}
-
-asset contract ActivePolicyPair {
-    Policy@Unowned key;
-    PolicyRecord@Active val;
-    ActiveMaybePair@Owned next;
-
-    ActivePolicyPair@Owned(Policy key, PolicyRecord@Active >> Unowned val, ActiveMaybePair@Owned next) {
-        this.key = key;
-        this.val = val;
-        this.next = next;
-    }
-
-    transaction setNext(ActiveMaybePair@Owned >> Unowned newNext) {
+    // returns old next node
+    private transaction setNext(ActivePolicyList@HasNext this, ActivePolicyList@Owned >> Unowned newNext) returns ActivePolicyList@Owned {
+        ActivePolicyList oldNext = next;
         next = newNext;
+        return oldNext;
     }
 
-    transaction getKey() returns Policy@Unowned {
+    transaction getKey(ActivePolicyList@HasNext this) returns Policy@Unowned {
         return key;
     }
 
-    transaction getValue() returns PolicyRecord@Unowned {
-        PolicyRecord@Active valCopy = val;
-        val = valCopy;
+    transaction getValue(ActivePolicyList@HasNext this) returns PolicyRecord@Unowned {
+        return val;
+    }
+
+    private transaction removeValue(ActivePolicyList@HasNext >> Empty this) returns PolicyRecord@Active {
+        PolicyRecord valCopy = val;
+        disown next;
+        ->Empty;
         return valCopy;
     }
 
-    transaction getValueOwned() returns PolicyRecord@Active {
-        PolicyRecord@Active valCopy = val;
-        val = new PolicyRecord(val.getPolicy(), new Money(0));
-        val.activate(new Money(0));
-        return valCopy;
-    }
 
-
-    transaction set(Policy@Unowned k, PolicyRecord@Active >> Unowned v) {
-        switch next {
-            case Some {
-                next.getPair().set(k, v);
+    transaction append(ActivePolicyList@Owned this, Policy@Unowned k, PolicyRecord@Active >> Unowned v) {
+        switch this {
+            case HasNext {
+                next.append(k, v);
             }
-            case None {
-                next = new ActiveMaybePair(new ActivePolicyPair(k, v, new ActiveMaybePair()));
+            case Empty {
+                ->HasNext(key = k, val = v, next = new ActivePolicyList());
             }
         }
     }
 
     // get and remove the pair with the given Policy as a key
-    transaction extract(Policy@Unowned policy, ActivePolicyPair@Shared prevNode) returns PolicyRecord@Active {
-        PolicyRecord@Active removed;
+    transaction remove(ActivePolicyList@Unowned this, Policy@Unowned policy, ActivePolicyList@HasNext prevNode) returns PolicyRecord@Active {
+        PolicyRecord removed;
+        switch this {
+            case Empty {
+                throw; // TODO : element not in map?
+            }
+            case HasNext {
 
-        if (key.equals(policy)) {
-            prevNode.setNext(next);
-            removed = getValueOwned();
-        } else {
-            switch next {
-                case Some {
-                    removed = next.getPair().extract(policy, this);
+                if (next.key.equals(policy)) {
+                    ActivePolicyList oldNext = setNext(next);
+                    removed = ownedThis.
+                    //removed = removeValue();
                 }
-
-                case None {
-                    throw; // TODO : element not in map?
+                else {
+                    removed = next.remove(policy, this);
                 }
             }
-
         }
 
         return removed;
-
     }
-
 }
 
 
-main contract ActivePolicyMap {
-
-    ActiveMaybePair@Owned first;
+main asset contract ActivePolicyMap {
+    ActivePolicyList@Owned list;
 
     ActivePolicyMap@Owned() {
-        first = new ActiveMaybePair();
+        list = new ActivePolicyList(); // Start with an empty list.
     }
 
     transaction set(ActivePolicyMap@Owned this, Policy@Unowned key, PolicyRecord@Active >> Unowned val) {
-        switch first {
-            case Some {
-                first.getPair().set(key, val);
-            }
-            case None {
-                first = new ActiveMaybePair(new ActivePolicyPair(key, val, new ActiveMaybePair()));
-            }
-        }
+        list.append(key, val);
     }
 
     // remove and return value of the pair with the given policy as a key
     transaction extract(ActivePolicyMap@Owned this, Policy@Unowned policy) returns PolicyRecord@Active {
-        PolicyRecord@Active removed;
+        PolicyRecord removed;
 
-        switch first {
-            case Some {
-                ActivePolicyPair@Shared pair = first.getPair();
-
-                if(pair.getKey().equals(policy)) {
-                    first = new ActiveMaybePair();
-                    removed = pair.getValueOwned();
+        switch list {
+            case HasNext {
+                if(list.getKey().equals(policy)) {
+                    ActivePolicyList oldList = list;
+                    [oldList@Owned];
+                    removed = oldList.removeValue();
+                    list = new ActivePolicyList();
                 } else {
-                    removed = pair.extract(policy, pair);
+                    removed = list.remove(policy, list);
                 }
             }
-            case None {
+            case Empty {
                 throw; //TODO : element not in map?
             }
         }

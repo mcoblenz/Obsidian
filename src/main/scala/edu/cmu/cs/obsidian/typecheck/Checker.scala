@@ -176,13 +176,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    val errors = new collection.mutable.ArrayStack[ErrorRecord]()
+    val errors = new collection.mutable.ArrayBuffer[ErrorRecord]()
     var currentContractSourcePath: String = ""
 
     /* an error is associated with an AST node to indicate where the error took place */
     private def logError(where: AST, err: Error): Unit = {
         assert(where.loc.line >= 1)
-        errors.push(ErrorRecord(err, where.loc, currentContractSourcePath))
+        errors += ErrorRecord(err, where.loc, currentContractSourcePath)
 
         /* this is helpful for debugging (to find out what function generated an error */
         if (verbose) {
@@ -983,7 +983,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     None
                 }
                 else {
-                    contextPrime.get(s"$x")
+                    contextPrime.get(x)
                 }
 
             val (variableType, isField) =
@@ -1011,6 +1011,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             (exprType, variableType) match {
                 case (exprNPType: NonPrimitiveType, variableNPType: NonPrimitiveType) =>
+                    if (variableNPType.isOwned && variableNPType.isAssetReference(context.contractTable) != No()) {
+                        logError(s, OverwrittenOwnershipError(x))
+                    }
                     if (exprNPType.contractName != variableNPType.contractName) {
                         logError(s, InconsistentContractTypeError(variableNPType.contractName, exprNPType.contractName))
                         contextPrime
@@ -1035,6 +1038,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         s match {
             case VariableDecl(typ: ObsidianType, name) =>
+                typ match {
+                    case np: NonPrimitiveType =>
+                        if (np.permission != Inferred()) {
+                            logError(s, (InvalidLocalVariablePermissionDeclarationError()))
+                        }
+                    case _ => // Nothing to check
+                }
                 context.updated(name, typ)
 
             case VariableDeclWithInit(typ: ObsidianType, name, e: Expression) =>
@@ -1702,7 +1712,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def checkConstructor(constr: Constructor, table: ContractTable, hasStates: Boolean): Unit = {
-
         // maybe this error should be handled in the parser
         if(constr.name != table.name) {
             logError(constr, ConstructorNameError(table.name))
@@ -1712,13 +1721,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(constr, AssetContractConstructorError(table.name))
         }
 
-        // first create this unchecked context so we can resolve types
-        var context = new TreeMap[String, ObsidianType]()
-
-        // Add all the args first (in an unsafe way) before checking anything
-        for (arg <- constr.args) {
-            context = context.updated(arg.varName, arg.typIn)
-        }
 
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
         var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, Map.empty)
@@ -1728,7 +1730,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         initContext = initContext.updated("this", thisType)
 
         for (arg <- constr.args) {
-            initContext = initContext.updated(arg.varName, context(arg.varName))
+            initContext = initContext.updated(arg.varName, arg.typIn)
+        }
+        // Check as if all the nonprimitive fields were of Inferred permission initially so that we can track ownership correctly.
+
+        for (field <- table.allFields) {
+            field.typ match {
+                case ContractReferenceType(contractType, permission, isRemote) =>
+                    val inferredType = ContractReferenceType(contractType, Inferred(), isRemote)
+                    initContext = initContext.updatedThisFieldType(field.name, inferredType)
+                case StateType(contractName, stateNames, isRemote) =>
+                    val inferredType = ContractReferenceType(ContractType(contractName), Inferred(), isRemote)
+                    initContext = initContext.updatedThisFieldType(field.name, inferredType)
+                case _ => () // Nothing to do
+            }
         }
 
         val outputContext =
@@ -1746,6 +1761,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             }
             case _ => ()
+        }
+
+        // Check that the arguments meet the correct specification afterwards
+        for (arg <- constr.args) {
+            outputContext.get(arg.varName) match {
+                case Some(actualTypOut) =>
+                    val errorOpt = isSubtype(actualTypOut, arg.typOut)
+                    if (errorOpt.isDefined) {
+                        logError(constr, ArgumentSpecificationError(arg.varName, constr.name, arg.typOut, actualTypOut))
+                    }
+                case None => ()
+            }
         }
 
         val expectedThisType: NonPrimitiveType = constr.resultType

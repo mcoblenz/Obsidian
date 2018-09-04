@@ -28,14 +28,14 @@ main asset contract InsuranceService {
 
     // TODO: information to calculate bids, Collection of Bid and Token
     transaction requestBids(int i) returns Policy@Offered {
-        InsuranceBid@Owned insBid = insurers.requestBid(i);
+        InsuranceBid insBid = insurers.requestBid(i);
 
         int cost = insBid.getCost();
         int expiration = insBid.getExpirationTime();
-        Money@Owned payout = insBid.getPayout();
+        Money payout = insBid.getPayout();
 
-        Policy@Offered policy = new Policy(cost, expiration);
-        PolicyRecord@Pending pendingPolicy = new PolicyRecord(policy, payout);
+        Policy policy = new Policy(cost, expiration);
+        PolicyRecord pendingPolicy = new PolicyRecord(policy, payout);
 
         pendingPolicies.set(policy, pendingPolicy);
 
@@ -45,10 +45,10 @@ main asset contract InsuranceService {
     transaction buyPolicy(Policy@Offered >> (Active | Expired) policy, Money@Owned >> Unowned money) returns Money@Owned {
 
         if (timeService.getTime() > policy.getExpirationTime()) {
-            PolicyRecord@Pending pendingPolicy = pendingPolicies.extract(policy);
+            PolicyRecord pendingPolicy = pendingPolicies.extract(policy);
 
             // refund insurer's payout
-            Money@Owned insurerRefund = pendingPolicy.refund();
+            Money insurerRefund = pendingPolicy.refund();
             insurers.receiveRefund(insurerRefund);
 
             // expire policy and return money
@@ -56,10 +56,10 @@ main asset contract InsuranceService {
             policy.expire();
             return money;
         } else {
-            PolicyRecord@Pending pendingPolicy = pendingPolicies.extract(policy);
+            PolicyRecord pendingPolicy = pendingPolicies.extract(policy);
             // get payment
             int cost = policy.getCost();
-            Money@Owned payment = money.getAmountOfMoney(cost);
+            Money payment = money.getAmountOfMoney(cost);
 
             // activate policy record with payment
             pendingPolicy.activate(payment);

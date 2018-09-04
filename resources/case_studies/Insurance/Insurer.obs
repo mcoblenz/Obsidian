@@ -9,7 +9,7 @@ main asset contract Insurer {
     Bank@Shared bank;
     TimeService@Shared timeService;
 
-    Insurer@Owned(TimeService@Shared ts, Bank@Shared b, Money@Owned m) {
+    Insurer@Owned(TimeService@Shared ts, Bank@Shared b, Money@Owned >> Unowned m) {
         timeService = ts;
         bank = b;
         money = m;
@@ -25,9 +25,9 @@ main asset contract Insurer {
         int expirationTime = timeService.getTime() + twentyFourHours;
 
         // get correct amount of money from owned money
-        Money@Owned m = money.getAmountOfMoney(costOfPayout);
+        Money m = money.getAmountOfMoney(costOfPayout);
 
-        InsuranceBid@Owned b = new InsuranceBid(costOfBid, expirationTime, m);
+        InsuranceBid b = new InsuranceBid(costOfBid, expirationTime, m);
 
         return b;
     }

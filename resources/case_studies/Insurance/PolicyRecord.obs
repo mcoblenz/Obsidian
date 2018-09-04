@@ -15,7 +15,7 @@ main contract PolicyRecord {
 
     state Expired {}
 
-    PolicyRecord@Pending(Policy@Unowned p, Money@Owned m) {
+    PolicyRecord@Pending(Policy@Unowned p, Money@Owned >> Unowned m) {
         policy = p;
         Pending::payout = m;
         ->Pending;

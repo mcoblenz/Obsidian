@@ -290,8 +290,12 @@ object Main {
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val typecheckingErrors = checker.checkProgram()
 
-            val allSortedErrors = (transformErrors ++ typecheckingErrors).sorted
+            val allSortedErrors = (transformErrors ++ typecheckingErrors)//.sorted
 
+            if (!allSortedErrors.isEmpty) {
+                val errorCount = allSortedErrors.size
+                println(s"Found $errorCount errors:")
+            }
             for (error <- allSortedErrors) {
                 error.printMessage()
             }

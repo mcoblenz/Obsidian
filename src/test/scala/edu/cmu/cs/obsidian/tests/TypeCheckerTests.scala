@@ -33,7 +33,7 @@ class TypeCheckerTests extends JUnitSuite {
         val errs = (checker.checkProgram() ++ transformErrors).sorted
 
         val remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
-        for (ErrorRecord(err, loc) <- errs) {
+        for (ErrorRecord(err, loc, _) <- errs) {
             val pred = (expected: (Error, LineNumber)) => {
                 expected._1 == err && expected._2 == loc.line
             }
@@ -442,6 +442,8 @@ class TypeCheckerTests extends JUnitSuite {
                 (InvalidInconsistentFieldType("money",
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
                     ContractReferenceType(ContractType("Money"), Owned(), false)), 26)
+                ::
+                (OverwrittenOwnershipError("money"), 27)
                 ::
                 (SubtypingError(
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
