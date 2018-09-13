@@ -12,12 +12,15 @@ Obsidian is currently under development and is not ready for general use. For mo
 Obsidian is a project by:
 
 * [Michael Coblenz](http://www.cs.cmu.edu/~mcoblenz)
-* [Jenna Wise](http://www.cs.cmu.edu/~jlwise/)
-* Tyler Etzel
-* Celeste Barnaby
-* [Brad Myers](http://www.cs.cmu.edu/~bam)
 * [Jonathan Aldrich](http://www.cs.cmu.edu/~aldrich)
+* [Brad Myers](http://www.cs.cmu.edu/~bam)
 * [Joshua Sunshine](http://www.cs.cmu.edu/~jssunshi)
+* Miles Baker
+* Celeste Barnaby
+* Tyler Etzel
+* Paulette Koronkevich
+* [Jenna Wise](http://www.cs.cmu.edu/~jlwise/)
+
 
 
 ## Publications
