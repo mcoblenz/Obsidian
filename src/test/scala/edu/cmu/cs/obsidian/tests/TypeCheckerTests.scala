@@ -232,9 +232,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def dereferenceTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Dereference.obs",
-            (FieldUndefinedError(ContractReferenceType(ContractType("Thing"), Shared(), false), "w"), 23)
+            (FieldUndefinedError(ContractReferenceType(ContractType("Construct"), Shared(), false), "x"), 30)
                 ::
-                (DereferenceError(StringType()), 25)
+                (DereferenceError(StringType()), 22)
+                ::
+                (InvalidNonThisFieldAccess(), 25)
                 ::
                 Nil
         )

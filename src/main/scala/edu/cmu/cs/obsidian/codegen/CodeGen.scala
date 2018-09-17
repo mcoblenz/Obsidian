@@ -1593,7 +1593,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 }
             case (s@State(_, _, _)) =>
                 translateStateDecl(s, aContract, newClass, translationContext)
-            case (c@Contract(_, _, _,_, _)) => translateInnerContract(c, newClass, translationContext)
+            case (c@Contract(_, _, _,_, _, _)) => translateInnerContract(c, newClass, translationContext)
             case t: TypeDecl =>
                 assert(false, "TODO")
                 ()

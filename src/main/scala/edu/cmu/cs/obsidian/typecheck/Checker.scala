@@ -549,24 +549,33 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
 
              case Dereference(eDeref: Expression, fieldName) =>
-                 val (derefType, contextPrime) = inferAndCheckExpr(decl, context, eDeref, ownershipConsumptionMode)
-                 if (derefType.isBottom) {
-                     return (BottomType(), contextPrime)
-                 }
-
-                 val fieldType =  context.lookupDeclaredFieldTypeInType(derefType)(fieldName) match {
-                     case Some(typ) => typ
-                     case None =>
-                         derefType match {
-                             case np: NonPrimitiveType =>
-                                 logError(e, FieldUndefinedError(np, fieldName))
-                                 return (BottomType(), contextPrime)
-                             case _ => logError(e, DereferenceError(derefType))
-                                 return (BottomType(), contextPrime)
+                 eDeref match {
+                     case This() =>
+                         context.lookupCurrentFieldTypeInThis(fieldName) match {
+                             case Some(t) =>
+                                 val newType = t.residualType(ownershipConsumptionMode)
+                                 if (newType != t) {
+                                     (t, context.updatedThisFieldType(fieldName, newType))
+                                 }
+                                 else {
+                                     (t, context)
+                                 }
+                             case None =>
+                                 logError(e, FieldUndefinedError(context.thisType, fieldName))
+                                 (BottomType(), context)
                          }
-                 }
 
-                 (fieldType, contextPrime)
+                     case _ =>
+                         inferAndCheckExpr(decl, context, eDeref, ownershipConsumptionMode) match {
+                             case (np: NonPrimitiveType, context) =>
+                                 logError(e, InvalidNonThisFieldAccess())
+                             case (typ, context) =>
+                                 if (!typ.isBottom) {
+                                     logError(e, DereferenceError(typ))
+                                 }
+                         }
+                         (BottomType(), context)
+                 }
 
              case LocalInvocation(name, args: Seq[Expression]) =>
                  handleInvocation(context, name, This(), args)
@@ -1095,10 +1104,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     /* the tx/function must have no return type */
                     case tx: Transaction if tx.retType.isEmpty =>
                         checkForUnusedOwnershipErrors(s, context, Set("this"))
-                        context.makeThrown
+                        context
                     case _ =>
                         logError(s, MustReturnError(decl.name))
-                        context.makeThrown
+                        context
                 }
 
             case ReturnExpr(e: Expression) =>
@@ -1107,7 +1116,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case tx: Transaction if tx.retType.isDefined => tx.retType
                     case _ =>
                         logError(s, CannotReturnError(decl.name))
-                        return context.makeThrown
+                        return context
                 }
 
                 val consumeOwnership = retTypeOpt match {
@@ -1135,7 +1144,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 checkForUnusedOwnershipErrors(s, contextPrime, thisSetToExclude ++ argsSetToExclude)
 
                 if (retTypeOpt.isDefined && !retTypeOpt.get.isBottom) checkIsSubtype(s, typ, retTypeOpt.get)
-                contextPrime.makeThrown
+                contextPrime
 
             case Transition(newStateName, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) =>
                 val thisTable = context.contractTable
@@ -1318,7 +1327,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case Throw() =>
                 // If exceptions are ever catchable, we will need to make sure the fields of this have types consistent with their declarations.
                 // For now, we treat this like a permanent abort.
-                context.copy(isThrown = true)
+                context.makeThrown
 
             case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
@@ -1355,7 +1364,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case np: NonPrimitiveType =>
                         np.contractName
                     case _ =>
-                        logError(e, SwitchError(t))
+                        if (!t.isBottom) {
+                            logError(e, SwitchError(t))
+                        }
                         return contextPrime
                 }
 

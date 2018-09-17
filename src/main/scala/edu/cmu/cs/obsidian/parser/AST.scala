@@ -71,7 +71,11 @@ case class GreaterThanOrEquals(e1: Expression, e2: Expression) extends Expressio
 case class LessThan(e1: Expression, e2: Expression) extends Expression
 case class LessThanOrEquals(e1: Expression, e2: Expression) extends Expression
 case class NotEquals(e1: Expression, e2: Expression) extends Expression
-case class Dereference(e: Expression, f: String) extends Expression
+case class Dereference(e: Expression, f: String) extends Expression {
+    override def toString: String = {
+        s"$e.$f"
+    }
+}
 case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
 case class Invocation(recipient: Expression, name: String, args: Seq[Expression]) extends Expression {
     override def toString: String = {

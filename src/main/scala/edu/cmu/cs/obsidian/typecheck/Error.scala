@@ -45,7 +45,18 @@ case class CombineAvailableIns(fieldName: String, states: String, prevLine: Int)
 }
 
 case class SubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
-    val msg: String = s"Found type '$t1', but expected something of type '$t2'"
+    val msg: String =
+        t1 match {
+            case np: NonPrimitiveType =>
+                if (np.permission == Inferred()) {
+                    s"Found a local variable of unknown permission; ensure that a value was assigned to this variable."
+                }
+                else {
+                    s"Found type '$t1', but expected something of type '$t2'"
+                }
+            case _ => s"Found type '$t1', but expected something of type '$t2'"
+        }
+
 }
 case class VariableUndefinedError(x: String, context: String) extends Error {
     val msg: String = s"Variable '$x' is undefined in '$context'."
@@ -84,10 +95,10 @@ case class FieldConstMutationError(fName: String) extends Error {
     val msg: String = s"Field '$fName' cannot be mutated because it is labeled 'const'"
 }
 case class DereferenceError(typ: ObsidianType) extends Error {
-    val msg: String = s"Type '$typ' cannot be dereferenced"
+    val msg: String = s"Type '$typ' cannot be dereferenced."
 }
 case class SwitchError(typ: ObsidianType) extends Error {
-    val msg: String = s"Type '$typ' cannot be switched on"
+    val msg: String = s"Type '$typ' cannot be switched on."
 }
 case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extends Error {
     val msg: String = receiver match {
@@ -239,6 +250,11 @@ case class ArgumentSpecificationError(arg: String, transactionName: String, t1: 
 case class InvalidNonThisFieldAssignment() extends Error {
     val msg: String = "Cannot assign to fields of variables other than 'this'."
 }
+
+case class InvalidNonThisFieldAccess() extends Error {
+    val msg: String = "Cannot read fields of variables other than 'this'. Instead, use an accessor transaction."
+}
+
 
 case class InvalidInconsistentFieldType(fieldName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
     val msg: String = s"At the ends of transactions, all fields must reference objects consistent with their declared types. " +

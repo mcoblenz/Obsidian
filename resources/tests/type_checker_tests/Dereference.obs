@@ -18,11 +18,15 @@ main contract Construct {
     transaction derefThings() {
       Thing thing1 = new Thing(5);
 
-      int a = thing1.x;
-      // should fail: no such field
-      int b = thing1.w;
       // should fail: not dereferenceable
       string c = "hi".y;
+
+      // should fail: cannot access fields of non-this references.
+      int x = thing1.x;
     }
 
+    transaction getBogusField() returns int {
+        // should fail: no such field
+        return this.x;
+    }
 }

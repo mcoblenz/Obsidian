@@ -11,8 +11,6 @@ main contract C {
         int i = d + 3;
         // test as an argument
         t2(i);
-        // test with dereferences
-        int i = d.f;
 
         // test as recipient of a call
         d.t();
