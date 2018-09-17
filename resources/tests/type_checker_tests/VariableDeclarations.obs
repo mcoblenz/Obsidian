@@ -1,0 +1,17 @@
+contract C {
+    state S1;
+    state S2;
+
+    C() {
+        ->S1;
+    }
+}
+
+main contract VariableDeclarations {
+    C@S1 cField;
+
+    transaction t(C@S2 cArg) {
+        // Error: can't specify typestate on local variable
+        C@S1 c;
+    }
+}

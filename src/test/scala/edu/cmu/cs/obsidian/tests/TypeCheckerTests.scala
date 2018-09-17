@@ -628,4 +628,10 @@ class TypeCheckerTests extends JUnitSuite {
                 (FieldSubtypingError("c", StateType("C", "S1", false), StateType("C", "S2", false)), 48)::
             Nil)
     }
+
+    @Test def variableDeclarationsTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/VariableDeclarations.obs",
+            (InvalidLocalVariablePermissionDeclarationError(), 15)::
+            Nil)
+    }
 }
