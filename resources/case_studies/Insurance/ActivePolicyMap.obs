@@ -87,7 +87,7 @@ contract ActivePolicyList {
                         }
                         case HasNext {
                             if(next.getKey().equals(policy)) {
-                                return next.removeNext();
+                                return this.removeNext();
                             }
                             else {
                                 return next.removeInRest(policy);
@@ -125,7 +125,7 @@ main asset contract ActivePolicyMap {
             case HasNext {
                 if(list.getKey().equals(policy)) {
                     ActivePolicyList secondNode = list.disconnectNext();
-
+                    [list@NoNext];
                     removed = list.removeValue();
                     list = secondNode;
                 } else {

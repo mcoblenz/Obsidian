@@ -1,22 +1,21 @@
 import "resources/case_studies/Insurance/PolicyRecord.obs"
 
-// This implements a mutable linked list of pending policies.
-asset contract PendingPolicyList {
-    state HasNext {
-        Policy@Unowned key;
-        PolicyRecord@Pending val;
+
+// This implements a mutable linked list of Pending policies.
+contract PendingPolicyList {
+    asset state HasNext {
         PendingPolicyList@Owned next;
     }
 
-    state Empty {
-    }
+    asset state NoNext;
+    state Empty;
+
+    Policy@Unowned key available in HasNext, NoNext;
+    PolicyRecord@Pending val available in HasNext, NoNext;
+
 
     PendingPolicyList@Empty() {
         ->Empty;
-    }
-
-    private transaction setNext(PendingPolicyList@HasNext this, PendingPolicyList@Owned >> Unowned newNext) {
-        next = newNext;
     }
 
     transaction getKey(PendingPolicyList@HasNext this) returns Policy@Unowned {
@@ -27,9 +26,19 @@ asset contract PendingPolicyList {
         return val;
     }
 
-    transaction removeValue(PendingPolicyList@HasNext this) returns PolicyRecord@Pending {
+    transaction disconnectNext(PendingPolicyList@HasNext >> NoNext this) returns PendingPolicyList@Owned {
+        PendingPolicyList removedNext = next;
+        ->NoNext;
+        return removedNext;
+    }
+
+    transaction reconnectNext(PendingPolicyList@NoNext >> HasNext this, PendingPolicyList@Owned >> Unowned newNext) {
+        ->HasNext(next = newNext);
+    }
+
+    private transaction removeValue(PendingPolicyList@NoNext >> Empty this) returns PolicyRecord@Pending {
         PolicyRecord valCopy = val;
-        val = new PolicyRecord(val.getPolicy(), new Money(0));
+        ->Empty;
         return valCopy;
     }
 
@@ -45,25 +54,48 @@ asset contract PendingPolicyList {
         }
     }
 
-    // get and remove the pair with the given Policy as a key
-    transaction remove(PendingPolicyList@Owned this, Policy@Unowned policy, PendingPolicyList@HasNext prevNode) returns PolicyRecord@Pending {
-        PolicyRecord@Pending removed;
-        switch this {
+
+
+    // Removes prevNode.next, returning the PolicyRecord that was previously owned by prevNode.next.
+    // Precondition: this is not the last node of the linked list.
+    transaction removeNext(PendingPolicyList@HasNext this) returns PolicyRecord@Pending {
+        PendingPolicyList removedNode = this.next;
+        [removedNode@Owned];
+
+        switch removedNode {
             case Empty {
-                throw; // TODO : element not in map?
+                throw; // this case doesn't make any sense.
             }
             case HasNext {
-                if (key.equals(policy)) {
-                    prevNode.setNext(next);
-                    removed = removeValue();
-                }
-                else {
-                    removed = next.remove(policy, this);
-                }
+                this.next = removedNode.disconnectNext();
+                [removedNode@NoNext];
+                return removedNode.removeValue();
             }
         }
+    }
 
-        return removed;
+    // Assumes "this" is not a match.
+     transaction removeInRest(PendingPolicyList@Owned this, Policy@Unowned policy) returns PolicyRecord@Pending {
+          switch this {
+               case Empty {
+                   throw; // We didn't find the policy in the list.
+               }
+               case HasNext {
+                   switch next {
+                        case Empty {
+                            throw;
+                        }
+                        case HasNext {
+                            if(next.getKey().equals(policy)) {
+                                return this.removeNext();
+                            }
+                            else {
+                                return next.removeInRest(policy);
+                            }
+                        }
+                   }
+               }
+          }
     }
 }
 
@@ -79,28 +111,30 @@ main asset contract PendingPolicyMap {
         list.append(key, val);
     }
 
+
+
+
     // remove and return value of the pair with the given policy as a key
-    transaction extract(PendingPolicyMap@Owned this, Policy@Unowned policy) returns PolicyRecord@Pending {
-        PolicyRecord@Pending removed;
+    transaction get(PendingPolicyMap@Owned this, Policy@Unowned policy) returns PolicyRecord@Pending {
+        PolicyRecord removed;
 
         switch list {
+            case Empty {
+                throw; // Element not in map.
+            }
             case HasNext {
                 if(list.getKey().equals(policy)) {
+                    PendingPolicyList secondNode = list.disconnectNext();
+                    [list@NoNext];
                     removed = list.removeValue();
-                    list = new PendingPolicyList();
+                    list = secondNode;
                 } else {
-                    removed = list.remove(policy, list);
+                    removed = list.removeInRest(policy);
                 }
-            }
-            case Empty {
-                throw; //TODO : element not in map?
             }
         }
 
         return removed;
 
     }
-
 }
-
-

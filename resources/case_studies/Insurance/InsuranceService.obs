@@ -45,7 +45,7 @@ main asset contract InsuranceService {
     transaction buyPolicy(Policy@Offered >> (Active | Expired) policy, Money@Owned >> Unowned money) returns Money@Owned {
 
         if (timeService.getTime() > policy.getExpirationTime()) {
-            PolicyRecord pendingPolicy = pendingPolicies.extract(policy);
+            PolicyRecord pendingPolicy = pendingPolicies.get(policy);
 
             // refund insurer's payout
             Money insurerRefund = pendingPolicy.refund();
@@ -56,7 +56,7 @@ main asset contract InsuranceService {
             policy.expire();
             return money;
         } else {
-            PolicyRecord pendingPolicy = pendingPolicies.extract(policy);
+            PolicyRecord pendingPolicy = pendingPolicies.get(policy);
             // get payment
             int cost = policy.getCost();
             Money payment = money.getAmountOfMoney(cost);

@@ -1078,6 +1078,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                             logError(s, InconsistentContractTypeError(declaredContractName, exprNonPrimitiveType.contractName))
                                             np // Just go with the declaration
                                         }
+                                    case BottomType() =>
+                                        // Don't emit an extra error message.
+                                        BottomType()
                                     case _ =>
                                         logError(s, InconsistentTypeAssignmentError(typ, exprType))
                                         np // Just go with the declaration
