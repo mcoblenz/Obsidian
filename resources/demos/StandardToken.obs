@@ -15,7 +15,7 @@ asset contract Money {
             throw;
         }
         value = value - v;
-        Money@Owned result = new Money(v);
+        Money result = new Money(v);
         return result;
     }
 
@@ -29,13 +29,13 @@ asset contract Account {
     Money@Owned value;
     int address;
 
-    Account@Owned(Money@Owned v, int a) {
+    Account@Owned(Money@Owned >> Unowned v, int a) {
         value = v;
         address = a;
     }
 
     transaction withdraw(Account@Unowned this, int amount) returns Money@Owned {
-        Money@Owned withdrawal = value.split(amount);
+        Money withdrawal = value.split(amount);
         return withdrawal;
     }
 
@@ -44,9 +44,13 @@ asset contract Account {
     }
 
     transaction setBalance(Account@Unowned this, Money@Owned >> Unowned money) returns Money@Owned {
-        Money@Owned result = value;
+        Money result = value;
         value = money;
         return result;
+    }
+
+    transaction getAddress(Account@Unowned this) returns int {
+        return address;
     }
 }
 
@@ -63,7 +67,7 @@ contract AccountList {
         ->Empty;
     }
 
-    AccountList@Owned(Account@Owned a) {
+    AccountList@Owned(Account@Owned >> Unowned a) {
         ->HasNext(account = a, next = new AccountList());
     }
 
@@ -73,7 +77,7 @@ contract AccountList {
                 throw;
             }
             case HasNext {
-                if (account.address == addressToFind) {
+                if (account.getAddress() == addressToFind) {
                     return account;
                 }
                 else {
@@ -89,17 +93,24 @@ main contract StandardToken {
     AccountList@Owned accounts;
 
     transaction transferFrom(int fromAddress, int toAddress, Money@Unowned amount) {
-        Account@Unowned fromAccount = accounts.find(fromAddress);
-        Account@Unowned toAccount = accounts.find(toAddress);
+        Account fromAccount = accounts.find(fromAddress);
+        Account toAccount = accounts.find(toAddress);
 
 
         // Original Solidity code:
         // balances[from] -= value;
         // balances[to] =+ value;
-        Money@Owned money = fromAccount.withdraw(amount.getValue());
-        //toAccount.setBalance(money);
+        Money money = fromAccount.withdraw(amount.getValue());
+//        toAccount.setBalance(money);
+
+
+
+
+
+
+
 // Correct code:
-             toAccount.deposit(money);
+         toAccount.deposit(money);
 
 
     }
