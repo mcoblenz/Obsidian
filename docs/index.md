@@ -24,6 +24,8 @@ Obsidian is a project by:
 
 
 ## Publications
+Paulete Koronkevich. "Obsidian in the Rough: A Case Study Evaluation of a New Blockchain Programming Language". SPLASH 2018 Student Research Competition. Second place winner.
+
 Michael Coblenz, Jonathan Aldrich, Joshua Sunshine, Brad A. Myers, "User-Centered Design of Permissions, Typestate, and Ownership in the Obsidian Blockchain Language," HCI for Blockchain: Studying, Designing, Critiquing and Envisioning Distributed Ledger Technologies Workshop at CHI'2018, April 22, 2018, Montreal, QC, Canada. [pdf](http://www.hciforblockchain.org/wp-content/uploads/sites/25/2018/04/Coblenz.pdf).
 
 Celeste Barnaby, Michael Coblenz, Tyler Etzel, Eliezer Kanal, Joshua Sunshine, Brad Myers, Jonathan Aldrich. "A User Study to Inform the Design of the Obsidian Blockchain DSL." 8th Workshop on Evaluation and Usability of Programming Languages and Tools (PLATEAU'2017) at SPLASH 2017, October 23, 2017. [pdf](http://www.cs.cmu.edu/~NatProg/papers/barnaby17%20-%20Obsidian-plateau.pdf)
