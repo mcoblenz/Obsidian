@@ -16,8 +16,6 @@ public abstract class ChaincodeClientStub {
     protected final byte[] TRUE_ARRAY = {1};
     protected final byte[] FALSE_ARRAY = {0};
 
-    protected final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
-
     // This constructor is used AFTER main finishes setting up the connection.
     public ChaincodeClientStub(ChaincodeClientConnectionManager connectionManager) {
         this.connectionManager = connectionManager;

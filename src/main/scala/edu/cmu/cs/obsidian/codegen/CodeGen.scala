@@ -181,7 +181,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             case BoolType() => JExpr.cond(unmarshalledExpr, JExpr.ref("TRUE_ARRAY"), JExpr.ref("FALSE_ARRAY"))
             case StringType() =>
                 val toByteArrayInvocation: JInvocation = JExpr.invoke(unmarshalledExpr, "getBytes")
-                val charset = JExpr._this().ref("DEFAULT_CHARSET")
+                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                 toByteArrayInvocation.arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
             case _ => unmarshalledExpr.invoke("__archiveBytes")
@@ -204,8 +204,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 marshalledExpr.component(JExpr.lit(0)).eq0()
             case StringType() =>
                 val stringClass = model.ref("java.lang.String")
-                val charset = JExpr._this().ref("DEFAULT_CHARSET")
-
+                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                 JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
             case _ =>
