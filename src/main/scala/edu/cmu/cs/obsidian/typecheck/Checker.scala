@@ -1523,8 +1523,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         logError(field, NonAssetOwningAssetError(lexicallyInsideOf.name, field))
                     }
                 }
+                if (typ.permission == Inferred()) {
+                    logError(field, FieldMissingPermissionError(field.name))
+                }
             case _ => ()
         }
+
     }
 
     private def checkTransactionInState(tx: Transaction,

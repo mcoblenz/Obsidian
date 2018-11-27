@@ -19,9 +19,9 @@ main asset contract C {
 
     C2@S f3;
 
-    C1 f5;
+    C1@Shared f5;
     C1@Unowned f6;
-    C2 f7;
+    C2@Shared f7;
     C2@Unowned f8;
     int f9;
     string f10;

@@ -1170,7 +1170,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
             val contract = resolveNonPrimitiveTypeToContract(n, translationContext, inContract)
             if (contract.isEmpty) {
-                println("Compilation error: unable to resolve type " + name)
+                println("Compilation error: unable to resolve type " + n)
             }
             else {
                 val archiveVariable = if (lazySerialization) {
