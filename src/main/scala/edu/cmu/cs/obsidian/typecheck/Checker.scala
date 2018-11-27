@@ -1150,6 +1150,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 contextPrime
 
             case Transition(newStateName, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) =>
+                // TO CHECK:
+                // 1. Assignments are only to fields that will be available in the new state.
+                // (1a: which don't exist anywhere; 1b: which exist but not in the target state)
+                // 2. All fields in the target state that MIGHT NOT exist in the current state must be initialized.
+                // 3. All asset references in the source state that will not exist in the destination state
+                //    must be unowned.
+
+
                 val thisTable = context.contractTable
 
                 if (thisTable.state(newStateName).isEmpty) {
@@ -1170,70 +1178,43 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // maybeOldFields is the set of fields from the old state that MAY be going away — 
                 //   we can't be sure when the current state is a union.
 
-                val possibleCurrentStates = oldType match {
-                    case ContractReferenceType(_, _, _) => thisTable.possibleStates
-                    case InterfaceContractType(_, _) => thisTable.possibleStates
-                    case StateType(_, stateNames, _) => stateNames
+                val possibleCurrentStates =
+                        oldType match {
+                            case ContractReferenceType(_, _, _) => thisTable.possibleStates
+                            case InterfaceContractType(_, _) => thisTable.possibleStates
+                            case StateType(_, stateNames, _) => stateNames
+                        }
+
+                def fieldsAvailableInState(stateName: String) : Set[Field] = {
+                    val allFields = thisTable.allFields
+                    allFields.filter((f: Field) =>
+                        f.availableIn.isEmpty || f.availableIn.get.contains(stateName))
                 }
 
                 // For each state that we might be in, compute the set of fields that could be available.
                 val allContractFields = thisTable.allFields
-                val oldFieldSets: Set[Set[Field]] = possibleCurrentStates.map((stateName: String) =>
-                    // Take this state name and find all fields that are applicable.
-                    allContractFields.filter((f: Field) =>
-                        if (f.availableIn.isEmpty) {
-                            // available in all states
-                            true
-                        }
-                        else {
-                            f.availableIn.get.contains(stateName)
-                        }
-                ))
-
-                val (oldFields: Set[(String, ObsidianType)], maybeOldFields: Set[(String, ObsidianType)]) =
-                // We don't have a statically-fixed set of old fields because we don't know statically
-                // which specific state we're in. We take a conservative approach:
-                // take the intersection to ensure that all fields might need to be initialized will be initialized.
-                    if (decl.isInstanceOf[Constructor] || oldFieldSets.isEmpty) {
-                        (Set.empty[(String, ObsidianType)], Set.empty[(String, ObsidianType)])
+                val possibleCurrentFields =
+                    if (possibleCurrentStates.isEmpty) {
+                        Set.empty[Field]
                     }
                     else {
-                        val oldFieldNamesSets: Set[Set[(String, ObsidianType)]] = oldFieldSets.map(
-                            (decls: Set[Field]) => decls.map((d: Field) => (d.name, d.typ))
-                        )
-
-                        (oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
-                            ((intersections, next) => intersections.intersect(next))
-                        },
-                            oldFieldNamesSets.tail.foldLeft(oldFieldNamesSets.head) {
-                                ((unions, next) => unions.union(next))
-                            })
-
+                        possibleCurrentStates.map(fieldsAvailableInState).reduce(
+                            (s1: Set[Field], s2: Set[Field]) => s1 union s2)
                     }
 
-                val newStateFields = newStateTable.ast.fields
-                                .filter(_.isInstanceOf[Field])
-                                .map((decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ))
-                val contractDeclarations = thisTable.contractTable.ast.asInstanceOf[Contract].declarations
-                val contractFieldDeclarationsAvailableInNewState: Seq[Declaration] =
-                    contractDeclarations.filter(
-                        (d: Declaration) => if (d.tag == FieldDeclTag) {
-                            val availableIn = d.asInstanceOf[Field].availableIn
-                            availableIn match {
-                                case None => false // We're not interested in fields that are available in all states because they were available in the old state too.
-                                case Some(stateIdentifiers) =>
-                                    stateIdentifiers.contains(newStateName)
-                            }
-                        }
-                        else {
-                            false
-                        }
-                    )
-                val fieldNamesInNewState = contractFieldDeclarationsAvailableInNewState.map(
-                    (decl: Declaration) => (decl.asInstanceOf[Field].name, decl.asInstanceOf[Field].typ))
-                val newFields: Seq[(String, ObsidianType)] = newStateFields ++ fieldNamesInNewState
+                val definiteCurrentFields = // These are definitely available now.
+                    if (possibleCurrentStates.isEmpty) {
+                        Set.empty[Field]
+                    }
+                    else {
+                        possibleCurrentStates.map(fieldsAvailableInState).reduce(
+                            (s1: Set[Field], s2: Set[Field]) => s1 intersect s2)
+                    }
 
-                val toInitialize = newFields.toSet.diff(oldFields) // All the fields that must be initialized.
+                val newFields = fieldsAvailableInState(newStateName)
+
+
+                val fieldsToInitialize = newFields -- definiteCurrentFields // All the fields that must be initialized.
 
                 // We require that all the fields of the new state that don't exist in the current state be initialized.
                 // However, shared fields may be initialized too.
@@ -1252,12 +1233,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     logError(invalidAssignment._3, InvalidStateFieldInitialization(invalidAssignment._1, invalidAssignment._2))
                 }
 
-                val updated = updatedInTransition.union(updatedViaAssignment) // Fields updated by either assignment or transition initialization
-                val uninitialized = toInitialize.filterNot((p: (String, ObsidianType)) => updated.contains(p._1))
+                val updatedFieldNames = updatedInTransition ++ updatedViaAssignment // Fields updated by either assignment or transition initialization
+                val uninitializedFieldNames = fieldsToInitialize.map((f: Field) => f.name) -- updatedFieldNames
 
-                if (uninitialized.nonEmpty) logError(s, TransitionUpdateError(uninitialized.map(_._1)))
+                if (uninitializedFieldNames.nonEmpty) {
+                    logError(s, TransitionUpdateError(uninitializedFieldNames))
+                }
 
-                val badInitializations = updated.diff(newFields.map(_._1).toSet) // We don't allow updates to fields that don't exist in the target state.
+                val badInitializations = updatedFieldNames -- newFields.map((f: Field) => f.name) // We don't allow updates to fields that don't exist in the target state.
                 for (s <- badInitializations) {
                     val err = FieldUndefinedError(newStateTable.nonPrimitiveType, s)
                     logError(updates.get.find(_._1.name == s).get._1, err)
@@ -1276,11 +1259,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 // Check for potentially-dropped resources.
-                val toCheckForDroppedAssets = maybeOldFields.diff(newFields.toSet) // fields that we might currently have minus fields we're initializing now
+                val toCheckForDroppedAssets = possibleCurrentFields -- newFields // fields that we might currently have minus fields we're initializing now
                 for (oldField <- toCheckForDroppedAssets) {
-                    val fieldType = contextPrime.thisFieldTypes.getOrElse(oldField._1, oldField._2)
+                    val fieldType = contextPrime.thisFieldTypes.getOrElse(oldField.name, oldField.typ)
                     if (fieldType.isAssetReference(thisTable) != No() && fieldType.isOwned) {
-                        logError(s, PotentiallyUnusedOwnershipError(oldField._1))
+                        logError(s, PotentiallyUnusedOwnershipError(oldField.name))
                     }
                 }
 

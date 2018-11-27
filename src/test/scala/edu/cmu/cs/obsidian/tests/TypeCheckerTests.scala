@@ -528,6 +528,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def sameFieldNameTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SameNameFields.obs",
             (
+                (FieldUndefinedError(StateType("C", Set("S1"), false), "shared"), 4)
+                ::
                 (CombineAvailableIns("x", "S1, S3", 8), 15)
                     ::
                     (CombineAvailableIns("shared", "S1, S2, S3", 18), 19)
