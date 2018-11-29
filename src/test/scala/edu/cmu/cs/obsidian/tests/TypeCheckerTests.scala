@@ -23,7 +23,7 @@ class TypeCheckerTests extends JUnitSuite {
                 fail(s"Failed with parser message $errMsg")
         }
 
-        val importsProcessedAst = ImportProcessor.processImports(file, prog)
+        val (importsProcessedAst, importErrors) = ImportProcessor.processImports(file, prog)
         val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
         val table = new SymbolTable(fieldsLiftedAst)

@@ -301,3 +301,6 @@ case class FieldMissingPermissionError(fieldName: String) extends Error {
 case class InvalidLocalVariablePermissionDeclarationError() extends Error {
     val msg: String = s"Local variable declarations cannot include states or permissions. They must be inferred from the type of the assigned value."
 }
+
+case class ImportError(msg: String) extends Error {
+}

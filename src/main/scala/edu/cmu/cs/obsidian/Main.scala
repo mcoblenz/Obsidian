@@ -278,7 +278,7 @@ object Main {
                 println()
             }
 
-            val importsProcessedAst = ImportProcessor.processImports(filename, ast)
+            val (importsProcessedAst, importErrors) = ImportProcessor.processImports(filename, ast)
             val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
             val table = new SymbolTable(fieldsLiftedAst)
@@ -292,7 +292,7 @@ object Main {
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val typecheckingErrors = checker.checkProgram()
 
-            val allSortedErrors = (transformErrors ++ typecheckingErrors)//.sorted
+            val allSortedErrors = (importErrors ++ transformErrors ++ typecheckingErrors)//.sorted
 
             if (!allSortedErrors.isEmpty) {
                 val errorCount = allSortedErrors.size
