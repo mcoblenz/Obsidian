@@ -10,7 +10,7 @@ object Lexer extends RegexParsers {
         case x => NumLiteralT(Integer.parseInt(x, 16))
     }
 
-    private def stringLitP = ("\".*\"".r) ^^ {
+    private def stringLitP = """"[^"]*"""".r ^^ {
         case s =>
             val content = s.substring(1, s.length - 1)
             StringLiteralT(content)
