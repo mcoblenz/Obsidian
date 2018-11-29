@@ -18,4 +18,9 @@ main contract Test {
         ->S2;
     }
 
+    transaction sharedOwnershipTransition(Test@Shared this) {
+        ->S2;
+        [this @ Shared];
+    }
+
 }

@@ -1268,7 +1268,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
-                val newSimpleType = StateType(thisTable.name, newStateName, false)
+                val newSimpleType =
+                    if (oldType.isOwned) {
+                        StateType(thisTable.name, newStateName, false)
+                    }
+                    else {
+                        // If the old "this" was unowned, we'd better not steal ownership for ourselves here.
+                        oldType
+                    }
 
                 contextPrime.updated("this", newSimpleType).updatedAfterTransition()
 
