@@ -69,4 +69,12 @@ class CompilerTests extends JUnitSuite {
     result = Main.compileProgram(inputArgs)
     assertTrue(result)
   }
+
+  @Test def shipmentTest(): Unit = {
+    var result = true
+    val inputArgs: Array[String] = Array("--dump-debug", "obs_output", "resources/tests/compilerTests/shipment.obs")
+    result = Main.compileProgram(inputArgs)
+    assertTrue(result)
+
+  }
 }
