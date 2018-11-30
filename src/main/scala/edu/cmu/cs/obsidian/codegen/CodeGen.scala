@@ -735,6 +735,19 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                     /* with the Hyperledger chaincode format */
                     generateMainServerClassMethods(newClass, translationContext)
                 }
+                else if (mockChaincode) {
+                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
+                }
+
+                val stubType = if (mockChaincode) {
+                    model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
+                } else if (lazySerialization) {
+                    model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState")
+                    /* (also contains a ChaincodeStub) */
+                } else {
+                    model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
+                }
+                generateRunMethod(newClass, translationContext, stubType)
                 generateSerialization(aContract, newClass, translationContext)
         }
     }
@@ -767,7 +780,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         System.out.println(!mockChaincode)
 
         if (mockChaincode) {
-            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMainMock"))
         } else if (lazySerialization) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.HyperledgerChaincodeBase"))
         } else {
@@ -782,9 +795,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         } else {
             model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
         }
-
-        /* run method */
-        generateRunMethod(newClass, translationContext, stubType)
 
         // need to gather the types of the main contract constructor in order to correctly deserialize arguments
         // find the first declaration that is a constructor
@@ -878,7 +888,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         /* we use this map to group together all transactions with the same name */
         val txsByName = new mutable.HashMap[String, mutable.Set[Transaction]]()
 
-        for (tx <- mainTransactions) {
+        for (decl <- translationContext.contract.declarations.filter((d: Declaration) => d.tag == TransactionDeclTag)) {
+            val tx = decl.asInstanceOf[Transaction]
             val opt = txsByName.get(tx.name)
             opt match {
               case Some(sameNameTxs) =>
@@ -974,13 +985,25 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
                 if (tx.retType.isDefined) {
                     txInvoke = JExpr.invoke(txMethName)
+
+                    val returnObj = stateCondBody.decl(resolveType(tx.retType.get), "returnObj", txInvoke)
+
+                    // Record the UUID of this object (if it is one).
+                    tx.retType.get match {
+                        case np: NonPrimitiveType =>
+                            val mapInvocation = stateCondBody.invoke("mapReturnedObject")
+                            mapInvocation.arg(returnObj)
+
+                        case _ => ()
+                    }
+
                     stateCondBody.assign(returnBytes,
                         tx.retType.get match {
-                            case IntType() => txInvoke.invoke("toByteArray")
+                            case IntType() => returnObj.invoke("toByteArray")
                             case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
                                 .staticInvoke("booleanToBytes").arg(txInvoke)
-                            case StringType() => txInvoke.invoke("getBytes")
-                            case _ => txInvoke.invoke("__archiveBytes")
+                            case StringType() => returnObj.invoke("getBytes")
+                            case _ => returnObj.invoke("__archiveBytes")
                         }
                     )
                 } else {
