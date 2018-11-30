@@ -298,6 +298,10 @@ case class FieldMissingPermissionError(fieldName: String) extends Error {
     val msg: String = s"Field $fieldName needs to have a permission, such as Owned, Unowned, or Shared."
 }
 
+case class ReturnTypeMissingPermissionError(typeName: String) extends Error {
+    val msg: String = s"Return type $typeName needs to have a permission, such as Owned, Unowned, or Shared."
+}
+
 case class InvalidLocalVariablePermissionDeclarationError() extends Error {
     val msg: String = s"Local variable declarations cannot include states or permissions. They must be inferred from the type of the assigned value."
 }

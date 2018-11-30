@@ -25,7 +25,14 @@ case class NoOwnershipConsumption() extends OwnershipConsumptionMode
 
 // Type of references to contracts.
 case class ContractReferenceType(contractType: ContractType, permission: Permission, override val isRemote: Boolean) extends NonPrimitiveType {
-    override def toString: String = contractName + "@" + permission
+    override def toString: String =
+        if (permission == Inferred()) {
+            contractName
+        }
+        else {
+            contractName + "@" + permission
+        }
+
     val contractName: String = contractType.contractName
 
     override def isOwned = permission == Owned()

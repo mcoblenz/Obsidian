@@ -1643,6 +1643,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         checkTransactionArgShadowing(startStates, tx)
         checkTransactionInState(tx, lexicallyInsideOf, initContext)
+
+        tx.retType match {
+            case Some(typ) =>
+                typ match {
+                    case np: NonPrimitiveType =>
+                         if (np.permission == Inferred()) {
+                             logError(tx, ReturnTypeMissingPermissionError(np.contractName))
+                         }
+                    case _ => ()
+                }
+            case _ => ()
+        }
     }
 
     private def checkStateFieldShadowing(lexicallyInsideOf: ContractTable, f: Field, s: State): Unit = {
