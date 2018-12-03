@@ -14,7 +14,7 @@ import java.util.UUID;
 public abstract class ChaincodeClientStub {
     protected ChaincodeClientConnectionManager connectionManager;
 
-    UUID uuid;
+    protected UUID uuid;
 
     protected final byte[] TRUE_ARRAY = {1};
     protected final byte[] FALSE_ARRAY = {0};
@@ -27,5 +27,9 @@ public abstract class ChaincodeClientStub {
 
     // This constructor is only used while configuring the main contract stub.
     ChaincodeClientStub() {
+    }
+
+    public UUID getUUID() {
+        return uuid;
     }
 }

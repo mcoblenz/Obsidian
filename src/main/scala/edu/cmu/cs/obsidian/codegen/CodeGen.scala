@@ -139,9 +139,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
 
         val constructor = contractClass.constructor(JMod.PUBLIC)
-        val param = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
+        val connectionManager = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
+        val uuid = constructor.param(model.directClass("java.util.UUID"), "uuid")
+
         val superConstructorInvocation = constructor.body().invoke("super")
-        superConstructorInvocation.arg(param)
+        superConstructorInvocation.arg(connectionManager)
+        superConstructorInvocation.arg(uuid)
+
 
       val txNames: mutable.Set[String] = new mutable.HashSet[String]()
 
@@ -266,6 +270,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
         doTransactionInvocation.arg(transaction.name)
         doTransactionInvocation.arg(argArray)
+        doTransactionInvocation.arg(JExpr.invoke("getUUID"))
         doTransactionInvocation.arg(transaction.retType.isDefined)
 
         if (transaction.retType.isDefined) {
@@ -1100,6 +1105,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             val stubJavaType = resolveType(stubType)
             val newStubExpr = JExpr._new(stubJavaType)
             newStubExpr.arg(JExpr.ref("connectionManager"))
+            val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID")
+            newStubExpr.arg(generateUUID)
             val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
             val clientMainInvocation = method.body.invoke("main")
             clientMainInvocation.arg(stubVariable)

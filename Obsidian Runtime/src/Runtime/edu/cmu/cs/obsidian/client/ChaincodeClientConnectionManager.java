@@ -5,6 +5,7 @@ import org.json.JSONTokener;
 import org.json.JSONWriter;
 
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.Base64;
 import java.io.*;
 
@@ -23,7 +24,7 @@ public class ChaincodeClientConnectionManager {
         this.printDebug = printDebug;
     }
 
-    public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, boolean returnsNonvoid)
+    public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, UUID receiverUUID, boolean returnsNonvoid)
             throws java.io.IOException,
                 ChaincodeClientTransactionFailedException,
                 ChaincodeClientTransactionBugException
@@ -53,6 +54,10 @@ public class ChaincodeClientConnectionManager {
                         jsonWriter.value(byteString);
                     }
                 jsonWriter.endArray(); // args
+            if (receiverUUID != null) {
+                jsonWriter.key("receiver");
+                jsonWriter.value(receiverUUID.toString());
+            }
             jsonWriter.endObject(); // ctorMsg
         jsonWriter.endObject(); // params
 
