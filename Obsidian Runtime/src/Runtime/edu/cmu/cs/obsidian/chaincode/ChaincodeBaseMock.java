@@ -1,8 +1,10 @@
 /**
  * Created by mcoblenz on 2/16/17.
  * A chaincode program corresponds to a server that listens for transaction requests.
- * This is the base class for such servers.
+ * ChaincodeBaseServer is the implementation of that server.
  * The main method waits for transaction requests and dispatches them.
+ *
+ * ChaincodeBaseMock is the base class for all chaincode objects on the mock environment.
  */
 
 package edu.cmu.cs.obsidian.chaincode;
@@ -16,16 +18,47 @@ import java.net.Socket;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Map;
+import java.util.HashMap;
+import java.lang.ref.WeakReference;
 
-class ChaincodeBaseServer {
+
+final class ChaincodeBaseServer {
     private final int port;
-    private final ChaincodeBaseMock base;
+    private final ChaincodeBaseMainMock base;
     private final boolean printDebug;
 
-    public ChaincodeBaseServer(int port, ChaincodeBaseMock base, boolean printDebug) {
+    private static ChaincodeBaseServer globalInstance;
+
+    public static ChaincodeBaseServer getGlobalInstance() {
+        return globalInstance;
+    }
+
+    // The server is responsible for tracking all publicly-accessible objects by GUID and dispatching invocations to the appropriate run() method.
+    /* We use WeakReferences here because we still want
+     * the objects to be garbage collected if they go out
+     * of scope. */
+    private Map<String, WeakReference<ChaincodeBaseMock>> guidMap;
+
+    public ChaincodeBaseMock getReturnedObject(String guid) {
+        WeakReference<ChaincodeBaseMock> ref = guidMap.get(guid);
+        if (ref != null) {
+            return ref.get();
+        } else {
+            return null;
+        }
+    }
+
+    public void mapReturnedObject(ChaincodeBaseMock obj) {
+        guidMap.put(obj.__getGUID(), new WeakReference<ChaincodeBaseMock>(obj));
+    }
+
+    public ChaincodeBaseServer(int port, ChaincodeBaseMainMock base, boolean printDebug) {
         this.port = port;
         this.base = base;
         this.printDebug = printDebug;
+        guidMap = new HashMap<String, WeakReference<ChaincodeBaseMock>>();
+        ChaincodeBaseServer.globalInstance = this;
     }
 
     // TODO: change this to gRPC.
@@ -47,7 +80,6 @@ class ChaincodeBaseServer {
                 "message": [return value encoded]
             }
         }
-
      */
 
     /* Waits for a request and then runs a transaction based on the request.
@@ -126,9 +158,24 @@ class ChaincodeBaseServer {
                     .getJSONObject("ctorMsg")
                     .getString("function");
 
-            if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
+            String receiverUUID = root.getJSONObject("params")
+                    .getJSONObject("ctorMsg")
+                    .getString("receiver");
+
+            ChaincodeBaseMock receiver = base;
+            if (receiverUUID != null) {
+                receiver = getReturnedObject(receiverUUID);
+                if (printDebug) {
+                    System.out.println("Found receiver object " + receiver);
+                }
+                if (receiver == null) {
+                    receiver = base; // TODO: don't send UUID from main client contract
+                }
+            }
+
+            if (printDebug) System.out.println("Calling transaction '" + txName + "' on object " + receiver + "...");
             try {
-                retBytes = base.run(base.stub, txName, txArgs);
+                retBytes = receiver.run(base.stub, txName, txArgs);
             } catch (ReentrancyException re) {
                 System.out.println("Error: Reentrant call made");
                 re.printStackTrace(System.out);
@@ -139,7 +186,7 @@ class ChaincodeBaseServer {
             } catch (NoSuchTransactionException e) {
                 /* This should never happen, because it won't compile if you
                  * reference a nonexistent transaction. */
-                System.out.println("Invalid transaction call " + txName);
+                System.err.println("Invalid transaction call " + txName);
                 failureMessage = ": No such transaction: " + txName;
             }
         }
@@ -215,83 +262,24 @@ class ChaincodeBaseServer {
 }
 
 public abstract class ChaincodeBaseMock {
-    public final ChaincodeStubMock stub = new ChaincodeStubMock();
+    public java.util.UUID __guid = java.util.UUID.randomUUID();
 
-    protected void invokeConstructor() {}; //to be overidden in generated code
-
-    public void delegatedMain(String args[]) {
-        if (args.length != 2) {
-            java.net.URL jar = null;
-            Class currentClass = new Object() { }.getClass().getEnclosingClass();
-            java.security.CodeSource src = currentClass.getProtectionDomain().getCodeSource();
-            if (src != null) {
-                jar = src.getLocation();
-            }
-
-            System.err.println(
-                    "Usage: 'java -jar " + jar + " <path> <port>' where\n" +
-                    "<path> is the path to the chaincode archive\n" +
-                    "<port> is a port number to listen for transactions on"
-            );
-            System.exit(1);
-        }
-
-        /* archive path */
-        String archivePathString = args[0];
-        java.nio.file.Path archivePath = java.nio.file.Paths.get(archivePathString);
-
-        /* port */
-        int port = Integer.parseInt(args[1]);
-
-        /* TODO: add an option to turn this on/off */
-        boolean printDebug = true;
-
-        try {
-            byte[] bytes = java.nio.file.Files.readAllBytes(archivePath);
-            __initFromArchiveBytes(bytes);
-        }
-        catch (InvalidProtocolBufferException e) {
-            // Failed to read the file. Bail.
-            System.err.println(archivePath + " is a file, but does not contain a valid archive of this contract.");
-            System.exit(1);
-        }
-        catch (IOException e) {
-            // If the file didn't exist, no problem; we'll create a new instance later.
-            invokeConstructor();
-        }
-
-        /* setup a hook that saves data to archive file on shutdown */
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("\nSaving to archive...");
-            byte[] newArchiveBytes = __archiveBytes();
-            try {
-                java.nio.file.Files.write(archivePath, newArchiveBytes,
-                        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
-            } catch (IOException e) {
-                System.err.println("Error: failed to write state to output file at " + archivePathString + ": " + e);
-                System.err.println("Data may be lost.");
-                System.exit(1);
-            }
-        }));
-
-        /* spin up server */
-        try {
-            new ChaincodeBaseServer(port, this, printDebug).start();
-        }
-        catch (IOException e) {
-            System.out.println("Error: IOException raised when running server: " + e);
-            System.exit(1);
-        }
+    public String __getGUID() {
+        return __guid.toString();
     }
 
-    // Must be overridden in generated class.
-    public abstract byte[] init(ChaincodeStubMock stub, byte[][] args)
-            throws InvalidProtocolBufferException;
+    public ChaincodeBaseMock getReturnedObject(String guid) {
+        return ChaincodeBaseServer.getGlobalInstance().getReturnedObject(guid);
+    }
+
+    public void mapReturnedObject(ChaincodeBaseMock obj) {
+        ChaincodeBaseServer.getGlobalInstance().mapReturnedObject(obj);
+    }
+
     public abstract byte[] run(ChaincodeStubMock stub, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-                   BadTransactionException, NoSuchTransactionException;
-    public abstract ChaincodeBaseMock __initFromArchiveBytes(byte[] archiveBytes) throws InvalidProtocolBufferException;
-    public abstract byte[] __archiveBytes();
+            BadTransactionException, NoSuchTransactionException;
 }
+
 
 

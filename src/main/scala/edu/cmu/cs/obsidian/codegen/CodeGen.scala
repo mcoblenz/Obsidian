@@ -139,9 +139,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
 
         val constructor = contractClass.constructor(JMod.PUBLIC)
-        val param = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
+        val connectionManager = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
+        val uuid = constructor.param(model.directClass("java.util.UUID"), "uuid")
+
         val superConstructorInvocation = constructor.body().invoke("super")
-        superConstructorInvocation.arg(param)
+        superConstructorInvocation.arg(connectionManager)
+        superConstructorInvocation.arg(uuid)
+
 
       val txNames: mutable.Set[String] = new mutable.HashSet[String]()
 
@@ -167,14 +171,25 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
           }
     }
 
+
     private def translateStubField(decl: Field, newClass: JDefinedClass): Unit = {
+        /*
+            For now, we don't need any fields. We might change that in the future.
+
         // In a stub, every non-primitive field is also a stub, so we need to make the field of appropriate type for that.
         // Primitive fields will not map to anything; instead, their accesses will translate to remote calls.
-        val remoteFieldType = decl.typ
-        newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.name)
+        val fieldType = decl.typ
+        fieldType match {
+                case np: NonPrimitiveType =>
+                    val remoteFieldType = np.remoteType
+                    newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.name)
+                case _ => ()
+        }
+        */
     }
 
-    private def marshallExpr(unmarshalledExpr: IJExpression, typ: ObsidianType): IJExpression = {
+
+    private def marshallExprWithFullObjects(unmarshalledExpr: IJExpression, typ: ObsidianType): IJExpression = {
         val marshalledArg = typ match
         {
             case IntType() => unmarshalledExpr.invoke("toByteArray");
@@ -185,13 +200,45 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 toByteArrayInvocation.arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
             case _ => unmarshalledExpr.invoke("__archiveBytes")
+
         }
 
         marshalledArg
     }
 
     // Returns a pair of an error-checking block option and the resulting expression.
-    private def unmarshallExpr(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock): IJExpression = {
+    private def unmarshallExprExpectingUUIDObjects(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock): IJExpression = {
+        typ match
+        {
+            case IntType() =>
+                val newInt = JExpr._new(model.parseType("java.math.BigInteger"))
+                newInt.arg(marshalledExpr)
+                newInt
+            case BoolType() =>
+                val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
+                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException")))
+                marshalledExpr.component(JExpr.lit(0)).eq0()
+            case StringType() =>
+                val stringClass = model.ref("java.lang.String")
+                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
+            // this case encompasses [AstContractType] and [AstStateType]
+            case _ =>
+                val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
+                val constructorInvocation = JExpr._new(targetClass)
+                constructorInvocation.arg(JExpr.ref("connectionManager"))
+
+                val stringClass = model.ref("java.lang.String")
+                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                val guidString = JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
+                val uuid = model.ref("java.util.UUID").staticInvoke("fromString").arg(guidString)
+
+                constructorInvocation.arg(uuid)
+                constructorInvocation
+        }
+    }
+
+    private def unmarshallExprExpectingFullObjects(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock): IJExpression = {
         typ match
         {
             case IntType() =>
@@ -216,6 +263,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         }
     }
 
+
     private def translateStubTransaction(transaction: Transaction,
                                          newClass: JDefinedClass,
                                          stOption: Option[State]) : JMethod = {
@@ -226,8 +274,16 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         //val txName = transactionGetMethodName(transaction.name, stName)
 
-        val javaRetType = transaction.retType match {
-            case Some(typ) => resolveType(typ)
+        val obsidianRetType = transaction.retType match {
+            case Some(typ) =>
+                    typ match {
+                        case np: NonPrimitiveType => Some(np.remoteType)
+                        case _ => Some(typ)
+                    }
+            case None => None
+        }
+        val javaRetType = obsidianRetType match {
+            case Some(retType) => resolveType(retType)
             case None => model.VOID
         }
 
@@ -255,7 +311,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         for (i <- 0 until argExpressions.length) {
             val unmarshalledArg = argExpressions(i)
 
-            val marshalledArg = marshallExpr(unmarshalledArg, transaction.args(i).typIn)
+            val marshalledArg = marshallExprWithFullObjects(unmarshalledArg, transaction.args(i).typIn)
             val setInvocation = body.invoke(argArray, "add")
             setInvocation.arg(marshalledArg)
         }
@@ -266,6 +322,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
         doTransactionInvocation.arg(transaction.name)
         doTransactionInvocation.arg(argArray)
+        doTransactionInvocation.arg(JExpr.invoke("__getGUID")) // pass UUID so server knows what object to invoke the transaction on
         doTransactionInvocation.arg(transaction.retType.isDefined)
 
         if (transaction.retType.isDefined) {
@@ -274,7 +331,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
 
             val errorBlock = new JBlock()
-            val expr = unmarshallExpr(marshalledResultDecl, transaction.retType.get, errorBlock)
+            val expr = unmarshallExprExpectingUUIDObjects(marshalledResultDecl, obsidianRetType.get, errorBlock)
 
             if (!errorBlock.isEmpty) {
                 tryBlock.body().add(errorBlock)
@@ -735,6 +792,19 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                     /* with the Hyperledger chaincode format */
                     generateMainServerClassMethods(newClass, translationContext)
                 }
+                else if (mockChaincode) {
+                    newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
+                }
+
+                val stubType = if (mockChaincode) {
+                    model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeStubMock")
+                } else if (lazySerialization) {
+                    model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState")
+                    /* (also contains a ChaincodeStub) */
+                } else {
+                    model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
+                }
+                generateRunMethod(newClass, translationContext, stubType)
                 generateSerialization(aContract, newClass, translationContext)
         }
     }
@@ -767,7 +837,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         System.out.println(!mockChaincode)
 
         if (mockChaincode) {
-            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMock"))
+            newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.ChaincodeBaseMainMock"))
         } else if (lazySerialization) {
             newClass._extends(model.directClass("edu.cmu.cs.obsidian.chaincode.HyperledgerChaincodeBase"))
         } else {
@@ -782,9 +852,6 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         } else {
             model.directClass("org.hyperledger.fabric.shim.ChaincodeStub")
         }
-
-        /* run method */
-        generateRunMethod(newClass, translationContext, stubType)
 
         // need to gather the types of the main contract constructor in order to correctly deserialize arguments
         // find the first declaration that is a constructor
@@ -846,7 +913,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             var runArgsIndex = 0
 
             for (t <- types) {
-                val deserializedArg: IJExpression = unmarshallExpr(runArgs.component(runArgsIndex),t,errorBlock)
+                val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(runArgs.component(runArgsIndex),t,errorBlock)
                 invocation.arg(deserializedArg)
                 runArgsIndex += 1
             }
@@ -878,7 +945,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         /* we use this map to group together all transactions with the same name */
         val txsByName = new mutable.HashMap[String, mutable.Set[Transaction]]()
 
-        for (tx <- mainTransactions) {
+        for (decl <- translationContext.contract.declarations.filter((d: Declaration) => d.tag == TransactionDeclTag)) {
+            val tx = decl.asInstanceOf[Transaction]
             val opt = txsByName.get(tx.name)
             opt match {
               case Some(sameNameTxs) =>
@@ -974,14 +1042,27 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
                 if (tx.retType.isDefined) {
                     txInvoke = JExpr.invoke(txMethName)
+
+                    val returnObj = stateCondBody.decl(resolveType(tx.retType.get), "returnObj", txInvoke)
+
+                    // Record the UUID of this object (if it is one).
+                    tx.retType.get match {
+                        case np: NonPrimitiveType =>
+                            val mapInvocation = stateCondBody.invoke("mapReturnedObject")
+                            mapInvocation.arg(returnObj)
+                        case _ => ()
+                    }
+
                     stateCondBody.assign(returnBytes,
                         tx.retType.get match {
-                            case IntType() => txInvoke.invoke("toByteArray")
+                            case IntType() => returnObj.invoke("toByteArray")
                             case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
                                 .staticInvoke("booleanToBytes").arg(txInvoke)
-                            case StringType() => txInvoke.invoke("getBytes")
-                            case _ => txInvoke.invoke("__archiveBytes")
+                            case StringType() => returnObj.invoke("getBytes")
+//                            case _ => returnObj.invoke("__archiveBytes")
+                            case _ => returnObj.invoke("__getGUID").invoke("getBytes")
                         }
+
                     )
                 } else {
                     txInvoke = stateCondBody.invoke(txMethName)
@@ -1077,6 +1158,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             val stubJavaType = resolveType(stubType)
             val newStubExpr = JExpr._new(stubJavaType)
             newStubExpr.arg(JExpr.ref("connectionManager"))
+            val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID")
+            newStubExpr.arg(generateUUID)
             val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
             val clientMainInvocation = method.body.invoke("main")
             clientMainInvocation.arg(stubVariable)

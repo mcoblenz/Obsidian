@@ -54,6 +54,8 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
     }
 
     override def topPermissionType: NonPrimitiveType = this.copy(permission = Unowned()).setLoc(this)
+
+    override def remoteType: NonPrimitiveType = ContractReferenceType(contractType, permission, true)
 }
 
 
@@ -129,6 +131,7 @@ case class StateType(contractName: String, stateNames: Set[String], override val
         stateIsAsset
     }
 
+    override def remoteType: NonPrimitiveType = StateType(contractName, stateNames, true)
 }
 
 object StateType {
@@ -215,6 +218,8 @@ sealed trait NonPrimitiveType extends ObsidianType {
             No()
         }
     }
+
+    def remoteType: NonPrimitiveType
 }
 
 
@@ -247,4 +252,5 @@ case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) ext
     override def topPermissionType: NonPrimitiveType = this
     override val contractName: String = name
     override val permission: Permission = simpleType.permission
+    override def remoteType: NonPrimitiveType = this
 }
