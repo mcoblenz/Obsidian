@@ -171,12 +171,23 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
           }
     }
 
+
     private def translateStubField(decl: Field, newClass: JDefinedClass): Unit = {
+        /*
+            For now, we don't need any fields. We might change that in the future.
+
         // In a stub, every non-primitive field is also a stub, so we need to make the field of appropriate type for that.
         // Primitive fields will not map to anything; instead, their accesses will translate to remote calls.
-        val remoteFieldType = decl.typ
-        newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.name)
+        val fieldType = decl.typ
+        fieldType match {
+                case np: NonPrimitiveType =>
+                    val remoteFieldType = np.remoteType
+                    newClass.field(JMod.PRIVATE, resolveType(remoteFieldType), decl.name)
+                case _ => ()
+        }
+        */
     }
+
 
     private def marshallExpr(unmarshalledExpr: IJExpression, typ: ObsidianType): IJExpression = {
         val marshalledArg = typ match
@@ -189,6 +200,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                 toByteArrayInvocation.arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
             case _ => unmarshalledExpr.invoke("__archiveBytes")
+
         }
 
         marshalledArg
@@ -213,10 +225,14 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             // this case encompasses [AstContractType] and [AstStateType]
             case _ =>
                 val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
-                val classInstance = JExpr._new(targetClass)
-                val invocation = classInstance.invoke("__initFromArchiveBytes")
-                val _ = invocation.arg(marshalledExpr)
-                invocation
+                val constructorInvocation = JExpr._new(targetClass)
+                constructorInvocation.arg(JExpr.ref("connectionManager"))
+                val uuid = model.ref("java.util.UUID").staticInvoke("nameUUIDFromBytes").arg(marshalledExpr)
+                constructorInvocation.arg(uuid)
+//                val invocation = classInstance.invoke("__initFromArchiveBytes")
+//                val _ = invocation.arg(marshalledExpr)
+//                invocation
+            constructorInvocation
         }
     }
 
@@ -230,8 +246,16 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         //val txName = transactionGetMethodName(transaction.name, stName)
 
-        val javaRetType = transaction.retType match {
-            case Some(typ) => resolveType(typ)
+        val obsidianRetType = transaction.retType match {
+            case Some(typ) =>
+                    typ match {
+                        case np: NonPrimitiveType => Some(np.remoteType)
+                        case _ => Some(typ)
+                    }
+            case None => None
+        }
+        val javaRetType = obsidianRetType match {
+            case Some(retType) => resolveType(retType)
             case None => model.VOID
         }
 
@@ -270,7 +294,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
         doTransactionInvocation.arg(transaction.name)
         doTransactionInvocation.arg(argArray)
-        doTransactionInvocation.arg(JExpr.invoke("getUUID"))
+        doTransactionInvocation.arg(JExpr.invoke("__getGUID")) // pass UUID so server knows what object to invoke the transaction on
         doTransactionInvocation.arg(transaction.retType.isDefined)
 
         if (transaction.retType.isDefined) {
@@ -279,7 +303,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
 
             val errorBlock = new JBlock()
-            val expr = unmarshallExpr(marshalledResultDecl, transaction.retType.get, errorBlock)
+            val expr = unmarshallExpr(marshalledResultDecl, obsidianRetType.get, errorBlock)
 
             if (!errorBlock.isEmpty) {
                 tryBlock.body().add(errorBlock)
@@ -1008,8 +1032,10 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                             case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
                                 .staticInvoke("booleanToBytes").arg(txInvoke)
                             case StringType() => returnObj.invoke("getBytes")
-                            case _ => returnObj.invoke("__archiveBytes")
+//                            case _ => returnObj.invoke("__archiveBytes")
+                            case _ => returnObj.invoke("__getGUID").invoke("getBytes")
                         }
+
                     )
                 } else {
                     txInvoke = stateCondBody.invoke(txMethName)

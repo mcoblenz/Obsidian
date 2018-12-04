@@ -165,9 +165,12 @@ final class ChaincodeBaseServer {
             ChaincodeBaseMock receiver = base;
             if (receiverUUID != null) {
                 receiver = getReturnedObject(receiverUUID);
+                if (printDebug) {
+                    System.out.println("Found receiver object " + receiver);
+                }
             }
 
-            if (printDebug) System.out.println("Calling transaction '" + txName + "'...");
+            if (printDebug) System.out.println("Calling transaction '" + txName + "' on object " + receiver + "...");
             try {
                 retBytes = receiver.run(base.stub, txName, txArgs);
             } catch (ReentrancyException re) {
@@ -180,7 +183,7 @@ final class ChaincodeBaseServer {
             } catch (NoSuchTransactionException e) {
                 /* This should never happen, because it won't compile if you
                  * reference a nonexistent transaction. */
-                System.out.println("Invalid transaction call " + txName);
+                System.err.println("Invalid transaction call " + txName);
                 failureMessage = ": No such transaction: " + txName;
             }
         }

@@ -29,7 +29,7 @@ public abstract class ChaincodeClientStub {
     ChaincodeClientStub() {
     }
 
-    public UUID getUUID() {
+    public UUID __getGUID() {
         return uuid;
     }
 }
