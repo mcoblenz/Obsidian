@@ -1624,7 +1624,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case StateType(_, stateNames, _) =>
                 if (stateNames.size == 1) {
                     val stateName = stateNames.head
-                    lexicallyInsideOf.contractTable.state(stateName).get
+
+                    lexicallyInsideOf.contractTable.state(stateName) match {
+                        case Some (t) => t
+                        case None => lexicallyInsideOf
+                    }
                 }
                 else {
                     lexicallyInsideOf
