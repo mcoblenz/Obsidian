@@ -1,3 +1,12 @@
+/**
+ * Created by mcoblenz on 12/4/2018.
+ *
+ * This is the superclass for main client contracts.
+ * Non-main client contracts instead inherit from ChaincodeBaseMock.
+ */
+
+
+
 package edu.cmu.cs.obsidian.chaincode;
 
 import com.google.protobuf.InvalidProtocolBufferException;
