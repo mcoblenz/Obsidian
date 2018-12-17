@@ -1,0 +1,77 @@
+%{
+This is part of a proof of soundness of Silica, the formal core of Obsidian.
+Copyright (c) 2018 Michael Coblenz.
+}%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Abstract syntax
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%% Types %%%%%%%%%%%%%%%%%
+typ: type.
+
+
+className : type. %name className C c.
+stateName : type. %name stateName S s.
+
+className_nat : nat -> className.
+stateName_nat : nat -> stateName.
+
+% http://twelf.org/wiki/Lists
+% Indexing these by length, per FJ, but it's not clear to me whether I need that.
+stateNameList : nat -> type. %name stateNameList SL sl.
+stateNameList_nil: stateNameList z.
+stateNameList_cons: stateName -> stateNameList N -> stateNameList (s N).
+%freeze stateNameList.
+
+
+tST : type.
+tST_owned : tST.
+tST_unowned : tST.
+tST_shared : tST.
+tST_stateList : stateNameList N -> tST.
+
+tC : className -> tST -> typ.
+boolean: typ.
+void: typ.
+
+
+%%%%%%%%%%%%%%% Programs %%%%%%%%%%%%%%%%%
+% In this formalism, fields are not named. They are identified only by index in their containing class or state.
+field : type.
+field_typ : typ -> field.
+
+fieldList : nat -> type.
+fieldList_nil: fieldList z.
+fieldList_cons : field -> fieldList N -> fieldList (s N).
+
+state : type.
+stateExp : stateName -> fieldList N -> type.
+
+stateList: nat -> type.
+stateList_nil : stateList z.
+stateList_cons : state -> stateList N -> stateList (s N).
+
+stateConstraint : type.
+stateConstraint_class : className -> stateConstraint.
+stateConstraint_transition: className -> tST -> stateConstraint.
+stateConstraint_base : stateConstraint. % e.g. boolean
+
+stateConstraintList : nat -> type.
+stateConstraintList_nil : stateConstraintList z.
+stateConstraintList_cons : stateConstraint -> stateConstraintList N -> stateConstraintList (s N).
+
+expr : type.
+
+method : type.
+methodDef : typ -> stateConstraintList N -> tST -> tST -> expr -> method.
+
+methodList : nat -> type.
+methodList_nil : methodList z.
+methodList_const : method -> methodList N -> methodList (s N).
+
+class: type.
+assetClass : className -> stateList N -> fieldList M -> methodList P -> class.
+nonAssetClass: className -> stateList N -> fieldList M -> methodList P -> class.
