@@ -63,7 +63,9 @@ stateConstraintList : nat -> type.
 stateConstraintList_nil : stateConstraintList z.
 stateConstraintList_cons : stateConstraint -> stateConstraintList N -> stateConstraintList (s N).
 
-expr : type.
+expr : type. %name expr E x.
+% Represent variables with LF variables; no variable constructor is needed.
+let : typ -> expr -> (expr -> expr) -> expr.
 
 method : type.
 methodDef : typ -> stateConstraintList N -> tST -> tST -> expr -> method.
@@ -72,6 +74,15 @@ methodList : nat -> type.
 methodList_nil : methodList z.
 methodList_const : method -> methodList N -> methodList (s N).
 
-class: type.
+class : type.
 assetClass : className -> stateList N -> fieldList M -> methodList P -> class.
 nonAssetClass: className -> stateList N -> fieldList M -> methodList P -> class.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Static semantics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+of : expr -> typ -> type.
+of/let : of (let T E1 E2) T2
+	  <- of E1 T
+	  <- of (E2 E1) T2.
