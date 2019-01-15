@@ -424,7 +424,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case Some(typ) => typ
             }
 
-            // XXX TODO: check to make sure type of "this" is tracked correctly!
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
@@ -941,8 +940,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                             invokable: Transaction,
                                             context: Context): Context = {
 
-        val contextPrime = receiver match {
-            case ReferenceIdentifier(x) => {
+        val nameToUpdate = receiver match {
+            case ReferenceIdentifier(x) => Some(x)
+            case This() => Some("this")
+            case _ => None
+        }
+
+        val contextPrime = nameToUpdate match {
+            case None => context
+            case Some(x) =>
                 receiverType match {
                     case typ: NonPrimitiveType => {
                         val newType = invokable.thisFinalType
@@ -971,13 +977,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                     case _ => context
                 }
-            }
-            case _ => context
         }
-        contextPrime
-    }
+    contextPrime
+}
 
-    private def checkStatement(
+private def checkStatement(
                                   decl: InvokableDeclaration,
                                   context: Context,
                                   s: Statement

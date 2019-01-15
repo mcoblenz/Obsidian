@@ -23,4 +23,7 @@ main contract Test {
         [this @ Shared];
     }
 
+    transaction transitionThis(Test@S1 >> S2 this) {
+        bar();
+    }
 }
