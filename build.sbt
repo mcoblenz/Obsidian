@@ -33,4 +33,7 @@ assemblyExcludedJars in assembly := {
 // don't get confused about multiple META-INF/MANIFEST.MF
 assemblyMergeStrategy in assembly := {
     case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+    case x =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+    	oldStrategy(x)
 }
