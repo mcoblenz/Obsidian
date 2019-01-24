@@ -2,8 +2,7 @@ module Prelude where
   open import Agda.Primitive using (Level; lzero; lsuc) renaming (_⊔_ to lmax)
   open import Data.Nat
   import Relation.Binary.PropositionalEquality as Eq
-  open Eq using (_≡_; refl)
-  open Eq.≡-Reasoning using (begin_; _≡⟨⟩_; _∎)
+
 
   -- empty type
   data ⊥ : Set where
