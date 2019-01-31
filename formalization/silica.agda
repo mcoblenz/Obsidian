@@ -246,7 +246,9 @@ data ReferenceConsistency : RuntimeEnv → TypeEnv → Set where
 data _&_ok : RuntimeEnv → TypeEnv → Set where
   ok : ∀ {Σ : RuntimeEnv}
        → {Δ : TypeEnv}
-         → ∀ {e : Expr} → ∀ {l : IndirectRef} → ∀ {T : Type}
+         → ∀ {e : Expr}
+         → ∀ {l : IndirectRef}
+         → ∀ {T : Type}
          → (l , T) ∈̇ Δ
          → ∃[ fl ] ((FreeLocations e fl) → (l ∈ fl))
          → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)
@@ -265,7 +267,7 @@ refConsistency (ok _ _ _ rc) =  rc
 
 ------------ Lemmas --------------
 -- If an expression is well-typed in Δ and Σ, Δ ok, then all locations in the expression are in the domain of the context.
-{- TODO 
+
 locationsOK : ∀ {Δ Δ' : TypeEnv}
               → ∀ {Σ : RuntimeEnv}
               → ∀ {e : Expr}
@@ -281,7 +283,7 @@ locationsOK : ∀ {Δ Δ' : TypeEnv}
 
 locationsOK ty consis =  let refConsis = (refConsistency consis)
                           in {!!}
--}
+
 ----------- Reduction Rules ------------
 {-
 data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
