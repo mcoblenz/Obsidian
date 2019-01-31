@@ -1,0 +1,29 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.json:json:20171018'
+    implementation group: 'org.hyperledger.fabric-chaincode-java', name: 'fabric-chaincode-shim', version: '1.+'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId 'edu.cmu.cs.obsidian.chaincode'
+            artifactId 'chaincode'
+            version '0.1'
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url = "~/.m2/repository"
+        }
+    }
+}
