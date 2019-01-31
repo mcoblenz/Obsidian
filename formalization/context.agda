@@ -6,6 +6,8 @@ import Relation.Binary.PropositionalEquality
 open Relation.Binary.PropositionalEquality using (_≡_; refl)
 open Relation.Binary.PropositionalEquality.≡-Reasoning using (begin_; _≡⟨⟩_; _∎)
 
+open import Data.List
+
 module Context (τ̇ : Set) where
   -- variables are named with naturals in expr. therefore we represent
     -- contexts as functions from names for variables (nats) to possible
@@ -25,8 +27,8 @@ _,,_ : ·ctx → (ℕ × τ̇) → ·ctx
 (Γ ,, (x , t)) y  | _  = Γ y
                                    
 -- membership, or presence, in a context
-_∈_ : (p : ℕ × τ̇) → (Γ : ·ctx) → Set
-(x , t) ∈ Γ = (Γ x) ≡ just t
+_∈̇_ : (p : ℕ × τ̇) → (Γ : ·ctx) → Set
+(x , t) ∈̇ Γ = (Γ x) ≡ just t
                               
 -- apartness for contexts, so that we can follow barendregt's convention
 _#_ : (n : ℕ) → (Γ : ·ctx) → Set
