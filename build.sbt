@@ -21,6 +21,9 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 
 libraryDependencies += "junit" % "junit" % "4.12" % "test"
 libraryDependencies += "com.google.protobuf" % "protobuf-java" % "3.5.1"
+libraryDependencies += "org.hyperledger.fabric-chaincode-java" % "fabric-chaincode-shim" % "1.4.0"
+libraryDependencies += "org.hyperledger.fabric-chaincode-java" % "fabric-chaincode-protos" % "1.4.0"
+
 
 publishTo := Some(Resolver.file("file",  new File(Path.userHome.absolutePath+"/.m2/repository")))
 

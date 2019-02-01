@@ -14,9 +14,9 @@ dependencies {
 
 publishing {
     publications {
-        maven(MavenPublication) {
-            groupId 'edu.cmu.cs.obsidian.chaincode'
-            artifactId 'chaincode'
+        mavenJava(MavenPublication) {
+            groupId 'edu.cmu.cs.obsidian'
+            artifactId 'runtime'
             version '0.1'
             from components.java
         }

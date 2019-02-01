@@ -1,1 +1,3 @@
-main contract Simple { }
+main contract Simple {
+       Simple(){}
+}
