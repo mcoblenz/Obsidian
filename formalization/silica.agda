@@ -133,6 +133,13 @@ module TypeEnvContext = Context Type
 TypeEnv = TypeEnvContext.·ctx
 open TypeEnvContext
 
+
+-- Subtyping --
+data _<:_ : Type → Type → Set where
+  refl : ∀ {T T' : Type}
+         ----------------
+         → T <: T
+
 -- Helper judgments --
 
 --data _⊢_NotAsset : ContractEnv.·ctx → Id → Set where
@@ -145,6 +152,24 @@ data NotAsset : ContractEnv.·ctx → Id → Set where
     → (q : (ContractEnv._∈̇_) (id , contr) Γ)
     -------------
     → NotAsset Γ id
+
+-- Context strength --
+data _<ₗ_ : TypeEnv → TypeEnv → Set where
+  empty : ∀ { Δ Δ' : TypeEnv}
+        → (Δ' ≡ ∅)
+        --------------
+         → Δ <ₗ Δ'
+
+  nonempty : ∀ {Δ Δ' Δ'' : TypeEnv}
+    → ∀ {x : ℕ}
+    → ∀ {T T' : Type}
+    → Δ' ≡ (Δ'' ,, (x , T))
+    → (x , T') ∈̇ Δ
+    → T <: T'
+    → Δ <ₗ Δ''
+    -------------
+    → Δ <ₗ Δ'
+  
 
 -- Splitting --
 data _⊢_⇛_/_ : ContractEnv.·ctx -> Type -> Type -> Type -> Set where
@@ -236,6 +261,18 @@ record RuntimeEnv : Set where
     φ : StateLockingEnv
     ψ : ReentrancyEnv
 
+----------- Reduction Rules ------------
+
+data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
+  SElookup :
+    ∀ {Σ : RuntimeEnv}
+    → ∀ {Δ Δ' : TypeEnv}
+    → ∀ {T : Type}
+    → ∀ {l : IndirectRef}
+    → ∀ {v : Expr}
+    → Δ ⊢ (loc l) ⦂ T ⊣ Δ'
+    → (RuntimeEnv.ρ Σ l ≡ just v)
+    → (Σ , (loc l) ⟶ Σ , v)
 
 --============= Consistency ==============
 
@@ -278,21 +315,28 @@ locLookup : ∀ {Σ : RuntimeEnv}
 locLookup (ok l et ltd fl re _) =  re
             
 
+
+
 ------------ Lemmas --------------
 
+preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
+               → ∀ {e e' : Expr}
+               → ∀ {Σ Σ' : RuntimeEnv}
+               → ∀ {T T' : Type}
+               → ∀ {l : IndirectRef} -- Ugh, do I really have to refer to l here?
+               → Δ ⊢ e ⦂ T ⊣ Δ'
+               → Σ & Δ ok l
+               -- TODO: hdref(e)
+               → Σ , e ⟶ Σ' , e'
+               -----------------------
+               →  (Δ' ⊢ e' ⦂ T' ⊣ Δ''')
+                 × (Σ' & Δ' ok l)
+                 × (Δ''' <ₗ Δ'')
+                 -- TODO...
+preservation = ?
 
------------ Reduction Rules ------------
 
-data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
-  SElookup :
-    ∀ {Σ : RuntimeEnv}
-    → ∀ {Δ Δ' : TypeEnv}
-    → ∀ {T : Type}
-    → ∀ {l : IndirectRef}
-    → ∀ {v : Expr}
-    → Δ ⊢ (loc l) ⦂ T ⊣ Δ'
-    → (RuntimeEnv.ρ Σ l ≡ just v)
-    → (Σ , (loc l) ⟶ Σ , v)
+
 
 -- Some tests to see if I know what I'm doing.
 
