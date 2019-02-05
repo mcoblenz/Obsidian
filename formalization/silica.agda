@@ -242,13 +242,15 @@ record RuntimeEnv : Set where
 ------------ Global Consistency -----------
 data ReferenceConsistency : RuntimeEnv → TypeEnv → Set where
   -- TODO
-  
+
+-- I feel kind of bad about the fact that l is an input here! Is that really necessary?
 data _&_ok_ : RuntimeEnv → TypeEnv → IndirectRef → Set where
   ok : ∀ {Σ : RuntimeEnv}
-       → {Δ : TypeEnv}
+       → {Δ Δ' : TypeEnv}
          → ∀ {e : Expr}
          → ∀ {T : Type}
          → ∀ (l : IndirectRef) -- If you give me any particular location...
+         → Δ ⊢ e ⦂ T ⊣ Δ'
          → (l , T) ∈̇ Δ         -- and that location is in Δ...
          → ∃[ fl ] ((FreeLocations e fl) → (l ∈ fl)) -- and that location is in the free locations of e ...
          → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)        -- and that location can be looked up in Σ...
@@ -264,46 +266,34 @@ refConsistency : ∀ {Σ : RuntimeEnv}
                  → ∀ {Δ : TypeEnv}
                  → ∀ {l : IndirectRef}
                  → Σ & Δ ok l → ReferenceConsistency Σ Δ
-refConsistency (ok l _ _ _ rc) =  rc
+refConsistency (ok l _ _ _ _ rc) =  rc
 
 -- Inversion for global consistency : location lookup for a particular location
--- Trying to say: if we know we have global consistency, and need to look up a particular location, we will be able to find it.
+-- If an expression is well-typed in Δ and (Σ & Δ ok), then all locations in the expression are in the domain of the context.
 locLookup : ∀ {Σ : RuntimeEnv}
             → ∀ {Δ : TypeEnv}
             → ∀ {l : IndirectRef}
             → Σ & Δ ok l
             → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)
-locLookup (ok l ltd fl re _) = {! re!}
---locLookup l o = {!!}
+locLookup (ok l et ltd fl re _) =  re
             
 
 ------------ Lemmas --------------
--- If an expression is well-typed in Δ and (Σ & Δ ok), then all locations in the expression are in the domain of the context.
 
-locationsOK : ∀ {Δ Δ' : TypeEnv}
-              → ∀ {Σ : RuntimeEnv}
-              → ∀ {e : Expr}
-              → ∀ {T : Type}
-              → ∀ {l : IndirectRef}
-              → Δ ⊢ e ⦂ T ⊣ Δ'
-              → Σ & Δ ok l
-              -- TODO!
---              → {!Data.List.Membership.Setoid._∈_ l ?!}
---              → l ∈ (fl (e)) -- (fl e) is a list of locations, so shouldn't this be right?
-              ------------------------
-              → ∃[ v ] ((RuntimeEnv.ρ Σ l) ≡ just v)
-
-locationsOK ty consis =  let refConsis = (refConsistency consis)
-                          in {!!}
 
 ----------- Reduction Rules ------------
-{-
+
 data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
   SElookup :
     ∀ {Σ : RuntimeEnv}
+    → ∀ {Δ Δ' : TypeEnv}
+    → ∀ {T : Type}
     → ∀ {l : IndirectRef}
-    → Σ , (loc l) ⟶ Σ , (loc (RuntimeEnv.ρ Σ l))
--}
+    → ∀ {v : Expr}
+    → Δ ⊢ (loc l) ⦂ T ⊣ Δ'
+    → (RuntimeEnv.ρ Σ l ≡ just v)
+    → (Σ , (loc l) ⟶ Σ , v)
+
 -- Some tests to see if I know what I'm doing.
 
 owned1 : Type
