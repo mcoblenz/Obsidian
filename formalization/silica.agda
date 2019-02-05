@@ -243,30 +243,42 @@ record RuntimeEnv : Set where
 data ReferenceConsistency : RuntimeEnv → TypeEnv → Set where
   -- TODO
   
-data _&_ok : RuntimeEnv → TypeEnv → Set where
+data _&_ok_ : RuntimeEnv → TypeEnv → IndirectRef → Set where
   ok : ∀ {Σ : RuntimeEnv}
        → {Δ : TypeEnv}
          → ∀ {e : Expr}
-         → ∀ {l : IndirectRef}
          → ∀ {T : Type}
-         → (l , T) ∈̇ Δ
-         → ∃[ fl ] ((FreeLocations e fl) → (l ∈ fl))
-         → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)
-       → ReferenceConsistency Σ Δ
+         → ∀ (l : IndirectRef) -- If you give me any particular location...
+         → (l , T) ∈̇ Δ         -- and that location is in Δ...
+         → ∃[ fl ] ((FreeLocations e fl) → (l ∈ fl)) -- and that location is in the free locations of e ...
+         → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)        -- and that location can be looked up in Σ...
+       → ReferenceConsistency Σ Δ                    -- and Σ and Δ have the ReferenceConsistency property...
      
 
        -- TODO: add remaining antecedents
        ---------------------------
-       → Σ & Δ ok
+       → Σ & Δ ok l
 
--- Inversion for global consistency
+-- Inversion for global consistency: reference consistency
 refConsistency : ∀ {Σ : RuntimeEnv}
-                 → ∀ {Δ : TypeEnv}                 
-                 → Σ & Δ ok → ReferenceConsistency Σ Δ
-refConsistency (ok _ _ _ rc) =  rc
+                 → ∀ {Δ : TypeEnv}
+                 → ∀ {l : IndirectRef}
+                 → Σ & Δ ok l → ReferenceConsistency Σ Δ
+refConsistency (ok l _ _ _ rc) =  rc
+
+-- Inversion for global consistency : location lookup for a particular location
+-- Trying to say: if we know we have global consistency, and need to look up a particular location, we will be able to find it.
+locLookup : ∀ {Σ : RuntimeEnv}
+            → ∀ {Δ : TypeEnv}
+            → ∀ {l : IndirectRef}
+            → Σ & Δ ok l
+            → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)
+locLookup (ok l ltd fl re _) = {! re!}
+--locLookup l o = {!!}
+            
 
 ------------ Lemmas --------------
--- If an expression is well-typed in Δ and Σ, Δ ok, then all locations in the expression are in the domain of the context.
+-- If an expression is well-typed in Δ and (Σ & Δ ok), then all locations in the expression are in the domain of the context.
 
 locationsOK : ∀ {Δ Δ' : TypeEnv}
               → ∀ {Σ : RuntimeEnv}
@@ -274,7 +286,7 @@ locationsOK : ∀ {Δ Δ' : TypeEnv}
               → ∀ {T : Type}
               → ∀ {l : IndirectRef}
               → Δ ⊢ e ⦂ T ⊣ Δ'
-              → Σ & Δ ok
+              → Σ & Δ ok l
               -- TODO!
 --              → {!Data.List.Membership.Setoid._∈_ l ?!}
 --              → l ∈ (fl (e)) -- (fl e) is a list of locations, so shouldn't this be right?
