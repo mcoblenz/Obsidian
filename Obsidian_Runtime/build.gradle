@@ -1,0 +1,25 @@
+// Gradle file to build the runtime library jar for deployed contracts on Fabric
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.json:json:20171018'
+    implementation group: 'org.hyperledger.fabric-chaincode-java', name: 'fabric-chaincode-shim', version: '1.+'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId 'edu.cmu.cs.obsidian'
+            artifactId 'runtime'
+            version '0.1'
+            from components.java
+        }
+    }
+}

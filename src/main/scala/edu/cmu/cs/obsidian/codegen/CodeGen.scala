@@ -936,8 +936,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
 
         val returnBytes = runMeth.body().decl(
-                              model.BYTE.array(), "returnBytes",
-                              JExpr.newArray(model.BYTE, 0))
+            model.BYTE.array(), "returnBytes",
+            JExpr.newArray(model.BYTE, 0))
 
         runMeth._throws(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
         runMeth._throws(model.ref("edu.cmu.cs.obsidian.chaincode.NoSuchTransactionException"))
@@ -949,11 +949,11 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
             val tx = decl.asInstanceOf[Transaction]
             val opt = txsByName.get(tx.name)
             opt match {
-              case Some(sameNameTxs) =>
-                sameNameTxs += tx
-                txsByName.put(tx.name, sameNameTxs)
-              case None =>
-                  txsByName.put(tx.name, mutable.Set(tx))
+                case Some(sameNameTxs) =>
+                    sameNameTxs += tx
+                    txsByName.put(tx.name, sameNameTxs)
+                case None =>
+                    txsByName.put(tx.name, mutable.Set(tx))
             }
         }
 
@@ -984,13 +984,13 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                             var test: IJExpression = JExpr.TRUE
                             for (stateName <- stateSet) {
                                 val thisTest = JExpr.invoke(getStateMeth)
-                                    .eq(translationContext.getEnum(stateName))
+                                  .eq(translationContext.getEnum(stateName))
 
                                 test = JOp.cor(test, thisTest)
                             }
                             test
 
-                        case None =>  JExpr.TRUE // No need to check anything before running this transaction.
+                        case None => JExpr.TRUE // No need to check anything before running this transaction.
                     }
                 }
 
@@ -1057,9 +1057,9 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                         tx.retType.get match {
                             case IntType() => returnObj.invoke("toByteArray")
                             case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
-                                .staticInvoke("booleanToBytes").arg(txInvoke)
+                              .staticInvoke("booleanToBytes").arg(txInvoke)
                             case StringType() => returnObj.invoke("getBytes")
-//                            case _ => returnObj.invoke("__archiveBytes")
+                            //                            case _ => returnObj.invoke("__archiveBytes")
                             case _ => returnObj.invoke("__getGUID").invoke("getBytes")
                         }
 
