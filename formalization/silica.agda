@@ -11,7 +11,7 @@ open import Data.Nat.Properties
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Data.Maybe using (just)
 import Relation.Binary.PropositionalEquality as Eq
-open Eq using (_≡_; refl; cong; sym)
+open Eq using (_≡_; _≢_; refl; cong; sym)
 open Eq.≡-Reasoning
 open import Data.Product as Prod using (∃; ∃-syntax)
 import Context
@@ -64,6 +64,9 @@ data Targ : Set where
 
 IndirectRef : Set
 IndirectRef = Id
+
+ObjectRef : Set
+ObjectRef = Id
   
 data SimpleExpression : Set where
   var : Id -> SimpleExpression
@@ -80,7 +83,7 @@ data Expr : Set where
   bool : Bool → Expr
   var : Id -> Expr
   void : Expr
-  obj : Object → Expr
+  objRef : ObjectRef → Expr
   loc : IndirectRef → Expr
   -- TODO: add the rest of the expressions
 
@@ -115,15 +118,8 @@ data FreeLocations : Expr → List IndirectRef → Set where
   boolFL : ∀ {b : Bool} → FreeLocations (bool b) []
   varFL : ∀ {x : Id} → FreeLocations (var x) []
   void : FreeLocations (void) []
-  obj : ∀ {o : Object} → FreeLocations (obj o) []
+  objRef : ∀ {o : ObjectRef} → FreeLocations (objRef o) []
   loc : ∀ {l : IndirectRef} → FreeLocations (loc l) [ l ]
-
-zeroList = [ zero ]
-zeroInList : zero ∈ zeroList
-zeroInList = Any.here refl
-
-
-
 
 --=============== Static Semantics ================
 -- A ContractEnv (written Γ) maps from Ids to contract definitions.
@@ -139,6 +135,7 @@ data _<:_ : Type → Type → Set where
   refl : ∀ {T T' : Type}
          ----------------
          → T <: T
+  -- TODO: add more subtyping judgments
 
 -- Helper judgments --
 
@@ -209,6 +206,15 @@ data _⊢_⇛_/_ : ContractEnv.·ctx -> Type -> Type -> Type -> Set where
     --------------
     → Γ ⊢  contractType ( record {tst = S s ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
 
+initialSplitType : ∀ {Γ : ContractEnv.·ctx}
+                   → ∀ {t1 t2 t3 : Type}
+                   → Γ ⊢ t1 ⇛ t2 / t3 → Type
+initialSplitType (void) = base Void
+initialSplitType boolean = base Boolean
+initialSplitType (unowned {t1 = T} x x₁ x₂) =  contractType T
+initialSplitType (shared-shared-shared {c = Contr}) = contractType ( record {tst = Shared ; contractName = Contr } )
+initialSplitType (owned-shared {c = Contr} x) = contractType ( record {tst = Owned ; contractName = Contr })
+initialSplitType (states-shared {s = sts} {c = Contr} x) = contractType ( record {tst = S sts ; contractName = Contr })
 
 ----------- PROPERTIES OF SPLITTING -----------
 -- The results of splitting are always compatible.
@@ -224,6 +230,23 @@ data _⊢_⦂_⊣_ : TypeEnv → Expr → Type → TypeEnv → Set where
       ------------------------------------
       → (Δ ,, (x , T₁)) ⊢ (var x) ⦂ T₂ ⊣ (Δ ,, (x , T₃))
 
+  Loc :  ∀ {Γ : ContractEnv.·ctx}
+      → ∀ {Δ : TypeEnv}
+      → ∀ {T₁ T₂ T₃ : Type}
+      → ∀ {l : IndirectRef}
+      → Γ ⊢ T₁ ⇛ T₂ / T₃
+      ------------------------------------
+      → (Δ ,, (l , T₁)) ⊢ (loc l) ⦂ T₂ ⊣ (Δ ,, (l , T₃))
+
+  Obj :  ∀ {Γ : ContractEnv.·ctx}
+      → ∀ {Δ : TypeEnv}
+      → ∀ {T₁ T₂ T₃ : Type}
+      → ∀ {o : ObjectRef}
+      → Γ ⊢ T₁ ⇛ T₂ / T₃
+      ------------------------------------
+      → (Δ ,, (o , T₁)) ⊢ (objRef o) ⦂ T₂ ⊣ (Δ ,, (o , T₃))
+
+
 ------------ DYNAMIC SEMANTICS --------------
 data Value : Expr → Set where
   bool : ∀ {b : Bool}
@@ -232,9 +255,9 @@ data Value : Expr → Set where
 
   void : Value (void)
 
-  obj : ∀ (o : Object)
+  obj : ∀ (o : ObjectRef)
         --------------
-        → Value (obj o)
+        → Value (objRef o)
 
 
 -- μ
@@ -262,9 +285,8 @@ record RuntimeEnv : Set where
     ψ : ReentrancyEnv
 
 ----------- Reduction Rules ------------
-
 data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
-  SElookup :
+  SElookup : -- of locations (i.e. let-bound variables)
     ∀ {Σ : RuntimeEnv}
     → ∀ {Δ Δ' : TypeEnv}
     → ∀ {T : Type}
@@ -275,65 +297,191 @@ data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
     → (Σ , (loc l) ⟶ Σ , v)
 
 --============= Consistency ==============
+-- Relates typing environments and object references to lists of all types of possible references.
+-- For now, this is ordered; perhaps that is too strong and I should use <Set> instead.
+data CtxTypes : TypeEnv → ObjectRef → List Type → Set where
+  ctxTypesDeltaEmpty : ∀ {Δ : TypeEnv}
+                      → ∀ (o : ObjectRef)
+                      → ∀ (D : List Type)
+                      → Δ ≡ ∅
+                      → D ≡ []
+                      -----------------
+                      → CtxTypes Δ o D
+
+  ctxTypesDeltaMatchNonEmpty : ∀ {Δ Δ' : TypeEnv}
+                             → ∀ (o o' : ObjectRef)
+                             → ∀ (D D' : List Type)
+                             → ∀ {T : Type}
+                             → Δ ≡ (Δ' ,, (o' , T))
+                             → o' ≡ o
+                             → CtxTypes Δ' o D'
+                             → D ≡ T ∷ D'
+                             --------------------
+                             → CtxTypes Δ o D
+
+  ctxTypesDeltaNoMatchNonEmpty : ∀ {Δ Δ' : TypeEnv}
+                               → ∀ (o o' : ObjectRef)
+                               → ∀ (D : List Type)
+                               → ∀ {T : Type}
+                               → Δ ≡ (Δ' ,, (o' , T))
+                               → o' ≢ o
+                               → CtxTypes Δ' o D
+                               --------------------
+                               → CtxTypes Δ o D
+
+data EnvTypes : RuntimeEnv → ObjectRef → List Type → Set where
+  envTypes : ∀ {Σ : RuntimeEnv}
+           → ∀ (o : ObjectRef)
+           → ∀ (D : List Type)
+           -- TODO: add actual antecedents
+           ---------------------
+           → EnvTypes Σ o D
+
+
+data RefFieldTypes : RuntimeEnv → ObjectRef → List Type → Set where
+  refFieldTypes :  ∀ {Σ : RuntimeEnv}
+                   → ∀ (o : ObjectRef)
+                   → ∀ (D : List Type)
+                   -- TODO: add actual antecedents
+                   ---------------------
+                   → RefFieldTypes Σ o D
+
+-- Relates an object reference in a context to a list of types that may reference the object.
+data RefTypes : RuntimeEnv → TypeEnv → ObjectRef → List Type → Set where
+  refTypes : ∀ {Σ : RuntimeEnv}
+             → ∀ {Δ : TypeEnv}
+             → ∀ (o : ObjectRef)
+             → ∀ (D D₁ D₂ D₃ : List Type)
+             → CtxTypes Δ o D₁
+             → EnvTypes Σ o D₂
+             → RefFieldTypes Σ o D₃
+             → D ≡ D₁ ++ D₂ ++ D₃
+             -------------------
+             → RefTypes Σ Δ o D
+
+
+data ReferenceConsistency : RuntimeEnv → TypeEnv → ObjectRef → Set where
+  referencesConsistent : ∀ {Σ : RuntimeEnv}
+                       → ∀ {Δ : TypeEnv}
+                       → ∀ (o : ObjectRef)
+                       → ∀ (D : List Type)
+                       → RefTypes Σ Δ o D
+                       ---------------------------
+                       → ReferenceConsistency Σ Δ o
+
+
 
 ------------ Global Consistency -----------
-data ReferenceConsistency : RuntimeEnv → TypeEnv → Set where
-  -- TODO
-
 -- I feel kind of bad about the fact that l is an input here! Is that really necessary?
-data _&_ok_ : RuntimeEnv → TypeEnv → IndirectRef → Set where
+data _&_ok_,_ : RuntimeEnv → TypeEnv → ObjectRef → IndirectRef → Set where
   ok : ∀ {Σ : RuntimeEnv}
        → {Δ Δ' : TypeEnv}
          → ∀ {e : Expr}
          → ∀ {T : Type}
+         → ∀ (o : ObjectRef)
          → ∀ (l : IndirectRef) -- If you give me any particular location...
          → Δ ⊢ e ⦂ T ⊣ Δ'
          → (l , T) ∈̇ Δ         -- and that location is in Δ...
          → ∃[ fl ] ((FreeLocations e fl) → (l ∈ fl)) -- and that location is in the free locations of e ...
          → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)        -- and that location can be looked up in Σ...
-       → ReferenceConsistency Σ Δ                    -- and Σ and Δ have the ReferenceConsistency property...
+       → ReferenceConsistency Σ Δ o                  -- and Σ and Δ have the ReferenceConsistency property...
      
 
        -- TODO: add remaining antecedents
        ---------------------------
-       → Σ & Δ ok l
+       → Σ & Δ ok o , l
 
 -- Inversion for global consistency: reference consistency
 refConsistency : ∀ {Σ : RuntimeEnv}
                  → ∀ {Δ : TypeEnv}
+                 → ∀ {o : ObjectRef}
                  → ∀ {l : IndirectRef}
-                 → Σ & Δ ok l → ReferenceConsistency Σ Δ
-refConsistency (ok l _ _ _ _ rc) =  rc
+                 → Σ & Δ ok o , l
+                 → ReferenceConsistency Σ Δ o
+refConsistency (ok o l _ _ _ _ rc) =  rc
 
 -- Inversion for global consistency : location lookup for a particular location
 -- If an expression is well-typed in Δ and (Σ & Δ ok), then all locations in the expression are in the domain of the context.
 locLookup : ∀ {Σ : RuntimeEnv}
             → ∀ {Δ : TypeEnv}
+            → ∀ {o : ObjectRef}
             → ∀ {l : IndirectRef}
-            → Σ & Δ ok l
+            → Σ & Δ ok o , l
             → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)
-locLookup (ok l et ltd fl re _) =  re
+locLookup (ok l o et ltd fl re _) =  re
             
 
 
 
 ------------ Lemmas --------------
+-- TODO: relax progress a little per statement of Theorem 5.1.
+data Progress (e : Expr) : Set where
+  step : ∀ {e'}
+         → ∀ {Σ Σ' : RuntimeEnv}
+         → ∀ {Δ Δ' : TypeEnv}
+         → (Σ , e ⟶ Σ' , e')
+         -------------
+         → Progress e
 
+  done :
+       Value e
+       ---------
+       → Progress e
+
+progress : ∀ {e T Δ Δ' Σ o l}
+           → Σ & Δ ok o , l
+           → Δ ⊢ e ⦂ T ⊣ Δ'
+           ---------------
+           → Progress e
+
+progress consis (Var split) =  step {!!}
+progress consis ty@(Loc {l = l} split) =  step ( SElookup ty {!locLookup consis!})
+progress consis (Obj split) =  step {!!}
+
+{-
 preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
                → ∀ {e e' : Expr}
                → ∀ {Σ Σ' : RuntimeEnv}
                → ∀ {T T' : Type}
-               → ∀ {l : IndirectRef} -- Ugh, do I really have to refer to l here?
+               → ∀ {o : ObjectRef}
+               → ∀ {l : IndirectRef} -- Ugh, do I really have to refer to l here?            
                → Δ ⊢ e ⦂ T ⊣ Δ'
-               → Σ & Δ ok l
+               → Σ & Δ ok o , l
                -- TODO: hdref(e)
                → Σ , e ⟶ Σ' , e'
                -----------------------
                →  (Δ' ⊢ e' ⦂ T' ⊣ Δ''')
-                 × (Σ' & Δ' ok l)
+                 × (Σ' & Δ' ok o , l)
                  × (Δ''' <ₗ Δ'')
-                 -- TODO...
-preservation = ?
+
+-- ty is the initial typing judgment, which we get to assume.
+-- ty' is the proof of well-typedness
+
+-- CASE: the typing judgment used was Loc, in which case the expression must be of the form (loc l).
+        -- and the step must have been taken via SElookup, which is the only rule that applies for exprs of the form (loc l).
+preservation  (Loc spl) consis (SElookup ty' r) = 
+  -- Case-analyze on the type of the expression.
+  {-
+  with T
+  ...   base Void | ?
+  ...   base Boolean | ?
+  ...   contractType tc | ?
+  -- By global consistency, in particular we must have consistency for l.
+-}
+  let ty = Loc spl
+      T₁ = initialSplitType spl
+    
+  in
+  {! 
+  !}
+  where
+    helper : Type → (Δ' ⊢ e' ⦂ T' ⊣ Δ''')
+                 × (Σ' & Δ' ok o , l)
+                 × (Δ''' <ₗ Δ'')
+    helper T = ?
+    helper _ = ?
+
+-}
 
 
 
