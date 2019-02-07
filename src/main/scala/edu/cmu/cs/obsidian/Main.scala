@@ -155,7 +155,7 @@ object Main {
         val sourcePath = sourceDir.toString
         //val compilerDir =
         val classPath =
-            s"Obsidian_Runtime/Runtime/:$sourcePath:lib/protobuf-java-3.5.1.jar:lib/json-20160810.jar:lib/shim-client-1.0.jar"
+            s"Obsidian_Runtime/Runtime/:$sourcePath:lib/protobuf-java-3.5.1.jar:lib/json-20160810.jar"
 
         val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
         val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
@@ -366,8 +366,6 @@ object Main {
                     return false
             } else {
                 // invoke gradle buildscript to produce a jar file
-                print(mainName)
-                print(tmpPath)
                 val gradleInvoke = s"gradle build -b buildscript/build.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
 
                 val gradleExit = gradleInvoke.!

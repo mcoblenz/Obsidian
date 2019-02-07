@@ -1,3 +1,4 @@
+// Gradle file to build the runtime library jar for deployed contracts on Fabric
 plugins {
     id 'java-library'
     id 'maven-publish'
@@ -19,11 +20,6 @@ publishing {
             artifactId 'runtime'
             version '0.1'
             from components.java
-        }
-    }
-    repositories {
-        maven {
-            url = "~/.m2/repository"
         }
     }
 }
