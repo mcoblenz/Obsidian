@@ -757,7 +757,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
         /* If the main contract didn't already have a new_X() method with zero parameters,
          * add one that sets all the fields to default values, so invokeConstructor()
          * has something to call.
-         * */
+         */
         if (!hasEmptyConstructor(aContract) && aContract.isMain) {
             generateDefaultConstructor(newClass, translationContext, aContract)
         }
