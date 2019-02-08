@@ -514,11 +514,11 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
                                           generateStub: Boolean
                                       ): TranslationContext = {
 
-        /* if we're not in the main contract, we need to ensure there's an empty constructor.
+        /* We need to ensure there's an empty constructor.
          * This constructor will be used in unarchiving; e.g. to unarchive class C:
          *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
          */
-        if (!aContract.isMain && !hasEmptyConstructor(aContract)) {
+        if (!hasEmptyConstructor(aContract)) {
             newClass.constructor(JMod.PUBLIC)
         }
 
@@ -756,7 +756,8 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
 
         /* If the main contract didn't already have a new_X() method with zero parameters,
          * add one that sets all the fields to default values, so invokeConstructor()
-         * has something to call. */
+         * has something to call.
+         */
         if (!hasEmptyConstructor(aContract) && aContract.isMain) {
             generateDefaultConstructor(newClass, translationContext, aContract)
         }
