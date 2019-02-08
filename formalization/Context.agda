@@ -1,42 +1,68 @@
--- Contexts, from https://github.com/hazelgrove/agda-popl17/blob/master/core.agda
-open import Data.Nat
-open import Data.Maybe
-open import Prelude
-import Relation.Binary.PropositionalEquality 
-open Relation.Binary.PropositionalEquality using (_≡_; refl)
-open Relation.Binary.PropositionalEquality.≡-Reasoning using (begin_; _≡⟨⟩_; _∎)
+-- Adapted from Wadler: https://plfa.github.io/Lambda/
 
-open import Data.List
 
-module Context (τ̇ : Set) where
-  -- variables are named with naturals in expr. therefore we represent
-    -- contexts as functions from names for variables (nats) to possible
-    -- bindings.
-·ctx : Set
-·ctx = ℕ → Maybe τ̇
+module Context (A : Set) where
+
+  open import Data.Nat
+  open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+  open import Data.Maybe
+  open import Data.Product using (_×_; proj₁; proj₂; ∃-syntax) renaming (_,_ to ⟨_,_⟩)
+  open import Relation.Nullary.Decidable
+  open import Relation.Nullary using (Dec; yes; no)
+
+
+  infixl 5  _,_⦂_
   
--- convenient shorthand for the (unique up to fun. ext.) empty context
-∅ : ·ctx
-∅ _ = nothing
+  -- Internal type of contexts
+  data ctx : Set where
+    ∅     : ctx
+    _,_⦂_  : ctx → ℕ → A → ctx
+
+  infix  4  _∋_⦂_
+
+  data _∋_⦂_ : ctx → ℕ → A → Set where
+
+    Z : ∀ {Γ : ctx}
+      → ∀ {x : ℕ}
+      → ∀ {a : A}
+        ------------------
+      → Γ , x ⦂ a ∋ x ⦂ a
   
--- add a new binding to the context, clobbering anything that might have
--- been there before.
-_,,_ : ·ctx → (ℕ × τ̇) → ·ctx
-(Γ ,, (x , t)) y with compare x y
-(Γ ,, (x , t)) .x | equal _ = just t
-(Γ ,, (x , t)) y  | _  = Γ y
-                                   
--- membership, or presence, in a context
-_∈̇_ : (p : ℕ × τ̇) → (Γ : ·ctx) → Set
-(x , t) ∈̇ Γ = (Γ x) ≡ just t
-                              
--- apartness for contexts, so that we can follow barendregt's convention
-_#_ : (n : ℕ) → (Γ : ·ctx) → Set
-x # Γ = (Γ x) ≡ nothing
-                 
--- without: remove a variable from a context
-_/_ : ·ctx → ℕ → ·ctx
-(Γ / x) y with compare x y
-(Γ / x) .x | equal _ = nothing
-(Γ / x) y  | _  = Γ y
+    S : ∀ {Γ x y a b}
+      → x ≢ y
+      → Γ ∋ x ⦂ a
+        ------------------
+      → Γ , y ⦂ b ∋ x ⦂ a
+
+  lookup : ctx → ℕ → Maybe A
+  lookup ∅ _ = nothing
+  lookup (Γ , x ⦂ t) y with compare x y
+  ...                       | equal _ = just t
+  ...                       | _ = lookup Γ x
   
+
+  obviousContainment : ∀ {x t}
+                       → ∀ (Γ : ctx)
+                       → Γ , x ⦂ t ∋ x ⦂ t
+                     
+  obviousContainment Γ = Z
+
+{- I will probably need this eventually, but not yet.
+  lookupWorksWithContainment : ∀ {Γ : ctx}
+                               → ∀ {x t}
+                               → Γ ∋ x ⦂ t
+                               --------------------
+                               → lookup Γ x ≡ just t
+
+
+  lookupWorksWithContainment {Γ} (Z {Γ'} {x} {a}) = {!!}
+-}
+
+  lookupWeakening : ∀ {Γ : ctx}
+                    → ∀ {x x' t t'}
+                    → Γ ∋ x ⦂ t
+                    → ∃[ T ] ((Γ , x' ⦂ t') ∋ x ⦂ T)
+                    
+  lookupWeakening {Γ} {x} {x'} {t} {t'} Γcontainment with x ≟ x'
+  ...                                                 | yes refl = ⟨ t' , Z {Γ = Γ} {x = x'} {a = t'} ⟩
+  ...                                                 | no neq =  ⟨ t , S neq Γcontainment ⟩
