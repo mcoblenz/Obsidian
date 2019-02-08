@@ -85,6 +85,7 @@ data Expr : Set where
   void : Expr
   objRef : ObjectRef → Expr
   loc : IndirectRef → Expr
+  fieldAccess : Id → Expr  -- All field accesses are to 'this', so the field name suffices.
   -- TODO: add the rest of the expressions
 
 record PublicTransaction : Set where
@@ -119,7 +120,11 @@ data FreeLocations : Expr → List IndirectRef → Set where
   varFL : ∀ {x : Id} → FreeLocations (var x) []
   void : FreeLocations (void) []
   objRef : ∀ {o : ObjectRef} → FreeLocations (objRef o) []
-  loc : ∀ {l : IndirectRef} → FreeLocations (loc l) [ l ]
+  loc : ∀ (l : IndirectRef) → FreeLocations (loc l) [ l ]
+
+freeLocationsExact : ∀ {l l'} → FreeLocations (loc l) [ l' ] → l ≡ l'
+freeLocationsExact (loc l)  =  refl
+
 
 --=============== Static Semantics ================
 -- A ContractEnv (written Γ) maps from Ids to contract definitions.
@@ -222,42 +227,63 @@ initialSplitType (states-shared {s = sts} {c = Contr} x) = contractType ( record
 
 ------------ Type judgments ----------------
 data _⊢_⦂_⊣_ : TypeEnv → Expr → Type → TypeEnv → Set where
-  Var : ∀ {Γ : ContractEnv.·ctx}
+  VarTy : ∀ {Γ : ContractEnv.·ctx}
       → ∀ {Δ : TypeEnv}
       → ∀ {T₁ T₂ T₃ : Type}
-      → ∀ {x : Id}
+      → ∀ (x : Id)
       → Γ ⊢ T₁ ⇛ T₂ / T₃
       ------------------------------------
       → (Δ ,, (x , T₁)) ⊢ (var x) ⦂ T₂ ⊣ (Δ ,, (x , T₃))
 
-  Loc :  ∀ {Γ : ContractEnv.·ctx}
+  LocTy :  ∀ {Γ : ContractEnv.·ctx}
       → ∀ {Δ : TypeEnv}
       → ∀ {T₁ T₂ T₃ : Type}
-      → ∀ {l : IndirectRef}
+      → ∀ (l : IndirectRef)
       → Γ ⊢ T₁ ⇛ T₂ / T₃
       ------------------------------------
       → (Δ ,, (l , T₁)) ⊢ (loc l) ⦂ T₂ ⊣ (Δ ,, (l , T₃))
 
-  Obj :  ∀ {Γ : ContractEnv.·ctx}
+  ObjTy :  ∀ {Γ : ContractEnv.·ctx}
       → ∀ {Δ : TypeEnv}
       → ∀ {T₁ T₂ T₃ : Type}
-      → ∀ {o : ObjectRef}
+      → ∀ (o : ObjectRef)
       → Γ ⊢ T₁ ⇛ T₂ / T₃
       ------------------------------------
       → (Δ ,, (o , T₁)) ⊢ (objRef o) ⦂ T₂ ⊣ (Δ ,, (o , T₃))
 
+  BoolTy : ∀ {Γ : ContractEnv.·ctx}
+         → ∀ {Δ : TypeEnv}
+         → ∀ (b : Bool)
+         ------------------------------------
+         → Δ ⊢ (bool b) ⦂ (base Boolean) ⊣ Δ
+
+  VoidTy : ∀ {Γ : ContractEnv.·ctx}
+         → ∀ {Δ : TypeEnv}
+         --------------------
+          → Δ ⊢ void ⦂ base Void ⊣ Δ
+
+
+
+initialContext : ∀ {Δ e T Δ'}
+                 → Δ ⊢ e ⦂ T ⊣ Δ'
+                 → TypeEnv
+initialContext (VarTy {Δ = Δ} x spl) = (Δ ,, (x , initialSplitType spl))
+initialContext (LocTy {Δ = Δ} l spl) = (Δ ,, (l , initialSplitType spl))
+initialContext (ObjTy {Δ = Δ} o spl) = (Δ ,, (o , initialSplitType spl))
+initialContext (BoolTy {Δ = Δ} b) = Δ
+initialContext (VoidTy {Δ = Δ}) = Δ
 
 ------------ DYNAMIC SEMANTICS --------------
 data Value : Expr → Set where
-  bool : ∀ {b : Bool}
-         ------------
-         → Value (bool b)
+  boolVal : ∀ (b : Bool)
+          ------------
+          → Value (bool b)
 
-  void : Value (void)
+  voidVal : Value (void)
 
-  obj : ∀ (o : ObjectRef)
-        --------------
-        → Value (objRef o)
+  objVal : ∀ (o : ObjectRef)
+           --------------
+           → Value (objRef o)
 
 
 -- μ
@@ -360,60 +386,91 @@ data RefTypes : RuntimeEnv → TypeEnv → ObjectRef → List Type → Set where
              → RefTypes Σ Δ o D
 
 
-data ReferenceConsistency : RuntimeEnv → TypeEnv → ObjectRef → Set where
+data ReferenceConsistency : RuntimeEnv → TypeEnv → Set where
   referencesConsistent : ∀ {Σ : RuntimeEnv}
                        → ∀ {Δ : TypeEnv}
-                       → ∀ (o : ObjectRef)
+                       → ∀ {o : ObjectRef}
                        → ∀ (D : List Type)
                        → RefTypes Σ Δ o D
                        ---------------------------
-                       → ReferenceConsistency Σ Δ o
+                       → ReferenceConsistency Σ Δ
 
 
 
 ------------ Global Consistency -----------
--- I feel kind of bad about the fact that l is an input here! Is that really necessary?
-data _&_ok_,_ : RuntimeEnv → TypeEnv → ObjectRef → IndirectRef → Set where
+-- I'm going to need the fact that if an expression typechecks, and I find a location in it, then the location can be looked
+-- up in the runtime environment. But every location in the expression has to also be in the typing context, so I can state this
+-- without talking about expressions at all.
+data _&_ok : RuntimeEnv → TypeEnv → Set where
   ok : ∀ {Σ : RuntimeEnv}
-       → {Δ Δ' : TypeEnv}
-         → ∀ {e : Expr}
-         → ∀ {T : Type}
-         → ∀ (o : ObjectRef)
-         → ∀ (l : IndirectRef) -- If you give me any particular location...
-         → Δ ⊢ e ⦂ T ⊣ Δ'
-         → (l , T) ∈̇ Δ         -- and that location is in Δ...
-         → ∃[ fl ] ((FreeLocations e fl) → (l ∈ fl)) -- and that location is in the free locations of e ...
-         → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)        -- and that location can be looked up in Σ...
-       → ReferenceConsistency Σ Δ o                  -- and Σ and Δ have the ReferenceConsistency property...
+       → ∀ {Δ : TypeEnv}
+       → ∀ {T : Type}
+       → (∀ {l : IndirectRef}            
+         → (l , T) ∈̇ Δ         -- If a location is in Δ...
+         → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v) -- then location can be looked up in Σ...
+         )
+       → ReferenceConsistency Σ Δ                    -- and Σ and Δ have the ReferenceConsistency property...
      
 
        -- TODO: add remaining antecedents
        ---------------------------
-       → Σ & Δ ok o , l
+       → Σ & Δ ok
 
 -- Inversion for global consistency: reference consistency
 refConsistency : ∀ {Σ : RuntimeEnv}
                  → ∀ {Δ : TypeEnv}
                  → ∀ {o : ObjectRef}
                  → ∀ {l : IndirectRef}
-                 → Σ & Δ ok o , l
-                 → ReferenceConsistency Σ Δ o
-refConsistency (ok o l _ _ _ _ rc) =  rc
+                 → Σ & Δ ok
+                 → ReferenceConsistency Σ Δ
+refConsistency (ok _ rc) =  rc
 
 -- Inversion for global consistency : location lookup for a particular location
--- If an expression is well-typed in Δ and (Σ & Δ ok), then all locations in the expression are in the domain of the context.
+-- If l is in Δ and Σ & Δ ok, then l can be found in Σ.ρ.
 locLookup : ∀ {Σ : RuntimeEnv}
             → ∀ {Δ : TypeEnv}
-            → ∀ {o : ObjectRef}
             → ∀ {l : IndirectRef}
-            → Σ & Δ ok o , l
+            → ∀ {T : Type}
+            → Σ & Δ ok
+            → (l , _) ∈̇ Δ
             → ∃[ v ] (RuntimeEnv.ρ Σ l ≡ just v)
-locLookup (ok l o et ltd fl re _) =  re
+locLookup (ok lContainment rc) =  {!!}
             
 
 
 
 ------------ Lemmas --------------
+-- If an expression is well-typed in Δ, then all locations in the expression are in Δ.
+locationsInExprAreInContext : ∀ {Δ Δ' e T fl}
+                              → ∀ {l : IndirectRef}
+                              → Δ ⊢ e ⦂ T ⊣ Δ'
+                              → FreeLocations e fl
+                              → l ∈ fl
+                              ----------------
+                              → ( l , _ ) ∈̇ Δ
+
+-- fl is empty, so l is in fl leads to a contradiction.
+locationsInExprAreInContext ty@(VarTy x spl) freeLocationRelation lInFL = {!!}
+
+
+-- l is related to e, so therefore we can point to where l is in Δ.
+locationsInExprAreInContext ty@(LocTy l spl) freeLocationRelation@(loc l) lInFL = 
+  let Δ = initialContext ty
+  in
+  {!!}
+{-
+locationsInExprAreInContext ty@(LocTy l' spl) freeLocationRelation@(loc l'') lInFL with compare l' l''
+...                                                                                  | equal _ = {!!}
+...                                                                                  | greater _ _ = {!!}
+...                                                                                  | less _ _ = ?
+  -}
+   -- proof is of the form "fl is exactly [l]. therefore the l in lInFL has to be the same l, which I need to show is in Δ. And look at the context in ty: there's l.
+
+locationsInExprAreInContext ty@(ObjTy o spl) freeLocationRelation lInFL = {!!}
+locationsInExprAreInContext ty@(BoolTy b) freeLocationRelation lInFl = {!!}
+locationsInExprAreInContext ty@(VoidTy) freeLocationRelation lInFl = {!!}
+
+
 -- TODO: relax progress a little per statement of Theorem 5.1.
 data Progress (e : Expr) : Set where
   step : ∀ {e'}
@@ -429,14 +486,16 @@ data Progress (e : Expr) : Set where
        → Progress e
 
 progress : ∀ {e T Δ Δ' Σ o l}
-           → Σ & Δ ok o , l
+           → Σ & Δ ok
            → Δ ⊢ e ⦂ T ⊣ Δ'
            ---------------
            → Progress e
 
-progress consis (Var split) =  step {!!}
-progress consis ty@(Loc {l = l} split) =  step ( SElookup ty {!locLookup consis!})
-progress consis (Obj split) =  step {!!}
+progress consis (VarTy x split) =  step {!!}
+progress consis ty@(LocTy l split) =  step ( SElookup ty {!locLookup consis {- prove l is in the context -}!})
+progress consis (ObjTy o split) =  step {!!}
+progress consis (BoolTy b) = done (boolVal b)
+progress consis (VoidTy) = done (voidVal)
 
 {-
 preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
@@ -446,7 +505,7 @@ preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
                → ∀ {o : ObjectRef}
                → ∀ {l : IndirectRef} -- Ugh, do I really have to refer to l here?            
                → Δ ⊢ e ⦂ T ⊣ Δ'
-               → Σ & Δ ok o , l
+               → Σ & Δ ok
                -- TODO: hdref(e)
                → Σ , e ⟶ Σ' , e'
                -----------------------
