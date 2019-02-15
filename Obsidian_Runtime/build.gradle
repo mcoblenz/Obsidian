@@ -22,4 +22,10 @@ publishing {
             from components.java
         }
     }
+    repositories {
+        //publish to local directory for GitHub hosting
+        maven {
+            url '../docs/repository'
+        }
+    }
 }
