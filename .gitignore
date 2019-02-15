@@ -40,8 +40,12 @@ project/plugins/project/
 # IntelliJ
 /out/
 *.jar
+!docs/repository/edu/cmu/cs/obsidian/runtime/0.1/runtime-0.1.jar
 *.proto
 .idea/libraries/
+
+# All Fabric base files
+fabric/
 
 # Gradle build script caches and whatnot
 buildscript/.gradle

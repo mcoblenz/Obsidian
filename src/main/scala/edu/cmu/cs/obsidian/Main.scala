@@ -318,6 +318,8 @@ object Main {
                 options.mockChaincode, options.lazySerialization)
             javaModel.build(srcDir.toFile)
 
+            val mainName = findMainContractName(transformedTable.ast)
+
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(transformedTable.ast, sourceFilename,
                                                                                   options.lazySerialization)
 
@@ -343,13 +345,43 @@ object Main {
                         println("`" + protocInvocation + "` exited abnormally: " + exitCode)
                         return false
                     }
+                    //what we need to do now is move the .java class and the outterclass to a different folder
+                    /* if an output path is specified, use it; otherwise, use working directory */
+                    val outputPath_temp = options.outputPath match {
+                        case Some(p) =>
+                            val path = Paths.get(p + mainName)
+                            /* create the dir if it doesn't exist */
+                            Files.createDirectories(path)
+                            path
+                        case None =>
+                            val path = Paths.get(mainName)
+                            /* create the dir if it doesn't exist */
+                            Files.createDirectories(path)
+                            path
+                    }
+
+                    val copyFabricFolderInvocation: String =
+                        "cp -R fabric/java/ " + outputPath_temp
+                    val copyJavaToFabricFolderInvocation: String =
+                        "cp " + srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + ".java " + mainName + "/src/main/java/org/hyperledger/fabric/example/"
+                    val copyJavaOuterToFabricFolderInvocation: String =
+                        "cp " + srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + "OuterClass.java "+ mainName + "/src/main/java/org/hyperledger/fabric/example/"
+                    val replaceClassNameInGradleBuild: String =
+                        "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + mainName + "/build.gradle"
+                    val deleteSedBackupFile: String =
+                        "rm " + mainName + "/build.gradle.backup"
+                    copyFabricFolderInvocation.!
+                    copyJavaToFabricFolderInvocation.!
+                    copyJavaOuterToFabricFolderInvocation.!
+                    replaceClassNameInGradleBuild.!
+                    deleteSedBackupFile.!
                 } catch {
                     case e: Throwable => println("Error running protoc: " + e)
                 }
             }
 
-            val mainName = findMainContractName(transformedTable.ast)
 
+            //technically this if/else not needed anymore => no more .jar required anyways
             if (options.mockChaincode) {
                 // invoke javac and make a jar from the result
                 val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
