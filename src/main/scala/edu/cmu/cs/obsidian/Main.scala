@@ -1,8 +1,10 @@
 package edu.cmu.cs.obsidian
 
 import java.io.File
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
+import java.io.PrintWriter
+import scala.io.Source
 
 import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
@@ -360,19 +362,34 @@ object Main {
                             path
                     }
 
-                    val copyFabricFolderInvocation: String =
-                        "cp -R fabric/java/ " + outputPath_temp
-                    val copyJavaToFabricFolderInvocation: String =
-                        "cp " + srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + ".java " + mainName + "/src/main/java/org/hyperledger/fabric/example/"
-                    val copyJavaOuterToFabricFolderInvocation: String =
-                        "cp " + srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + "OuterClass.java "+ mainName + "/src/main/java/org/hyperledger/fabric/example/"
+                    val sourceLocation = Paths.get("fabric/java")
+                    Files.walk(sourceLocation).forEach((s) => {
+                        def foo(s: Path): Unit = try {
+                            val d = outputPath_temp.resolve(sourceLocation.relativize(s))
+                            if (Files.isDirectory(s)) {
+                                if (!Files.exists(d)) Files.createDirectory(d)
+                                return
+                            }
+                            Files.copy(s, d, StandardCopyOption.REPLACE_EXISTING)
+                        } catch {
+                            case e: Exception =>
+                                e.printStackTrace()
+                        }
+                        foo(s)
+                    })
+
+                    val javaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + ".java")
+                    val javaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + mainName + ".java")
+                    Files.copy(javaSourceLocation, javaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
+
+                    val outerJavaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + "OuterClass.java")
+                    val outerJavaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + mainName + "OuterClass.java")
+                    Files.copy(outerJavaSourceLocation, outerJavaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
+
                     val replaceClassNameInGradleBuild: String =
                         "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + mainName + "/build.gradle"
                     val deleteSedBackupFile: String =
                         "rm " + mainName + "/build.gradle.backup"
-                    copyFabricFolderInvocation.!
-                    copyJavaToFabricFolderInvocation.!
-                    copyJavaOuterToFabricFolderInvocation.!
                     replaceClassNameInGradleBuild.!
                     deleteSedBackupFile.!
                 } catch {
