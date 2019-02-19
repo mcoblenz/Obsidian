@@ -44,9 +44,6 @@ project/plugins/project/
 *.proto
 .idea/libraries/
 
-# All Fabric base files
-fabric/
-
 # Gradle build script caches and whatnot
 buildscript/.gradle
 buildscript/build
