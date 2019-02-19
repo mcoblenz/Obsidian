@@ -212,6 +212,54 @@ object Main {
         f.delete()
     }
 
+    def generateFabricCode(mainName: String, outputPath: Option[String], srcDir: Path): Unit = {
+        try {
+            //what we need to do now is move the .java class and the outterclass to a different folder
+            /* if an output path is specified, use it; otherwise, use working directory */
+            val outputPath_temp = outputPath match {
+                case Some(p) =>
+                    val path = Paths.get(p + mainName)
+                    /* create the dir if it doesn't exist */
+                    Files.createDirectories(path)
+                    path
+                case None =>
+                    val path = Paths.get(mainName)
+                    /* create the dir if it doesn't exist */
+                    Files.createDirectories(path)
+                    path
+            }
+
+            //copy the content of the fabric/java/ folder into a folder with the class name
+            val copyFabricFolderInvocation: String =
+                "cp -R fabric/java/ " + outputPath_temp
+            copyFabricFolderInvocation.!
+
+            //copy both the java and outerClass.java files to the Fabric folder
+            val javaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + ".java")
+            val javaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + mainName + ".java")
+            Files.copy(javaSourceLocation, javaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
+
+            val outerJavaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + protobufOuterClassNameForClass(mainName) + ".java")
+            val outerJavaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + protobufOuterClassNameForClass(mainName) + ".java")
+            Files.copy(outerJavaSourceLocation, outerJavaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
+
+            //place the correct class name in the build.gradle
+            val replaceClassNameInGradleBuild: String =
+                "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + mainName + "/build.gradle"
+            //sed automatically creates a backup of the original file, has to be deleted
+            val deleteSedBackupFile: String =
+                "rm " + mainName + "/build.gradle.backup"
+            //.keep file is only there since we need it to get the original Fabric structure on Git
+            val deleteKeepFile: String =
+                "rm " + mainName + "/src/main/java/org/hyperledger/fabric/example/.keep"
+            deleteKeepFile.!
+            replaceClassNameInGradleBuild.!
+            deleteSedBackupFile.!
+        } catch {
+            case e: Throwable => println("Error generating Fabric code: " + e)
+        }
+    }
+
 
     private def protobufOuterClassNameForClass(className: String): String = {
         className.substring(0, 1).toUpperCase(java.util.Locale.US) + className.substring(1) + "OuterClass"
@@ -240,7 +288,6 @@ object Main {
             println("Please re-run with the --hyperledger flag to generate lazy Hyperledger code.")
             sys.exit(1)
         }
-
         val tmpPath: Path = options.debugPath match {
             case Some(p) =>
                 val path = Paths.get(p)
@@ -347,58 +394,13 @@ object Main {
                         println("`" + protocInvocation + "` exited abnormally: " + exitCode)
                         return false
                     }
-                    //what we need to do now is move the .java class and the outterclass to a different folder
-                    /* if an output path is specified, use it; otherwise, use working directory */
-                    val outputPath_temp = options.outputPath match {
-                        case Some(p) =>
-                            val path = Paths.get(p + mainName)
-                            /* create the dir if it doesn't exist */
-                            Files.createDirectories(path)
-                            path
-                        case None =>
-                            val path = Paths.get(mainName)
-                            /* create the dir if it doesn't exist */
-                            Files.createDirectories(path)
-                            path
-                    }
-
-                    val sourceLocation = Paths.get("fabric/java")
-                    Files.walk(sourceLocation).forEach((s) => {
-                        def foo(s: Path): Unit = try {
-                            val d = outputPath_temp.resolve(sourceLocation.relativize(s))
-                            if (Files.isDirectory(s)) {
-                                if (!Files.exists(d)) Files.createDirectory(d)
-                                return
-                            }
-                            Files.copy(s, d, StandardCopyOption.REPLACE_EXISTING)
-                        } catch {
-                            case e: Exception =>
-                                e.printStackTrace()
-                        }
-                        foo(s)
-                    })
-
-                    val javaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + ".java")
-                    val javaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + mainName + ".java")
-                    Files.copy(javaSourceLocation, javaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
-
-                    val outerJavaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + "OuterClass.java")
-                    val outerJavaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + mainName + "OuterClass.java")
-                    Files.copy(outerJavaSourceLocation, outerJavaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
-
-                    val replaceClassNameInGradleBuild: String =
-                        "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + mainName + "/build.gradle"
-                    val deleteSedBackupFile: String =
-                        "rm " + mainName + "/build.gradle.backup"
-                    replaceClassNameInGradleBuild.!
-                    deleteSedBackupFile.!
                 } catch {
                     case e: Throwable => println("Error running protoc: " + e)
                 }
+                generateFabricCode(mainName, options.outputPath, srcDir)
             }
 
 
-            //technically this if/else not needed anymore => no more .jar required anyways
             if (options.mockChaincode) {
                 // invoke javac and make a jar from the result
                 val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
@@ -414,18 +416,7 @@ object Main {
                 else
                     return false
             } else {
-                // invoke gradle buildscript to produce a jar file
-                val gradleInvoke = s"gradle build -b buildscript/build.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
-
-                val gradleExit = gradleInvoke.!
-                if (gradleExit != 0) {
-                    println("`" + gradleInvoke + "` exited abnormally: " + gradleExit)
-                    return false
-                }
-
-                if (options.verbose) {
-                    println("gradle exited with value " + gradleExit)
-                }
+                generateFabricCode(mainName, options.outputPath, srcDir)
             }
 
         } catch {
