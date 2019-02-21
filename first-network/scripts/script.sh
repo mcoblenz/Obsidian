@@ -23,8 +23,7 @@ LANGUAGE=`echo "$LANGUAGE" | tr [:upper:] [:lower:]`
 COUNTER=1
 MAX_RETRY=10
 
-#CC_SRC_PATH="/opt/gopath/src/github.com/Simple3/"
-CC_SRC_PATH="/opt/gopath/src/github.com/chaincode/chaincode_example02/java/"
+CC_SRC_PATH="/opt/gopath/src/github.com/chaincode/"
 
 echo "Channel name : "$CHANNEL_NAME
 
