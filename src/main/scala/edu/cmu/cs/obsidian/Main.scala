@@ -228,8 +228,9 @@ object Main {
 
             //copy the content of the fabric/java/ folder into a folder with the class name
             val fabricFolderPath = Paths.get("fabric", "java")
+            //have to add the trailing separator to avoid copying the java directory too
             val copyFabricFolderInvocation: String =
-                "cp -R " + fabricFolderPath.toString + " " + outputPath_temp
+                "cp -R " + fabricFolderPath.toString + File.separator + " " + outputPath_temp
             copyFabricFolderInvocation.!
 
             //copy both the java and outerClass.java files to the Fabric folder
