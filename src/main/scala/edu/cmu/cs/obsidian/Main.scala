@@ -214,47 +214,46 @@ object Main {
 
     def generateFabricCode(mainName: String, outputPath: Option[String], srcDir: Path): Unit = {
         try {
-            //what we need to do now is move the .java class and the outterclass to a different folder
+            //what we need to do now is move the .java class and the outerclass to a different folder
             /* if an output path is specified, use it; otherwise, use working directory */
-            val outputPath_temp = outputPath match {
+            val path = outputPath match {
                 case Some(p) =>
-                    val path = Paths.get(p + mainName)
-                    /* create the dir if it doesn't exist */
-                    Files.createDirectories(path)
-                    path
+                    Paths.get(p + mainName)
                 case None =>
-                    val path = Paths.get(mainName)
-                    /* create the dir if it doesn't exist */
-                    Files.createDirectories(path)
-                    path
+                    Paths.get(mainName)
             }
+            /* create the dir if it doesn't exist */
+            Files.createDirectories(path)
+            val outputPath_temp = path
 
             //copy the content of the fabric/java/ folder into a folder with the class name
+            val fabricFolderPath = Paths.get("fabric", "java")
             val copyFabricFolderInvocation: String =
-                "cp -R fabric/java/ " + outputPath_temp
+                "cp -R " + fabricFolderPath.toString + " " + outputPath_temp
             copyFabricFolderInvocation.!
 
             //copy both the java and outerClass.java files to the Fabric folder
-            val javaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + mainName + ".java")
-            val javaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + mainName + ".java")
+            val javaSourceLocation = srcDir.resolve(Paths.get("edu", "cmu", "cs", "obsidian", "generated_code", mainName + ".java"))
+            val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", mainName + ".java")
             Files.copy(javaSourceLocation, javaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
 
-            val outerJavaSourceLocation = Paths.get(srcDir + "/edu/cmu/cs/obsidian/generated_code/" + protobufOuterClassNameForClass(mainName) + ".java")
-            val outerJavaTargetLocation = Paths.get(mainName + "/src/main/java/org/hyperledger/fabric/example/" + protobufOuterClassNameForClass(mainName) + ".java")
+            val outerJavaSourceLocation = srcDir.resolve(Paths.get("edu", "cmu", "cs", "obsidian", "generated_code", protobufOuterClassNameForClass(mainName) + ".java"))
+            val outerJavaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", protobufOuterClassNameForClass(mainName) + ".java")
             Files.copy(outerJavaSourceLocation, outerJavaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
 
             //place the correct class name in the build.gradle
+            val gradlePath = Paths.get(mainName, "build.gradle")
             val replaceClassNameInGradleBuild: String =
-                "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + mainName + "/build.gradle"
+                "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
+
             //sed automatically creates a backup of the original file, has to be deleted
+            val gradleBackupPath = Paths.get(mainName, "build.gradle.backup")
             val deleteSedBackupFile: String =
-                "rm " + mainName + "/build.gradle.backup"
-            //.keep file is only there since we need it to get the original Fabric structure on Git
-            val deleteKeepFile: String =
-                "rm " + mainName + "/src/main/java/org/hyperledger/fabric/example/.keep"
-            deleteKeepFile.!
+                "rm " + gradleBackupPath.toString
+
             replaceClassNameInGradleBuild.!
             deleteSedBackupFile.!
+            println("Successfully generated Fabric chaincode at " + outputPath_temp)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
         }
@@ -397,7 +396,6 @@ object Main {
                 } catch {
                     case e: Throwable => println("Error running protoc: " + e)
                 }
-                generateFabricCode(mainName, options.outputPath, srcDir)
             }
 
 
