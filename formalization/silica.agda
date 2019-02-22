@@ -134,9 +134,6 @@ data FreeLocations : Expr → List IndirectRef → Set where
   objRefFL : ∀ {o : ObjectRef} → FreeLocations (objRef o) []
   locFL : ∀ (l : IndirectRef) → FreeLocations (simpleExpr (loc l)) [ l ]
 
-freeLocationsExact : ∀ {l l'} → FreeLocations (simpleExpr (loc l)) [ l' ] → l ≡ l'
-freeLocationsExact (locFL l)  =  refl
-
 
 freeLocations : Expr → List IndirectRef
 freeLocations (bool b) = []
@@ -147,6 +144,30 @@ freeLocations (simpleExpr (loc l)) = [ l ]
 freeLocations (fieldAccess x) = []
 freeLocations (assertₓ x x₁) = []
 freeLocations (assertₗ l x₁) = [ l ]
+
+data FreeVariables : Expr → List Id → Set where
+  boolFL : ∀ {b : Bool} → FreeVariables (bool b) []
+  varFL : ∀ {x : Id} → FreeVariables (simpleExpr (var x)) [ x ]
+  voidFL : FreeVariables (void) []
+  objRefFL : ∀ {o : ObjectRef} → FreeVariables (objRef o) []
+  locFL : ∀ (l : IndirectRef) → FreeVariables (simpleExpr (loc l)) []
+
+data Closed : Expr → Set where
+  closed : ∀ (e : Expr)
+           → FreeVariables e []
+           --------------------
+           → Closed e
+
+freeVariables : Expr → List IndirectRef
+freeVariables (bool b) = []
+freeVariables (simpleExpr (var x)) = [ x ]
+freeVariables (void) = []
+freeVariables (objRef o) = []
+freeVariables (simpleExpr (loc l)) = []
+freeVariables (fieldAccess x) = []
+freeVariables (assertₓ x x₁) = [ x ]
+freeVariables (assertₗ l x₁) =  []
+
 
 --=============== Static Semantics ================
 -- A ContractEnv (written Γ) maps from Ids to contract definitions.
@@ -514,13 +535,14 @@ data Progress : Expr → Set where
          → Progress e
          
 progress : ∀ {e T Δ Δ' Σ}
+           → Closed e
            → Σ & Δ ok
            → Δ ⊢ e ⦂ T ⊣ Δ'
            ---------------
            → Progress e
 
-progress consis (varTy x split) =  step {!!}
-progress consis@(ok {Σ} _ _ _) ty@(locTy l split) =
+progress (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
+progress cl consis@(ok {Σ} _ _ _) ty@(locTy l split) =
   let
     fl = freeLocations (simpleExpr (loc l))
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -530,11 +552,11 @@ progress consis@(ok {Σ} _ _ _) ty@(locTy l split) =
     v = proj₁ heapLookupResult
   in
     step {simpleExpr (loc l)} {v} {Σ} {Σ} (SElookup ty heapLookupFound)
-progress consis (objTy o split) =  step {!!}
-progress consis (boolTy b) = done (boolVal b)
-progress consis (voidTy) = done (voidVal)
-progress consis (assertTyₗ tcEq subset) = {!!}
-progress consis (assertTyₓ tcEq subset) = {!!}
+progress cl consis (objTy o split) =  step {!!}
+progress cl consis (boolTy b) = done (boolVal b)
+progress cl consis (voidTy) = done (voidVal)
+progress cl consis (assertTyₗ tcEq subset) = {!!}
+progress cl consis (assertTyₓ tcEq subset) = {!!}
 
 {-
 preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
