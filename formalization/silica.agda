@@ -88,20 +88,14 @@ record Object : Set where
     contractFields : List SimpleExpr
     stateFields : List SimpleExpr
 
-contextIndex : SimpleExpr → ℕ
-contextIndex (var x) = x
-contextIndex (loc l) = l
-
-data ContextIndex : SimpleExpr → ℕ → Set where
-     contextIndexIntro : ∀ {x : ℕ} → ∀ (s : SimpleExpr) → contextIndex s ≡ x → ContextIndex s x
-
 data Expr : Set where
   simpleExpr : SimpleExpr → Expr
   bool : Bool → Expr
   void : Expr
   objRef : ObjectRef → Expr
   fieldAccess : Id → Expr  -- All field accesses are to 'this', so the field name suffices.
-  assert : SimpleExpr → StateSet.⟨Set⟩ → Expr
+  assertₓ : Id → StateSet.⟨Set⟩ → Expr
+  assertₗ : IndirectRef → StateSet.⟨Set⟩ → Expr
   -- TODO: add the rest of the expressions
 
 
@@ -151,7 +145,8 @@ freeLocations (void) = []
 freeLocations (objRef o) = []
 freeLocations (simpleExpr (loc l)) = [ l ]
 freeLocations (fieldAccess x) = []
-freeLocations (assert x x₁) = []
+freeLocations (assertₓ x x₁) = []
+freeLocations (assertₗ l x₁) = [ l ]
 
 --=============== Static Semantics ================
 -- A ContractEnv (written Γ) maps from Ids to contract definitions.
@@ -160,6 +155,24 @@ module ContractEnv = Context Contract
 module TypeEnvContext = Context Type
 TypeEnv = TypeEnvContext.ctx
 open TypeEnvContext
+
+record StaticEnv : Set where
+  constructor se
+  field
+    varEnv : TypeEnv
+    locEnv : TypeEnv
+    objEnv : TypeEnv
+
+_,ₓ_⦂_ : StaticEnv → Id → Type → StaticEnv
+Δ ,ₓ x ⦂ T = record Δ {varEnv = (StaticEnv.varEnv Δ) , x ⦂ T}
+
+_,ₗ_⦂_ : StaticEnv → Id → Type → StaticEnv
+Δ ,ₗ l ⦂ T = record Δ {locEnv = (StaticEnv.locEnv Δ) , l ⦂ T}
+
+_,ₒ_⦂_ : StaticEnv → Id → Type → StaticEnv
+Δ ,ₒ o ⦂ T = record Δ {objEnv = (StaticEnv.objEnv Δ) , o ⦂ T}
+
+
 
 
 -- Subtyping --
@@ -253,66 +266,62 @@ initialSplitType (states-shared {s = sts} {c = Contr} x) = contractType ( record
 -- TODO
 
 ------------ Type judgments ----------------
-data _⊢_⦂_⊣_ : TypeEnv → Expr → Type → TypeEnv → Set where
+data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
   varTy : ∀ {Γ : ContractEnv.ctx}
-      → ∀ {Δ : TypeEnv}
+      → ∀ {Δ : StaticEnv}
       → ∀ {T₁ T₂ T₃ : Type}
       → ∀ (x : Id)
       → Γ ⊢ T₁ ⇛ T₂ / T₃
       -----------------------------------
-      → (Δ , x ⦂ T₁) ⊢ (simpleExpr (var x)) ⦂ T₂ ⊣ (Δ , x ⦂ T₃)
+      → (Δ ,ₓ x ⦂ T₁) ⊢ (simpleExpr (var x)) ⦂ T₂ ⊣ (Δ ,ₓ x ⦂ T₃)
 
   locTy :  ∀ {Γ : ContractEnv.ctx}
-      → ∀ {Δ : TypeEnv}
+      → ∀ {Δ : StaticEnv}
       → ∀ {T₁ T₂ T₃ : Type}
       → ∀ (l : IndirectRef)
       → Γ ⊢ T₁ ⇛ T₂ / T₃
       ------------------------------------
-      → (Δ , l ⦂ T₁) ⊢ (simpleExpr (loc l)) ⦂ T₂ ⊣ (Δ , l ⦂ T₃)
+      → (Δ ,ₗ l ⦂ T₁) ⊢ (simpleExpr (loc l)) ⦂ T₂ ⊣ (Δ ,ₗ l ⦂ T₃)
 
   objTy :  ∀ {Γ : ContractEnv.ctx}
-      → ∀ {Δ : TypeEnv}
+      → ∀ {Δ : StaticEnv}
       → ∀ {T₁ T₂ T₃ : Type}
       → ∀ (o : ObjectRef)
       → Γ ⊢ T₁ ⇛ T₂ / T₃
       ------------------------------------
-      → (Δ , o ⦂ T₁) ⊢ (objRef o) ⦂ T₂ ⊣ (Δ , o ⦂ T₃)
+      → (Δ ,ₒ o ⦂ T₁) ⊢ (objRef o) ⦂ T₂ ⊣ (Δ ,ₒ o ⦂ T₃)
 
   boolTy : ∀ {Γ : ContractEnv.ctx}
-         → ∀ {Δ : TypeEnv}
+         → ∀ {Δ : StaticEnv}
          → ∀ (b : Bool)
          ------------------------------------
          → Δ ⊢ (bool b) ⦂ (base Boolean) ⊣ Δ
 
   voidTy : ∀ {Γ : ContractEnv.ctx}
-         → ∀ {Δ : TypeEnv}
+         → ∀ {Δ : StaticEnv}
          --------------------
           → Δ ⊢ void ⦂ base Void ⊣ Δ
 
 
-  assertTy : ∀ {Γ : ContractEnv.ctx}
-           → ∀ {Δ : TypeEnv}
+  assertTyₓ : ∀ {Γ : ContractEnv.ctx}
+           → ∀ {Δ : StaticEnv}
            → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
            → ∀ {tc : Tc}
-           → ∀ {i : ℕ}
-           → ∀ {s : SimpleExpr}
-           → contextIndex s ≡ i
-           → tc ≡ record {contractName = _; tst = S s₁}
+           → ∀ {x : IndirectRef}
+           → Tc.tst tc ≡ S s₁
            → s₁ ⊆ s₂
            --------------------------
-           → (Δ , i ⦂ (contractType tc)) ⊢ assert s s₁ ⦂ base Void ⊣ (Δ , i ⦂ (contractType tc))
-  
+           → (Δ ,ₓ x ⦂ (contractType tc)) ⊢ assertₓ x s₁ ⦂ base Void ⊣ (Δ ,ₓ x ⦂ (contractType tc))
 
-
-initialContext : ∀ {Δ e T Δ'}
-                 → Δ ⊢ e ⦂ T ⊣ Δ'
-                 → TypeEnv
-initialContext (varTy {Δ = Δ} x spl) = (Δ , x ⦂ initialSplitType spl)
-initialContext (locTy {Δ = Δ} l spl) = (Δ , l ⦂ initialSplitType spl)
-initialContext (objTy {Δ = Δ} o spl) = (Δ , o ⦂ initialSplitType spl)
-initialContext (boolTy {Δ = Δ} b) = Δ
-initialContext (voidTy {Δ = Δ}) = Δ
-initialContext (assertTy {Δ = Δ} _ _ _) = Δ
+  assertTyₗ : ∀ {Γ : ContractEnv.ctx}
+           → ∀ {Δ : StaticEnv}
+           → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
+           → ∀ {tc : Tc}
+           → ∀ {l : Id}
+           → Tc.tst tc ≡ S s₁
+           → s₁ ⊆ s₂
+           --------------------------
+           → (Δ ,ₗ l ⦂ (contractType tc)) ⊢ assertₗ l s₁ ⦂ base Void ⊣ (Δ ,ₗ l ⦂ (contractType tc))
 
 ------------ DYNAMIC SEMANTICS --------------
 data Value : Expr → Set where
@@ -351,11 +360,13 @@ record RuntimeEnv : Set where
     φ : StateLockingEnv
     ψ : ReentrancyEnv
 
+
+
 ----------- Reduction Rules ------------
 data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
   SElookup : -- of locations (i.e. let-bound variables)
     ∀ {Σ : RuntimeEnv}
-    → ∀ {Δ Δ' : TypeEnv}
+    → ∀ {Δ Δ' : StaticEnv}
     → ∀ {T : Type}
     → ∀ {l : IndirectRef}
     → ∀ {v : Expr}
@@ -398,7 +409,7 @@ data IsConnected : List Type → Set where
 
 contextTypes : TypeEnv → ObjectRef → List Type
 contextTypes ∅ _ = []
-contextTypes (Δ , x ⦂ T) o = T ∷ (contextTypes Δ o)
+contextTypes (Δ , o' ⦂ T) o = [] -- if o Data.Nat.≟ o' then T ∷ (contextTypes Δ o) else contextTypes Δ o
 
 envTypesHelper : IndirectRefEnv → TypeEnv → ObjectRef → List Type
 envTypesHelper IndirectRefContext.∅  Δ o = []
@@ -406,22 +417,22 @@ envTypesHelper (IndirectRefContext._,_⦂_ ρ l v) Δ o with (TypeEnvContext.loo
 ...                                               | just T =  if true {- v =̂ o -} then (T ∷ envTypesHelper ρ Δ o) else envTypesHelper ρ Δ o  
 ...                                               | Data.Maybe.nothing = envTypesHelper ρ Δ o
 
-envTypes : RuntimeEnv → TypeEnv → ObjectRef → List Type
-envTypes Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) Δ o
+envTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
+envTypes Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) (StaticEnv.locEnv Δ) o
 
-refFieldTypesHelper : ObjectRefEnv → TypeEnv → ObjectRef → List Type
+refFieldTypesHelper : ObjectRefEnv → StaticEnv → ObjectRef → List Type
 refFieldTypesHelper ObjectRefContext.∅ Δ o = []
 refFieldTypesHelper (ObjectRefContext._,_⦂_ μ o' obj) Δ o = refFieldTypesHelper μ Δ o  -- TODO; this is bogus!
 
-refFieldTypes : RuntimeEnv → TypeEnv → ObjectRef → List Type
+refFieldTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
 refFieldTypes Σ Δ o = refFieldTypesHelper (RuntimeEnv.μ Σ) Δ o
 
-refTypes : RuntimeEnv → TypeEnv → ObjectRef → List Type
-refTypes Σ Δ o = (contextTypes Δ o) ++ (envTypes Σ Δ o) ++ (refFieldTypes Σ Δ o)
+refTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
+refTypes Σ Δ o = (contextTypes (StaticEnv.objEnv Δ) o) ++ (envTypes Σ Δ o) ++ (refFieldTypes Σ Δ o)
 
-data ReferenceConsistency : RuntimeEnv → TypeEnv → Set where
+data ReferenceConsistency : RuntimeEnv → StaticEnv → Set where
   referencesConsistent : ∀ {Σ : RuntimeEnv}
-                       → ∀ {Δ : TypeEnv}
+                       → ∀ {Δ : StaticEnv}
                        → ∀ {o : ObjectRef}
                        → IsConnected (refTypes Σ Δ o)
                        -- TODO: add subtype constraint: C <: (refTypes Σ Δ o)
@@ -432,11 +443,11 @@ data ReferenceConsistency : RuntimeEnv → TypeEnv → Set where
 -- I'm going to need the fact that if an expression typechecks, and I find a location in it, then the location can be looked
 -- up in the runtime environment. But every location in the expression has to also be in the typing context, so I can state this
 -- without talking about expressions at all.
-data _&_ok : RuntimeEnv → TypeEnv → Set where
+data _&_ok : RuntimeEnv → StaticEnv → Set where
   ok : ∀ {Σ : RuntimeEnv}
-       → ∀ (Δ : TypeEnv)
+       → ∀ (Δ : StaticEnv)
        → (∀ (l : IndirectRef) → ∀ (T : Type)
-         → Δ ∋ l ⦂ T         -- If a location is in Δ...
+         → (StaticEnv.locEnv Δ) ∋ l ⦂ T         -- If a location is in Δ...
          → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v) -- then location can be looked up in Σ...
          )
        → ReferenceConsistency Σ Δ                    -- and Σ and Δ have the ReferenceConsistency property...
@@ -446,7 +457,7 @@ data _&_ok : RuntimeEnv → TypeEnv → Set where
 
 -- Inversion for global consistency: reference consistency
 refConsistency : ∀ {Σ : RuntimeEnv}
-                 → ∀ {Δ : TypeEnv}
+                 → ∀ {Δ : StaticEnv}
                  → ∀ {o : ObjectRef}
                  → ∀ {l : IndirectRef}
                  → Σ & Δ ok
@@ -457,11 +468,11 @@ refConsistency (ok Δ _ rc) =  rc
 -- Inversion for global consistency : location lookup for a particular location
 -- If l is in Δ and Σ & Δ ok, then l can be found in Σ.ρ.
 locLookup : ∀ {Σ : RuntimeEnv}
-            → ∀ {Δ : TypeEnv}
+            → ∀ {Δ : StaticEnv}
             → ∀ {l : IndirectRef}
             → ∀ {T : Type}
             → Σ & Δ ok
-            → Δ ∋ l ⦂ T
+            → (StaticEnv.locEnv Δ) ∋ l ⦂ T
             → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
 
 locLookup (ok Δ lContainment rc) lInDelta@(Z {Δ'} {x} {a}) = lContainment x a lInDelta
@@ -477,12 +488,12 @@ locationsInExprAreInContext : ∀ {Δ Δ' e T fl}
                               → FreeLocations e fl
                               → l ∈ fl
                               ----------------
-                              → ∃[ T' ] (Δ ∋ l ⦂ T')
+                              → ∃[ T' ] ((StaticEnv.locEnv Δ) ∋ l ⦂ T')
 
 -- fl is empty, so l is in fl leads to a contradiction.
 locationsInExprAreInContext (varTy x spl) varFL ()
 -- l is related to e, so therefore we can point to where l is in Δ.
-locationsInExprAreInContext (locTy {Δ = Δ''} {T₁ = T₁} l spl) (locFL l) (here refl) =  ⟨ T₁ , obviousContainment Δ'' ⟩
+locationsInExprAreInContext (locTy {Δ = Δ''} {T₁ = T₁} l spl) (locFL l) (here refl) =  ⟨ T₁ , obviousContainment (StaticEnv.locEnv Δ'') ⟩
 locationsInExprAreInContext (locTy {Δ = Δ''} {T₁} l spl) (locFL l) (there ())
 locationsInExprAreInContext (objTy o spl) objRefFL ()
 locationsInExprAreInContext (boolTy b) boolFL ()
@@ -493,7 +504,6 @@ locationsInExprAreInContext ty voidFL ()
 data Progress : Expr → Set where
   step : ∀ {e e' : Expr}
          → ∀ {Σ Σ' : RuntimeEnv}
-         → ∀ {Δ Δ' : TypeEnv}
          → (Σ , e ⟶ Σ' , e')
          -------------
          → Progress e
@@ -502,7 +512,7 @@ data Progress : Expr → Set where
          → Value e
          ---------
          → Progress e
-
+         
 progress : ∀ {e T Δ Δ' Σ}
            → Σ & Δ ok
            → Δ ⊢ e ⦂ T ⊣ Δ'
@@ -510,7 +520,7 @@ progress : ∀ {e T Δ Δ' Σ}
            → Progress e
 
 progress consis (varTy x split) =  step {!!}
-progress consis@(ok {Σ} (Δ , l ⦂ T₁) _ _) ty@(locTy {Γ} {Δ} {T₁} {T₂} {T₃} l split) =
+progress consis@(ok {Σ} _ _ _) ty@(locTy l split) =
   let
     fl = freeLocations (simpleExpr (loc l))
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -519,11 +529,12 @@ progress consis@(ok {Σ} (Δ , l ⦂ T₁) _ _) ty@(locTy {Γ} {Δ} {T₁} {T₂
     heapLookupFound = proj₂ heapLookupResult
     v = proj₁ heapLookupResult
   in
-    step {simpleExpr (loc l)} {v} {Σ} {Σ} {(Δ , l ⦂ T₁)} {(Δ , l ⦂ T₁)} (SElookup ty heapLookupFound)
+    step {simpleExpr (loc l)} {v} {Σ} {Σ} (SElookup ty heapLookupFound)
 progress consis (objTy o split) =  step {!!}
 progress consis (boolTy b) = done (boolVal b)
 progress consis (voidTy) = done (voidVal)
-progress consis (assertTy ci tcEq subset) = {!!}
+progress consis (assertTyₗ tcEq subset) = {!!}
+progress consis (assertTyₓ tcEq subset) = {!!}
 
 {-
 preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
