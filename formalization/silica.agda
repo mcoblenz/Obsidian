@@ -328,7 +328,7 @@ data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
            → ∀ {Δ : StaticEnv}
            → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
            → ∀ {tc : Tc}
-           → ∀ {x : IndirectRef}
+           → ∀ {x : Id}
            → Tc.tst tc ≡ S s₁
            → s₁ ⊆ s₂
            --------------------------
@@ -338,7 +338,7 @@ data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
            → ∀ {Δ : StaticEnv}
            → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
            → ∀ {tc : Tc}
-           → ∀ {l : Id}
+           → ∀ {l : IndirectRef}
            → Tc.tst tc ≡ S s₁
            → s₁ ⊆ s₂
            --------------------------
@@ -394,6 +394,20 @@ data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
     → Δ ⊢ (simpleExpr (loc l)) ⦂ T ⊣ Δ'
     → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
     → (Σ , (simpleExpr (loc l)) ⟶ Σ , v)
+
+  SEassertₓ :
+    ∀ {Σ : RuntimeEnv}
+    → ∀ (x : Id)
+    → ∀ (s : StateSet.⟨Set⟩)
+    --------------
+    → (Σ , assertₓ x s ⟶ Σ , void)
+
+  SEassertₗ :
+    ∀ {Σ : RuntimeEnv}
+    → ∀ (l : IndirectRef)
+    → ∀ (s : StateSet.⟨Set⟩)
+    --------------
+    → (Σ , assertₗ l s ⟶ Σ , void)
 
 --============= Consistency ==============
 -- Relates typing environments and object references to lists of all types of possible references.
@@ -523,8 +537,8 @@ locationsInExprAreInContext ty voidFL ()
 
 -- TODO: relax progress a little per statement of Theorem 5.1.
 data Progress : Expr → Set where
-  step : ∀ {e e' : Expr}
-         → ∀ {Σ Σ' : RuntimeEnv}
+  step : ∀ (Σ Σ' : RuntimeEnv)
+         → ∀ (e e' : Expr)       
          → (Σ , e ⟶ Σ' , e')
          -------------
          → Progress e
@@ -534,15 +548,16 @@ data Progress : Expr → Set where
          ---------
          → Progress e
          
-progress : ∀ {e T Δ Δ' Σ}
+progress : ∀ {e T Δ Δ'}
+           → ∀ (Σ : RuntimeEnv)
            → Closed e
            → Σ & Δ ok
            → Δ ⊢ e ⦂ T ⊣ Δ'
            ---------------
            → Progress e
 
-progress (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
-progress cl consis@(ok {Σ} _ _ _) ty@(locTy l split) =
+progress Σ (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
+progress Σ cl consis@(ok {Σ} _ _ _) ty@(locTy l split) =
   let
     fl = freeLocations (simpleExpr (loc l))
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -551,12 +566,12 @@ progress cl consis@(ok {Σ} _ _ _) ty@(locTy l split) =
     heapLookupFound = proj₂ heapLookupResult
     v = proj₁ heapLookupResult
   in
-    step {simpleExpr (loc l)} {v} {Σ} {Σ} (SElookup ty heapLookupFound)
-progress cl consis (objTy o split) =  step {!!}
-progress cl consis (boolTy b) = done (boolVal b)
-progress cl consis (voidTy) = done (voidVal)
-progress cl consis (assertTyₗ tcEq subset) = {!!}
-progress cl consis (assertTyₓ tcEq subset) = {!!}
+    step Σ Σ (simpleExpr (loc l)) v (SElookup ty heapLookupFound)
+progress Σ cl consis (objTy o split) =  done (objVal o)
+progress Σ cl consis (boolTy b) = done (boolVal b)
+progress Σ cl consis (voidTy) = done (voidVal)
+progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (void) (SEassertₗ {Σ} l s)
+progress Σ cl consis (assertTyₓ {s₁ = s} {x = x} tcEq subset) = step Σ Σ (assertₓ x s) (void) (SEassertₓ {Σ} x s)
 
 {-
 preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
