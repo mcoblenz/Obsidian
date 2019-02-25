@@ -525,6 +525,7 @@ data _&_ok : RuntimeEnv → StaticEnv → Set where
   ok : ∀ {Σ : RuntimeEnv}
        → ∀ (Δ : StaticEnv)
        → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Void → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just voidExpr)))
+       → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean → ∃[ b ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (boolExpr b))))
        → (∀ (l : IndirectRef) → ∀ (T : Type)
          → (StaticEnv.locEnv Δ) ∋ l ⦂ T         -- If a location is in Δ...
          → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v) -- then location can be looked up in Σ...
@@ -541,7 +542,7 @@ refConsistency : ∀ {Σ : RuntimeEnv}
                  → ∀ {l : IndirectRef}
                  → Σ & Δ ok
                  → ReferenceConsistency Σ Δ
-refConsistency (ok Δ _ _ rc) =  rc
+refConsistency (ok Δ _ _ _ rc) =  rc
 
 
 -- Inversion for global consistency : location lookup for a particular location
@@ -554,8 +555,8 @@ locLookup : ∀ {Σ : RuntimeEnv}
             → (StaticEnv.locEnv Δ) ∋ l ⦂ T
             → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
 
-locLookup (ok Δ _ lContainment rc) lInDelta@(Z {Δ'} {x} {a}) = lContainment x a lInDelta
-locLookup (ok Δ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
+locLookup (ok Δ _ _ lContainment rc) lInDelta@(Z {Δ'} {x} {a}) = lContainment x a lInDelta
+locLookup (ok Δ _ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
 
 voidLookup : ∀ {Σ : RuntimeEnv}
             → ∀ {Δ : StaticEnv}
@@ -563,8 +564,17 @@ voidLookup : ∀ {Σ : RuntimeEnv}
             → Σ & Δ ok
             → (StaticEnv.locEnv Δ) ∋ l ⦂ base Void
             → IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just voidExpr
-voidLookup (ok Δ voidContainment _ _ ) voidType@(Z {Δ'} {l} {a}) = voidContainment l voidType
-voidLookup (ok Δ voidContainment _ _ ) voidType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = voidContainment l voidType 
+voidLookup (ok Δ voidContainment _ _ _) voidType@(Z {Δ'} {l} {a}) = voidContainment l voidType
+voidLookup (ok Δ voidContainment _ _ _) voidType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = voidContainment l voidType
+
+boolLookup : ∀ {Σ : RuntimeEnv}
+            → ∀ {Δ : StaticEnv}
+            → ∀ {l : IndirectRef}
+            → Σ & Δ ok
+            → (StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean
+            → ∃[ b ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (boolExpr b))
+boolLookup (ok Δ _ boolContainment _ _) boolType@(Z {Δ'} {l} {a}) = boolContainment l boolType
+boolLookup (ok Δ _ boolContainment _ _) boolType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = boolContainment l boolType 
 
 ------------ Lemmas --------------
 -- If an expression is well-typed in Δ, then all locations in the expression are in Δ.
@@ -608,7 +618,7 @@ progress : ∀ {e T Δ Δ'}
            → Progress e
 
 progress Σ (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
-progress Σ cl consis@(ok {Σ} _ _ _ _) ty@(locTy l split) =
+progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l split) =
   let
     fl = freeLocations (simpleExpr (loc l))
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -661,8 +671,15 @@ preservation ty@(locTy {Γ} {Δ} l voidSplit) consis st@(SElookup {l = l} {v = v
     e'TypingJudgment = voidTy {Δ = Δ'}
   in 
     pres ty consis st Δ' e'TypingJudgment consis <*-refl
-preservation ty@(locTy {Γ} {Δ} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr true} _ lookupL) = {!!}
-preservation ty@(locTy {Γ} {Δ} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr false} _ lookupL) = {!!}
+preservation ty@(locTy {Γ} {Δ} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr b} _ lookupL) = 
+ let
+    ΔInitial = (Δ ,ₗ l ⦂ base Boolean)
+    Δ' = ΔInitial
+    -- Show that e' ≡ void so that we can show that e' : Void.
+    e'IsBool = boolLookup consis Z
+    e'TypingJudgment = boolTy {Δ = Δ'}
+  in 
+    pres ty consis st Δ' (e'TypingJudgment b) consis <*-refl
 preservation ty@(locTy {Γ} {Δ} l spl) consis st@(SElookup {l = l} {v = v} _ lookupL) = {!!}
 preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
 preservation ty consis st@(SEassertₗ l s) = pres ty consis st {!!} {!!} {!!} {!!}
