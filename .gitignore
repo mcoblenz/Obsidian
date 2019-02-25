@@ -40,6 +40,7 @@ project/plugins/project/
 # IntelliJ
 /out/
 *.jar
+!docs/repository/edu/cmu/cs/obsidian/runtime/0.1/runtime-0.1.jar
 *.proto
 .idea/libraries/
 

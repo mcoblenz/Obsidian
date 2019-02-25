@@ -1,8 +1,10 @@
 package edu.cmu.cs.obsidian
 
 import java.io.File
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
+import java.io.PrintWriter
+import scala.io.Source
 
 import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
@@ -210,6 +212,54 @@ object Main {
         f.delete()
     }
 
+    def generateFabricCode(mainName: String, outputPath: Option[String], srcDir: Path): Unit = {
+        try {
+            //what we need to do now is move the .java class and the outerclass to a different folder
+            /* if an output path is specified, use it; otherwise, use working directory */
+            val path = outputPath match {
+                case Some(p) =>
+                    Paths.get(p + mainName)
+                case None =>
+                    Paths.get(mainName)
+            }
+            /* create the dir if it doesn't exist */
+            Files.createDirectories(path)
+            val outputPath_temp = path
+
+            //copy the content of the fabric/java/ folder into a folder with the class name
+            val fabricFolderPath = Paths.get("fabric", "java")
+            //have to add the trailing separator to avoid copying the java directory too
+            val copyFabricFolderInvocation: String =
+                "cp -R " + fabricFolderPath.toString + File.separator + " " + outputPath_temp
+            copyFabricFolderInvocation.!
+
+            //copy both the java and outerClass.java files to the Fabric folder
+            val javaSourceLocation = srcDir.resolve(Paths.get("edu", "cmu", "cs", "obsidian", "generated_code", mainName + ".java"))
+            val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", mainName + ".java")
+            Files.copy(javaSourceLocation, javaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
+
+            val outerJavaSourceLocation = srcDir.resolve(Paths.get("edu", "cmu", "cs", "obsidian", "generated_code", protobufOuterClassNameForClass(mainName) + ".java"))
+            val outerJavaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", protobufOuterClassNameForClass(mainName) + ".java")
+            Files.copy(outerJavaSourceLocation, outerJavaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
+
+            //place the correct class name in the build.gradle
+            val gradlePath = Paths.get(mainName, "build.gradle")
+            val replaceClassNameInGradleBuild: String =
+                "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
+
+            //sed automatically creates a backup of the original file, has to be deleted
+            val gradleBackupPath = Paths.get(mainName, "build.gradle.backup")
+            val deleteSedBackupFile: String =
+                "rm " + gradleBackupPath.toString
+
+            replaceClassNameInGradleBuild.!
+            deleteSedBackupFile.!
+            println("Successfully generated Fabric chaincode at " + outputPath_temp)
+        } catch {
+            case e: Throwable => println("Error generating Fabric code: " + e)
+        }
+    }
+
 
     private def protobufOuterClassNameForClass(className: String): String = {
         className.substring(0, 1).toUpperCase(java.util.Locale.US) + className.substring(1) + "OuterClass"
@@ -238,7 +288,6 @@ object Main {
             println("Please re-run with the --hyperledger flag to generate lazy Hyperledger code.")
             sys.exit(1)
         }
-
         val tmpPath: Path = options.debugPath match {
             case Some(p) =>
                 val path = Paths.get(p)
@@ -318,6 +367,8 @@ object Main {
                 options.mockChaincode, options.lazySerialization)
             javaModel.build(srcDir.toFile)
 
+            val mainName = findMainContractName(transformedTable.ast)
+
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(transformedTable.ast, sourceFilename,
                                                                                   options.lazySerialization)
 
@@ -348,7 +399,6 @@ object Main {
                 }
             }
 
-            val mainName = findMainContractName(transformedTable.ast)
 
             if (options.mockChaincode) {
                 // invoke javac and make a jar from the result
@@ -365,18 +415,7 @@ object Main {
                 else
                     return false
             } else {
-                // invoke gradle buildscript to produce a jar file
-                val gradleInvoke = s"gradle build -b buildscript/build.gradle -Pmain=$mainName -PcodeDirectory=$tmpPath/generated_java"
-
-                val gradleExit = gradleInvoke.!
-                if (gradleExit != 0) {
-                    println("`" + gradleInvoke + "` exited abnormally: " + gradleExit)
-                    return false
-                }
-
-                if (options.verbose) {
-                    println("gradle exited with value " + gradleExit)
-                }
+                generateFabricCode(mainName, options.outputPath, srcDir)
             }
 
         } catch {
