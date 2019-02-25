@@ -70,7 +70,7 @@ class CodeGen (val target: Target, val mockChaincode: Boolean, val lazySerializa
      * so that the old state can be garbage-collected after a transition */
     private final val deleteOldStateName = "__oldStateToNull"
 
-    final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
+    final val packageName: String = "org.hyperledger.fabric.example"
 
     def populateProtobufOuterClassNames (contract: Contract,
                                          protobufOuterClassName: String,

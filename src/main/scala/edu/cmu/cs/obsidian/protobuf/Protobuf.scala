@@ -7,7 +7,7 @@ import java.io.{File, PrintWriter}
   */
 
 class Protobuf (var messages: Seq[ProtobufMessage]) {
-    final val packageName: String = "edu.cmu.cs.obsidian.generated_code"
+    final val packageName: String = "org.hyperledger.fabric.example"
 
     def build(outputFile: File, targetOuterClassName: String): Unit = {
         outputFile.delete()
