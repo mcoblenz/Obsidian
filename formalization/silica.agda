@@ -90,8 +90,8 @@ record Object : Set where
 
 data Expr : Set where
   simpleExpr : SimpleExpr → Expr
-  bool : Bool → Expr
-  void : Expr
+  boolExpr : Bool → Expr
+  voidExpr : Expr
   objRef : ObjectRef → Expr
   fieldAccess : Id → Expr  -- All field accesses are to 'this', so the field name suffices.
   assertₓ : Id → StateSet.⟨Set⟩ → Expr
@@ -128,17 +128,17 @@ data Program : Set where
 
 --============= Utilities ================
 data FreeLocations : Expr → List IndirectRef → Set where
-  boolFL : ∀ {b : Bool} → FreeLocations (bool b) []
+  boolFL : ∀ {b : Bool} → FreeLocations (boolExpr b) []
   varFL : ∀ {x : Id} → FreeLocations (simpleExpr (var x)) []
-  voidFL : FreeLocations (void) []
+  voidFL : FreeLocations (voidExpr) []
   objRefFL : ∀ {o : ObjectRef} → FreeLocations (objRef o) []
   locFL : ∀ (l : IndirectRef) → FreeLocations (simpleExpr (loc l)) [ l ]
 
 
 freeLocations : Expr → List IndirectRef
-freeLocations (bool b) = []
+freeLocations (boolExpr b) = []
 freeLocations (simpleExpr (var x)) = []
-freeLocations (void) = []
+freeLocations (voidExpr) = []
 freeLocations (objRef o) = []
 freeLocations (simpleExpr (loc l)) = [ l ]
 freeLocations (fieldAccess x) = []
@@ -146,9 +146,9 @@ freeLocations (assertₓ x x₁) = []
 freeLocations (assertₗ l x₁) = [ l ]
 
 data FreeVariables : Expr → List Id → Set where
-  boolFL : ∀ {b : Bool} → FreeVariables (bool b) []
+  boolFL : ∀ {b : Bool} → FreeVariables (boolExpr b) []
   varFL : ∀ {x : Id} → FreeVariables (simpleExpr (var x)) [ x ]
-  voidFL : FreeVariables (void) []
+  voidFL : FreeVariables (voidExpr) []
   objRefFL : ∀ {o : ObjectRef} → FreeVariables (objRef o) []
   locFL : ∀ (l : IndirectRef) → FreeVariables (simpleExpr (loc l)) []
 
@@ -159,9 +159,9 @@ data Closed : Expr → Set where
            → Closed e
 
 freeVariables : Expr → List IndirectRef
-freeVariables (bool b) = []
+freeVariables (boolExpr b) = []
 freeVariables (simpleExpr (var x)) = [ x ]
-freeVariables (void) = []
+freeVariables (voidExpr) = []
 freeVariables (objRef o) = []
 freeVariables (simpleExpr (loc l)) = []
 freeVariables (fieldAccess x) = []
@@ -198,7 +198,7 @@ _,ₒ_⦂_ : StaticEnv → Id → Type → StaticEnv
 
 -- Subtyping --
 data _<:_ : Type → Type → Set where
-  refl : ∀ {T T' : Type}
+  <:-refl : ∀ {T T' : Type}
          ----------------
          → T <: T
   -- TODO: add more subtyping judgments
@@ -223,34 +223,63 @@ data _<ₗ_ : TypeEnv → TypeEnv → Set where
         --------------
          → Δ <ₗ Δ'
 
-  nonempty< : ∀ {Δ Δ' Δ'' : TypeEnv}
-    → ∀ {x : ℕ}
+  nonempty< : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
+    → ∀ {l : ℕ}
     → ∀ {T T' : Type}
-    → Δ' ≡ (Δ'' , x ⦂ T)
-    → Δ ∋ x ⦂ T'
+    → Δ' ≡ (Δ'' , l ⦂ T')
+    → Δ ≡ (Δ''' , l ⦂ T)
     → T <: T'
-    → Δ <ₗ Δ''
+    → Δ''' <ₗ Δ''
     -------------
     → Δ <ₗ Δ'
+
+data _<*_ : StaticEnv → StaticEnv → Set where
+  * : ∀ {Δ Δ'}
+        → (StaticEnv.varEnv Δ) ≡ (StaticEnv.varEnv Δ')
+        → (StaticEnv.locEnv Δ) <ₗ (StaticEnv.locEnv Δ')
+        → (StaticEnv.objEnv Δ) ≡ (StaticEnv.objEnv Δ')
+        -----------------------------------------------
+        → Δ <* Δ'
+
+<ₗ-refl : ∀ {Δ : TypeEnv}
+          → Δ <ₗ Δ
+<ₗ-refl {Context.∅} = empty< refl
+<ₗ-refl {Δ , x ⦂ x₁} = nonempty< refl refl <:-refl (<ₗ-refl {Δ})
+
+<*-refl : ∀ {Δ : StaticEnv}
+          → Δ <* Δ
+
+<*-refl =
+  let
+    lt = <ₗ-refl
+  in 
+  * refl lt refl
   
-
 -- Splitting --
-data _⊢_⇛_/_ : ContractEnv.ctx -> Type -> Type -> Type -> Set where
-  void : ∀ {Γ : ContractEnv.ctx}
-        ---------------
-        → Γ ⊢ (base Void) ⇛ (base Void) / (base Void)
+record SplitType : Set where
+  constructor _⇛_/_
+  field
+    t₁ : Type
+    t₂ : Type
+    t₃ : Type
 
-  boolean : ∀ {Γ : ContractEnv.ctx}
-        --------------
-        → Γ ⊢ base Boolean ⇛ base Boolean / base Boolean
+infix 4 _⊢_
+data _⊢_ : ContractEnv.ctx -> SplitType -> Set where
+  voidSplit : ∀ {Γ : ContractEnv.ctx}
+              ---------------
+              → Γ ⊢ (base Void) ⇛ (base Void) / (base Void)
+
+  booleanSplit : ∀ {Γ : ContractEnv.ctx}
+                 --------------
+                 → Γ ⊢ base Boolean ⇛ base Boolean / base Boolean
         
-  unowned : ∀ {Γ : ContractEnv.ctx}
-          → ∀ {t1 t2 t3 : Tc}
-          → (Tc.contractName t1) ≡ (Tc.contractName t2)
-          → (Tc.tst t1) ≡ (Tc.tst t2)
-          → Tc.tst t3 ≡ Unowned
-        --------------
-        → Γ ⊢ contractType t1 ⇛ contractType t2 / contractType t3
+  unownedSplit : ∀ {Γ : ContractEnv.ctx}
+                 → ∀ {t1 t2 t3 : Tc}
+                 → (Tc.contractName t1) ≡ (Tc.contractName t2)
+                 → (Tc.tst t1) ≡ (Tc.tst t2)
+                 → Tc.tst t3 ≡ Unowned
+                 --------------
+                 → Γ ⊢ contractType t1 ⇛ contractType t2 / contractType t3
 
   shared-shared-shared :
     ∀ {c : Id}
@@ -262,7 +291,7 @@ data _⊢_⇛_/_ : ContractEnv.ctx -> Type -> Type -> Type -> Set where
    → ∀ {Γ : ContractEnv.ctx}
    → NotAsset Γ c
    --------------
-    → Γ ⊢  contractType ( record {tst = Owned ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+    → Γ ⊢ contractType ( record {tst = Owned ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
 
   states-shared :
     ∀ {s : σ}
@@ -270,17 +299,31 @@ data _⊢_⇛_/_ : ContractEnv.ctx -> Type -> Type -> Type -> Set where
     → ∀ {Γ : ContractEnv.ctx}
     → NotAsset Γ c
     --------------
-    → Γ ⊢  contractType ( record {tst = S s ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+    → Γ ⊢ contractType ( record {tst = S s ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
 
-initialSplitType : ∀ {Γ : ContractEnv.ctx}
-                   → ∀ {t1 t2 t3 : Type}
-                   → Γ ⊢ t1 ⇛ t2 / t3 → Type
-initialSplitType (void) = base Void
-initialSplitType boolean = base Boolean
-initialSplitType (unowned {t1 = T} x x₁ x₂) =  contractType T
-initialSplitType (shared-shared-shared {c = Contr}) = contractType ( record {tst = Shared ; contractName = Contr } )
-initialSplitType (owned-shared {c = Contr} x) = contractType ( record {tst = Owned ; contractName = Contr })
-initialSplitType (states-shared {s = sts} {c = Contr} x) = contractType ( record {tst = S sts ; contractName = Contr })
+splitType : ∀ {Γ : ContractEnv.ctx}
+          → ∀ {t1 t2 t3 : Type}
+          → Γ ⊢ t1 ⇛ t2 / t3
+          → SplitType
+
+splitType voidSplit = (base Void) ⇛ (base Void) / (base Void)
+splitType booleanSplit =  base Boolean ⇛ base Boolean / base Boolean
+splitType (unownedSplit {Γ} {t1} {t2} {t3} x x₁ x₂) = contractType t1 ⇛ contractType t2 / contractType t3
+splitType (shared-shared-shared {c}) =  contractType ( record {tst = Shared ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c})
+splitType (owned-shared {c} x) = contractType ( record {tst = Owned ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+splitType (states-shared {s} {c} x) = contractType ( record {tst = S s ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+
+splitTypeCorrect :  ∀ {Γ}
+                    → ∀ {t1 t2 t3 : Type}
+                    → ∀ (p : Γ ⊢ t1 ⇛ t2 / t3)
+                    → splitType p ≡ t1 ⇛ t2 / t3
+splitTypeCorrect voidSplit = refl
+splitTypeCorrect booleanSplit = refl
+splitTypeCorrect (unownedSplit x x₁ x₂) = refl
+splitTypeCorrect shared-shared-shared = refl
+splitTypeCorrect (owned-shared x) = refl
+splitTypeCorrect (states-shared x) = refl
+
 
 ----------- PROPERTIES OF SPLITTING -----------
 -- The results of splitting are always compatible.
@@ -316,12 +359,12 @@ data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
          → ∀ {Δ : StaticEnv}
          → ∀ (b : Bool)
          ------------------------------------
-         → Δ ⊢ (bool b) ⦂ (base Boolean) ⊣ Δ
+         → Δ ⊢ (boolExpr b) ⦂ (base Boolean) ⊣ Δ
 
   voidTy : ∀ {Γ : ContractEnv.ctx}
          → ∀ {Δ : StaticEnv}
          --------------------
-          → Δ ⊢ void ⦂ base Void ⊣ Δ
+          → Δ ⊢ voidExpr ⦂ base Void ⊣ Δ
 
 
   assertTyₓ : ∀ {Γ : ContractEnv.ctx}
@@ -348,9 +391,9 @@ data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
 data Value : Expr → Set where
   boolVal : ∀ (b : Bool)
           ------------
-          → Value (bool b)
+          → Value (boolExpr b)
 
-  voidVal : Value (void)
+  voidVal : Value (voidExpr)
 
   objVal : ∀ (o : ObjectRef)
            --------------
@@ -382,7 +425,6 @@ record RuntimeEnv : Set where
     ψ : ReentrancyEnv
 
 
-
 ----------- Reduction Rules ------------
 data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
   SElookup : -- of locations (i.e. let-bound variables)
@@ -393,6 +435,7 @@ data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
     → ∀ {v : Expr}
     → Δ ⊢ (simpleExpr (loc l)) ⦂ T ⊣ Δ'
     → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
+    -----------------------------------------------------------
     → (Σ , (simpleExpr (loc l)) ⟶ Σ , v)
 
   SEassertₓ :
@@ -400,14 +443,14 @@ data _,_⟶_,_ : RuntimeEnv → Expr → RuntimeEnv → Expr → Set where
     → ∀ (x : Id)
     → ∀ (s : StateSet.⟨Set⟩)
     --------------
-    → (Σ , assertₓ x s ⟶ Σ , void)
+    → (Σ , assertₓ x s ⟶ Σ , voidExpr)
 
   SEassertₗ :
     ∀ {Σ : RuntimeEnv}
     → ∀ (l : IndirectRef)
     → ∀ (s : StateSet.⟨Set⟩)
     --------------
-    → (Σ , assertₗ l s ⟶ Σ , void)
+    → (Σ , assertₗ l s ⟶ Σ , voidExpr)
 
 --============= Consistency ==============
 -- Relates typing environments and object references to lists of all types of possible references.
@@ -481,6 +524,7 @@ data ReferenceConsistency : RuntimeEnv → StaticEnv → Set where
 data _&_ok : RuntimeEnv → StaticEnv → Set where
   ok : ∀ {Σ : RuntimeEnv}
        → ∀ (Δ : StaticEnv)
+       → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Void → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just voidExpr)))
        → (∀ (l : IndirectRef) → ∀ (T : Type)
          → (StaticEnv.locEnv Δ) ∋ l ⦂ T         -- If a location is in Δ...
          → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v) -- then location can be looked up in Σ...
@@ -497,7 +541,7 @@ refConsistency : ∀ {Σ : RuntimeEnv}
                  → ∀ {l : IndirectRef}
                  → Σ & Δ ok
                  → ReferenceConsistency Σ Δ
-refConsistency (ok Δ _ rc) =  rc
+refConsistency (ok Δ _ _ rc) =  rc
 
 
 -- Inversion for global consistency : location lookup for a particular location
@@ -510,10 +554,17 @@ locLookup : ∀ {Σ : RuntimeEnv}
             → (StaticEnv.locEnv Δ) ∋ l ⦂ T
             → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
 
-locLookup (ok Δ lContainment rc) lInDelta@(Z {Δ'} {x} {a}) = lContainment x a lInDelta
-locLookup (ok Δ lContainment rc) lInDelta@(S {Δ'} {x} {y} {a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
+locLookup (ok Δ _ lContainment rc) lInDelta@(Z {Δ'} {x} {a}) = lContainment x a lInDelta
+locLookup (ok Δ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
 
-
+voidLookup : ∀ {Σ : RuntimeEnv}
+            → ∀ {Δ : StaticEnv}
+            → ∀ {l : IndirectRef}
+            → Σ & Δ ok
+            → (StaticEnv.locEnv Δ) ∋ l ⦂ base Void
+            → IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just voidExpr
+voidLookup (ok Δ voidContainment _ _ ) voidType@(Z {Δ'} {l} {a}) = voidContainment l voidType
+voidLookup (ok Δ voidContainment _ _ ) voidType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = voidContainment l voidType 
 
 ------------ Lemmas --------------
 -- If an expression is well-typed in Δ, then all locations in the expression are in Δ.
@@ -557,7 +608,7 @@ progress : ∀ {e T Δ Δ'}
            → Progress e
 
 progress Σ (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
-progress Σ cl consis@(ok {Σ} _ _ _) ty@(locTy l split) =
+progress Σ cl consis@(ok {Σ} _ _ _ _) ty@(locTy l split) =
   let
     fl = freeLocations (simpleExpr (loc l))
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -570,25 +621,53 @@ progress Σ cl consis@(ok {Σ} _ _ _) ty@(locTy l split) =
 progress Σ cl consis (objTy o split) =  done (objVal o)
 progress Σ cl consis (boolTy b) = done (boolVal b)
 progress Σ cl consis (voidTy) = done (voidVal)
-progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (void) (SEassertₗ {Σ} l s)
-progress Σ cl consis (assertTyₓ {s₁ = s} {x = x} tcEq subset) = step Σ Σ (assertₓ x s) (void) (SEassertₓ {Σ} x s)
+progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (voidExpr) (SEassertₗ {Σ} l s)
+progress Σ cl consis (assertTyₓ {s₁ = s} {x = x} tcEq subset) = step Σ Σ (assertₓ x s) (voidExpr) (SEassertₓ {Σ} x s)
 
-{-
-preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
-               → ∀ {e e' : Expr}
+data Preservation : Expr → Set where
+  pres : ∀ {e e' : Expr}
+       → ∀ {T T' : Type}
+       → ∀ {Δ Δ'' Δ''' : StaticEnv}
+       → ∀ {Σ Σ' : RuntimeEnv }
+       → Δ ⊢ e ⦂ T ⊣ Δ'' 
+       → Σ & Δ ok        
+       -- TODO: hdref(e)
+       → Σ , e ⟶ Σ' , e'
+       → ∀ Δ'
+       → (Δ' ⊢ e' ⦂ T' ⊣ Δ''') 
+       → (Σ' & Δ' ok)  -- 
+       → (Δ''' <* Δ'')
+       -----------------
+       → Preservation e
+
+preservation : ∀ {e e' : Expr}
+               → ∀ {T : Type}
+               → ∀ {Δ Δ'' : StaticEnv}
                → ∀ {Σ Σ' : RuntimeEnv}
-               → ∀ {T T' : Type}
-               → ∀ {o : ObjectRef}
-               → ∀ {l : IndirectRef} -- Ugh, do I really have to refer to l here?            
-               → Δ ⊢ e ⦂ T ⊣ Δ'
-               → Σ & Δ ok
-               -- TODO: hdref(e)
+               → Δ ⊢ e ⦂ T ⊣ Δ'' 
+               → Σ & Δ ok   
                → Σ , e ⟶ Σ' , e'
                -----------------------
-               →  (Δ' ⊢ e' ⦂ T' ⊣ Δ''')
-                 × (Σ' & Δ' ok o , l)
-                 × (Δ''' <ₗ Δ'')
+               → Preservation e
 
+-- Proof proceeds by induction on the dynamic semantics.
+
+preservation ty@(locTy {Γ} {Δ} l voidSplit) consis st@(SElookup {l = l} {v = voidExpr} _ lookupL) =
+  let
+    ΔInitial = (Δ ,ₗ l ⦂ base Void)
+    Δ' = ΔInitial
+    -- Show that e' ≡ void so that we can show that e' : Void.
+    e'IsVoid = voidLookup consis Z
+    e'TypingJudgment = voidTy {Δ = Δ'}
+  in 
+    pres ty consis st Δ' e'TypingJudgment consis <*-refl
+preservation ty@(locTy {Γ} {Δ} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr true} _ lookupL) = {!!}
+preservation ty@(locTy {Γ} {Δ} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr false} _ lookupL) = {!!}
+preservation ty@(locTy {Γ} {Δ} l spl) consis st@(SElookup {l = l} {v = v} _ lookupL) = {!!}
+preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
+preservation ty consis st@(SEassertₗ l s) = pres ty consis st {!!} {!!} {!!} {!!}
+
+{-
 -- ty is the initial typing judgment, which we get to assume.
 -- ty' is the proof of well-typedness
 
@@ -597,7 +676,7 @@ preservation : ∀ {Δ Δ' Δ'' Δ''' : TypeEnv}
 preservation  (Loc spl) consis (SElookup ty' r) = 
   -- Case-analyze on the type of the expression.
   {-
-  with T
+  with TSS
   ...   base Void | ?
   ...   base Boolean | ?
   ...   contractType tc | ?
@@ -617,25 +696,3 @@ preservation  (Loc spl) consis (SElookup ty' r) =
     helper _ = ?
 
 -}
-
-
-
-
--- Some tests to see if I know what I'm doing.
-
-owned1 : Type
-owned1 = contractType  (record {contractName = zero ; tst = Owned })
-unowned1 : Type
-unowned1 = contractType (record {contractName = zero ; tst = Unowned })
-shared1 : Type
-shared1 = contractType (record {contractName = zero ; tst = Shared })
-
-test1 : ContractEnv.∅ ⊢ owned1 ⇛ owned1 / unowned1
-test1 = unowned refl refl refl
-
-isSharedTest1 = isShared shared1
-isSharedTest2 = isShared owned1
-
-open import IO
-
-main = run (putStrLn (if isSharedTest2 then "true" else "false"))

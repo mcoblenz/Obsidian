@@ -39,7 +39,13 @@ module Context (A : Set) where
   lookup (Γ , x ⦂ t) y with compare x y
   ...                       | equal _ = just t
   ...                       | _ = lookup Γ x
-  
+
+-- Removing elements from a context
+  _#_ : ctx → ℕ → ctx
+  ∅ # x = ∅
+  (Γ , x' ⦂ T) # x with compare x x'
+  ... | equal _  = Γ
+  ... | _ = (Γ # x) , x' ⦂ T
 
   obviousContainment : ∀ {x t}
                        → ∀ (Γ : ctx)
