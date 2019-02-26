@@ -20,23 +20,6 @@ module Prelude where
     Inl : A → A +̇ B
     Inr : B → A +̇ B
 
-  -- pairs
-  infixr 1 _,_
-  record Σ {l1 l2 : Level} (A : Set l1) (B : A → Set l2) : Set (lmax l1 l2) where
-    constructor _,_
-    field
-      π1 : A
-      π2 : B π1
-  open Σ public
-
-  -- Sigma types, or dependent pairs, with nice notation.
-  syntax Σ A (\ x -> B) = Σ[ x ∈ A ] B
-
-  _×_ : {l1 : Level} {l2 : Level} → (Set l1) → (Set l2) → Set (lmax l1 l2)
-  A × B = Σ A λ _ → B
-
-  infixr 1 _×_
-
 {-
 -- equality of naturals is decidable. we represent this as computing a
   -- choice of units, with inl <> meaning that the naturals are indeed the

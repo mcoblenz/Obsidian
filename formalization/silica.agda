@@ -3,7 +3,7 @@ module silica where
 -- open import Data.AVL.Sets using (⟨Set⟩)
 
 open import Agda.Builtin.Bool
-open import Data.Bool
+open import Data.Bool using (true; false)
 open import Prelude
 open import Data.Nat
 open import Data.List
@@ -19,6 +19,7 @@ import Context
 open import Data.List.Membership.DecSetoid ≡-decSetoid
 open import Data.List.Any
 open import Data.List.All
+open import Data.Empty
 
 import Data.AVL.Sets
 module StateSet = Data.AVL.Sets Data.Nat.Properties.<-strictTotalOrder
@@ -35,17 +36,17 @@ Id = ℕ
 _⊆_ : σ → σ → Set
 s₁ ⊆ s₂ = (x : ℕ) → (x StateSet.∈? s₁) ≡ true → (x StateSet.∈? s₂) ≡ true
 
-data Tst : Set where
-  Owned : Tst
-  Unowned : Tst
-  Shared : Tst
-  S : σ → Tst
+data Perm : Set where
+  Owned : Perm
+  Unowned : Perm
+  Shared : Perm
+  S : σ → Perm
 
 record Tc : Set where
   constructor tc
   field
     contractName : Id
-    tst : Tst
+    perm : Perm
 
 data Tbase : Set where
   Void : Tbase
@@ -57,7 +58,7 @@ data Type : Set where
 
 
 isShared : Type → Bool
-isShared (contractType (record {contractName = _ ; tst = Shared})) = true
+isShared (contractType (record {contractName = _ ; perm = Shared})) = true
 isShared _ = false
 
 
@@ -68,7 +69,7 @@ data State : Set where
   state : Id -> List Field -> State
 
 data Targ : Set where
-  arg-trans : Tc -> Tst -> Targ
+  arg-trans : Tc -> Perm -> Targ
   base : Tbase -> Targ
 
 IndirectRef : Set
@@ -107,8 +108,8 @@ record PublicTransaction : Set where
     name : Id
     argType : Targ
     argName : Id
-    initialState : Tst
-    finalState : Tst
+    initialState : Perm
+    finalState : Perm
     expr : Expr
 
 -- TODO: add private transactions
@@ -272,26 +273,29 @@ data _⊢_ : ContractEnv.ctx -> SplitType -> Set where
   booleanSplit : ∀ {Γ : ContractEnv.ctx}
                  --------------
                  → Γ ⊢ base Boolean ⇛ base Boolean / base Boolean
-        
+
+  -- split Unowned off of anything.
   unownedSplit : ∀ {Γ : ContractEnv.ctx}
                  → ∀ {t1 t2 t3 : Tc}
                  → (Tc.contractName t1) ≡ (Tc.contractName t2)
-                 → (Tc.tst t1) ≡ (Tc.tst t2)
-                 → Tc.tst t3 ≡ Unowned
+                 → Tc.contractName t1 ≡ Tc.contractName t3
+                 → (Tc.perm t1) ≡ (Tc.perm t2)
+                 → Tc.perm t3 ≡ Unowned
                  --------------
                  → Γ ⊢ contractType t1 ⇛ contractType t2 / contractType t3
 
-  shared-shared-shared :
-    ∀ {c : Id}
-    → ∀ {Γ : ContractEnv.ctx}
-    → Γ ⊢ contractType ( record {tst = Shared ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+  shared-shared-shared : ∀ {Γ : ContractEnv.ctx}
+                         → ∀ {t : Tc}
+                         → Tc.perm t ≡ Shared
+                         --------------------------------------------------------
+                         → Γ ⊢ contractType t  ⇛ contractType t / contractType t
 
   owned-shared :
    ∀ {c : Id}
    → ∀ {Γ : ContractEnv.ctx}
    → NotAsset Γ c
    --------------
-    → Γ ⊢ contractType ( record {tst = Owned ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+    → Γ ⊢ contractType (tc c Owned)  ⇛ contractType (tc c Shared) / contractType (tc c Shared)
 
   states-shared :
     ∀ {s : σ}
@@ -299,7 +303,7 @@ data _⊢_ : ContractEnv.ctx -> SplitType -> Set where
     → ∀ {Γ : ContractEnv.ctx}
     → NotAsset Γ c
     --------------
-    → Γ ⊢ contractType ( record {tst = S s ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+    → Γ ⊢ contractType ( record {perm = S s ; contractName = c} )  ⇛ contractType ( record {perm = Shared ; contractName = c} ) / contractType ( record {perm = Shared ; contractName = c} )
 
 splitType : ∀ {Γ : ContractEnv.ctx}
           → ∀ {t1 t2 t3 : Type}
@@ -308,10 +312,10 @@ splitType : ∀ {Γ : ContractEnv.ctx}
 
 splitType voidSplit = (base Void) ⇛ (base Void) / (base Void)
 splitType booleanSplit =  base Boolean ⇛ base Boolean / base Boolean
-splitType (unownedSplit {Γ} {t1} {t2} {t3} x x₁ x₂) = contractType t1 ⇛ contractType t2 / contractType t3
-splitType (shared-shared-shared {c}) =  contractType ( record {tst = Shared ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c})
-splitType (owned-shared {c} x) = contractType ( record {tst = Owned ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
-splitType (states-shared {s} {c} x) = contractType ( record {tst = S s ; contractName = c} )  ⇛ contractType ( record {tst = Shared ; contractName = c} ) / contractType ( record {tst = Shared ; contractName = c} )
+splitType (unownedSplit {Γ} {t1} {t2} {t3} eqNames1 eqNames2 eqPerms eqUnownedPerm) = contractType t1 ⇛ contractType t2 / contractType t3
+splitType (shared-shared-shared {Γ} {t} _) =  contractType t  ⇛ contractType t / contractType t
+splitType (owned-shared {c} x) = contractType ( record {perm = Owned ; contractName = c} )  ⇛ contractType ( record {perm = Shared ; contractName = c} ) / contractType ( record {perm = Shared ; contractName = c} )
+splitType (states-shared {s} {c} x) = contractType ( record {perm = S s ; contractName = c} )  ⇛ contractType ( record {perm = Shared ; contractName = c} ) / contractType ( record {perm = Shared ; contractName = c} )
 
 splitTypeCorrect :  ∀ {Γ}
                     → ∀ {t1 t2 t3 : Type}
@@ -319,15 +323,12 @@ splitTypeCorrect :  ∀ {Γ}
                     → splitType p ≡ t1 ⇛ t2 / t3
 splitTypeCorrect voidSplit = refl
 splitTypeCorrect booleanSplit = refl
-splitTypeCorrect (unownedSplit x x₁ x₂) = refl
-splitTypeCorrect shared-shared-shared = refl
+splitTypeCorrect (unownedSplit x _ _ _) = refl
+splitTypeCorrect (shared-shared-shared _) = refl
 splitTypeCorrect (owned-shared x) = refl
 splitTypeCorrect (states-shared x) = refl
 
 
------------ PROPERTIES OF SPLITTING -----------
--- The results of splitting are always compatible.
--- TODO
 
 ------------ Type judgments ----------------
 data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
@@ -372,7 +373,7 @@ data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
            → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
            → ∀ {tc : Tc}
            → ∀ {x : Id}
-           → Tc.tst tc ≡ S s₁
+           → Tc.perm tc ≡ S s₁
            → s₁ ⊆ s₂
            --------------------------
            → (Δ ,ₓ x ⦂ (contractType tc)) ⊢ assertₓ x s₁ ⦂ base Void ⊣ (Δ ,ₓ x ⦂ (contractType tc))
@@ -382,7 +383,7 @@ data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
            → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
            → ∀ {tc : Tc}
            → ∀ {l : IndirectRef}
-           → Tc.tst tc ≡ S s₁
+           → Tc.perm tc ≡ S s₁
            → s₁ ⊆ s₂
            --------------------------
            → (Δ ,ₗ l ⦂ (contractType tc)) ⊢ assertₗ l s₁ ⦂ base Void ⊣ (Δ ,ₗ l ⦂ (contractType tc))
@@ -461,39 +462,136 @@ data _⟷_ : Type → Type → Set where
               → T₁ ⟷ T₂
               ---------
               → T₂ ⟷ T₁
-
-  unownedCompat : ∀ {T : Type}
-                  → ∀ (C : Id)
+              
+  unownedCompat :  ∀ {C C' : Id}
+                  → ∀ {perm perm' : Perm}
+                  → perm ≡ Unowned
+                  → C ≡ C'
                   --------------------------------------------------------------
-                  → (contractType (record {contractName = C ; tst = Unowned})) ⟷ T
+                  → contractType (tc C perm) ⟷ contractType (tc C' perm')
 
-  sharedCompat : ∀ (C C' : Id)
-                 → C ≡ C'
+  sharedCompat : ∀ {t t' : Tc}
+                 → Tc.perm t ≡ Shared
+                 → Tc.perm t' ≡ Shared
+                 → Tc.contractName t ≡ Tc.contractName t'
                  ----------------
-                 → (contractType (record {contractName = C ; tst = Shared})) ⟷ (contractType (record {contractName = C' ; tst = Shared}))
+                 → contractType t ⟷ contractType t'
 
-data IsConnected : List Type → Set where
-  emptyConnected : ∀ {D}
-                 → D ≡ []
-                 -----------
-                 → IsConnected D
+  voidCompat : ----------------------
+               base Void ⟷ base Void
 
-  inductiveConnected : ∀ {T : Type}
-                       → ∀ {D : List Type}
-                       → All (λ T' → T ⟷ T') D
-                       → IsConnected D
-                       ---------------------
-                       → IsConnected (T ∷ D)                    
+  booleanCompat : ----------------------
+                  base Boolean ⟷ base Boolean
+  
 
-contextTypes : TypeEnv → ObjectRef → List Type
-contextTypes ∅ _ = []
-contextTypes (Δ , o' ⦂ T) o = [] -- if o Data.Nat.≟ o' then T ∷ (contextTypes Δ o) else contextTypes Δ o
+----------- PROPERTIES OF SPLITTING -----------
+-- The results of splitting are always compatible.
+splitCompatibility : ∀ {Γ}
+                     → ∀ {t₁ t₂ t₃ : Type}
+                     → Γ ⊢ t₁ ⇛ t₂ / t₃
+                     → t₂ ⟷ t₃
+splitCompatibility voidSplit = voidCompat
+splitCompatibility booleanSplit = booleanCompat
+splitCompatibility (unownedSplit {Γ} {t₁} {t₂} {t₃} eqNames1 eqNames2 eqPerms t3IsUnowned) = symCompat (unownedCompat t3IsUnowned (Eq.trans (Eq.sym eqNames2) eqNames1))
+splitCompatibility (shared-shared-shared {Γ} {t} eq)  = sharedCompat eq eq refl
+splitCompatibility (owned-shared notAsset) = sharedCompat refl refl refl
+splitCompatibility (states-shared x) = sharedCompat refl refl refl
+
+splittingRespectsHeap : ∀ {Γ}
+                        → ∀ {T t₁ t₂ t₃ : Type}
+                        → Γ ⊢ t₁ ⇛ t₂ / t₃
+                        → T ⟷ t₁
+                        → (T ⟷ t₂) × (T ⟷ t₃)
+
+{-
+splittingRespectsHeap {Γ} {base Void} {t₁} {t₂} {t₃} voidSplit consis = ⟨ consis , consis ⟩
+splittingRespectsHeap {Γ} {base Boolean} {t₁} {t₂} {t₃} spl consis = {!!}
+splittingRespectsHeap {Γ} {contractType x} {t₁} {t₂} {t₃} spl consis = {!!}
+-}
+
+splittingRespectsHeap {Γ} {T} {(base Void)} {(base Void)} {(base Void)} voidSplit consis = ⟨ consis , consis ⟩
+splittingRespectsHeap {Γ} {T} {.(base Boolean)} {.(base Boolean)} {.(base Boolean)} booleanSplit consis = ⟨ consis , consis ⟩
+
+splittingRespectsHeap {Γ} {T} {contractType t₁} {contractType t₂} {contractType t₃} spl@(unownedSplit x x₁ x₂ x₃) (symCompat consis) = ⟨ symCompat {!!} , {!!} ⟩
+
+-- t1 => t1 / Unowned
+splittingRespectsHeap {Γ} {(contractType (tc C perm))} {contractType (tc C' perm')} {contractType t₂} {contractType t₃} (unownedSplit x x₁ x₂ x₃) (unownedCompat x₄ x₅) =
+  ⟨ unownedCompat x₄ (Eq.trans x₅ x), unownedCompat x₄ (Eq.trans x₅ x₁) ⟩
+splittingRespectsHeap {Γ} {(contractType t)} {contractType t₁} {contractType t₂} {contractType t₃} (unownedSplit x x₁ x₂ x₃) (sharedCompat t₁Shared t₂Shared t₁t₂Names) rewrite x₂ =
+  ⟨ sharedCompat t₁Shared t₂Shared (Eq.trans t₁t₂Names x) , symCompat (unownedCompat x₃ (Eq.trans (Eq.sym x₁) (Eq.sym t₁t₂Names))) ⟩
+
+splittingRespectsHeap {Γ} {T} {.(contractType _)} {.(contractType _)} {.(contractType _)} (shared-shared-shared x) consis = ⟨ consis , consis ⟩
+
+-- Owned => Shared / Shared. Requires that T be Unowned.
+splittingRespectsHeap {Γ} {T} {.(contractType (tc _ Owned))} {.(contractType (tc _ Shared))} {.(contractType (tc _ Shared))} (owned-shared x) (symCompat consis) = {!!}
+splittingRespectsHeap {Γ} {.(contractType (tc _ _))} {.(contractType (tc _ Owned))} {.(contractType (tc _ Shared))} {.(contractType (tc _ Shared))} (owned-shared x) (unownedCompat x₁ x₂) = ⟨ unownedCompat x₁ x₂ , unownedCompat x₁ x₂ ⟩
+splittingRespectsHeap {Γ} {.(contractType _)} {.(contractType (tc _ Owned))} {.(contractType (tc _ Shared))} {.(contractType (tc _ Shared))} (owned-shared x) (sharedCompat x₁ () x₃)
+
+splittingRespectsHeap {Γ} {T} {.(contractType (record { contractName = _ ; perm = S _ }))} {.(contractType (record { contractName = _ ; perm = Shared }))} {.(contractType (record { contractName = _ ; perm = Shared }))} (states-shared x) consis = {!!}
+
+
+record RefTypes : Set where
+  field
+    ctxTypes : List Type -- Corresponds to types from Δ
+    envTypes : List Type -- Corresponds to types from ρ
+    fieldTypes : List Type -- Corresponds to types from fields inside μ
+
+data IsConnectedTypeList : List Type → Set where
+  emptyTypeList : ∀ {D}
+                  → D ≡ []
+                  ----------
+                  → IsConnectedTypeList D
+
+  consTypeList : ∀ {T D}
+                 → All (λ T' → (T ⟷ T')) D
+                 → IsConnectedTypeList D
+                 ------------------------
+                 → IsConnectedTypeList (T ∷ D)
+
+data IsConnectedEnvAndField : RefTypes → Set where
+  emptyEnvTypes : ∀ {R}
+                  → RefTypes.envTypes R ≡ []
+                  → IsConnectedTypeList (RefTypes.fieldTypes R)
+                  ----------------------------------------------
+                  → IsConnectedEnvAndField R
+
+  consEnvTypes : ∀ {R D T}
+                 → RefTypes.envTypes R ≡ T ∷ D
+                 → All (λ T' → T ⟷ T') D
+                 → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)
+                 → IsConnectedTypeList (RefTypes.fieldTypes R)
+                 ----------------------------------------------
+                 → IsConnectedEnvAndField R
+
+data IsConnected : RefTypes → Set where              
+  emptyCtxTypes : ∀ {R}
+                  → RefTypes.ctxTypes R ≡ []
+                  → IsConnectedEnvAndField R
+                  ----------------------------
+                  → IsConnected R
+
+  nonEmptyCtxTypes : ∀ {R D T T'}
+                   → RefTypes.ctxTypes R ≡ T ∷ D
+                   → All (λ T' → T ⟷ T') D
+                   → All (λ T' → T ⟷ T') (RefTypes.envTypes R)
+                   → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)
+                   → IsConnected (record {ctxTypes = D ; envTypes = RefTypes.envTypes R ; fieldTypes = RefTypes.fieldTypes R})
+                   -----------------------------------------------
+                   → IsConnected R
+                       
+
+objTypes : TypeEnv → ObjectRef → List Type
+objTypes ∅ _ = []
+objTypes (Δ , o' ⦂ T) o with o ≟ o'
+...                    | yes eq = T ∷ (objTypes Δ o) 
+...                    | no nEq = objTypes Δ o
 
 envTypesHelper : IndirectRefEnv → TypeEnv → ObjectRef → List Type
 envTypesHelper IndirectRefContext.∅  Δ o = []
-envTypesHelper (IndirectRefContext._,_⦂_ ρ l v) Δ o with (TypeEnvContext.lookup Δ l)
-...                                               | just T =  if true {- v =̂ o -} then (T ∷ envTypesHelper ρ Δ o) else envTypesHelper ρ Δ o  
-...                                               | Data.Maybe.nothing = envTypesHelper ρ Δ o
+envTypesHelper (IndirectRefContext._,_⦂_ ρ l (objRef o')) Δ o with (compare o' o) | (TypeEnvContext.lookup Δ l)
+...                                             | equal _ | just T =  (T ∷ envTypesHelper ρ Δ o)
+...                                             | _ | _ = envTypesHelper ρ Δ o
+envTypesHelper (IndirectRefContext._,_⦂_ ρ l v) Δ o = envTypesHelper ρ Δ o
 
 envTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
 envTypes Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) (StaticEnv.locEnv Δ) o
@@ -505,17 +603,65 @@ refFieldTypesHelper (ObjectRefContext._,_⦂_ μ o' obj) Δ o = refFieldTypesHel
 refFieldTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
 refFieldTypes Σ Δ o = refFieldTypesHelper (RuntimeEnv.μ Σ) Δ o
 
-refTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
-refTypes Σ Δ o = (contextTypes (StaticEnv.objEnv Δ) o) ++ (envTypes Σ Δ o) ++ (refFieldTypes Σ Δ o)
+refTypes : RuntimeEnv → StaticEnv → ObjectRef → RefTypes
+refTypes Σ Δ o = record {ctxTypes = (objTypes (StaticEnv.objEnv Δ) o) ; envTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
 
-data ReferenceConsistency : RuntimeEnv → StaticEnv → Set where
+{-
+compatibleStaticExtensionsOK : ∀ {Σ Δ o l T}
+                               → IsConnected (refTypes Σ Δ o)
+                               → (∀ T' → ∀ l' → (StaticEnv.locEnv Δ) ∋ l' ⦂ T' → T' ⟷ T)
+                               → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T) o)
+compatibleStaticExtensionsOK (emptyCtxTypes eq (emptyEnvTypes eq' conn)) compat = {!!}
+compatibleStaticExtensionsOK (emptyCtxTypes eq (consEnvTypes x x₁ x₂ x₃)) compat = {!!}
+compatibleStaticExtensionsOK (nonEmptyCtxTypes x x₁ x₂ x₃ conn) compat = {!!}
+
+compatibleDynamicExtensionsOK : ∀ {Σ Δ o o' T}
+                                → IsConnected (refTypes Σ Δ o)
+                                → (∀ T' → ∀ o'' → (StaticEnv.objEnv Δ) ∋ o'' ⦂ T' → T' ⟷ T)
+                                → IsConnected (refTypes Σ (Δ ,ₒ o' ⦂ T) o)
+
+compatibleDynamicExtensionsOK conn compat = {!!}
+-}
+
+splitReplacementEnvFieldOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
+                             → IsConnectedEnvAndField (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                             → Γ ⊢ T₁ ⇛ T₂ / T₃
+                             → IsConnectedEnvAndField (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
+splitReplacementEnvFieldOK = {!!}
+
+splitReplacementOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
+                     → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                     → Γ ⊢ T₁ ⇛ T₂ / T₃
+                     → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
+splitReplacementOK (emptyCtxTypes eq envFieldConnected) spl =
+  -- The new obj context includes o, so it is no longer empty.
+  nonEmptyCtxTypes
+    {!refl!} 
+    [] -- o is the only thing in the object context, so the rest of the list is empty and trivially is connected.
+    {!!} -- show that o is connected to all the prior env types
+    {!
+      -- show that o is connected to all prior field types.
+      -- Plan: all prior field types were compatible with T₁, so they must still be compatible with both T₁ and T₃.
+
+!} 
+    {!emptyCtxTypes refl envFieldConnected!} -- show that the rest of the context is all connected
+splitReplacementOK (nonEmptyCtxTypes eq withinContext withEnv withField restConnected) spl = nonEmptyCtxTypes {!!} withinContext {!!} withField {!!}
+
+data ReferenceConsistency : RuntimeEnv → StaticEnv → ObjectRef → Set where
   referencesConsistent : ∀ {Σ : RuntimeEnv}
                        → ∀ {Δ : StaticEnv}
                        → ∀ {o : ObjectRef}
                        → IsConnected (refTypes Σ Δ o)
                        -- TODO: add subtype constraint: C <: (refTypes Σ Δ o)
                        ---------------------------
-                       → ReferenceConsistency Σ Δ
+                       → ReferenceConsistency Σ Δ o
+
+-- Inversion for reference consistency: connectivity
+referencesConsistentImpliesConnectivity : ∀ {Σ Δ o}
+                                          → ReferenceConsistency Σ Δ o
+                                          → IsConnected (refTypes Σ Δ o)
+                                          
+referencesConsistentImpliesConnectivity (referencesConsistent ic) = ic
 
 ------------ Global Consistency -----------
 -- I'm going to need the fact that if an expression typechecks, and I find a location in it, then the location can be looked
@@ -526,11 +672,12 @@ data _&_ok : RuntimeEnv → StaticEnv → Set where
        → ∀ (Δ : StaticEnv)
        → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Void → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just voidExpr)))
        → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean → ∃[ b ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (boolExpr b))))
-       → (∀ (l : IndirectRef) → ∀ (T : Type)
-         → (StaticEnv.locEnv Δ) ∋ l ⦂ T         -- If a location is in Δ...
-         → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v) -- then location can be looked up in Σ...
+       → (∀ (l : IndirectRef)
+         → ∀ (T : Tc)
+         → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)         -- If a location is in Δ and has contract reference type...
+         → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o)) -- then location can be looked up in Σ...
          )
-       → ReferenceConsistency Σ Δ                    -- and Σ and Δ have the ReferenceConsistency property...
+       → (∀ o → o ObjectRefContext.∈dom (RuntimeEnv.μ Σ) → ReferenceConsistency Σ Δ o)
        -- TODO: add remaining antecedents
        ---------------------------
        → Σ & Δ ok
@@ -541,7 +688,7 @@ refConsistency : ∀ {Σ : RuntimeEnv}
                  → ∀ {o : ObjectRef}
                  → ∀ {l : IndirectRef}
                  → Σ & Δ ok
-                 → ReferenceConsistency Σ Δ
+                 → (∀ o → o ObjectRefContext.∈dom RuntimeEnv.μ Σ → ReferenceConsistency Σ Δ o)
 refConsistency (ok Δ _ _ _ rc) =  rc
 
 
@@ -550,13 +697,13 @@ refConsistency (ok Δ _ _ _ rc) =  rc
 locLookup : ∀ {Σ : RuntimeEnv}
             → ∀ {Δ : StaticEnv}
             → ∀ {l : IndirectRef}
-            → ∀ {T : Type}
+            → ∀ {T : Tc}
             → Σ & Δ ok
-            → (StaticEnv.locEnv Δ) ∋ l ⦂ T
-            → ∃[ v ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
+            → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)
+            → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o))
 
-locLookup (ok Δ _ _ lContainment rc) lInDelta@(Z {Δ'} {x} {a}) = lContainment x a lInDelta
-locLookup (ok Δ _ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
+locLookup (ok Δ _ _ lContainment rc) lInDelta@(Z {Δ'} {x} {contractType a}) = lContainment x a lInDelta
+locLookup (ok Δ _ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {contractType a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
 
 voidLookup : ∀ {Σ : RuntimeEnv}
             → ∀ {Δ : StaticEnv}
@@ -589,7 +736,7 @@ locationsInExprAreInContext : ∀ {Δ Δ' e T fl}
 -- fl is empty, so l is in fl leads to a contradiction.
 locationsInExprAreInContext (varTy x spl) varFL ()
 -- l is related to e, so therefore we can point to where l is in Δ.
-locationsInExprAreInContext (locTy {Δ = Δ''} {T₁ = T₁} l spl) (locFL l) (here refl) =  ⟨ T₁ , obviousContainment (StaticEnv.locEnv Δ'') ⟩
+locationsInExprAreInContext (locTy {Δ = Δ''} {T₁ = T₁} l spl) (locFL l) (here refl) =  ⟨ T₁ , Z ⟩
 locationsInExprAreInContext (locTy {Δ = Δ''} {T₁} l spl) (locFL l) (there ())
 locationsInExprAreInContext (objTy o spl) objRefFL ()
 locationsInExprAreInContext (boolTy b) boolFL ()
@@ -608,7 +755,6 @@ data Progress : Expr → Set where
          → Value e
          ---------
          → Progress e
-         
 progress : ∀ {e T Δ Δ'}
            → ∀ (Σ : RuntimeEnv)
            → Closed e
@@ -618,16 +764,58 @@ progress : ∀ {e T Δ Δ'}
            → Progress e
 
 progress Σ (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
-progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l split) =
+-- TODO: Refactor these cases to avoid duplication!
+progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l voidSplit) = 
   let
-    fl = freeLocations (simpleExpr (loc l))
+    locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
+    lInDelta = proj₂ locationExistsInContext
+    heapLookupResult = voidLookup consis lInDelta
+  in
+    step Σ Σ (simpleExpr (loc l)) voidExpr (SElookup ty heapLookupResult)
+progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l booleanSplit) = 
+  let
+    locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
+    lInDelta = proj₂ locationExistsInContext
+    heapLookupResult = boolLookup consis lInDelta
+  in
+    step Σ Σ (simpleExpr (loc l)) (boolExpr (proj₁ heapLookupResult)) (SElookup ty (proj₂ heapLookupResult))
+progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (unownedSplit _ _ _ _)) = 
+  let
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
     lInDelta = proj₂ locationExistsInContext
     heapLookupResult = locLookup consis lInDelta
     heapLookupFound = proj₂ heapLookupResult
-    v = proj₁ heapLookupResult
+    o = proj₁ heapLookupResult
   in
-    step Σ Σ (simpleExpr (loc l)) v (SElookup ty heapLookupFound)
+    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (shared-shared-shared _)) =
+  let
+    locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
+    lInDelta = proj₂ locationExistsInContext
+    heapLookupResult = locLookup consis lInDelta
+    heapLookupFound = proj₂ heapLookupResult
+    o = proj₁ heapLookupResult
+  in
+    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (owned-shared _)) =
+  let
+    locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
+    lInDelta = proj₂ locationExistsInContext
+    heapLookupResult = locLookup consis lInDelta
+    heapLookupFound = proj₂ heapLookupResult
+    o = proj₁ heapLookupResult
+  in
+    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (states-shared _)) =
+  let
+    locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
+    lInDelta = proj₂ locationExistsInContext
+    heapLookupResult = locLookup consis lInDelta
+    heapLookupFound = proj₂ heapLookupResult
+    o = proj₁ heapLookupResult
+  in
+    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+
 progress Σ cl consis (objTy o split) =  done (objVal o)
 progress Σ cl consis (boolTy b) = done (boolVal b)
 progress Σ cl consis (voidTy) = done (voidVal)
@@ -662,54 +850,65 @@ preservation : ∀ {e e' : Expr}
 
 -- Proof proceeds by induction on the dynamic semantics.
 
-preservation ty@(locTy {Γ} {Δ} l voidSplit) consis st@(SElookup {l = l} {v = voidExpr} _ lookupL) =
+preservation ty@(locTy {Γ} {Δ₀} l voidSplit) consis st@(SElookup {l = l} {v = voidExpr} _ lookupL) =
   let
-    ΔInitial = (Δ ,ₗ l ⦂ base Void)
-    Δ' = ΔInitial
-    -- Show that e' ≡ void so that we can show that e' : Void.
-    e'IsVoid = voidLookup consis Z
-    e'TypingJudgment = voidTy {Δ = Δ'}
+    Δ = (Δ₀ ,ₗ l ⦂ base Void)
+    Δ' = Δ
+    e'TypingJudgment = voidTy {Γ} {Δ = Δ'}
   in 
     pres ty consis st Δ' e'TypingJudgment consis <*-refl
-preservation ty@(locTy {Γ} {Δ} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr b} _ lookupL) = 
+preservation ty@(locTy {Γ} {Δ₀} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr b} _ lookupL) = 
  let
-    ΔInitial = (Δ ,ₗ l ⦂ base Boolean)
-    Δ' = ΔInitial
-    -- Show that e' ≡ void so that we can show that e' : Void.
-    e'IsBool = boolLookup consis Z
-    e'TypingJudgment = boolTy {Δ = Δ'}
+    Δ = (Δ₀ ,ₗ l ⦂ base Boolean)
+    Δ' = Δ
+    e'TypingJudgment = boolTy {Γ} {Δ = Δ'} b
   in 
-    pres ty consis st Δ' (e'TypingJudgment b) consis <*-refl
-preservation ty@(locTy {Γ} {Δ} l spl) consis st@(SElookup {l = l} {v = v} _ lookupL) = {!!}
+    pres {Δ = Δ} ty consis st Δ' e'TypingJudgment consis <*-refl
+preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractType t₃} l spl@(unownedSplit _ _ _ _))
+                       consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
+                       st@(SElookup {Σ} {l = l} {v = objRef o} _ lookupL) = 
+  let
+    e'TypingJudgment = objTy {Γ} {Δ = Δ''} o spl
+   
+    consis' = ok Δ' voidLookup' boolLookup' objLookup' refConsistency'
+  in
+    pres {Δ = Δ} {Δ'' = Δ''} ty consis st Δ' e'TypingJudgment consis' {!!}
+  where
+    splT = splitType spl
+    Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT)
+    Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₁ splT)
+    --Δ = Δ₀ ,ₗ l ⦂ (SplitType.t₁ splT)
+    -- Show that if you look up l in the new context, you get the same type as before.
+    voidLookup' : (∀ (l' : IndirectRef)
+                  → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Void
+                  → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just voidExpr)))
+    voidLookup' l' l'InΔ' with l' Data.Nat.≟ l
+    voidLookup' l' (Context.S l'NeqL l'VoidType) | yes eq = ⊥-elim (l'NeqL eq)
+    voidLookup' l' l'InΔ' | no nEq = voidLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
+
+    boolLookup' : (∀ (l' : IndirectRef)
+                  → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Boolean
+                  → ∃[ b ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just (boolExpr b))))
+    boolLookup' l' l'InΔ' with l' Data.Nat.≟ l
+    boolLookup' l' (Context.S l'NeqL l'BoolType) | yes eq = ⊥-elim (l'NeqL eq)
+    boolLookup' l' l'InΔ' | no nEq = boolLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
+    
+    objLookup' : (∀ (l' : IndirectRef) → ∀ (T : Tc)
+                  → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
+                  → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just (objRef o))))
+    objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
+    objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
+    objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
+    objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
+
+    -- Show that all location-based aliases from the previous environment are compatible with the new alias.
+    refConsistency' = λ o → λ oInμ →
+      let
+        origRefConsistency = refConsistencyFunc o oInμ
+        origConnected = referencesConsistentImpliesConnectivity {Σ} {Δ} origRefConsistency
+      in 
+        referencesConsistent (splitReplacementOK origConnected spl)
+
+
 preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
 preservation ty consis st@(SEassertₗ l s) = pres ty consis st {!!} {!!} {!!} {!!}
-
-{-
--- ty is the initial typing judgment, which we get to assume.
--- ty' is the proof of well-typedness
-
--- CASE: the typing judgment used was Loc, in which case the expression must be of the form (loc l).
-        -- and the step must have been taken via SElookup, which is the only rule that applies for exprs of the form (loc l).
-preservation  (Loc spl) consis (SElookup ty' r) = 
-  -- Case-analyze on the type of the expression.
-  {-
-  with TSS
-  ...   base Void | ?
-  ...   base Boolean | ?
-  ...   contractType tc | ?
-  -- By global consistency, in particular we must have consistency for l.
--}
-  let ty = Loc spl
-      T₁ = initialSplitType spl
-    
-  in
-  {! 
-  !}
-  where
-    helper : Type → (Δ' ⊢ e' ⦂ T' ⊣ Δ''')
-                 × (Σ' & Δ' ok o , l)
-                 × (Δ''' <ₗ Δ'')
-    helper T = ?
-    helper _ = ?
-
--}

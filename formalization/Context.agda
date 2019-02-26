@@ -4,11 +4,12 @@
 module Context (A : Set) where
 
   open import Data.Nat
-  open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+  open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym)
   open import Data.Maybe
   open import Data.Product using (_×_; proj₁; proj₂; ∃-syntax) renaming (_,_ to ⟨_,_⟩)
   open import Relation.Nullary.Decidable
   open import Relation.Nullary using (Dec; yes; no)
+  import Data.Empty
 
 
   infixl 5  _,_⦂_
@@ -40,6 +41,13 @@ module Context (A : Set) where
   ...                       | equal _ = just t
   ...                       | _ = lookup Γ x
 
+  data _∈dom_ : ℕ → ctx → Set where
+    inDom : ∀ {x Γ a}
+          → Γ ∋ x ⦂ a
+          -------------
+          → x ∈dom Γ
+
+
 -- Removing elements from a context
   _#_ : ctx → ℕ → ctx
   ∅ # x = ∅
@@ -47,22 +55,48 @@ module Context (A : Set) where
   ... | equal _  = Γ
   ... | _ = (Γ # x) , x' ⦂ T
 
-  obviousContainment : ∀ {x t}
-                       → ∀ (Γ : ctx)
-                       → Γ , x ⦂ t ∋ x ⦂ t
-                     
-  obviousContainment Γ = Z
+  
+  irrelevantExtensionsOK : ∀ {Γ : ctx}
+                           → ∀ {x y t t'}
+                           → Γ ∋ x ⦂ t
+                           → x ≢ y
+                           → Γ , y ⦂ t' ∋ x ⦂ t
+  irrelevantExtensionsOK {Γ} {x} {y} {t} cont@(Z {Γ₀} {x} {t}) neq = S neq cont
+  irrelevantExtensionsOK (S neq' rest) neq = S neq (irrelevantExtensionsOK rest neq')
 
-{- I will probably need this eventually, but not yet.
-  lookupWorksWithContainment : ∀ {Γ : ctx}
-                               → ∀ {x t}
-                               → Γ ∋ x ⦂ t
-                               --------------------
-                               → lookup Γ x ≡ just t
+  irrelevantReductionsOK :  ∀ {Γ : ctx}
+                           → ∀ {x y t t'}
+                           → Γ , x ⦂ t ∋ y ⦂ t'
+                           → y ≢ x
+                           → Γ ∋ y ⦂ t'
+                           -- ⊥-elim (!neq (Relation.Binary.PropositionalEquality.sym x x))
+  irrelevantReductionsOK {Γ} {x} {y} {t} {t'} z@(Z {Γ} {x} {t}) neq =
+    let
+      s : x ≡ x
+      s = refl
+      bot = neq s
+    in
+      Data.Empty.⊥-elim bot
+      
+  irrelevantReductionsOK {Γ} {x} {y} {t} {t'} (S x₁ qq) neq = qq                 
 
+  contextLookupUnique : ∀ {Γ : ctx}
+                        → ∀ {x t t'}
+                        → Γ ∋ x ⦂ t
+                        → Γ ∋ x ⦂ t'
+                        → t ≡ t'
+  contextLookupUnique z1@Z z2@Z = refl
+  contextLookupUnique z1@Z s2@(S {Γ} {x} {y} {a} {b} neq xHasTypeT') = Data.Empty.⊥-elim (neq refl)
+  contextLookupUnique (S neq xHasTypeT) Z = Data.Empty.⊥-elim (neq refl)
+  contextLookupUnique (S x₁ xHasTypeT) (S x₂ xHasTypeT') = contextLookupUnique xHasTypeT xHasTypeT'
 
-  lookupWorksWithContainment {Γ} (Z {Γ'} {x} {a}) = {!!}
--}
+  contextLookupNeq : ∀ {Γ : ctx}
+                     → ∀ {x x' t t'}
+                     → Γ , x ⦂ t ∋ x' ⦂ t'
+                     → t ≢ t'
+                     → x ≢ x'
+  contextLookupNeq Z tNeq = Data.Empty.⊥-elim (tNeq refl)
+  contextLookupNeq (S xNeq x'InΓ) tNeq = λ xEq → xNeq (sym xEq)
 
   lookupWeakening : ∀ {Γ : ctx}
                     → ∀ {x x' t t'}
