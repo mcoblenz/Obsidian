@@ -18,7 +18,7 @@ To do so, go to the Obsidian_Runtime folder and run `gradle publish`.
 Then, push the modified .jar to the Git master branch, and it will be available online at `http://obsidian-lang.com/repository`
 
 ###### Fabric deployment
-To use the chaincode on Fabric, some pre-requisites have to be met.
+To use the chaincode on Fabric, some pre-requisites have to be met. First of all, you should have Docker installed on your machine. Then:
 1. In a terminal, go to the root of the Obsidian project folder.
 2. Run the following command: `curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.0`
 
