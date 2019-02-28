@@ -28,12 +28,7 @@ For detailed instructions, go to `https://hyperledger-fabric.readthedocs.io/en/r
 
 To deploy and invoke the generated chaincode in a real Fabric environment, follow these steps:
 1. Generate the chaincode following the `Usage instructions` above.
-2. In the `first-network` folder, open `docker-compose-cli.yaml` and change the two instances of `{{FOLDER_NAME}}` line 84 to the name of the class you are generating.
-3. In the same folder, in the sub-directory `scripts`, open `script.sh`. Line 26, change `{{FOLDER_NAME}}` to the same value as in point 3.
-4. To change the function that has to be invoked, open `utils.sh` in the `scripts` directory. Line 313, change the value of the `Args`. The value passed has to be an array of strings. The first argument is the name of the function, and then the following values are the arguments to this function. Example: `"Args":["sum", "10", "15"]`.
-
-Now that all the setup is done, you can start using Fabric.
-1. Go to the `first-network` folder in the Obsidian project
-2. Run the following command `./byfn.sh generate`
-3. On completion, run `./byfn.sh up`
-4. If chaincode has changed or you want to invoke new functions, you always have to run `./byfn.sh down` before going back to step 2. 
+2. Go into the `first-network` folder and run the command `./up.sh -s PATH_TO_CHAINCODE`, where the path is from the root, i.e if the folder was generated with default settings, you simply specify the name of the folder (ex: StringContainer)
+3. Run `./install.sh PEER_NUMBER ORG_NUMBER`, for instance: `./install.sh 0 1` and `./install.sh 0 2`
+3. Run `./invoke.sh FUNCTION_NAME ARG1 ARG2 ...`, for instance: `./invoke.sh setS randomstring`
+4. After you are down, run `./down.sh` to kill and cleanup all Docker containers.
