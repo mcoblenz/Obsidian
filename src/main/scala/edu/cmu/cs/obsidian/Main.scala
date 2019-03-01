@@ -23,7 +23,6 @@ case class CompilerOptions (outputPath: Option[String],
                             printTokens: Boolean,
                             printAST: Boolean,
                             buildClient: Boolean,
-                            mockChaincode: Boolean,
                             lazySerialization: Boolean)
 
 object Main {
@@ -51,7 +50,6 @@ object Main {
         var printTokens = false
         var printAST = false
         var buildClient = false
-        var mockChaincode = true
         var lazySerialization = false
 
         def parseOptionsRec(remainingArgs: List[String]) : Unit = {
@@ -77,10 +75,6 @@ object Main {
                     parseOptionsRec(tail)
                 case "--build-client" :: tail =>
                     buildClient = true
-                    parseOptionsRec(tail)
-                case "--hyperledger" :: tail =>
-                    mockChaincode = false
-                    lazySerialization = true
                     parseOptionsRec(tail)
                 case "--lazy" :: tail =>
                     lazySerialization = true
@@ -115,7 +109,7 @@ object Main {
         }
 
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
-                        printTokens, printAST, buildClient, mockChaincode, lazySerialization)
+                        printTokens, printAST, buildClient, lazySerialization)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -126,9 +120,9 @@ object Main {
         return mainContractOption.get.name
     }
 
-    def translateServerASTToJava (ast: Program, protobufOuterClassName: String, mockChaincode: Boolean,
+    def translateServerASTToJava (ast: Program, protobufOuterClassName: String,
                                   lazySerialization: Boolean): JCodeModel = {
-        val codeGen = new CodeGen(Server(), mockChaincode, lazySerialization)
+        val codeGen = new CodeGen(Server(), lazySerialization)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
@@ -136,14 +130,14 @@ object Main {
         ast.contracts.find((c: Contract) => c.modifiers.contains(IsMain()))
     }
 
-    def translateClientASTToJava (ast: Program, protobufOuterClassName: String, mockChaincode: Boolean,
+    def translateClientASTToJava (ast: Program, protobufOuterClassName: String,
                                   lazySerialization: Boolean): JCodeModel = {
         // Client programs must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val codeGen = new CodeGen(Client(mainContractOption.get), mockChaincode, lazySerialization)
+        val codeGen = new CodeGen(Client(mainContractOption.get), lazySerialization)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
@@ -283,11 +277,6 @@ object Main {
     def compileProgram(args: Array[String]): Boolean = {
         val options = parseOptions(args.toList)
 
-        if (options.lazySerialization && options.mockChaincode) {
-            println("Lazy serialization is currently not supported for mock chaincode.")
-            println("Please re-run with the --hyperledger flag to generate lazy Hyperledger code.")
-            sys.exit(1)
-        }
         val tmpPath: Path = options.debugPath match {
             case Some(p) =>
                 val path = Paths.get(p)
@@ -362,9 +351,8 @@ object Main {
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
             val javaModel = if (options.buildClient) translateClientASTToJava(transformedTable.ast, protobufOuterClassName,
-                options.mockChaincode, options.lazySerialization)
-            else translateServerASTToJava(transformedTable.ast, protobufOuterClassName,
-                options.mockChaincode, options.lazySerialization)
+                options.lazySerialization)
+            else translateServerASTToJava(transformedTable.ast, protobufOuterClassName, options.lazySerialization)
             javaModel.build(srcDir.toFile)
 
             val mainName = findMainContractName(transformedTable.ast)
@@ -399,25 +387,7 @@ object Main {
                 }
             }
 
-
-            if (options.mockChaincode) {
-                // invoke javac and make a jar from the result
-                val javacExit = invokeJavac(options.verbose, mainName, srcDir, bytecodeDir)
-                if (options.verbose) {
-                    println("javac exited with value " + javacExit)
-                }
-                if (javacExit == 0) {
-                    val jarExit = makeJar(options.verbose, mainName, bytecodeDir)
-                    if (options.verbose) {
-                        println("jar exited with value " + jarExit)
-                    }
-                }
-                else
-                    return false
-            } else {
-                generateFabricCode(mainName, options.outputPath, srcDir)
-            }
-
+            generateFabricCode(mainName, options.outputPath, srcDir)
         } catch {
             case e:
                 Parser.ParseException => println (e.message);
