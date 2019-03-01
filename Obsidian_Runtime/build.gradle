@@ -10,7 +10,7 @@ repositories {
 
 dependencies {
     implementation 'org.json:json:20171018'
-    implementation group: 'org.hyperledger.fabric-chaincode-java', name: 'fabric-chaincode-shim', version: '1.+'
+    implementation group: 'org.hyperledger.fabric-chaincode-java', name: 'fabric-chaincode-shim', version: '[1.4,)'
 }
 
 publishing {

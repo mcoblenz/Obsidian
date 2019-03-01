@@ -228,11 +228,11 @@ object Main {
             copyFabricFolderInvocation.!
 
             //copy both the java and outerClass.java files to the Fabric folder
-            val javaSourceLocation = srcDir.resolve(Paths.get("edu", "cmu", "cs", "obsidian", "generated_code", mainName + ".java"))
+            val javaSourceLocation = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example", mainName + ".java"))
             val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", mainName + ".java")
             Files.copy(javaSourceLocation, javaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
 
-            val outerJavaSourceLocation = srcDir.resolve(Paths.get("edu", "cmu", "cs", "obsidian", "generated_code", protobufOuterClassNameForClass(mainName) + ".java"))
+            val outerJavaSourceLocation = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example", protobufOuterClassNameForClass(mainName) + ".java"))
             val outerJavaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", protobufOuterClassNameForClass(mainName) + ".java")
             Files.copy(outerJavaSourceLocation, outerJavaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
 
@@ -345,7 +345,7 @@ object Main {
                 return false
             }
 
-            val lastSlash = filename.lastIndexOf("/")
+            val lastSlash = filename.lastIndexOf(File.separator)
             val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
