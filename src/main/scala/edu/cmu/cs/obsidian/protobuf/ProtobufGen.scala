@@ -14,15 +14,10 @@ class Unimplemented extends Exception {}
   * Unlike the JCodeModel class hierarchy, this class does code generation in a functional style.
   */
 object ProtobufGen {
-
-    var lazySerialization = false
-
     // Programs translate to lists of messages (one per contract).
-    def translateProgram(program: Program, sourceFilename: String, lazySerialization: Boolean): Seq[(Protobuf, String)] = {
+    def translateProgram(program: Program, sourceFilename: String): Seq[(Protobuf, String)] = {
         val protobuf = new Protobuf(Nil)
         assert(program.imports.isEmpty, "Imports should be empty after processing.")
-
-        this.lazySerialization = lazySerialization
 
         val messages = program.contracts.map(translateContract)
 
@@ -80,11 +75,7 @@ object ProtobufGen {
             case s@edu.cmu.cs.obsidian.typecheck.StringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.name)
                 // TODO: get the right type for the state if this is type specifies typestate?
             case np: NonPrimitiveType =>
-                if (lazySerialization) {
-                    ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.name);
-                } else {
-                    ProtobufField(edu.cmu.cs.obsidian.protobuf.ObjectType(np.contractName), f.name)
-                }
+                ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.name);
             case BottomType() => assert(false, "Bottom type should not occur at codegen time"); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
             case UnitType() => assert(false, "Fields should not be of unit type."); ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), "bogus")
         }
