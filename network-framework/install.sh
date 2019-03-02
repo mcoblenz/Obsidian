@@ -4,3 +4,5 @@
 docker exec cli scripts/install.sh 0 1
 
 docker exec cli scripts/install.sh 0 2
+
+docker exec cli scripts/instantiate.sh 0 2
