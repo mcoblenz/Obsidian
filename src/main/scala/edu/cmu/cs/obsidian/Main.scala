@@ -279,6 +279,7 @@ object Main {
 
         val srcDir = tmpPath.resolve("generated_java")
         val bytecodeDir = tmpPath.resolve("generated_bytecode")
+        val protoDir = tmpPath.resolve("generated_proto")
 
         /* if an output path is specified, use it; otherwise, use working directory */
         val outputPath = options.outputPath match {
@@ -293,6 +294,7 @@ object Main {
 
         Files.createDirectories(srcDir)
         Files.createDirectories(bytecodeDir)
+        Files.createDirectories(protoDir)
 
         /* we just look at the first file because we don't have a module system yet */
         val filename = options.inputFiles.head
@@ -354,14 +356,14 @@ object Main {
                 val protobufOuterClassName = Util.protobufOuterClassNameForFilename(filename)
                 val protobufFilename = protobufOuterClassName + ".proto"
 
-                val protobufPath = outputPath.resolve(protobufFilename)
+                val protobufPath = protoDir.resolve(protobufFilename)
 
                 protobuf.build(protobufPath.toFile, protobufOuterClassName)
 
 
                 // Invoke protoc to compile from protobuf to Java.
                 val protocInvocation: String =
-                    "protoc --java_out=" + srcDir + " " + protobufPath.toString
+                    "protoc --java_out=" + srcDir + " --proto_path=" + protobufPath.getParent.toString + " " + protobufPath.toString
 
                 try {
                     val exitCode = protocInvocation.!
