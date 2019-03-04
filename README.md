@@ -29,6 +29,6 @@ For detailed instructions, go to `https://hyperledger-fabric.readthedocs.io/en/r
 To deploy and invoke the generated chaincode in a real Fabric environment, follow these steps:
 1. Generate the chaincode following the `Usage instructions` above.
 2. Go into the `network-framework` folder and run the command `./up.sh -s PATH_TO_CHAINCODE`, where the path is from the root, i.e if the folder was generated with default settings, you simply specify the name of the folder (ex: StringContainer)
-3. Run `./install.sh PEER_NUMBER ORG_NUMBER`, for instance: `./install.sh 0 1` and `./install.sh 0 2`
+3. Run `./install.sh`
 3. Run `./invoke.sh FUNCTION_NAME ARG1 ARG2 ...`, for instance: `./invoke.sh setS randomstring`
 4. After you are down, run `./down.sh` to kill and cleanup all Docker containers.

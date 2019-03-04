@@ -219,14 +219,11 @@ object Main {
                 "cp -R " + fabricFolderPath.toString + File.separator + " " + outputPath_temp
             copyFabricFolderInvocation.!
 
-            //copy both the java and outerClass.java files to the Fabric folder
-            val javaSourceLocation = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example", mainName + ".java"))
-            val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", mainName + ".java")
-            Files.copy(javaSourceLocation, javaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
-
-            val outerJavaSourceLocation = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example", protobufOuterClassNameForClass(mainName) + ".java"))
-            val outerJavaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example", protobufOuterClassNameForClass(mainName) + ".java")
-            Files.copy(outerJavaSourceLocation, outerJavaTargetLocation, StandardCopyOption.REPLACE_EXISTING)
+            val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
+            val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example")
+            val copyAllGeneratedClasses : String =
+                "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
+            copyAllGeneratedClasses.!
 
             //place the correct class name in the build.gradle
             val gradlePath = Paths.get(mainName, "build.gradle")
