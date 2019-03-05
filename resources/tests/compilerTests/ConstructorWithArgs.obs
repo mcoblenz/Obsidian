@@ -1,10 +1,10 @@
 contract A {}
 
-main contract C {
+main contract ConstructorWithArgs {
     int a;
     A@Shared b;
 
-    C@Owned(int x, A@Shared y) {
+    ConstructorWithArgs@Owned(int x, A@Shared y) {
         a = x;
         b = y;
         ->S1;

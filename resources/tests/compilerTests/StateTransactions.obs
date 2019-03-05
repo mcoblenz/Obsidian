@@ -1,7 +1,7 @@
 // testing whether transactions available only in certain states are generated properly
-main contract A {
+main contract StateTransactions {
 
-   A() {
+   StateTransactions() {
        ->S1;
    }
 
@@ -12,11 +12,11 @@ main contract A {
    }
 
 
-   transaction t(A@(S1|S2) this) {
+   transaction t(StateTransactions@(S1|S2) this) {
        int x = 3;
    }
 
-   transaction inState3(A@S3 this) {
+   transaction inState3(StateTransactions@S3 this) {
        y = 4;
    }
 

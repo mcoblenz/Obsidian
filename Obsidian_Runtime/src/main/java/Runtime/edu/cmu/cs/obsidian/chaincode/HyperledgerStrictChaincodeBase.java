@@ -79,8 +79,6 @@ public abstract class HyperledgerStrictChaincodeBase extends ChaincodeBase {
         }
     }
 
-    protected void invokeConstructor() {}; //to be overidden in generated code
-
     public void delegatedMain(String args[]) {
         /* spin up server */
         try {

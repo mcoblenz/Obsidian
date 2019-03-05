@@ -83,8 +83,6 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
     }
 
-    protected void invokeConstructor(SerializationState st) {}; //to be overidden in generated code
-
     public void delegatedMain(String args[]) {
         /* spin up server */
         try {

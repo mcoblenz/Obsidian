@@ -258,7 +258,8 @@ class CodeGen (val target: Target) {
                 val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
                 val invocation = classInstance.invoke("__initFromArchiveBytes")
-                val _ = invocation.arg(marshalledExpr)
+                invocation.arg(marshalledExpr)
+                invocation.arg(JExpr.ref("stub"))
                 invocation
         }
     }
@@ -513,15 +514,6 @@ class CodeGen (val target: Target) {
                                           protobufOuterClassNames: Map[String, String],
                                           generateStub: Boolean
                                       ): TranslationContext = {
-
-        /* We need to ensure there's an empty constructor.
-         * This constructor will be used in unarchiving; e.g. to unarchive class C:
-         *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
-         */
-        if (!hasEmptyConstructor(aContract)) {
-            newClass.constructor(JMod.PUBLIC)
-        }
-
         /* setup the state enum */
         val stateDeclarations: Seq[State] =
             aContract.declarations.filter((d: Declaration) => d match {
@@ -740,23 +732,24 @@ class CodeGen (val target: Target) {
         newClass._implements(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
         generateLazySerializationCode(aContract, newClass, translationContext)
 
-        var generated: Boolean = false
-
         for (decl <- aContract.declarations) {
             translateDeclaration(decl, newClass, translationContext, aContract)
-            if (decl.isInstanceOf[Constructor] && (!generated) && aContract.isMain) {
-                generateInvokeConstructor(newClass)
-                generated = true
-            }
         }
 
         /* If the main contract didn't already have a new_X() method with zero parameters,
-         * add one that sets all the fields to default values, so invokeConstructor()
-         * has something to call.
+         * add one that sets all the fields to default values.
          */
         if (!hasEmptyConstructor(aContract) && aContract.isMain) {
-            generateDefaultConstructor(newClass, translationContext, aContract)
+            generateInitializer(newClass, translationContext, aContract)
         }
+
+        /* We need to ensure there's an empty constructor.
+        * This constructor will be used in unarchiving; e.g. to unarchive class C:
+        *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
+        *
+        *          The constructor is also used when initializing main contracts.
+        */
+        newClass.constructor(JMod.PUBLIC)
 
         translationContext
     }
@@ -770,6 +763,10 @@ class CodeGen (val target: Target) {
         val newClass: JDefinedClass = programPackage._class(aContract.name)
 
         val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
+
+
+
+
         translateContract(aContract, newClass, translationContext)
         generateReentrantFlag(newClass, translationContext)
 
@@ -994,7 +991,11 @@ class CodeGen (val target: Target) {
                             newString.arg(runArg)
                             newString.arg(charset)
                             newString
-                        case _ => JExpr._new(javaArgType).invoke("__initFromArchiveBytes").arg(runArg)
+                        case _ => val newExpr = JExpr._new(javaArgType)
+                                  newExpr.invoke("__initFromArchiveBytes")
+                                  newExpr.arg(runArg)
+                                  newExpr.arg(JExpr.ref("stub"))
+                                  newExpr
                     }
 
                     val newTxArg: JVar = stateCondBody.decl(
@@ -1082,7 +1083,10 @@ class CodeGen (val target: Target) {
         // newClass instance = new newClass();
         // instance.delegatedMain(args);
         val body = mainMeth.body()
-        val instance = body.decl(newClass, "instance", JExpr._new(newClass))
+        val constructorInvocation = JExpr._new(newClass)
+        constructorInvocation.arg(newClass.name()) // The name of the class suffices as a GUID for the top level contract.
+        val instance = body.decl(newClass, "instance", constructorInvocation)
+
         val invocation = body.invoke(instance, "delegatedMain")
         invocation.arg(args)
     }
@@ -1811,48 +1815,38 @@ class CodeGen (val target: Target) {
         generateStateArchiver(contract, state, stateClass, translationContext)
     }
 
-    private def generateInvokeConstructor(newClass: JDefinedClass) = {
 
-        val meth: JMethod = newClass.method(JMod.PROTECTED, model.VOID, "invokeConstructor")
-        // Not sure this is actually required (if we're invoking the constructor we can't
-        // have any objects serialized yet), but needed for consistency with other constructors.
-        meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
-
-        val name : String = "new_" + newClass.name()
-        val body = meth.body()
-        meth.annotate(model.directClass("java.lang.Override"))
-        val invocation = body.invokeThis(name)
-        invocation.arg(JExpr.ref(serializationParamName))
+    private def assignNewGUID(newClass : JDefinedClass, aContract: Contract, meth: JMethod) = {
+        /* Generate a GUID for the object when it's created. */
+        /* If it's a main contract, we use the contract name as an ID so we know
+         * how to find the root of the object graph. */
+        if (aContract.isMain) {
+            meth.body().assign(newClass.fields get guidFieldName, JExpr.lit(aContract.name))
+        } else {
+            val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
+            meth.body().assign(newClass.fields get guidFieldName, generateUUID)
+        }
     }
 
-    /* the local context at the beginning of the method */
 
-    /* The obsidian constructor only runs when the contract is deployed.
-     * Thus, the obsidian constructor must be placed in a distinct method. */
+    /* Constructors are mapped to "new_" methods because we need to
+     *separate initialization (which may occur via deserialization) from construction.
+     */
     private def translateConstructor(
                                         c: Constructor,
                                         newClass: JDefinedClass,
                                         translationContext: TranslationContext,
                                         aContract: Contract) : JMethod = {
 
-        // by default, make it a constructor
-        var meth: JMethod = newClass.constructor(JMod.PUBLIC)
+        val name = "new_" + newClass.name()
+        var meth = newClass.method(JMod.PRIVATE, model.VOID, name)
 
-        // however, if it is a main contract, create a new_ method
-        if (aContract.isMain) {
-            val name = "new_" + newClass.name()
+        mainConstructor = Some(meth)
 
-            meth = newClass.method(JMod.PRIVATE, model.VOID, name)
-
-            mainConstructor = Some(meth)
-        }
-
-        if (aContract.isMain) {
-            // We need to pass in a stub as well since we might need
-            // to deserialize some objects in here (for example, if we call a method on a parameter
-            // that returns a property of one of its child objects which isn't yet loaded)
-            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
-        }
+        // We need to pass in a stub as well since we might need
+        // to deserialize some objects in here (for example, if we call a method on a parameter
+        // that returns a property of one of its child objects which isn't yet loaded)
+        meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
@@ -1872,15 +1866,8 @@ class CodeGen (val target: Target) {
         /* add body */
         translateBody(meth.body(), c.body, translationContext, localContext)
 
-        /* Generate a GUID for the object when it's created. */
-        /* If it's a main contract, we use the contract name as an ID so we know
-         * how to find the root of the object graph. */
-        if (aContract.isMain) {
-            meth.body().assign(newClass.fields get guidFieldName, JExpr.lit(aContract.name))
-        } else {
-            val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
-            meth.body().assign(newClass.fields get guidFieldName, generateUUID)
-        }
+        assignNewGUID(newClass, aContract, meth)
+
         /* When an object is newly created, we always mark it as modified (and loaded). */
         meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
@@ -1888,7 +1875,8 @@ class CodeGen (val target: Target) {
         meth
     }
 
-    private def generateDefaultConstructor(
+    // Generates a new_Foo() method, which takes the serialization state as a parameter, and initializes all the fields.
+    private def generateInitializer(
                                             newClass: JDefinedClass,
                                             translationContext: TranslationContext,
                                             aContract: Contract) {
