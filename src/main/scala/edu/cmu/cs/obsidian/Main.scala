@@ -222,7 +222,7 @@ object Main {
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
             val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example")
             val copyAllGeneratedClasses : String =
-                "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
+                "cp -R " + tmpGeneratedCodePath.toString + File.separator +  "* " + javaTargetLocation.toString
             println("copying: " + copyAllGeneratedClasses)
             copyAllGeneratedClasses.!
 
