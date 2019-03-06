@@ -216,13 +216,13 @@ object Main {
             val fabricFolderPath = Paths.get("fabric", "java")
             //have to add the trailing separator to avoid copying the java directory too
             val copyFabricFolderInvocation: String =
-                "cp -R " + fabricFolderPath.toString + File.separator + " " + outputPath_temp
+                "cp -R " + fabricFolderPath.toString + File.separator + "* " + outputPath_temp
             copyFabricFolderInvocation.!
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
             val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example")
             val copyAllGeneratedClasses : String =
-                "cp -R " + tmpGeneratedCodePath.toString + File.separator +  "* " + javaTargetLocation.toString
+                "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
             println("copying: " + copyAllGeneratedClasses)
             copyAllGeneratedClasses.!
 
