@@ -53,7 +53,35 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     @Override
     public Response invoke(ChaincodeStub stub) {
         final String function = stub.getFunction();
-        final String args[] = stub.getParameters().stream().toArray(String[]::new);
+        String args[] = stub.getParameters().stream().toArray(String[]::new);
+
+        // If this invocation is really to a different contract, figure that out.
+        HyperledgerChaincodeBase invocationReciever = this;
+        if (args.length > 0) {
+            String firstArg = args[0];
+            if (firstArg.equals("__receiver")) {
+                // Expect the second arg to be the GUID of the reciever.
+                if (args.length > 1) {
+                    String receiverGUID = args[1];
+                    ObsidianSerialized receiverContract = getEntry(receiverGUID);
+                    if (receiverContract == null) {
+                        return newErrorResponse("Cannot invoke transaction on unknown object " + receiverGUID);
+                    }
+                    else {
+                        if (receiverContract instanceof HyperledgerChaincodeBase) {
+                            invocationReciever = (HyperledgerChaincodeBase)receiverContract;
+                        }
+                        else {
+                            return new ErrorRespose("Cannot invoke transaction on non-contract " + receiverContract);
+                        }
+                    }
+                }
+                else {
+                    return newErrorResponse("Invoking on a non-main contract requires specifying a receiver.");
+                }
+            }
+            args = Arrays.copyOfRange(args, 2, args.length - 1);
+        }
 
         byte byte_args[][] = new byte[args.length][];
         for (int i = 0; i < args.length; i++) {
@@ -70,7 +98,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
              * the root object.) */
             __restoreObject(st);
 
-            byte result[] = run(st, function, byte_args);
+            byte result[] = invocationReceiver.run(st, function, byte_args);
             __saveModifiedData(stub);
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {

@@ -874,8 +874,7 @@ class CodeGen (val target: Target) {
             val errorBlock: JBlock = new JBlock()
             val invocation: JInvocation =
             // Need to pass serialization state as arg to constructor
-            initMeth.body().invoke(c).arg(JExpr.ref(serializationParamName))
-
+            initMeth.body().invoke(c)
 
             var runArgsIndex = 0
 
@@ -884,6 +883,8 @@ class CodeGen (val target: Target) {
                 invocation.arg(deserializedArg)
                 runArgsIndex += 1
             }
+
+            invocation.arg(JExpr.ref(serializationParamName))
 
         })
 
@@ -1015,14 +1016,6 @@ class CodeGen (val target: Target) {
                     txInvoke = JExpr.invoke(txMethName)
 
                     val returnObj = stateCondBody.decl(resolveType(tx.retType.get), "returnObj", txInvoke)
-
-                    // Record the UUID of this object (if it is one).
-                    tx.retType.get match {
-                        case np: NonPrimitiveType =>
-                            val mapInvocation = stateCondBody.invoke("mapReturnedObject")
-                            mapInvocation.arg(returnObj)
-                        case _ => ()
-                    }
 
                     stateCondBody.assign(returnBytes,
                         tx.retType.get match {
@@ -1831,36 +1824,32 @@ class CodeGen (val target: Target) {
 
     /* Constructors are mapped to "new_" methods because we need to
      *separate initialization (which may occur via deserialization) from construction.
+     * However, for non-top-level contracts, we want to be able to invoke the constructor as a
+     * regular constructor.
+     *
+     * Because we don't know whether this class will be instantiated at runtime (as opposed to at deployment),
+     * we generate both versions for all contracts.
      */
     private def translateConstructor(
                                         c: Constructor,
                                         newClass: JDefinedClass,
                                         translationContext: TranslationContext,
-                                        aContract: Contract) : JMethod = {
+                                        aContract: Contract) = {
 
-        val name = "new_" + newClass.name()
-        var meth = newClass.method(JMod.PRIVATE, model.VOID, name)
+        val methodName = "new_" + newClass.name()
+        var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
 
         mainConstructor = Some(meth)
-
-        // We need to pass in a stub as well since we might need
-        // to deserialize some objects in here (for example, if we call a method on a parameter
-        // that returns a property of one of its child objects which isn't yet loaded)
-        if (aContract.isMain) {
-            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
-        }
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
             (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
         )
 
-        if (!aContract.isMain) {
-            // We expect the stub to be the first parameter of the main
-            // constructor. But everything else expects it to be the last parameter of
-            // non-main constructors.
-            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
-        }
+        // We need to pass in a stub as well since we might need
+        // to deserialize some objects in here (for example, if we call a method on a parameter
+        // that returns a property of one of its child objects which isn't yet loaded)
+        meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
@@ -1874,7 +1863,19 @@ class CodeGen (val target: Target) {
         meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
 
-        meth
+        // -----------------------------------------------------------------------------
+        // Also generate a constructor that calls the new_ method that we just generated.
+        val constructor = newClass.constructor(JMod.PUBLIC)
+        val invocation = constructor.body().invoke(methodName)
+
+        /* add args to method and collect them in a list */
+        for (arg <- c.args) {
+            constructor.param(resolveType(arg.typIn), arg.varName)
+            invocation.arg(JExpr.ref(arg.varName))
+        }
+
+        constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        invocation.arg(JExpr.ref(serializationParamName))
     }
 
     // Generates a new_Foo() method, which takes the serialization state as a parameter, and initializes all the fields.
