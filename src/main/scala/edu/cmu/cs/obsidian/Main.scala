@@ -241,7 +241,7 @@ object Main {
             //place the correct class name in the build.gradle
             val gradlePath = Paths.get(mainName, "build.gradle")
             val replaceClassNameInGradleBuild: String =
-                "sed -i .backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
+                "sed -i.backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
 
             //sed automatically creates a backup of the original file, has to be deleted
             val gradleBackupPath = Paths.get(mainName, "build.gradle.backup")
