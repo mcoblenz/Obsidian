@@ -259,7 +259,7 @@ class CodeGen (val target: Target) {
                 val classInstance = JExpr._new(targetClass)
                 val invocation = classInstance.invoke("__initFromArchiveBytes")
                 invocation.arg(marshalledExpr)
-                invocation.arg(JExpr.ref("stub"))
+                invocation.arg(JExpr.ref(serializationParamName))
                 invocation
         }
     }
@@ -838,7 +838,7 @@ class CodeGen (val target: Target) {
 
         /* query method */
         val queryMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "query")
-        queryMeth.param(stubType, "stub")
+        queryMeth.param(stubType, serializationParamName)
         queryMeth.param(model.ref("String"), "transName")
         queryMeth.param(model.BYTE.array().array(), "args")
 
@@ -860,7 +860,7 @@ class CodeGen (val target: Target) {
                     stubType: AbstractJClass,
                     types: Seq[ObsidianType]): Unit = {
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
-        initMeth.param(stubType, "stub")
+        initMeth.param(stubType, serializationParamName)
         val runArgs = initMeth.param(model.BYTE.array().array(), "args")
 
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
@@ -874,7 +874,7 @@ class CodeGen (val target: Target) {
             val errorBlock: JBlock = new JBlock()
             val invocation: JInvocation =
             // Need to pass serialization state as arg to constructor
-            initMeth.body().invoke(c).arg(JExpr.ref("stub"))
+            initMeth.body().invoke(c).arg(JExpr.ref(serializationParamName))
 
 
             var runArgsIndex = 0
@@ -898,7 +898,7 @@ class CodeGen (val target: Target) {
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         runMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
-        runMeth.param(stubType, "stub")
+        runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
 
@@ -992,10 +992,10 @@ class CodeGen (val target: Target) {
                             newString.arg(charset)
                             newString
                         case _ => val newExpr = JExpr._new(javaArgType)
-                                  newExpr.invoke("__initFromArchiveBytes")
-                                  newExpr.arg(runArg)
-                                  newExpr.arg(JExpr.ref("stub"))
-                                  newExpr
+                                  val initExpr = newExpr.invoke("__initFromArchiveBytes")
+                                  initExpr.arg(runArg)
+                                  initExpr.arg(JExpr.ref(serializationParamName))
+                                  initExpr
                     }
 
                     val newTxArg: JVar = stateCondBody.decl(
@@ -1045,7 +1045,7 @@ class CodeGen (val target: Target) {
 
                 // Pass serialization state to transactions
                 // for deserialization of child objects.
-                txInvoke.arg(JExpr.ref("stub"))
+                txInvoke.arg(JExpr.ref(serializationParamName))
 
             }
             /* If we aren't in any of the states were we can use this transaction, we throw an exception */
@@ -1132,7 +1132,7 @@ class CodeGen (val target: Target) {
             newStubExpr.arg(JExpr.ref("connectionManager"))
             val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID")
             newStubExpr.arg(generateUUID)
-            val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
+            val stubVariable = method.body().decl(stubJavaType, serializationParamName, newStubExpr)
             val clientMainInvocation = method.body.invoke("main")
             clientMainInvocation.arg(stubVariable)
         }
@@ -1846,7 +1846,9 @@ class CodeGen (val target: Target) {
         // We need to pass in a stub as well since we might need
         // to deserialize some objects in here (for example, if we call a method on a parameter
         // that returns a property of one of its child objects which isn't yet loaded)
-        meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        if (aContract.isMain) {
+            meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        }
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
