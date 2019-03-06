@@ -210,13 +210,25 @@ object Main {
             }
             /* create the dir if it doesn't exist */
             Files.createDirectories(path)
-            val outputPath_temp = path
 
             //copy the content of the fabric/java/ folder into a folder with the class name
-            val fabricFolderPath = Paths.get("fabric", "java")
             //have to add the trailing separator to avoid copying the java directory too
+            var compilerDir = System.getenv("TRAVIS_BUILD_DIR")
+            if (compilerDir == null) {
+                // TODO: package up the compiler as a jar file and use a path relative to that
+                // Requiring the working dir to be the compiler's directory is inconvenient.
+                compilerDir = Paths.get("").toAbsolutePath().toString
+            }
+            val fabricPath = Paths.get(compilerDir, "fabric", "java")
+            val buildPath = fabricPath.resolve("build.gradle")
+            val settingsPath = fabricPath.resolve("settings.gradle")
+            val srcPath = fabricPath.resolve("src")
             val copyFabricFolderInvocation: String =
-                "cp -R " + fabricFolderPath.toString + File.separator + "* " + outputPath_temp
+                "cp -R " + buildPath.toString + " " +
+                    settingsPath.toString + " " +
+                    srcPath.toString + " " +
+                    path + File.separator
+            println("copying: " + copyFabricFolderInvocation)
             copyFabricFolderInvocation.!
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
@@ -238,7 +250,7 @@ object Main {
 
             replaceClassNameInGradleBuild.!
             deleteSedBackupFile.!
-            println("Successfully generated Fabric chaincode at " + outputPath_temp)
+            println("Successfully generated Fabric chaincode at " + path)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
         }
