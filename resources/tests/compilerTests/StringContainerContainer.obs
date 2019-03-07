@@ -1,0 +1,24 @@
+contract StringContainer {
+    string str;
+
+    StringContainer(string s) {
+        str = s;
+    }
+
+    transaction getString() returns string {
+        return str;
+    }
+}
+
+
+main contract StringContainerContainer {
+    StringContainer@Owned container;
+
+    StringContainerContainer() {
+        container = new StringContainer("hello, world");
+    }
+
+    transaction getContainer() returns StringContainer@Unowned {
+        return container;
+    }
+}
