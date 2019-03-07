@@ -1017,12 +1017,22 @@ class CodeGen (val target: Target) {
 
                     val returnObj = stateCondBody.decl(resolveType(tx.retType.get), "returnObj", txInvoke)
 
+                    // Record the UUID of this object (if it is one).
+                    tx.retType.get match {
+                        case np: NonPrimitiveType =>
+                            val mapInvocation = stateCondBody.invoke("mapReturnedObject")
+                            mapInvocation.arg(returnObj)
+                        case _ => ()
+                    }
+
                     stateCondBody.assign(returnBytes,
                         tx.retType.get match {
                             case IntType() => returnObj.invoke("toByteArray")
                             case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
                               .staticInvoke("booleanToBytes").arg(txInvoke)
-                            case StringType() => returnObj.invoke("getBytes")
+                            case StringType() =>    val invocation = returnObj.invoke("getBytes")
+                                                    val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                                                    invocation.arg(charset)
                             //                            case _ => returnObj.invoke("__archiveBytes")
                             case _ => returnObj.invoke("__getGUID").invoke("getBytes")
                         }
@@ -1411,7 +1421,7 @@ class CodeGen (val target: Target) {
                 // so if someone else references it later, we get the same reference.
                 checkForObj._else().invoke(JExpr.ref(serializationParamName), "putEntry")
                     .arg(JExpr.ref(javaFieldName + "ID"))
-                    .arg(JExpr.ref(javaFieldName + "Val"))
+                    .arg(fieldVar)
 
             }
         }
@@ -1816,7 +1826,7 @@ class CodeGen (val target: Target) {
         if (aContract.isMain) {
             meth.body().assign(newClass.fields get guidFieldName, JExpr.lit(aContract.name))
         } else {
-            val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
+            val generateUUID = JExpr.ref(serializationParamName).invoke("getUUIDFactory").invoke("newUUID").invoke("toString")
             meth.body().assign(newClass.fields get guidFieldName, generateUUID)
         }
     }
@@ -1862,6 +1872,12 @@ class CodeGen (val target: Target) {
         /* When an object is newly created, we always mark it as modified (and loaded). */
         meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
+
+        // Put the entry in the GUID map so we can find it later.
+        val putEntryInvocation = meth.body().invoke(JExpr.ref(serializationParamName), "putEntry")
+
+        putEntryInvocation.arg(newClass.fields get guidFieldName)
+        putEntryInvocation.arg(JExpr._this())
 
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.

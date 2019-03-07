@@ -19,6 +19,7 @@ public class SerializationState {
      * of scope. */
     private Map<String, WeakReference<ObsidianSerialized>> guidMap;
     private ChaincodeStub stub;
+    UUIDFactory uuidFactory;
 
     public SerializationState() {
         guidMap = new HashMap<String, WeakReference<ObsidianSerialized>>();
@@ -26,6 +27,7 @@ public class SerializationState {
 
     public void setStub(ChaincodeStub newStub) {
         stub = newStub;
+        uuidFactory = new UUIDFactory(newStub.getTxId());
     }
 
     public ChaincodeStub getStub() {
@@ -43,5 +45,9 @@ public class SerializationState {
 
     public void putEntry(String guid, ObsidianSerialized obj) {
         guidMap.put(guid, new WeakReference<ObsidianSerialized>(obj));
+    }
+
+    public UUIDFactory getUUIDFactory() {
+        return uuidFactory;
     }
 }

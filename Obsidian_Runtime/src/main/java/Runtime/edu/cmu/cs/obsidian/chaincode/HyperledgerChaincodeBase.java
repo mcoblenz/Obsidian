@@ -18,28 +18,91 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
+import org.hyperledger.fabric.shim.ledger.*;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
+    /* When we return an object to the client, we have to be able to look up that object later by its GUID.
+     * On lookup, we need to be able to create a lazily-initialized object, which requires that we know the name of its class.
+     *
+     * */
+
+    static final String s_returnedObjectsMapKey = "ReturnedObject";
+
+    private Map<String, Class> returnedObjectClassMap;
+    SerializationState serializationState;
+
+    public HyperledgerChaincodeBase() {
+        serializationState = new SerializationState();
+    }
+
+
+    public void mapReturnedObject(ObsidianSerialized obj) {
+        if (returnedObjectClassMap == null) {
+            returnedObjectClassMap = new HashMap<String, Class>();
+        }
+
+        returnedObjectClassMap.put(obj.__getGUID(), obj.getClass());
+    }
+
+    public Class getReturnedObjectClass(ChaincodeStub stub, String guid) {
+        loadReturnedObjectsMap(stub);
+
+        return returnedObjectClassMap.get(guid);
+    }
+
+    public void archiveReturnedObjectsMap (ChaincodeStub stub) {
+        // TODO: remove old, stale entries?
+
+
+        for (Map.Entry<String, Class> entry : returnedObjectClassMap.entrySet()) {
+            CompositeKey key = stub.createCompositeKey(s_returnedObjectsMapKey, entry.getKey());
+            stub.putStringState(key.toString(), entry.getValue().getCanonicalName());
+            System.out.println("archiving returned object: " + key + "->" + entry.getValue().getCanonicalName());
+        }
+    }
+
+    private void loadReturnedObjectsMap (ChaincodeStub stub) {
+        if (returnedObjectClassMap == null) {
+            returnedObjectClassMap = new HashMap<String, Class>();
+
+            QueryResultsIterator<KeyValue> results = stub.getStateByPartialCompositeKey(s_returnedObjectsMapKey);
+
+            for (KeyValue kv : results) {
+                try {
+                    Class c = Class.forName(kv.getStringValue());
+                    returnedObjectClassMap.put(kv.getKey(), c);
+                    System.out.println("loading map: " + kv.getKey() + " -> " + c);
+                }
+                catch (ClassNotFoundException e) {
+                    System.err.println("Failed to find a Class object for class name " + kv.getValue());
+                }
+            }
+        }
+    }
+
     @Override
     public Response init(ChaincodeStub stub) {
+        serializationState.setStub(stub);
+
         final String function = stub.getFunction();
         if (function.equals("init")) {
             try {
-                SerializationState st = new SerializationState();
-                st.setStub(stub);
-
                 final String args[] = stub.getParameters().stream().toArray(String[]::new);
 
                 byte byte_args[][] = new byte[args.length][];
                 for (int i = 0; i < args.length; i++) {
                     byte_args[i] = args[i].getBytes();
                 }
-                byte[] result = init(st, byte_args);
+                byte[] result = init(serializationState, byte_args);
                 __saveModifiedData(stub);
                 return newSuccessResponse(result);
             } catch (Throwable e) {
@@ -52,38 +115,59 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
 
     @Override
     public Response invoke(ChaincodeStub stub) {
+        serializationState.setStub(stub);
+
         final String function = stub.getFunction();
         String args[] = stub.getParameters().stream().toArray(String[]::new);
 
-        SerializationState st = new SerializationState();
-        st.setStub(stub);
-
         // If this invocation is really to a different contract, figure that out.
-        HyperledgerChaincodeBase invocationReceiver = this;
+        ObsidianSerialized invocationReceiver = this;
         if (args.length > 0) {
             String firstArg = args[0];
             if (firstArg.equals("__receiver")) {
                 // Expect the second arg to be the GUID of the reciever.
                 if (args.length > 1) {
                     String receiverGUID = args[1];
-                    ObsidianSerialized receiverContract = st.getEntry(receiverGUID);
+                    ObsidianSerialized receiverContract = serializationState.getEntry(receiverGUID);
+                    // If it's not in our map, maybe we just haven't loaded it yet.
+                    if (receiverContract == null) {
+                        Class objectClass = getReturnedObjectClass(stub, receiverGUID);
+                        try {
+                            Constructor constructor = objectClass.getConstructor(String.class);
+                            receiverContract = (ObsidianSerialized)constructor.newInstance(receiverGUID);
+                            serializationState.putEntry(receiverGUID, receiverContract);
+                        }
+                        catch (NoSuchMethodException |
+                                InstantiationException |
+                                IllegalAccessException |
+                                InvocationTargetException e) {
+                            return newErrorResponse("Failed to instantiate archived object: " + e);
+                        }
+                    }
+
                     if (receiverContract == null) {
                         return newErrorResponse("Cannot invoke transaction on unknown object " + receiverGUID);
                     }
                     else {
-                        if (receiverContract instanceof HyperledgerChaincodeBase) {
-                            invocationReceiver = (HyperledgerChaincodeBase)receiverContract;
+                        if (receiverContract instanceof ObsidianSerialized) {
+                            invocationReceiver = (ObsidianSerialized)receiverContract;
                         }
                         else {
                             return newErrorResponse("Cannot invoke transaction on non-contract " + receiverContract);
                         }
+                    }
+
+                    if (args.length > 2) {
+                        args = Arrays.copyOfRange(args, 2, args.length - 1);
+                    }
+                    else {
+                        args = new String[0];
                     }
                 }
                 else {
                     return newErrorResponse("Invoking on a non-main contract requires specifying a receiver.");
                 }
             }
-            args = Arrays.copyOfRange(args, 2, args.length - 1);
         }
 
         byte byte_args[][] = new byte[args.length][];
@@ -92,15 +176,17 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
 
         try {
-
+            System.out.println("before _restoreObject");
             /* Try to restore ourselves (the root object) from the blockchain
              * before we invoke a transaction. (This applies if we stopped the
              * chaincode and restarted it -- we have to restore the state of
              * the root object.) */
-            __restoreObject(st);
-
-            byte result[] = invocationReceiver.run(st, function, byte_args);
+            __restoreObject(serializationState);
+            System.out.println("after restoreObject");
+            byte result[] = invocationReceiver.run(serializationState, function, byte_args);
+            System.out.println("after run");
             __saveModifiedData(stub);
+            System.out.println("after saveModifiedData");
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
             /* This will be returned when calling an invalid transaction
