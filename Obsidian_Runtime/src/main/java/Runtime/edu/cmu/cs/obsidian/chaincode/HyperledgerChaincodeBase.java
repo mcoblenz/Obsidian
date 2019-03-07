@@ -55,24 +55,27 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         final String function = stub.getFunction();
         String args[] = stub.getParameters().stream().toArray(String[]::new);
 
+        SerializationState st = new SerializationState();
+        st.setStub(stub);
+
         // If this invocation is really to a different contract, figure that out.
-        HyperledgerChaincodeBase invocationReciever = this;
+        HyperledgerChaincodeBase invocationReceiver = this;
         if (args.length > 0) {
             String firstArg = args[0];
             if (firstArg.equals("__receiver")) {
                 // Expect the second arg to be the GUID of the reciever.
                 if (args.length > 1) {
                     String receiverGUID = args[1];
-                    ObsidianSerialized receiverContract = getEntry(receiverGUID);
+                    ObsidianSerialized receiverContract = st.getEntry(receiverGUID);
                     if (receiverContract == null) {
                         return newErrorResponse("Cannot invoke transaction on unknown object " + receiverGUID);
                     }
                     else {
                         if (receiverContract instanceof HyperledgerChaincodeBase) {
-                            invocationReciever = (HyperledgerChaincodeBase)receiverContract;
+                            invocationReceiver = (HyperledgerChaincodeBase)receiverContract;
                         }
                         else {
-                            return new ErrorRespose("Cannot invoke transaction on non-contract " + receiverContract);
+                            return newErrorResponse("Cannot invoke transaction on non-contract " + receiverContract);
                         }
                     }
                 }
@@ -89,8 +92,6 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
 
         try {
-            SerializationState st = new SerializationState();
-            st.setStub(stub);
 
             /* Try to restore ourselves (the root object) from the blockchain
              * before we invoke a transaction. (This applies if we stopped the
