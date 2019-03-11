@@ -11,18 +11,14 @@ import org.hyperledger.fabric.shim.ChaincodeStub;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import java.util.Map;
 import java.util.HashMap;
-import java.lang.ref.WeakReference;
 
 public class SerializationState {
-    /* We use WeakReferences here because we still want
-     * the objects to be garbage collected if they go out
-     * of scope. */
-    private Map<String, WeakReference<ObsidianSerialized>> guidMap;
+    private Map<String, ObsidianSerialized> guidMap;
     private ChaincodeStub stub;
     UUIDFactory uuidFactory;
 
     public SerializationState() {
-        guidMap = new HashMap<String, WeakReference<ObsidianSerialized>>();
+        guidMap = new HashMap<String, ObsidianSerialized>();
     }
 
     public void setStub(ChaincodeStub newStub) {
@@ -35,25 +31,22 @@ public class SerializationState {
     }
 
     public ObsidianSerialized getEntry(String guid) {
-        WeakReference<ObsidianSerialized> ref = guidMap.get(guid);
-        if (ref != null) {
-            return ref.get();
-        } else {
-            return null;
-        }
+        return guidMap.get(guid);
     }
 
     public void putEntry(String guid, ObsidianSerialized obj) {
-        guidMap.put(guid, new WeakReference<ObsidianSerialized>(obj));
+        guidMap.put(guid, obj);
     }
 
     public void flushEntries() {
         // Fabric requires that all endorsers produce identical read sets.
         // But the peer on which instantiation happened will have some objects cached, resulting in an
         // inconsistent write set with the other peers.
-        // To work around this problem, we flush the map after instantiation.
+        // To work around this problem, we flush all flushable objects.
 
-        guidMap.clear();
+        for (ObsidianSerialized obj : guidMap.values()) {
+            obj.flush();
+        }
     }
 
     public UUIDFactory getUUIDFactory() {

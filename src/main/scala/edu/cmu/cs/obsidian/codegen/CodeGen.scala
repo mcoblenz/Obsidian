@@ -683,6 +683,11 @@ class CodeGen (val target: Target) {
             val unloadMeth = newClass.method(JMod.PROTECTED, model.VOID, "__unload")
             unloadMeth.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
         }
+
+        if (!aContract.isMain) {
+            val flushMethod = newClass.method(JMod.PUBLIC, model.VOID, "flush");
+            flushMethod.body().assign(newClass.fields get loadedFieldName, JExpr.lit(false));
+        }
     }
 
 
@@ -1878,8 +1883,6 @@ class CodeGen (val target: Target) {
 
         putEntryInvocation.arg(newClass.fields get guidFieldName)
         putEntryInvocation.arg(JExpr._this())
-
-        meth.body().invoke(JExpr.ref(serializationParamName), "flushEntries")
 
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.

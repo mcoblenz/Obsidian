@@ -45,6 +45,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         serializationState = new SerializationState();
     }
 
+    public void flush() {
+        // No need to do anything because main contracts aren't lazily loaded.
+    }
 
     public void mapReturnedObject(ObsidianSerialized obj) {
         if (returnedObjectClassMap == null) {
@@ -105,6 +108,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                 }
                 byte[] result = init(serializationState, byte_args);
                 __saveModifiedData(stub);
+
+                serializationState.flushEntries();
                 return newSuccessResponse(result);
             } catch (Throwable e) {
                 return newErrorResponse(e);
@@ -112,6 +117,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         } else {
             return newErrorResponse("Unknown initialization function " + function);
         }
+
+
     }
 
     @Override

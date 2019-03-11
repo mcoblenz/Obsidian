@@ -11,4 +11,5 @@ public interface ObsidianSerialized {
             throws InvalidProtocolBufferException, ReentrancyException,
             BadTransactionException, NoSuchTransactionException;
 
+    public void flush();
 }
