@@ -31,14 +31,6 @@ import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
 
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
-    /* When we return an object to the client, we have to be able to look up that object later by its GUID.
-     * On lookup, we need to be able to create a lazily-initialized object, which requires that we know the name of its class.
-     *
-     * */
-
-    static final String s_returnedObjectsMapKey = "ReturnedObject";
-
-    private Map<String, Class> returnedObjectClassMap;
     SerializationState serializationState;
 
     public HyperledgerChaincodeBase() {
@@ -49,49 +41,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         // No need to do anything because main contracts aren't lazily loaded.
     }
 
-    public void mapReturnedObject(ObsidianSerialized obj) {
-        if (returnedObjectClassMap == null) {
-            returnedObjectClassMap = new HashMap<String, Class>();
-        }
 
-        returnedObjectClassMap.put(obj.__getGUID(), obj.getClass());
-    }
-
-    public Class getReturnedObjectClass(ChaincodeStub stub, String guid) {
-        loadReturnedObjectsMap(stub);
-
-        return returnedObjectClassMap.get(guid);
-    }
-
-    public void archiveReturnedObjectsMap (ChaincodeStub stub) {
-        // TODO: remove old, stale entries?
-
-
-        for (Map.Entry<String, Class> entry : returnedObjectClassMap.entrySet()) {
-            CompositeKey key = stub.createCompositeKey(s_returnedObjectsMapKey, entry.getKey());
-            stub.putStringState(key.toString(), entry.getValue().getCanonicalName());
-            System.out.println("archiving returned object: " + key + "->" + entry.getValue().getCanonicalName());
-        }
-    }
-
-    private void loadReturnedObjectsMap (ChaincodeStub stub) {
-        if (returnedObjectClassMap == null) {
-            returnedObjectClassMap = new HashMap<String, Class>();
-
-            QueryResultsIterator<KeyValue> results = stub.getStateByPartialCompositeKey(s_returnedObjectsMapKey);
-
-            for (KeyValue kv : results) {
-                try {
-                    Class c = Class.forName(kv.getStringValue());
-                    returnedObjectClassMap.put(kv.getKey(), c);
-                    System.out.println("loading map: " + kv.getKey() + " -> " + c);
-                }
-                catch (ClassNotFoundException e) {
-                    System.err.println("Failed to find a Class object for class name " + kv.getValue());
-                }
-            }
-        }
-    }
 
     @Override
     public Response init(ChaincodeStub stub) {
@@ -139,7 +89,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                     ObsidianSerialized receiverContract = serializationState.getEntry(receiverGUID);
                     // If it's not in our map, maybe we just haven't loaded it yet.
                     if (receiverContract == null) {
-                        Class objectClass = getReturnedObjectClass(stub, receiverGUID);
+                        Class objectClass = serializationState.getReturnedObjectClass(stub, receiverGUID);
                         if (objectClass == null) {
                             return newErrorResponse("Can't find object with ID: " + receiverGUID);
                         }

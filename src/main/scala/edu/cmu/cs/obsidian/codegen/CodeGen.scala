@@ -1025,7 +1025,7 @@ class CodeGen (val target: Target) {
                     // Record the UUID of this object (if it is one).
                     tx.retType.get match {
                         case np: NonPrimitiveType =>
-                            val mapInvocation = stateCondBody.invoke("mapReturnedObject")
+                            val mapInvocation = stateCondBody.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
                             mapInvocation.arg(returnObj)
                         case _ => ()
                     }
