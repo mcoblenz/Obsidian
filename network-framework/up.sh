@@ -349,8 +349,12 @@ while getopts "h?c:t:d:f:s:l:i:v" opt; do
   esac
 done
 
-# ask for confirmation to proceed
-askProceed
 
 #Create the network using docker compose
 networkUp
+
+# Install and instantiate the chaincode.
+docker exec cli scripts/install.sh 0 1
+docker exec cli scripts/install.sh 0 2
+
+docker exec cli scripts/instantiate.sh 0 2

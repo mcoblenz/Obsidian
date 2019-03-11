@@ -47,6 +47,15 @@ public class SerializationState {
         guidMap.put(guid, new WeakReference<ObsidianSerialized>(obj));
     }
 
+    public void flushEntries() {
+        // Fabric requires that all endorsers produce identical read sets.
+        // But the peer on which instantiation happened will have some objects cached, resulting in an
+        // inconsistent write set with the other peers.
+        // To work around this problem, we flush the map after instantiation.
+
+        guidMap.clear();
+    }
+
     public UUIDFactory getUUIDFactory() {
         return uuidFactory;
     }

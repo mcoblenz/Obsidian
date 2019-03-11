@@ -29,6 +29,7 @@ import org.hyperledger.fabric.shim.ledger.*;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
+
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
     /* When we return an object to the client, we have to be able to look up that object later by its GUID.
      * On lookup, we need to be able to create a lazily-initialized object, which requires that we know the name of its class.
@@ -132,16 +133,20 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                     // If it's not in our map, maybe we just haven't loaded it yet.
                     if (receiverContract == null) {
                         Class objectClass = getReturnedObjectClass(stub, receiverGUID);
-                        try {
-                            Constructor constructor = objectClass.getConstructor(String.class);
-                            receiverContract = (ObsidianSerialized)constructor.newInstance(receiverGUID);
-                            serializationState.putEntry(receiverGUID, receiverContract);
+                        if (objectClass == null) {
+                            return newErrorResponse("Can't find object with ID: " + receiverGUID);
                         }
-                        catch (NoSuchMethodException |
-                                InstantiationException |
-                                IllegalAccessException |
-                                InvocationTargetException e) {
-                            return newErrorResponse("Failed to instantiate archived object: " + e);
+                        else {
+                            try {
+                                Constructor constructor = objectClass.getConstructor(String.class);
+                                receiverContract = (ObsidianSerialized) constructor.newInstance(receiverGUID);
+                                serializationState.putEntry(receiverGUID, receiverContract);
+                            } catch (NoSuchMethodException |
+                                    InstantiationException |
+                                    IllegalAccessException |
+                                    InvocationTargetException e) {
+                                return newErrorResponse("Failed to instantiate archived object: " + e);
+                            }
                         }
                     }
 
@@ -176,17 +181,13 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
 
         try {
-            System.out.println("before _restoreObject");
             /* Try to restore ourselves (the root object) from the blockchain
              * before we invoke a transaction. (This applies if we stopped the
              * chaincode and restarted it -- we have to restore the state of
              * the root object.) */
             __restoreObject(serializationState);
-            System.out.println("after restoreObject");
             byte result[] = invocationReceiver.run(serializationState, function, byte_args);
-            System.out.println("after run");
             __saveModifiedData(stub);
-            System.out.println("after saveModifiedData");
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
             /* This will be returned when calling an invalid transaction

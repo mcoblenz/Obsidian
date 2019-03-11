@@ -128,8 +128,5 @@ while getopts "h?c:f:i" opt; do
   esac
 done
 
-# ask for confirmation to proceed
-askProceed
-
 #Create the network using docker compose
 networkDown

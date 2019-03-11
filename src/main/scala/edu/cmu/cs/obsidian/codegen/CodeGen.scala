@@ -1879,6 +1879,8 @@ class CodeGen (val target: Target) {
         putEntryInvocation.arg(newClass.fields get guidFieldName)
         putEntryInvocation.arg(JExpr._this())
 
+        meth.body().invoke(JExpr.ref(serializationParamName), "flushEntries")
+
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
         val constructor = newClass.constructor(JMod.PUBLIC)
@@ -1921,6 +1923,8 @@ class CodeGen (val target: Target) {
                 case _ => /* nothing */
             }
         }
+
+        body.invoke(JExpr.ref(serializationParamName), "flushEntries")
     }
 
     private def translateTransDecl(
