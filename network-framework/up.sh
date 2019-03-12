@@ -14,7 +14,7 @@ export VERBOSE=false
 # Print the usage message
 function printHelp() {
   echo "Usage: "
-  echo "  up.sh [-c <channel name>] [-t <timeout>] [-d <delay>] [-f <docker-compose-file>] [-s <chaincodedirectory>] [-l <language>] [-i <imagetag>] [-v]"
+  echo "  up.sh [-c <channel name>] [-t <timeout>] [-d <delay>] [-f <docker-compose-file>] [-s <chaincodedirectory>] [-l <language>] [-i <imagetag>] [-v] [-n <init-args>]"
   echo "    -c <channel name> - channel name to use (defaults to \"mychannel\")"
   echo "    -t <timeout> - CLI timeout duration in seconds (defaults to 10)"
   echo "    -d <delay> - delay duration in seconds (defaults to 3)"
@@ -23,6 +23,7 @@ function printHelp() {
   echo "    -i <imagetag> - the tag to be used to launch the network (defaults to \"latest\")"
   echo "    -v - verbose mode"
   echo "    -s <chaincodedirectory> - the path to the chaincode directory, just the name if it's generated at root"
+  echo "    -n <arg> - argument to pass when instantiating the chaincode. Pass multiple -n arguments for multiple arguments."
   echo "  up.sh -h (print this message)"
 }
 
@@ -310,13 +311,18 @@ CD=default
 LANGUAGE=java
 # default image tag
 IMAGETAG="latest"
+#default (no initialization args)
+INIT="-"
+
 # Parse commandline args
 if [ "$1" = "-m" ]; then # supports old usage, muscle memory is powerful!
   shift
 fi
 EXPMODE="Starting"
 
-while getopts "h?c:t:d:f:s:l:i:v" opt; do
+INIT=""
+
+while getopts "h?c:t:d:f:s:l:i:v:n:" opt; do
   case "$opt" in
   h | \?)
     printHelp
@@ -346,6 +352,13 @@ while getopts "h?c:t:d:f:s:l:i:v" opt; do
   v)
     VERBOSE=true
     ;;
+  n)
+    if [ -n "$INIT" ]; then
+        INIT="${INIT},\"${OPTARG}\""
+    else
+        INIT="\"${OPTARG}\""
+    fi
+    ;;
   esac
 done
 
@@ -357,4 +370,8 @@ networkUp
 docker exec cli scripts/install.sh 0 1
 docker exec cli scripts/install.sh 0 2
 
-docker exec cli scripts/instantiate.sh 0 2
+if [ -n "$INIT" ]; then
+    docker exec cli scripts/instantiate.sh 0 2 $INIT
+else
+    docker exec cli scripts/instantiate.sh 0 2
+fi
