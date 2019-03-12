@@ -1,0 +1,14 @@
+asset contract Prescription {}
+
+interface Pharmacy {
+  transaction depositPrescription(Prescription @ Owned >> Unowned p);
+  transaction removePrescription(Prescription @ Unowned p) returns Prescription @ Owned;
+}
+
+contract Patient {
+  transaction fillPrescription(Pharmacy @ Unowned pharmacy, Prescription @ Unowned pre) {
+    pharmacy.depositPrescription(pre); // Location (A)
+    Prescription p = pharmacy.removePrescription(pre); [p @ Owned]; // Location (B)
+    pharmacy.depositPrescription(p); [p @ Unowned]; // Location (C)
+  }
+}

@@ -12,25 +12,57 @@ import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
  * immediately which type this needs to be in order for type checking to work
  * transitionFieldsInitialized is a set of (state, field, AST) triples that are guaranteed to have been initialized.
  * The AST is for error message generation.
+ *
+ * localFieldsInitialized is a set of state and contract fields that have been initialized.
  */
 
 case class Context(table: DeclarationTable,
                    underlyingVariableMap: Map[String, ObsidianType],
                    isThrown: Boolean,
                    transitionFieldsInitialized: Set[(String, String, AST)],
+                   localFieldsInitialized: Set[String],
                    thisFieldTypes: Map[String, ObsidianType]) {
     def keys: Iterable[String] = underlyingVariableMap.keys
 
     def updated(s: String, t: ObsidianType): Context =
-        Context(contractTable, underlyingVariableMap.updated(s, t), isThrown, transitionFieldsInitialized, thisFieldTypes)
-    def updatedWithInitialization(stateName: String, fieldName: String, ast: AST): Context =
-        Context(contractTable, underlyingVariableMap, isThrown, transitionFieldsInitialized + ((stateName, fieldName, ast)), thisFieldTypes)
+        Context(contractTable,
+            underlyingVariableMap.updated(s, t),
+            isThrown,
+            transitionFieldsInitialized,
+            localFieldsInitialized,
+            thisFieldTypes)
+    def updatedWithTransitionInitialization(stateName: String, fieldName: String, ast: AST): Context =
+        Context(contractTable,
+            underlyingVariableMap,
+            isThrown,
+            transitionFieldsInitialized + ((stateName, fieldName, ast)),
+            localFieldsInitialized,
+            thisFieldTypes)
 
     def updatedAfterTransition(): Context =
-        Context(contractTable, underlyingVariableMap, isThrown, Set.empty, Map.empty)
+        Context(contractTable,
+            underlyingVariableMap,
+            isThrown,
+            Set.empty,
+            Set.empty,
+            Map.empty)
+
+    def updatedWithFieldInitialization(fieldName: String): Context = {
+        Context(contractTable,
+            underlyingVariableMap,
+            isThrown,
+            transitionFieldsInitialized,
+            localFieldsInitialized + fieldName,
+            thisFieldTypes)
+    }
 
     def updatedThisFieldType(fieldName: String, newType: ObsidianType): Context =
-        Context(contractTable, underlyingVariableMap, isThrown, transitionFieldsInitialized, thisFieldTypes.updated(fieldName, newType))
+        Context(contractTable,
+            underlyingVariableMap,
+            isThrown,
+            transitionFieldsInitialized,
+            localFieldsInitialized,
+            thisFieldTypes.updated(fieldName, newType))
 
     def get(s: String): Option[ObsidianType] = underlyingVariableMap.get(s)
 
@@ -786,7 +818,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         checkForUnusedOwnershipErrors(ast, branchContext, oldContext.keys.toSet)
 
-        Context(oldContext.contractTable, newContext.underlyingVariableMap, isThrown = branchContext.isThrown, newContext.transitionFieldsInitialized, branchContext.thisFieldTypes)
+        Context(oldContext.contractTable,
+            newContext.underlyingVariableMap,
+            isThrown = branchContext.isThrown,
+            newContext.transitionFieldsInitialized,
+            newContext.localFieldsInitialized,
+            branchContext.thisFieldTypes)
     }
 
     private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
@@ -837,7 +874,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val mergedVariableMap = mergeMaps(context1.underlyingVariableMap, context2.underlyingVariableMap)
         val mergedThisFieldMap = mergeMaps(context1.thisFieldTypes, context2.thisFieldTypes)
 
-        Context(context1.contractTable, mergedVariableMap, context1.isThrown, context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized), mergedThisFieldMap)
+        Context(context1.contractTable,
+            mergedVariableMap,
+            context1.isThrown,
+            context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized),
+            context1.localFieldsInitialized.intersect(context2.localFieldsInitialized),
+            mergedThisFieldMap)
     }
 
     /* if [e] is of the form ReferenceIdentifier(x), This(), or if [e] is a sequence of
@@ -1022,6 +1064,15 @@ private def checkStatement(
                     (typ, false)
                 }
 
+            val contextWithAssignmentUpdate =
+                if (isField) {
+                    contextPrime.updatedWithFieldInitialization(x)
+                }
+                else {
+                    // TODO: give errors for uninitialized local variables.
+                    contextPrime
+                }
+
             (exprType, variableType) match {
                 case (exprNPType: NonPrimitiveType, variableNPType: NonPrimitiveType) =>
                     if (variableNPType.isOwned && variableNPType.isAssetReference(context.contractTable) != No()) {
@@ -1029,22 +1080,22 @@ private def checkStatement(
                     }
                     if (exprNPType.contractName != variableNPType.contractName) {
                         logError(s, InconsistentContractTypeError(variableNPType.contractName, exprNPType.contractName))
-                        contextPrime
+                        contextWithAssignmentUpdate
                     }
                     else if (isField) {
                         if (variableType != exprType) {
-                            contextPrime.updatedThisFieldType(x, exprType)
+                            contextWithAssignmentUpdate.updatedThisFieldType(x, exprType)
                         }
                         else {
-                            contextPrime
+                            contextWithAssignmentUpdate
                         }
                     }
                     else {
-                        contextPrime.updated(x, exprType)
+                        contextWithAssignmentUpdate.updated(x, exprType)
                     }
                 case (_, _) =>
                     checkIsSubtype(s, exprType, variableType)
-                    contextPrime
+                    contextWithAssignmentUpdate
             }
         }
 
@@ -1312,7 +1363,7 @@ private def checkStatement(
                     contextPrime
                 }
                 else {
-                    contextPrime.updatedWithInitialization(stateName._1, fieldIdentifier._1, s)
+                    contextPrime.updatedWithTransitionInitialization(stateName._1, fieldIdentifier._1, s)
                 }
 
             // assignment target is neither a variable nor a field
@@ -1641,7 +1692,12 @@ private def checkStatement(
         }
 
         // Construct the context that the body should start with
-        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, tx.initialFieldTypes)
+        var initContext = Context(table,
+                                  new TreeMap[String, ObsidianType](),
+                                  isThrown = false,
+                                  Set.empty,
+                                  Set.empty,
+                                  tx.initialFieldTypes)
         initContext = initContext.updated("this", thisType)
 
         // Add all the args first (in an unsafe way) before checking anything
@@ -1751,7 +1807,12 @@ private def checkStatement(
 
 
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
-        var initContext = Context(table, new TreeMap[String, ObsidianType](), isThrown = false, Set.empty, Map.empty)
+        var initContext = Context(table,
+                                  new TreeMap[String, ObsidianType](),
+                                  isThrown = false,
+                                  Set.empty,
+                                  Set.empty,
+                                  Map.empty)
 
         val thisType = ContractReferenceType(table.contractType, Owned(), false)
 
@@ -1814,6 +1875,15 @@ private def checkStatement(
             logError(constr, NoStartStateError(constr.name))
         }
 
+        // If there are states, we'll check to make sure the transitions initialize all fields.
+        // But if there are no states, we have to check separately.
+        if (!hasStates) {
+            for (field <- table.allFields) {
+                if (!outputContext.localFieldsInitialized.contains(field.name)) {
+                    logError(constr, UninitializedFieldError(field.name))
+                }
+            }
+        }
     }
 
     private def checkConstructors(constructors: Seq[Constructor], contract: Contract, table: ContractTable): Unit = {

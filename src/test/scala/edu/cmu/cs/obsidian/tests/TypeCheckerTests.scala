@@ -251,35 +251,35 @@ class TypeCheckerTests extends JUnitSuite {
                 (SubtypingError(ContractReferenceType(ContractType("Thing"), Owned(), false),
                     ContractReferenceType(ContractType("OtherThing"), Inferred(), false)), 27)
                 ::
-                (WrongArityError(0, 1, "constructor of Thing"), 37)
+                (WrongArityError(0, 1, "constructor of Thing"), 39)
                 ::
                 (ArgumentSubtypingError("Thing", "x",
                     StringType(),
-                    IntType()), 37)
+                    IntType()), 39)
                 ::
                 (ArgumentSubtypingError("OtherThing", "x",
                     StringType(),
-                    IntType()), 37)
+                    IntType()), 39)
                 ::
-                (WrongArityError(3, 1, "constructor of Thing"), 37)
+                (WrongArityError(3, 1, "constructor of Thing"), 39)
                 ::
-                (WrongArityError(0, 3, "constructor of Thing"), 39)
+                (WrongArityError(0, 3, "constructor of Thing"), 41)
                 ::
-                (WrongArityError(1, 3, "constructor of Thing"), 39)
+                (WrongArityError(1, 3, "constructor of Thing"), 41)
                 ::
-                (WrongArityError(1, 3, "constructor of OtherThing"), 39)
+                (WrongArityError(1, 3, "constructor of OtherThing"), 41)
                 ::
                 (ArgumentSubtypingError("Thing", "z",
                     IntType(),
-                    BoolType()), 39)
+                    BoolType()), 41)
                 ::
                 (ArgumentSubtypingError("Thing", "y",
                     IntType(),
-                    StringType()), 39)
+                    StringType()), 41)
                 ::
-                (ContractUndefinedError("Stuff"), 41)
+                (ContractUndefinedError("Stuff"), 43)
                 ::
-                (ContractUndefinedError("Stuff"), 41)
+                (ContractUndefinedError("Stuff"), 43)
                 ::
                 Nil
         )
@@ -635,5 +635,12 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/VariableDeclarations.obs",
             (InvalidLocalVariablePermissionDeclarationError(), 15)::
             Nil)
+    }
+
+    @Test def uninitializedFieldTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Uninitialized.obs",
+            ((UninitializedFieldError("x"), 6) ::
+             (UninitializedFieldError("z"), 6) ::
+                Nil))
     }
 }

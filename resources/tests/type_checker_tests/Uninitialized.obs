@@ -1,0 +1,14 @@
+main contract Uninitialized {
+    int x;
+    int y;
+    int z;
+
+    Uninitialized() {
+        // ERROR: failed to initialize field "x".
+        // ERROR: failed to initialize field "z".
+        y = 3;
+        if (true) {
+            z = 4;
+        }
+    }
+}

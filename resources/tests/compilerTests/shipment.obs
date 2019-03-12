@@ -1,0 +1,39 @@
+main contract Shipment {
+   int id;
+   string seller;
+   int load;
+   string description;
+   string plannedDate;
+   string releasedDate;
+   Transport@Owned transportList;
+
+
+   state Contract {}
+   state Release {}
+   state InTransit  {}
+   state Delivered {}
+
+    Shipment@Contract(int nid, string pseller,
+    		 int pload, string pdescription, string pplannedDate) {
+       id = nid;
+       seller = pseller;
+       seller = pseller;
+       load = pload;
+       description = pdescription;
+       plannedDate = pplannedDate;
+       ->Contract;
+    }
+
+    transaction Load (Shipment@Contract >> Release this, string transportName, string transportType, string pstartLoad) {
+            // transportList = new Transport(transportName, transportType, source);
+            transportList = new Transport();
+
+             ->Release
+            (
+       			releasedDate = pstartLoad
+       		);
+    }
+}
+
+contract Transport {
+}

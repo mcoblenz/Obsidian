@@ -1,0 +1,19 @@
+contract A {}
+
+main contract C {
+    string a;
+    A@Shared b;
+
+    C@Owned(string x, A@Shared y) {
+        a = x;
+        b = y;
+        ->S1;
+    }
+
+    state S1 {}
+
+    state S {
+        string x;
+    }
+
+}

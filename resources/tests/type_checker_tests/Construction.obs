@@ -26,6 +26,8 @@ contract Thing {
     // should fail: constructor name error
     OtherThing(int x) {
         this.x = x;
+        this.y = "a";
+        this.z = true;
     }
 }
 
