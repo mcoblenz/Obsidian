@@ -821,8 +821,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         Context(oldContext.contractTable,
             newContext.underlyingVariableMap,
             isThrown = branchContext.isThrown,
-            newContext.transitionFieldsInitialized,
-            newContext.localFieldsInitialized,
+            branchContext.transitionFieldsInitialized,
+            branchContext.localFieldsInitialized,
             branchContext.thisFieldTypes)
     }
 
@@ -1877,7 +1877,7 @@ private def checkStatement(
 
         // If there are states, we'll check to make sure the transitions initialize all fields.
         // But if there are no states, we have to check separately.
-        if (!hasStates) {
+        if (!hasStates && !outputContext.isThrown) {
             for (field <- table.allFields) {
                 if (!outputContext.localFieldsInitialized.contains(field.name)) {
                     logError(constr, UninitializedFieldError(field.name))
