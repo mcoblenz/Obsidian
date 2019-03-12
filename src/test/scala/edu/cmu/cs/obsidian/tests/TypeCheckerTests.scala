@@ -639,8 +639,8 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def uninitializedFieldTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Uninitialized.obs",
-            ((UninitializedFieldError("x"), 6) ::
-             (UninitializedFieldError("z"), 6) ::
+            ((UninitializedFieldError("x"), 7) ::
+             (UninitializedFieldError("z"), 7) ::
                 Nil))
     }
 }
