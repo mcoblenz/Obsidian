@@ -10,6 +10,8 @@ public interface ObsidianSerialized {
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
             BadTransactionException, NoSuchTransactionException;
+    public abstract byte[] init(SerializationState st, byte[][] args)
+            throws InvalidProtocolBufferException;
 
     public void flush();
 }

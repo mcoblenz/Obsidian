@@ -23,4 +23,13 @@ while getopts "h?" opt; do
    esac
 done
 
+confirmNetworkUp() {
+    CLI=$(docker ps -f name=cli -q)
+    if [ -z "$CLI" ]; then
+        echo "Fabric network not found. Did you remember to run up.sh?"
+        exit 0
+    fi
+}
+
+confirmNetworkUp
 docker exec cli scripts/invoke.sh $@

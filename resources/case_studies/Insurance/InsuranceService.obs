@@ -7,28 +7,41 @@ import "resources/case_studies/Insurance/ActivePolicyMap.obs"
 main asset contract InsuranceService {
     // TODO: Collection of Insurer
     // TODO: Keys of trusted banks
-    Insurer@Shared insurers;
-    TimeService@Shared timeService;
+    state Ready {
+        Insurer@Shared insurer;
+        TimeService@Shared timeService;
+        // for now have to have a reference to bank
+        Bank@Shared bank;
+    }
+
+
+    state New {
+    }
 
     // pending and active policies
     PendingPolicyMap@Owned pendingPolicies;
     ActivePolicyMap@Owned activePolicies;
 
-    // for now have to have a reference to bank
-    Bank@Shared bank;
 
     InsuranceService@Owned() {
         pendingPolicies = new PendingPolicyMap();
         activePolicies = new ActivePolicyMap();
+        ->New();
     }
 
+    transaction setup(InsuranceService@New >> Ready this, TimeService@Shared ts, Bank@Shared b, Insurer@Shared ins) {
+        ->Ready(insurer = ins, timeService = ts, bank = b);
+    }
+
+/*
+    When we support a collection of insurer, we should put this back.
     transaction addInsurer(Insurer@Shared insurer) {
-        insurers = insurer;
+        insurer = insurer;
     }
-
+*/
     // TODO: information to calculate bids, Collection of Bid and Token
-    transaction requestBids(int i) returns Policy@Offered {
-        InsuranceBid insBid = insurers.requestBid(i);
+    transaction requestBids(InsuranceService@Ready this, int i) returns Policy@Offered {
+        InsuranceBid insBid = insurer.requestBid(i);
 
         int cost = insBid.getCost();
         int expiration = insBid.getExpirationTime();
@@ -42,14 +55,16 @@ main asset contract InsuranceService {
         return policy;
     }
 
-    transaction buyPolicy(Policy@Offered >> (Active | Expired) policy, Money@Owned >> Unowned money) returns Money@Owned {
+    transaction buyPolicy(InsuranceService@Ready this, Policy@Offered >> (Active | Expired) policy, Money@Owned >> Unowned money) returns Money@Owned {
 
         if (timeService.getTime() > policy.getExpirationTime()) {
-            PolicyRecord pendingPolicy = pendingPolicies.get(policy);
+            PolicyRecord pendingPolicy = pendingPolicies.get(policy); [pendingPolicy @ Pending];
 
             // refund insurer's payout
             Money insurerRefund = pendingPolicy.refund();
-            insurers.receiveRefund(insurerRefund);
+            [pendingPolicy @ Expired];
+
+            insurer.receiveRefund(insurerRefund);
 
             // expire policy and return money
             disown pendingPolicy;

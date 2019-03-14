@@ -21,7 +21,6 @@ verifyResult() {
   fi
 }
 
-
 parseParameters() {
   # If there is no argument left, no function name is specified
   # exit
