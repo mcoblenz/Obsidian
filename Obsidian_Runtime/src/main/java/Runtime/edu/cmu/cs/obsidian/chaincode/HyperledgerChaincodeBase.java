@@ -210,8 +210,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
         try {
             Class foundClass = Class.forName(contractClassName);
-            Constructor<ObsidianSerialized> constructor = foundClass.getConstructor(SerializationState.class);
-            ObsidianSerialized contract = constructor.newInstance(serializationState);
+            Constructor<ObsidianSerialized> constructor = foundClass.getConstructor();
+            ObsidianSerialized contract = constructor.newInstance();
             try {
                 contract.init(serializationState, args);
             }
