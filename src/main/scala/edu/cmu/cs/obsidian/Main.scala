@@ -375,8 +375,9 @@ object Main {
 
 
                 // Invoke protoc to compile from protobuf to Java.
+                val protoPath = protobufPath.getParent.toString + " " + protobufPath.toString
                 val protocInvocation: String =
-                    "protoc --java_out=" + srcDir + " --proto_path=" + protobufPath.getParent.toString + " " + protobufPath.toString
+                    "protoc --java_out=" + srcDir + " --proto_path=" + protoPath
 
                 try {
                     val exitCode = protocInvocation.!
@@ -387,6 +388,20 @@ object Main {
                 } catch {
                     case e: Throwable => println("Error running protoc: " + e)
                 }
+
+                // Copy the proto file to the output path for use by clients.
+
+                val outputPath = options.outputPath match {
+                    case Some(p) =>
+                        Paths.get(p + mainName)
+                    case None =>
+                        Paths.get(mainName)
+                }
+                val protobufOutputPath = outputPath.resolve("protos")
+                Files.createDirectories(protobufOutputPath)
+                val copyProtobufCmd = s"cp $protobufPath $protobufOutputPath"
+                copyProtobufCmd.!
+
             }
 
             generateFabricCode(mainName, options.outputPath, srcDir)

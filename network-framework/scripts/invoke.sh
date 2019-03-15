@@ -12,6 +12,10 @@ HARD_PEER_CONN_PARMS="--peerAddresses peer0.org1.example.com:7051
  --peerAddresses peer0.org2.example.com:7051
  --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt "
 
+PROTO_PATH="${CC_SRC_PATH}protos/"
+CC_NAME=$(basename $CC_SRC_PATH)
+
+
 verifyResult() {
   if [ $1 -ne 0 ]; then
     echo "!!!!!!!!!!!!!!! "$2" !!!!!!!!!!!!!!!!"
@@ -20,6 +24,7 @@ verifyResult() {
     exit 1
   fi
 }
+
 
 parseParameters() {
   # If there is no argument left, no function name is specified
@@ -32,11 +37,38 @@ parseParameters() {
 
   # Parse out all arguments
   while [ "$#" -gt 1 ]; do
-    PARAMS="$PARAMS\"$1\","
+    if [ "$1" = "-g" ]; then
+        if [ "$#" -lt 4 ]; then break; fi
+        # Interpret the NEXT arguments as a TYPE followed by a GUID.
+        shift
+        TYPE=$1
+        shift
+        GUID=$1
+        ENCODED_GUID=$(echo "guid: \"${GUID}\"" | protoc --encode=$TYPE --proto_path=$PROTO_PATH ${PROTO_PATH}${CC_NAME}OuterClass.proto)
+        BASE64_GUID=$(echo "$ENCODED_GUID" | openssl base64)
+        PARAMS="$PARAMS\"$BASE64_GUID\","
+    else
+        PARAMS="$PARAMS\"$1\","
+    fi
     # shift by one to get the next function name or argument for function call
     shift
   done
-  PARAMS="$PARAMS\"$1\"]}"
+
+  # Ugh, bash is terrible. Refactor this!
+  if [ "$1" = "-g" ]; then
+        # Interpret the NEXT arguments as a TYPE followed by a GUID.
+        shift
+        TYPE=$1
+        shift
+        GUID=$1
+        ENCODED_GUID=$(echo "guid: \"${GUID}\"" | protoc --encode=$TYPE --proto_path=$PROTO_PATH ${PROTO_PATH}${CC_NAME}OuterClass.proto)
+        BASE64_GUID=$(echo "$ENCODED_GUID" | openssl base64)
+        PARAMS="$PARAMS\"$BASE64_GUID\""
+    else
+        PARAMS="$PARAMS\"$1\""
+    fi
+
+  PARAMS="$PARAMS]}"
 }
 
 

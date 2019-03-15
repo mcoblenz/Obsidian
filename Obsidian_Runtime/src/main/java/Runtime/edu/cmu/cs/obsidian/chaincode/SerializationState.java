@@ -13,6 +13,9 @@ import org.hyperledger.fabric.shim.ledger.*;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import java.util.Map;
 import java.util.HashMap;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 
 
 
@@ -109,5 +112,38 @@ public class SerializationState {
 
     public UUIDFactory getUUIDFactory() {
         return uuidFactory;
+    }
+
+
+    public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid) {
+        ObsidianSerialized receiverContract = getEntry(guid);
+        // If it's not in our map, maybe we just haven't loaded it yet.
+        if (receiverContract == null) {
+            Class objectClass = getReturnedObjectClass(stub, guid);
+            if (objectClass == null) {
+                System.err.println("Unable to find class of object to look up: " + guid);
+                return null;
+            } else {
+                try {
+                    Constructor constructor = objectClass.getConstructor(String.class);
+                    Object loadedObject = constructor.newInstance(guid);
+                    if ((loadedObject instanceof ObsidianSerialized)) {
+                        receiverContract = (ObsidianSerialized)loadedObject;
+                        putEntry(guid, receiverContract);
+                    }
+                    else {
+                        System.err.println("Loaded object is not an Obsidian object.");
+                    }
+                } catch (NoSuchMethodException |
+                        InstantiationException |
+                        IllegalAccessException |
+                        InvocationTargetException e) {
+                    System.err.println("Caught exception constructing object to load: " + e);
+                    return null;
+                }
+            }
+        }
+
+        return receiverContract;
     }
 }

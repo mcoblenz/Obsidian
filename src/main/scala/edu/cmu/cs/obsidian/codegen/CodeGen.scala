@@ -76,7 +76,7 @@ class CodeGen (val target: Target) {
                                          protobufOuterClassName: String,
                                          contractNameResolutionMap: Map[Contract, String],
                                          protobufOuterClassNames: mutable.HashMap[String, String]): Unit = {
-        protobufOuterClassNames += (contractNameResolutionMap(contract) -> protobufOuterClassName)
+        protobufOuterClassNames += (contractNameResolutionMap(contract) -> (packageName + "." + protobufOuterClassName))
 
         for (d <- contract.declarations if d.isInstanceOf[Contract]) {
             val innerContract = d.asInstanceOf[Contract]
@@ -238,7 +238,7 @@ class CodeGen (val target: Target) {
         }
     }
 
-    private def unmarshallExprExpectingFullObjects(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock): IJExpression = {
+    private def unmarshallExprExpectingFullObjects(translationContext: TranslationContext, body: JBlock, marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock, paramIndex: Integer): IJExpression = {
         typ match
         {
             case IntType() =>
@@ -254,13 +254,37 @@ class CodeGen (val target: Target) {
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                 JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
-            case _ =>
+            case np: NonPrimitiveType =>
+                val contract = resolveNonPrimitiveTypeToContract(np, translationContext, translationContext.contract)
+                assert(contract.isDefined)
+                val protobufClassName = translationContext.getProtobufClassName(contract.get)
+                val archiveType = model.directClass(protobufClassName + "OrGUID")
+
+                val archive = body.decl(archiveType, "archive" + paramIndex, archiveType.staticInvoke("parseFrom").arg(marshalledExpr))
+
+                val enumGetter = "getEitherCase"
+                val guidEnumName = protobufClassName + "OrGUID" + "." + "EitherCase" + "." + "GUID"
+
+                val unarchivedObjDecl = body.decl(resolveType(typ), "unarchivedObj" + paramIndex)
+                // If we have a GUID…
+                val hasGUID = archive.invoke(enumGetter).invoke("equals").arg(JExpr.direct(guidEnumName))
+
+                val cond = body._if(hasGUID)
+
+                val stub = JExpr.ref(serializationParamName).invoke("getStub")
+                val guid = archive.invoke("getGuid")
+                val loadInvocation = JExpr.ref(serializationParamName).invoke("loadContractWithGUID").arg(stub).arg(guid)
+                cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(typ), loadInvocation))
+
+                // If we have an object…
                 val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
                 val invocation = classInstance.invoke("__initFromArchiveBytes")
                 invocation.arg(marshalledExpr)
                 invocation.arg(JExpr.ref(serializationParamName))
-                invocation
+
+                cond._else().assign(unarchivedObjDecl, invocation)
+                unarchivedObjDecl
         }
     }
 
@@ -842,7 +866,7 @@ class CodeGen (val target: Target) {
             }
 
         /* init method */
-        generateInitMethod(newClass, stubType, constructorTypes)
+        generateInitMethod(translationContext, newClass, stubType, constructorTypes)
     }
 
     private def translateInnerContract(aContract: Contract,
@@ -893,9 +917,10 @@ class CodeGen (val target: Target) {
     }
 
     private def generateInitMethod(
-                    newClass: JDefinedClass,
-                    stubType: AbstractJClass,
-                    types: Seq[ObsidianType]): Unit = {
+                                    translationContext: TranslationContext,
+                                    newClass: JDefinedClass,
+                                    stubType: AbstractJClass,
+                                    types: Seq[ObsidianType]): Unit = {
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
         initMeth.param(stubType, serializationParamName)
         val runArgs = initMeth.param(model.BYTE.array().array(), "args")
@@ -909,22 +934,19 @@ class CodeGen (val target: Target) {
 
         mainConstructor.foreach(c =>  {
             val errorBlock: JBlock = new JBlock()
-            val invocation: JInvocation =
-            // Need to pass serialization state as arg to constructor
-            initMeth.body().invoke(c)
+            val invocation: JInvocation = JExpr.invoke(c)
 
             var runArgsIndex = 0
 
             for (t <- types) {
-                val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(runArgs.component(runArgsIndex),t,errorBlock)
+                val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(translationContext, initMeth.body(), runArgs.component(runArgsIndex),t,errorBlock, runArgsIndex)
                 invocation.arg(deserializedArg)
                 runArgsIndex += 1
             }
 
             invocation.arg(JExpr.ref(serializationParamName))
-
+            initMeth.body().add(invocation)
         })
-
         initMeth.body()._return(JExpr.newArray(model.BYTE, 0))
     }
 

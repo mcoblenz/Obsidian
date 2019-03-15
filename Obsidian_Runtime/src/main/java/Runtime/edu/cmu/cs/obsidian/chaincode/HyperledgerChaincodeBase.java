@@ -75,8 +75,6 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         } else {
             return newErrorResponse("Unknown initialization function " + function);
         }
-
-
     }
 
     @Override
@@ -124,34 +122,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                 // Expect the second arg to be the GUID of the reciever.
                 if (params.size() > 1) {
                     String receiverGUID = new String(params.get(1), java.nio.charset.StandardCharsets.UTF_8);
-                    ObsidianSerialized receiverContract = serializationState.getEntry(receiverGUID);
-                    // If it's not in our map, maybe we just haven't loaded it yet.
-                    if (receiverContract == null) {
-                        Class objectClass = serializationState.getReturnedObjectClass(stub, receiverGUID);
-                        if (objectClass == null) {
-                            return newErrorResponse("Can't find object with ID: " + receiverGUID);
-                        } else {
-                            try {
-                                Constructor constructor = objectClass.getConstructor(String.class);
-                                receiverContract = (ObsidianSerialized) constructor.newInstance(receiverGUID);
-                                serializationState.putEntry(receiverGUID, receiverContract);
-                            } catch (NoSuchMethodException |
-                                    InstantiationException |
-                                    IllegalAccessException |
-                                    InvocationTargetException e) {
-                                return newErrorResponse("Failed to instantiate archived object: " + e);
-                            }
-                        }
-                    }
-
-                    if (receiverContract == null) {
-                        return newErrorResponse("Cannot invoke transaction on unknown object " + receiverGUID);
-                    } else {
-                        if (receiverContract instanceof ObsidianSerialized) {
-                            invocationReceiver = (ObsidianSerialized) receiverContract;
-                        } else {
-                            return newErrorResponse("Cannot invoke transaction on non-contract " + receiverContract);
-                        }
+                    invocationReceiver = serializationState.loadContractWithGUID(stub, receiverGUID);
+                    if (invocationReceiver == null) {
+                        return newErrorResponse("Failed to load receiver contract with GUID " + receiverGUID);
                     }
 
                     paramsConsumed = 2;
@@ -203,7 +176,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     }
 
     // Returns the GUID of the new instance if initialization was successful, and null otherwise.
-    public ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) {
+    private ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) {
         if (!contractClassName.startsWith("org.hyperledger.fabric.example")) {
             // We don't permit looking up arbitrary Java classes for security reasons!
             return null;

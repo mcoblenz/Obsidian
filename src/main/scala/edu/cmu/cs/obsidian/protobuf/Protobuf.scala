@@ -6,7 +6,7 @@ import java.io.{File, PrintWriter}
   * Created by mcoblenz on 2/17/17.
   */
 
-class Protobuf (var messages: Seq[ProtobufMessage]) {
+class Protobuf (var messages: Seq[ProtobufDeclaration]) {
     final val packageName: String = "org.hyperledger.fabric.example"
 
     def build(outputFile: File, targetOuterClassName: String): Unit = {
@@ -39,6 +39,12 @@ abstract class ProtobufDeclaration {
         }
 
         str.mkString
+    }
+}
+
+case class ProtobufDeclarationPair (d1: ProtobufDeclaration, d2: ProtobufDeclaration) extends ProtobufDeclaration {
+    def build(initialNextFieldIndex: Int, nestingLevel: Int) : (String, Int) = {
+        (d1.build(initialNextFieldIndex, nestingLevel)._1 + "\n" + d2.build(initialNextFieldIndex, nestingLevel)._1, nestingLevel)
     }
 }
 
