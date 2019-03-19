@@ -9,9 +9,9 @@ public interface ObsidianSerialized {
     byte[] __archiveBytes();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-            BadTransactionException, NoSuchTransactionException;
+            BadTransactionException, BadArgumentException, NoSuchTransactionException;
     public abstract byte[] init(SerializationState st, byte[][] args)
-            throws InvalidProtocolBufferException;
+            throws InvalidProtocolBufferException, BadArgumentException;
 
     public void flush();
 }

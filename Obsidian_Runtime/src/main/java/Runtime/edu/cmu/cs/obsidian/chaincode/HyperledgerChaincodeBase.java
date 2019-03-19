@@ -99,13 +99,18 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                 else {
                     restArgs = new byte[0][];
                 }
-                ObsidianSerialized newContract = instantiateOtherContract(otherClassName, restArgs);
-                if (newContract != null) {
-                    __saveModifiedData(stub, newContract);
-                    return newSuccessResponse(newContract.__getGUID().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+                try {
+                    ObsidianSerialized newContract = instantiateOtherContract(otherClassName, restArgs);
+                    if (newContract != null) {
+                        __saveModifiedData(stub, newContract);
+                        return newSuccessResponse(newContract.__getGUID().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    } else {
+                        return newErrorResponse("Failed to instantiate contract " + otherContractName);
+                    }
                 }
-                else {
-                    return newErrorResponse("Failed to instantiate contract " + otherContractName);
+                catch (BadArgumentException e) {
+                    return newErrorResponse("Failed to instantiate contract; arguments were invalid.");
                 }
             }
             else {
@@ -176,7 +181,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     }
 
     // Returns the GUID of the new instance if initialization was successful, and null otherwise.
-    private ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) {
+    private ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) throws BadArgumentException {
         if (!contractClassName.startsWith("org.hyperledger.fabric.example")) {
             // We don't permit looking up arbitrary Java classes for security reasons!
             return null;
@@ -208,7 +213,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         for (ObsidianSerialized field : dirtyFields) {
             /* Find key and bytes to archive for each dirty field. */
             String archiveKey = field.__getGUID();
-            String archiveValue = new String(archiveBytes, java.nio.charset.StandardCharsets.UTF_8);
+            String archiveValue = new String(field.__archiveBytes(), java.nio.charset.StandardCharsets.UTF_8);
             System.out.println("Saving modified data: ("+field+" @ <"+archiveKey+"> => "+archiveValue+")");
             stub.putStringState(archiveKey, archiveValue);
         }
@@ -220,9 +225,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract String __getGUID();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-                   BadTransactionException, NoSuchTransactionException;
+                   BadTransactionException, NoSuchTransactionException, BadArgumentException;
     public abstract byte[] init(SerializationState st, byte[][] args)
-            throws InvalidProtocolBufferException;
+            throws InvalidProtocolBufferException, BadArgumentException;
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes, SerializationState __st)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();

@@ -242,12 +242,19 @@ class CodeGen (val target: Target) {
         typ match
         {
             case IntType() =>
-                val newInt = JExpr._new(model.parseType("java.math.BigInteger"))
-                newInt.arg(marshalledExpr)
-                newInt
+                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                val stringType = model.ref("java.lang.String")
+                val intAsString = JExpr._new(stringType).arg(marshalledExpr)
+                intAsString.arg(charset)
+                val intType = resolveType(typ)
+                val decl = body.decl(intType, "unmarshalledInt" + paramIndex, JExpr._new(intType).arg(intAsString))
+                val test = body._if(decl.eq(JExpr._null()))
+                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+                test._then()._throw(exception)
+                decl
             case BoolType() =>
                 val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
-                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException")))
+                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException")))
                 marshalledExpr.component(JExpr.lit(0)).eq0()
             case StringType() =>
                 val stringClass = model.ref("java.lang.String")
@@ -933,6 +940,7 @@ class CodeGen (val target: Target) {
 
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         initMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
+        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
 
         // have to check that the args parameter has the correct number of arguments
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
@@ -964,6 +972,7 @@ class CodeGen (val target: Target) {
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         runMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
         runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
