@@ -18,6 +18,10 @@ main contract StringContainerContainer {
         container = new StringContainer("hello, world");
     }
 
+    transaction setContainer(StringContainer@Owned >> Unowned s) {
+        container = s;
+    }
+
     transaction getContainer() returns StringContainer@Unowned {
         return container;
     }

@@ -260,7 +260,13 @@ class CodeGen (val target: Target) {
                 val protobufClassName = translationContext.getProtobufClassName(contract.get)
                 val archiveType = model.directClass(protobufClassName + "OrGUID")
 
-                val archive = body.decl(archiveType, "archive" + paramIndex, archiveType.staticInvoke("parseFrom").arg(marshalledExpr))
+                val decodedArg = body.decl(model.parseType("byte[]"),
+                    "decoded" + paramIndex,
+                    model.directClass("java.util.Base64").staticInvoke("getDecoder").invoke("decode").arg(marshalledExpr)
+                    )
+
+
+                val archive = body.decl(archiveType, "archive" + paramIndex, archiveType.staticInvoke("parseFrom").arg(decodedArg))
 
                 val enumGetter = "getEitherCase"
                 val guidEnumName = protobufClassName + "OrGUID" + "." + "EitherCase" + "." + "GUID"
@@ -280,7 +286,7 @@ class CodeGen (val target: Target) {
                 val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
                 val invocation = classInstance.invoke("__initFromArchiveBytes")
-                invocation.arg(marshalledExpr)
+                invocation.arg(decodedArg)
                 invocation.arg(JExpr.ref(serializationParamName))
 
                 cond._else().assign(unarchivedObjDecl, invocation)
@@ -1024,48 +1030,34 @@ class CodeGen (val target: Target) {
                 val stateCond = transCondBody._if(stateEq)
                 val stateCondBody = stateCond._then()
 
+                // Check to make sure we have enough arguments.
+                val argsTest = runArgs.ref("length").eq(JExpr.lit(tx.args.length))
+                val enoughArgsTest = stateCondBody._if(argsTest)
+                val enoughArgs = enoughArgsTest._then()
+                val notEnoughArgs = enoughArgsTest._else()
+
+                // TODO: report the error to the client more directly
+                notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
+                notEnoughArgs._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+
                 /* parse the (typed) args from raw bytes */
                 var txArgsList: List[JVar] = List.empty
                 var runArgNumber = 0
                 for (txArg <- tx.args) {
+
+
                     val runArg = runArgs.component(JExpr.lit(runArgNumber))
                     val javaArgType = resolveType(txArg.typIn)
+                    val errorBlock = new JBlock()
 
-                    val transactionArgExpr: IJExpression = txArg.typIn match {
-                        case IntType() =>
-                            val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                            val intAsString = JExpr._new(model.ref("java.lang.String")).arg(runArg)
-                            intAsString.arg(charset)
-                            JExpr._new(javaArgType).arg(intAsString)
-                        case BoolType() =>
-                            // Arg has to be a 1-element-long array containing
-                            // either 0 or 1.
-                            val lengthCheckCall = model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils").staticInvoke("bytesRepresentBoolean")
-                            lengthCheckCall.arg(runArg)
+                    val transactionArgExpr = unmarshallExprExpectingFullObjects(translationContext, enoughArgs, runArg, txArg.typIn, errorBlock, runArgNumber)
 
-                            val lengthCheck = stateCondBody._if(lengthCheckCall.not())
-                            val _ = lengthCheck._then()._return(JExpr._null())
-
-
-                            JExpr.cond(runArg.component(JExpr.lit(0)).eq0(), JExpr.lit(false), JExpr.lit(true))
-                        case StringType() =>
-                            val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                            val newString = JExpr._new(model.ref("java.lang.String"))
-                            newString.arg(runArg)
-                            newString.arg(charset)
-                            newString
-                        case _ => val newExpr = JExpr._new(javaArgType)
-                                  val initExpr = newExpr.invoke("__initFromArchiveBytes")
-                                  initExpr.arg(runArg)
-                                  initExpr.arg(JExpr.ref(serializationParamName))
-                                  initExpr
-                    }
-
-                    val newTxArg: JVar = stateCondBody.decl(
+                    val newTxArg: JVar = enoughArgs.decl(
                         javaArgType,
                         txArg.varName,
                         transactionArgExpr
                     )
+
 
                     txArgsList = newTxArg :: txArgsList
                     runArgNumber += 1
@@ -1077,17 +1069,17 @@ class CodeGen (val target: Target) {
                 if (tx.retType.isDefined) {
                     txInvoke = JExpr.invoke(txMethName)
 
-                    val returnObj = stateCondBody.decl(resolveType(tx.retType.get), "returnObj", txInvoke)
+                    val returnObj = enoughArgs.decl(resolveType(tx.retType.get), "returnObj", txInvoke)
 
                     // Record the UUID of this object (if it is one).
                     tx.retType.get match {
                         case np: NonPrimitiveType =>
-                            val mapInvocation = stateCondBody.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+                            val mapInvocation = enoughArgs.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
                             mapInvocation.arg(returnObj)
                         case _ => ()
                     }
 
-                    stateCondBody.assign(returnBytes,
+                    enoughArgs.assign(returnBytes,
                         tx.retType.get match {
                             case IntType() =>
                                 val stringResult = returnObj.invoke("toString")
@@ -1104,7 +1096,7 @@ class CodeGen (val target: Target) {
 
                     )
                 } else {
-                    txInvoke = stateCondBody.invoke(txMethName)
+                    txInvoke = enoughArgs.invoke(txMethName)
                 }
 
                 for (txArg <- txArgsList.reverse) {
@@ -1401,6 +1393,8 @@ class CodeGen (val target: Target) {
         // val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
+        archiveBody.invoke(builderVariable, "setGuid").arg(inClass.fields().get("__guid"))
+
         val declarations = contract.declarations
 
         for (f <- declarations if f.isInstanceOf[Field]) {
@@ -1631,6 +1625,8 @@ class CodeGen (val target: Target) {
         val enumGetter = "getStateCase"
         val enumName = (stateName: String) =>
             protobufClassName + "." + "StateCase" + "." + ("STATE" + stateName).toUpperCase
+
+        fromArchiveBody.assign(JExpr.ref("__guid"), archive.invoke("getGuid"))
 
         for (stDecl <- declarations if stDecl.isInstanceOf[State]) {
             val st = stDecl.asInstanceOf[State]

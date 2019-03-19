@@ -151,7 +151,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             __restoreObject(serializationState);
 
             byte result[] = invocationReceiver.run(serializationState, function, paramsBytes);
-            __saveModifiedData(stub, this);
+            __saveModifiedData(stub, invocationReceiver);
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
             /* This will be returned when calling an invalid transaction
@@ -208,7 +208,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         for (ObsidianSerialized field : dirtyFields) {
             /* Find key and bytes to archive for each dirty field. */
             String archiveKey = field.__getGUID();
-            String archiveValue = new String(field.__archiveBytes());
+            String archiveValue = new String(archiveBytes, java.nio.charset.StandardCharsets.UTF_8);
             System.out.println("Saving modified data: ("+field+" @ <"+archiveKey+"> => "+archiveValue+")");
             stub.putStringState(archiveKey, archiveValue);
         }

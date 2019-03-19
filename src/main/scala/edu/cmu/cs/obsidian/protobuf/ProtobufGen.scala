@@ -45,18 +45,21 @@ object ProtobufGen {
             }
         )
 
+        val declsWithGUID = ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") :: decls
+
         val contractMessage = if (stateNames.length > 0) {
             val oneOfOptions = stateNames.map((stateName: String) =>
                 (ObjectType(stateName), "state" + stateName))
             val stateDecl = ProtobufOneOf("state", oneOfOptions)
 
-            new ProtobufMessage(stateDecl::decls, aContract.name)
+            new ProtobufMessage(stateDecl::declsWithGUID, aContract.name)
         }
         else {
-            new ProtobufMessage(decls, aContract.name)
+            new ProtobufMessage(declsWithGUID, aContract.name)
         }
 
-        val contractOrGUIDFields : List[(FieldType, String)] = List[(FieldType, String)]((ObjectType(aContract.name), "obj"), (StringType(), "guid"))
+        val contractOrGUIDFields : List[(FieldType, String)] = List[(FieldType, String)]((ObjectType(aContract.name), "obj"),
+                                                                                         (edu.cmu.cs.obsidian.protobuf.StringType(), "guid"))
         val contractOrGUIDMessage = new ProtobufMessage(Seq(new ProtobufOneOf("either", contractOrGUIDFields)),
                                                         aContract.name + "OrGUID")
 
