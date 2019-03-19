@@ -298,6 +298,12 @@ class CodeGen (val target: Target) {
 
                 cond._else().assign(unarchivedObjDecl, invocation)
                 unarchivedObjDecl
+            case BottomType() =>
+                assert(false)
+                JExpr._null()
+            case UnitType() =>
+                assert(false)
+                JExpr._null()
         }
     }
 
