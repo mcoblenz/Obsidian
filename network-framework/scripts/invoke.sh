@@ -33,7 +33,7 @@ parseParameters() {
     exit 1
   fi
 
-    set -x
+  # set -x
   PARAMS='{"Args":['
 
   # Parse out all arguments
