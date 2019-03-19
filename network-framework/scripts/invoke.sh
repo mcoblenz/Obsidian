@@ -33,6 +33,7 @@ parseParameters() {
     exit 1
   fi
 
+    set -x
   PARAMS='{"Args":['
 
   # Parse out all arguments
@@ -44,8 +45,8 @@ parseParameters() {
         TYPE=$1
         shift
         GUID=$1
-        ENCODED_GUID=$(echo "guid: \"${GUID}\"" | protoc --encode=$TYPE --proto_path=$PROTO_PATH ${PROTO_PATH}${CC_NAME}OuterClass.proto)
-        BASE64_GUID=$(echo "$ENCODED_GUID" | openssl base64)
+        ENCODED_GUID=$(echo -n "guid: \"${GUID}\"" | protoc --encode=$TYPE --proto_path=$PROTO_PATH ${PROTO_PATH}${CC_NAME}OuterClass.proto)
+        BASE64_GUID=$(echo -n "$ENCODED_GUID" | openssl base64)
         PARAMS="$PARAMS\"$BASE64_GUID\","
     else
         PARAMS="$PARAMS\"$1\","

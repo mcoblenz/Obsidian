@@ -362,7 +362,16 @@ while getopts "h?c:t:d:f:s:l:i:v:n:" opt; do
   esac
 done
 
+confirmNetworkDown() {
+    CLI=$(docker ps -f name=cli -q)
+    if [ -n "$CLI" ]; then
+        echo "Fabric network found. Did you remember to run down.sh before restarting?"
+        exit 0
+    fi
+}
 
+
+confirmNetworkDown
 #Create the network using docker compose
 networkUp
 
