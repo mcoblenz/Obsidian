@@ -36,7 +36,6 @@ object Main {
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
-          |    --hyperledger                generate Java chaincode for Hyperledger Fabric
         """.stripMargin
 
     def parseOptions(args: List[String]): CompilerOptions = {
