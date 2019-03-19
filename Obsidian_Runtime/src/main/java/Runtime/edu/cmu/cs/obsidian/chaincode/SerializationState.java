@@ -8,24 +8,39 @@
 package edu.cmu.cs.obsidian.chaincode;
 
 import org.hyperledger.fabric.shim.ChaincodeStub;
+import org.hyperledger.fabric.shim.ledger.*;
+
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import java.util.Map;
 import java.util.HashMap;
-import java.lang.ref.WeakReference;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
+
+
 
 public class SerializationState {
-    /* We use WeakReferences here because we still want
-     * the objects to be garbage collected if they go out
-     * of scope. */
-    private Map<String, WeakReference<ObsidianSerialized>> guidMap;
+    private Map<String, ObsidianSerialized> guidMap;
+
+    /* When we return an object to the client, we have to be able to look up that object later by its GUID.
+     * On lookup, we need to be able to create a lazily-initialized object, which requires that we know the name of its class.
+     *
+     * */
+    private Map<String, Class> returnedObjectClassMap;
+
+    static final String s_returnedObjectsMapKey = "ReturnedObject";
+
+
     private ChaincodeStub stub;
+    UUIDFactory uuidFactory;
 
     public SerializationState() {
-        guidMap = new HashMap<String, WeakReference<ObsidianSerialized>>();
+        guidMap = new HashMap<String, ObsidianSerialized>();
     }
 
     public void setStub(ChaincodeStub newStub) {
         stub = newStub;
+        uuidFactory = new UUIDFactory(newStub.getTxId());
     }
 
     public ChaincodeStub getStub() {
@@ -33,15 +48,102 @@ public class SerializationState {
     }
 
     public ObsidianSerialized getEntry(String guid) {
-        WeakReference<ObsidianSerialized> ref = guidMap.get(guid);
-        if (ref != null) {
-            return ref.get();
-        } else {
-            return null;
-        }
+        return guidMap.get(guid);
     }
 
     public void putEntry(String guid, ObsidianSerialized obj) {
-        guidMap.put(guid, new WeakReference<ObsidianSerialized>(obj));
+        guidMap.put(guid, obj);
+    }
+
+    public void flushEntries() {
+        // Fabric requires that all endorsers produce identical read sets.
+        // But the peer on which instantiation happened will have some objects cached, resulting in an
+        // inconsistent write set with the other peers.
+        // To work around this problem, we flush all flushable objects.
+
+        for (ObsidianSerialized obj : guidMap.values()) {
+            obj.flush();
+        }
+    }
+
+    public void mapReturnedObject(ObsidianSerialized obj) {
+        if (returnedObjectClassMap == null) {
+            returnedObjectClassMap = new HashMap<String, Class>();
+        }
+
+        returnedObjectClassMap.put(obj.__getGUID(), obj.getClass());
+    }
+
+    public Class getReturnedObjectClass(ChaincodeStub stub, String guid) {
+        loadReturnedObjectsMap(stub);
+
+        return returnedObjectClassMap.get(guid);
+    }
+
+    public void archiveReturnedObjectsMap (ChaincodeStub stub) {
+        // TODO: remove old, stale entries?
+
+
+        for (Map.Entry<String, Class> entry : returnedObjectClassMap.entrySet()) {
+            CompositeKey key = stub.createCompositeKey(s_returnedObjectsMapKey, entry.getKey());
+            stub.putStringState(key.toString(), entry.getValue().getCanonicalName());
+            System.out.println("archiving returned object: " + key + "->" + entry.getValue().getCanonicalName());
+        }
+    }
+
+    private void loadReturnedObjectsMap (ChaincodeStub stub) {
+        if (returnedObjectClassMap == null) {
+            returnedObjectClassMap = new HashMap<String, Class>();
+
+            QueryResultsIterator<KeyValue> results = stub.getStateByPartialCompositeKey(s_returnedObjectsMapKey);
+
+            for (KeyValue kv : results) {
+                try {
+                    Class c = Class.forName(kv.getStringValue());
+                    returnedObjectClassMap.put(kv.getKey(), c);
+                    System.out.println("loading map: " + kv.getKey() + " -> " + c);
+                }
+                catch (ClassNotFoundException e) {
+                    System.err.println("Failed to find a Class object for class name " + kv.getValue());
+                }
+            }
+        }
+    }
+
+    public UUIDFactory getUUIDFactory() {
+        return uuidFactory;
+    }
+
+
+    public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid) {
+        ObsidianSerialized receiverContract = getEntry(guid);
+        // If it's not in our map, maybe we just haven't loaded it yet.
+        if (receiverContract == null) {
+            Class objectClass = getReturnedObjectClass(stub, guid);
+            if (objectClass == null) {
+                System.err.println("Unable to find class of object to look up: " + guid);
+                return null;
+            } else {
+                try {
+                    Constructor constructor = objectClass.getConstructor(String.class);
+                    Object loadedObject = constructor.newInstance(guid);
+                    if ((loadedObject instanceof ObsidianSerialized)) {
+                        receiverContract = (ObsidianSerialized)loadedObject;
+                        putEntry(guid, receiverContract);
+                    }
+                    else {
+                        System.err.println("Loaded object is not an Obsidian object.");
+                    }
+                } catch (NoSuchMethodException |
+                        InstantiationException |
+                        IllegalAccessException |
+                        InvocationTargetException e) {
+                    System.err.println("Caught exception constructing object to load: " + e);
+                    return null;
+                }
+            }
+        }
+
+        return receiverContract;
     }
 }

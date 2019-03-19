@@ -8,6 +8,7 @@ VERBOSE="false"
 
 PEER="$1"
 ORG="$2"
+INIT_ARGS="$3"
 CC_SRC_PATH=$CC_SRC_PATH
 
 ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
@@ -70,17 +71,28 @@ echo "===================== instantiating Chaincode on peer${PEER}.org${ORG} on 
 setGlobals $PEER $ORG
 VERSION=${3:-1.0}
 
+if [ -n "${INIT_ARGS}" ] ; then
+    if [ "${INIT_ARGS}" == "-" ] ; then
+        INIT='["init"]'
+    else
+        INIT='["init",'${INIT_ARGS}']'
+    fi
+else
+    INIT='["init"]'
+fi
+
+
 # while 'peer chaincode' command can get the orderer endpoint from the peer
 # (if join was successful), let's supply it directly as we know it using
 # the "-o" option
 if [ -z "$CORE_PEER_TLS_ENABLED" -o "$CORE_PEER_TLS_ENABLED" = "false" ]; then
 set -x
-peer chaincode instantiate -o orderer.example.com:7050 -C $CHANNEL_NAME -n mycc -l ${LANGUAGE} -v ${VERSION} -c '{"Args":["init"]}' -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
+peer chaincode instantiate -o orderer.example.com:7050 -C $CHANNEL_NAME -n mycc -l ${LANGUAGE} -v ${VERSION} -c \{\"Args\":${INIT}\} -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
 res=$?
 set +x
 else
 set -x
-peer chaincode instantiate -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc -l ${LANGUAGE} -v 1.0 -c '{"Args":["init"]}' -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
+peer chaincode instantiate -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc -l ${LANGUAGE} -v 1.0 -c \{\"Args\":${INIT}\} -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
 res=$?
 set +x
 fi

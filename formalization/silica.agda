@@ -61,7 +61,12 @@ isShared : Type → Bool
 isShared (contractType (record {contractName = _ ; perm = Shared})) = true
 isShared _ = false
 
-
+eqContractTypes : ∀ {t₁ : Tc}
+                  → ∀ {t₂ : Tc}
+                  → Tc.perm t₁ ≡ Tc.perm t₂
+                  → Tc.contractName t₁ ≡ Tc.contractName t₂
+                  → t₁ ≡ t₂
+eqContractTypes {t₁} {t₂} refl refl = refl
 
 data Field : Set where
 
@@ -497,6 +502,25 @@ splitCompatibility (shared-shared-shared {Γ} {t} eq)  = sharedCompat eq eq refl
 splitCompatibility (owned-shared notAsset) = sharedCompat refl refl refl
 splitCompatibility (states-shared x) = sharedCompat refl refl refl
 
+compatibleContractsHaveSameNames : ∀ {T : Type}
+                                   → ∀ {t : Tc}
+                                   → ∀ {t' : Tc}
+                                   → contractType t ⟷ T
+                                   → T ≡ contractType t'
+                                   → Tc.contractName t ≡ Tc.contractName t'
+compatibleContractsHaveSameNames {T} {t} {t'} (symCompat compat) refl = sym (compatibleContractsHaveSameNames compat refl)
+compatibleContractsHaveSameNames {T} {t} {t'} (unownedCompat x x₁) refl = x₁
+compatibleContractsHaveSameNames {T} {t} {t'} (sharedCompat x x₁ x₂) refl = x₂          
+
+typesCompatibleWithContractsAreContracts : ∀ {T : Type}
+                                           → ∀ {t : Tc}
+                                           → contractType t ⟷ T
+                                           → ∃[ t' ] (T ≡ contractType t')
+
+typesCompatibleWithContractsAreContracts {T} {t} (symCompat compat) = {!!}
+typesCompatibleWithContractsAreContracts {T} {t} (unownedCompat {C} {C'} {perm} {perm'} refl refl) = ⟨ tc C perm' , refl ⟩
+typesCompatibleWithContractsAreContracts {T} {t} (sharedCompat {tc C Shared} {tc C' Shared} refl refl refl) = ⟨ tc C Shared , refl ⟩ 
+
 splittingRespectsHeap : ∀ {Γ}
                         → ∀ {T t₁ t₂ t₃ : Type}
                         → Γ ⊢ t₁ ⇛ t₂ / t₃
@@ -512,7 +536,12 @@ splittingRespectsHeap {Γ} {contractType x} {t₁} {t₂} {t₃} spl consis = {!
 splittingRespectsHeap {Γ} {T} {(base Void)} {(base Void)} {(base Void)} voidSplit consis = ⟨ consis , consis ⟩
 splittingRespectsHeap {Γ} {T} {.(base Boolean)} {.(base Boolean)} {.(base Boolean)} booleanSplit consis = ⟨ consis , consis ⟩
 
-splittingRespectsHeap {Γ} {T} {contractType t₁} {contractType t₂} {contractType t₃} spl@(unownedSplit x x₁ x₂ x₃) (symCompat consis) = ⟨ symCompat {!!} , {!!} ⟩
+splittingRespectsHeap {Γ} {T} {contractType t₁} {contractType t₂} {contractType t₃} (unownedSplit x x₁ x₂ x₃) (symCompat consis) rewrite (eqContractTypes x₂ x) =
+  let
+    val TIsContractType = typesCompatibleWithContractsAreContracts consis
+    compatTypes = (compatibleContractsHaveSameNames consis (proj₂ TIsContractType))
+  in 
+    ⟨ symCompat consis , symCompat {!unownedCompat x₃ ?!} ⟩
 
 -- t1 => t1 / Unowned
 splittingRespectsHeap {Γ} {(contractType (tc C perm))} {contractType (tc C' perm')} {contractType t₂} {contractType t₃} (unownedSplit x x₁ x₂ x₃) (unownedCompat x₄ x₅) =
