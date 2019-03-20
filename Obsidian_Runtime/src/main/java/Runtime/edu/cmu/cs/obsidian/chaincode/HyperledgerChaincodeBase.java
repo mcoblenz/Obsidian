@@ -168,9 +168,24 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             return newErrorResponse("No such transaction: " + function);
         } catch (Throwable e) {
             System.err.println("Caught exception dispatching invocation: " + e);
+
             e.printStackTrace();
-            return newErrorResponse(e);
+
+            // Workaround for https://jira.hyperledger.org/browse/FAB-14713
+            // Otherwise, we'd return newErrorResponse(e).
+            String message = e.getMessage();
+            if (message == null) {
+                message = "";
+            }
+            return newErrorResponse(message, printStackTrace(e));
         }
+    }
+
+    private static byte[] printStackTrace(Throwable throwable) {
+        if (throwable == null) return new byte[0];
+        final StringWriter buffer = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(buffer));
+        return buffer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     public void delegatedMain(String args[]) {

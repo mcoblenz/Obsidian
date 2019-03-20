@@ -1991,6 +1991,32 @@ class CodeGen (val target: Target) {
         body.invoke(JExpr.ref(serializationParamName), "flushEntries")
     }
 
+    private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
+        typ match {
+            case StateType(_, states, _) => {
+                val currentState = expr.invoke(getStateMeth)
+
+                var cond: IJExpression = JExpr.TRUE
+                // check if the current state is in any of the possible states
+                for (st <- states) {
+                    val className = resolveType(typ).name()
+                    val enumClassName = stateEnumNameForClassName(className)
+                    val enumClass = model.ref(packageName + "." + className + "." + enumClassName)
+                    val enumConstant = JExpr.enumConstantRef(enumClass, st)
+                    cond = JOp.cand(currentState.ne(enumConstant), cond)
+                }
+
+                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
+                exception.arg(expr)
+                exception.arg(currentState.invoke("toString"))
+                exception.arg(tx.name)
+                body._if(cond)
+                  ._then()._throw(exception)
+            }
+            case _ => ()
+        }
+    }
+
     private def translateTransDecl(
                     tx: Transaction,
                     newClass: JDefinedClass,
@@ -2012,24 +2038,17 @@ class CodeGen (val target: Target) {
         meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
 
 
-        // Dynamically check the state
-        tx.thisType match {
-            case StateType(_, states, _) => {
-                val currentState = JExpr.invoke(getStateMeth)
+        // Dynamically check the state of the receiver and the arguments.
+        dynamicStateCheck(tx, meth.body(), JExpr._this(), tx.thisType)
 
-                var cond: IJExpression = JExpr.TRUE
-                // check if the current state is in any of the possible states
-                for (st <- states) {
-                    cond = JOp.cand(currentState.ne(translationContext.getEnum(st)), cond)
-                }
+        /* add args to method and collect them in a list */
+        val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
+            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
+        )
 
-                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
-                exception.arg(currentState.invoke("toString"))
-                exception.arg(tx.name)
-                meth.body()._if(cond)
-                   ._then()._throw(exception)
-            }
-            case _ => ()
+        val argsWithVars = jArgs.zip (tx.args)
+        for  (argWithVar <- argsWithVars) {
+            dynamicStateCheck(tx, meth.body(), argWithVar._1._2, argWithVar._2.typIn)
         }
 
         /* We put the method body in a try block, and set the tx flag to false in a finally
@@ -2056,15 +2075,10 @@ class CodeGen (val target: Target) {
             case Server(_) =>
         }
 
-        /* add args to method and collect them in a list */
-        val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
-        )
-
         val argList: Seq[(String, JVar)] =
-                // We need to pass the ChaincodeStub to methods so that the objects can
-                // restore themselves from the blockchain if need be.
-                (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
+        // We need to pass the ChaincodeStub to methods so that the objects can
+        // restore themselves from the blockchain if need be.
+            (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
