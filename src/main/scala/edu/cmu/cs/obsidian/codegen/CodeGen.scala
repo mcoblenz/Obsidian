@@ -250,11 +250,14 @@ class CodeGen (val target: Target) {
                 val decl = body.decl(intType, "unmarshalledInt" + paramIndex, JExpr._new(intType).arg(intAsString))
                 val test = body._if(decl.eq(JExpr._null()))
                 val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+                exception.arg(intAsString)
                 test._then()._throw(exception)
                 decl
             case BoolType() =>
                 val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
-                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException")))
+                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+                exception.arg(marshalledExpr)
+                val _ = ifLengthIncorrect._then()._throw(exception)
                 marshalledExpr.component(JExpr.lit(0)).eq0()
             case StringType() =>
                 val stringClass = model.ref("java.lang.String")
@@ -298,6 +301,12 @@ class CodeGen (val target: Target) {
 
                 cond._else().assign(unarchivedObjDecl, invocation)
                 unarchivedObjDecl
+            case BottomType() =>
+                assert(false)
+                JExpr._null()
+            case UnitType() =>
+                assert(false)
+                JExpr._null()
         }
     }
 
@@ -941,6 +950,8 @@ class CodeGen (val target: Target) {
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         initMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
+        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
 
         // have to check that the args parameter has the correct number of arguments
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
@@ -973,6 +984,10 @@ class CodeGen (val target: Target) {
         runMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+
         runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
@@ -1047,7 +1062,12 @@ class CodeGen (val target: Target) {
 
                 // TODO: report the error to the client more directly
                 notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
-                notEnoughArgs._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+
+                val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
+                exception.arg(txName)
+                exception.arg(tx.args.length)
+                exception.arg(runArgs.ref("length"))
+                notEnoughArgs._throw(exception)
 
                 /* parse the (typed) args from raw bytes */
                 var txArgsList: List[JVar] = List.empty
@@ -1119,7 +1139,7 @@ class CodeGen (val target: Target) {
             }
             /* If we aren't in any of the states were we can use this transaction, we throw an exception */
             if (transactionIsConditional) {
-                transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+                transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.InvalidStateException")))
             }
         }
 
@@ -1896,6 +1916,8 @@ class CodeGen (val target: Target) {
 
         val methodName = "new_" + newClass.name()
         var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+
 
         mainConstructor = Some(meth)
 
@@ -1930,6 +1952,8 @@ class CodeGen (val target: Target) {
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
         val constructor = newClass.constructor(JMod.PUBLIC)
+        constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+
         val invocation = constructor.body().invoke(methodName)
 
         /* add args to method and collect them in a list */
@@ -1973,6 +1997,32 @@ class CodeGen (val target: Target) {
         body.invoke(JExpr.ref(serializationParamName), "flushEntries")
     }
 
+    private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
+        typ match {
+            case StateType(_, states, _) => {
+                val currentState = expr.invoke(getStateMeth)
+
+                var cond: IJExpression = JExpr.TRUE
+                // check if the current state is in any of the possible states
+                for (st <- states) {
+                    val className = resolveType(typ).name()
+                    val enumClassName = stateEnumNameForClassName(className)
+                    val enumClass = model.ref(packageName + "." + className + "." + enumClassName)
+                    val enumConstant = JExpr.enumConstantRef(enumClass, st)
+                    cond = JOp.cand(currentState.ne(enumConstant), cond)
+                }
+
+                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
+                exception.arg(expr)
+                exception.arg(currentState.invoke("toString"))
+                exception.arg(tx.name)
+                body._if(cond)
+                  ._then()._throw(exception)
+            }
+            case _ => ()
+        }
+    }
+
     private def translateTransDecl(
                     tx: Transaction,
                     newClass: JDefinedClass,
@@ -1986,25 +2036,27 @@ class CodeGen (val target: Target) {
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, tx.name)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+
 
         /* ensure the object is loaded before trying to do anything.
          * (even checking the state!) */
         meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
         meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
 
-        // Dynamically check the state
-        tx.thisType match {
-            case StateType(_, states, _) => {
-                var cond: IJExpression = JExpr.TRUE
-                // check if the current state is in any of the possible states
-                for (st <- states) {
-                    cond = JOp.cand(JExpr.invoke(getStateMeth).ne(translationContext.getEnum(st)), cond)
-                }
 
-                meth.body()._if(cond)
-                   ._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
-            }
-            case _ => ()
+        // Dynamically check the state of the receiver and the arguments.
+        dynamicStateCheck(tx, meth.body(), JExpr._this(), tx.thisType)
+
+        /* add args to method and collect them in a list */
+        val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
+            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
+        )
+
+        val argsWithVars = jArgs.zip (tx.args)
+        for  (argWithVar <- argsWithVars) {
+            dynamicStateCheck(tx, meth.body(), argWithVar._1._2, argWithVar._2.typIn)
         }
 
         /* We put the method body in a try block, and set the tx flag to false in a finally
@@ -2015,7 +2067,10 @@ class CodeGen (val target: Target) {
 
         /* if the flag has already been set, that means there has been a reentrancy */
         val jIf = jTry.body()._if(isInsideInvocationFlag())
-        jIf._then()._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException")))
+        val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+        exception.arg(translationContext.contract.sourcePath)
+        exception.arg(tx.loc.line)
+        jIf._then()._throw(exception)
 
         /* otherwise, we set the flag to true */
         jIf._else().assign(isInsideInvocationFlag(), JExpr.lit(true))
@@ -2028,15 +2083,10 @@ class CodeGen (val target: Target) {
             case Server(_) =>
         }
 
-        /* add args to method and collect them in a list */
-        val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
-        )
-
         val argList: Seq[(String, JVar)] =
-                // We need to pass the ChaincodeStub to methods so that the objects can
-                // restore themselves from the blockchain if need be.
-                (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
+        // We need to pass the ChaincodeStub to methods so that the objects can
+        // restore themselves from the blockchain if need be.
+            (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
@@ -2183,7 +2233,11 @@ class CodeGen (val target: Target) {
             }
 
             case Throw() =>
-                body._throw(JExpr._new(model.ref("RuntimeException")))
+                val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+                exception.arg(translationContext.contract.sourcePath)
+                exception.arg(statement.loc.line)
+                exception.arg(JExpr._null())
+                body._throw(exception)
 
             case If(e, s) =>
                 translateBody(body._if(translateExpr(e, translationContext, localContext))._then(),

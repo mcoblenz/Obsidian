@@ -17,4 +17,12 @@ main contract TimeService {
         return hours * 3600000;
     }
 
+    transaction setTime(int newMillis) {
+        if (newMillis >= currentTimeInMillis) {
+            currentTimeInMillis = newMillis;
+        }
+        else {
+            throw;
+        }
+    }
 }

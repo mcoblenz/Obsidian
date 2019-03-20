@@ -36,4 +36,8 @@ main asset contract Insurer {
         money.addMoney(m);
     }
 
+    transaction getRemainingBalance() returns int {
+        return money.getAmount();
+    }
+
 }

@@ -14,6 +14,7 @@ before_install:
   - export PATH=${PATH}:${HOME}/protobuf/
 
 script:
+  - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++2.12.4 test
 # Since the mock environment is deprecated, the tests need to be updated.
 # For now, disable the integration tests.
