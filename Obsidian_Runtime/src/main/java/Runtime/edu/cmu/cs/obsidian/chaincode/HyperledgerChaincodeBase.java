@@ -115,6 +115,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                 catch (WrongNumberOfArgumentsException e) {
                     return newErrorResponse("Failed to instantiate contract: " + e);
                 }
+                catch (ObsidianThrowException e) {
+                    return newErrorResponse(e.getMessage());
+                }
             }
             else {
                 return newErrorResponse("Instantiating another contract requires specifying a contract class name.");
@@ -166,6 +169,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
              * from the command line -- referencing an invalid transaction
              * in the client will give a compile-time error. */
             return newErrorResponse("No such transaction: " + function);
+        } catch (ObsidianThrowException e) {
+                return newErrorResponse(e.getMessage());
         } catch (Throwable e) {
             System.err.println("Caught exception dispatching invocation: " + e);
 
@@ -175,7 +180,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             // Otherwise, we'd return newErrorResponse(e).
             String message = e.getMessage();
             if (message == null) {
-                message = "";
+                message = e.toString();
             }
             return newErrorResponse(message, printStackTrace(e));
         }
@@ -200,7 +205,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     }
 
     // Returns the GUID of the new instance if initialization was successful, and null otherwise.
-    private ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) throws BadArgumentException, WrongNumberOfArgumentsException {
+    private ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) throws BadArgumentException, WrongNumberOfArgumentsException, ObsidianThrowException {
         if (!contractClassName.startsWith("org.hyperledger.fabric.example")) {
             // We don't permit looking up arbitrary Java classes for security reasons!
             return null;
@@ -244,9 +249,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract String __getGUID();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-                   BadTransactionException, NoSuchTransactionException, BadArgumentException, WrongNumberOfArgumentsException, InvalidStateException;
+                   BadTransactionException, NoSuchTransactionException, BadArgumentException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianThrowException;
     public abstract byte[] init(SerializationState st, byte[][] args)
-            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException;
+            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianThrowException;
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes, SerializationState __st)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
