@@ -1,0 +1,15 @@
+import "resources/case_studies/Insurance/WeatherRecord.obs"
+
+contract Signature {
+	string signature; // If we had arrays of bytes, we'd use those, but we don't.
+
+	// Constructor makes a Signature object that corresponds to a particular object.
+	Signature (WeatherRecord c) {
+	    signature = ""; // TODO
+	}
+
+	// verify takes a contract and returns true iff the receiver is a signature of that contract.
+	transaction verify(Signature@Unowned this, WeatherRecord c) returns bool {
+	    return true; // TODO
+	}
+}

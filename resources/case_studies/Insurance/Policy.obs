@@ -9,6 +9,8 @@ main contract Policy {
 
     state Expired {}
 
+    state Claimed {}
+
     Policy@Offered(int c, int expiration) {
         ->Offered(cost = c, expirationTime = expiration);
     }
@@ -19,6 +21,10 @@ main contract Policy {
 
     transaction expire(Policy@Offered >> Expired this) {
         ->Expired;
+    }
+
+    transaction claim(Policy@Active >> Claimed this) {
+        ->Claimed;
     }
 
     transaction getExpirationTime(Policy@Offered this) returns int {

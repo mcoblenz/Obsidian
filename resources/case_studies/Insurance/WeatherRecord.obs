@@ -1,0 +1,16 @@
+// A WeatherRecord represents a report from an external weather service.
+// It records a soil moisture measurement at a particular location and time.
+
+contract WeatherRecord {
+    int longitude;
+    int latitude;
+    int moistureReading;
+    int timestamp;
+
+    WeatherRecord(int lo, int la, int m, int t) {
+        longitude = lo;
+        latitude = la;
+        moistureReading = m;
+        timestamp = t;
+    }
+}
