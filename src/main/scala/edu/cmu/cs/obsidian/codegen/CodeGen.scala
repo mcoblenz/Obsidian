@@ -250,11 +250,14 @@ class CodeGen (val target: Target) {
                 val decl = body.decl(intType, "unmarshalledInt" + paramIndex, JExpr._new(intType).arg(intAsString))
                 val test = body._if(decl.eq(JExpr._null()))
                 val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+                exception.arg(intAsString)
                 test._then()._throw(exception)
                 decl
             case BoolType() =>
                 val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
-                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException")))
+                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+                exception.arg(marshalledExpr)
+                val _ = ifLengthIncorrect._then()._throw(exception)
                 marshalledExpr.component(JExpr.lit(0)).eq0()
             case StringType() =>
                 val stringClass = model.ref("java.lang.String")
@@ -947,6 +950,7 @@ class CodeGen (val target: Target) {
         val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         initMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
 
         // have to check that the args parameter has the correct number of arguments
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
@@ -979,6 +983,9 @@ class CodeGen (val target: Target) {
         runMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
+
         runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
@@ -1053,7 +1060,12 @@ class CodeGen (val target: Target) {
 
                 // TODO: report the error to the client more directly
                 notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
-                notEnoughArgs._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+
+                val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
+                exception.arg(txName)
+                exception.arg(tx.args.length)
+                exception.arg(runArgs.ref("length"))
+                notEnoughArgs._throw(exception)
 
                 /* parse the (typed) args from raw bytes */
                 var txArgsList: List[JVar] = List.empty
@@ -1125,7 +1137,7 @@ class CodeGen (val target: Target) {
             }
             /* If we aren't in any of the states were we can use this transaction, we throw an exception */
             if (transactionIsConditional) {
-                transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+                transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.InvalidStateException")))
             }
         }
 
@@ -1992,23 +2004,30 @@ class CodeGen (val target: Target) {
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, tx.name)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
 
         /* ensure the object is loaded before trying to do anything.
          * (even checking the state!) */
         meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
         meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
 
+
         // Dynamically check the state
         tx.thisType match {
             case StateType(_, states, _) => {
+                val currentState = JExpr.invoke(getStateMeth)
+
                 var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
                 for (st <- states) {
-                    cond = JOp.cand(JExpr.invoke(getStateMeth).ne(translationContext.getEnum(st)), cond)
+                    cond = JOp.cand(currentState.ne(translationContext.getEnum(st)), cond)
                 }
 
+                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
+                exception.arg(currentState.invoke("toString"))
+                exception.arg(tx.name)
                 meth.body()._if(cond)
-                   ._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException")))
+                   ._then()._throw(exception)
             }
             case _ => ()
         }
@@ -2021,7 +2040,10 @@ class CodeGen (val target: Target) {
 
         /* if the flag has already been set, that means there has been a reentrancy */
         val jIf = jTry.body()._if(isInsideInvocationFlag())
-        jIf._then()._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException")))
+        val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+        exception.arg(translationContext.contract.sourcePath)
+        exception.arg(tx.loc.line)
+        jIf._then()._throw(exception)
 
         /* otherwise, we set the flag to true */
         jIf._else().assign(isInsideInvocationFlag(), JExpr.lit(true))

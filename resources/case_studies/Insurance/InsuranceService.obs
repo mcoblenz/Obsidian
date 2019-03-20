@@ -33,6 +33,15 @@ main asset contract InsuranceService {
         ->Ready(insurer = ins, timeService = ts, bank = b);
     }
 
+    transaction testSetup() {
+        // Convenience transaction for testing.
+        TimeService ts = new TimeService();
+        Bank b = new Bank();
+        Money m = b.requestMoney(10);
+        Insurer ins = new Insurer(ts, b, m);
+        ->Ready(insurer = ins, timeService = ts, bank = b);
+    }
+
 /*
     When we support a collection of insurer, we should put this back.
     transaction addInsurer(Insurer@Shared insurer) {
