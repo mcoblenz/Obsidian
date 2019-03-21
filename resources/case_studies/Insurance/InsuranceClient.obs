@@ -1,25 +1,21 @@
 import "resources/case_studies/Insurance/InsuranceService.obs"
-import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/java-utilities/System.obs"
+import "Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian/java-utilities/System.obs"
 
 main contract InsuranceClient {
 	transaction main(remote InsuranceService@Shared insService) {
-	    TimeService@Shared timeService = new TimeService();
-        Bank@Shared bank = new Bank();
+	    TimeService timeService = new TimeService();
+        Bank bank = new Bank();
         // should be requesting money from bank, but can't call transactions from constructor
-        Money@Owned money = new Money(25);
-        Insurer@Owned insurers = new Insurer(timeService, bank, money);
+        Money money = new Money(25);
+        Insurer insurers = new Insurer(timeService, bank, money);
 
         insService.addInsurer(insurers);
 
-	    Policy@Offered policy = insService.requestBids(3);
-
-        // test
-        System.println(policy.getCost());
+	    Policy policy = insService.requestBids(3);
 
         // now buy the policy
-        Money@Owned refund = insService.buyPolicy(policy, new Money(10));
-
-        System.println(refund.getAmount());
+        Money refund = insService.buyPolicy(policy, new Money(10));
+        disown refund;
 
 	}
 }

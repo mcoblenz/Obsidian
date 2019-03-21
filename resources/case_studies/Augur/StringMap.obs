@@ -1,0 +1,130 @@
+contract StringList {
+    asset state HasNext {
+        StringList@Owned next;
+    }
+
+    asset state NoNext;
+    state Empty;
+
+    string key available in HasNext, NoNext;
+    string val available in HasNext, NoNext;
+
+
+    StringList@Empty() {
+        ->Empty;
+    }
+
+    transaction getKey(StringList@HasNext this) returns string {
+        return key;
+    }
+
+    transaction getValue(StringList@HasNext this) returns string {
+        return val;
+    }
+
+    transaction disconnectNext(StringList@HasNext >> NoNext this) returns StringList@Owned {
+        StringList removedNext = next;
+        ->NoNext;
+        return removedNext;
+    }
+
+    transaction reconnectNext(StringList@NoNext >> HasNext this, StringList@Owned >> Unowned newNext) {
+        ->HasNext(next = newNext);
+    }
+
+    private transaction removeValue(StringList@NoNext >> Empty this) returns string {
+        string valCopy = val;
+        ->Empty;
+        return valCopy;
+    }
+
+
+    transaction append(StringList@Owned this, string k, string v) {
+        switch this {
+            case HasNext {
+                next.append(k, v);
+            }
+            case Empty {
+                ->HasNext(key = k, val = v, next = new StringList());
+            }
+        }
+    }
+
+
+    transaction removeNext(StringList@HasNext this) returns string {
+        StringList removedNode = this.next;
+        [removedNode@Owned];
+
+        switch removedNode {
+            case Empty {
+                throw; // this case doesn't make any sense.
+            }
+            case HasNext {
+                this.next = removedNode.disconnectNext();
+                [removedNode@NoNext];
+                return removedNode.removeValue();
+            }
+        }
+    }
+
+    // Assumes "this" is not a match.
+     transaction getInRest(StringList@Owned this, string k) returns string {
+          switch this {
+               case Empty {
+                   throw; // We didn't find the key in the list.
+               }
+               case HasNext {
+                   switch next {
+                        case Empty {
+                            throw;
+                        }
+                        case HasNext {
+                            if(next.getKey() == k) {
+                                return this.getValue();
+                            }
+                            else {
+                                return next.getInRest(k);
+                            }
+                        }
+                   }
+               }
+          }
+    }
+}
+
+
+main asset contract StringMap {
+    StringList@Owned list;
+
+    StringMap@Owned() {
+        list = new StringList(); // Start with an empty list.
+    }
+
+    transaction set(StringMap@Owned this, string key, string val) {
+        list.append(key, val);
+    }
+
+
+
+
+    // remove and return value of the pair with the given string as a key
+    transaction get(StringMap@Owned this, string key) returns string {
+        string value;
+
+        switch list {
+            case Empty {
+                throw; // Element not in map.
+            }
+            case HasNext {
+                if(list.getKey() == key) {
+                    value = list.getValue();
+                } else {
+                    value = list.getInRest(key);
+                }
+            }
+        }
+
+        return value;
+
+    }
+}

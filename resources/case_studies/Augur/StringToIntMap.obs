@@ -1,0 +1,219 @@
+contract StringToIntList {
+    asset state HasNext {
+        StringToIntList@Owned next;
+    }
+
+    asset state NoNext;
+    state Empty;
+
+    string key available in HasNext, NoNext;
+    int val available in HasNext, NoNext;
+
+
+    StringToIntList@Empty() {
+        ->Empty;
+    }
+
+    transaction getKey(StringToIntList@HasNext this) returns string {
+        return key;
+    }
+
+    transaction getValue(StringToIntList@HasNext this) returns int {
+        return val;
+    }
+
+    transaction setValue(StringToIntList@HasNext this, int value) returns int {
+        this.val = value;
+        return value;
+    }
+
+    transaction disconnectNext(StringToIntList@HasNext >> NoNext this) returns StringToIntList@Owned {
+        StringToIntList removedNext = next;
+        ->NoNext;
+        return removedNext;
+    }
+
+    transaction reconnectNext(StringToIntList@NoNext >> HasNext this, StringToIntList@Owned >> Unowned newNext) {
+        ->HasNext(next = newNext);
+    }
+
+    private transaction removeValue(StringToIntList@NoNext >> Empty this) returns int {
+        int valCopy = val;
+        ->Empty;
+        return valCopy;
+    }
+
+
+    transaction append(StringToIntList@Owned this, string k, int v) {
+        switch this {
+            case HasNext {
+                next.append(k, v);
+            }
+            case Empty {
+                ->HasNext(key = k, val = v, next = new StringToIntList());
+            }
+        }
+    }
+
+
+    transaction removeNext(StringToIntList@HasNext this) returns int {
+        StringToIntList removedNode = this.next;
+        [removedNode@Owned];
+
+        switch removedNode {
+            case Empty {
+                throw; // this case doesn't make any sense.
+            }
+            case HasNext {
+                this.next = removedNode.disconnectNext();
+                [removedNode@NoNext];
+                return removedNode.removeValue();
+            }
+        }
+    }
+
+    // Assumes "this" is not a match.
+     transaction getInRest(StringToIntList@Owned this, string k) returns int {
+          switch this {
+               case Empty {
+                   throw; // We didn't find the key in the list.
+               }
+               case HasNext {
+                   switch next {
+                        case Empty {
+                            throw;
+                        }
+                        case HasNext {
+                            if(next.getKey() == k) {
+                                return this.getValue();
+                            }
+                            else {
+                                return next.getInRest(k);
+                            }
+                        }
+                   }
+               }
+          }
+    }
+
+     transaction putIfAbsent(StringToIntList@Owned this, string k, int value) returns int {
+          switch this {
+               case Empty {
+                   this.append(k, value); // We didn't find the key in the list.
+                   return value;
+               }
+               case HasNext {
+                   switch next {
+                        case Empty {
+                            this.append(k, value); // We didn't find the key in the list.
+                            return value;
+                        }
+                        case HasNext {
+                            if(next.getKey() == k) {
+                                return this.getValue();
+                            }
+                            else {
+                                return next.putIfAbsent(k, value);
+                            }
+                        }
+                   }
+               }
+          }
+    }
+
+     transaction put(StringToIntList@Owned this, string k, int value) returns int {
+          switch this {
+               case Empty {
+                   throw; // We didn't find the key in the list.
+               }
+               case HasNext {
+                   switch next {
+                        case Empty {
+                            throw; // We didn't find the key in the list.
+                        }
+                        case HasNext {
+                            if(next.getKey() == k) {
+                                next.setValue(value);
+                                return value;
+                            }
+                            else {
+                                return next.put(k, value);
+                            }
+                        }
+                   }
+               }
+          }
+    }
+}
+
+
+main asset contract StringToIntMap {
+    StringToIntList@Owned list;
+
+    StringToIntMap@Owned() {
+        list = new StringToIntList(); // Start with an empty list.
+    }
+
+    transaction set(StringToIntMap@Owned this, string key, int val) {
+        list.append(key, val);
+    }
+
+    transaction get(StringToIntMap@Owned this, string key) returns int {
+        int value;
+
+        switch list {
+            case Empty {
+                throw; // Element not in map.
+            }
+            case HasNext {
+                if(list.getKey() == key) {
+                    value = list.getValue();
+                } else {
+                    value = list.getInRest(key);
+                }
+            }
+        }
+
+        return value;
+
+    }
+
+    transaction putIfAbsent(StringToIntMap@Owned this, string key, int value) returns int {
+        int map_value;
+
+        switch list {
+            case Empty {
+                list.append(key, value); // Element not in map.
+                map_value = value;
+            }
+            case HasNext {
+                if(list.getKey() == key) {
+                    map_value = list.getValue();
+                } else {
+                    map_value = list.putIfAbsent(key, value);
+                }
+            }
+        }
+
+        return map_value;
+    }
+
+    transaction put(StringToIntMap@Owned this, string key, int value) returns int {
+        int map_value;
+
+        switch list {
+            case Empty {
+                throw; // Element not in map.
+            }
+            case HasNext {
+                if(list.getKey() == key) {
+                    map_value = list.setValue(value);
+                } else {
+                    map_value = list.put(key, value);
+                }
+            }
+        }
+
+        return map_value;
+    }
+}

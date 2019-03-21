@@ -1,0 +1,145 @@
+import "resources/case_studies/Augur/Order.obs"
+
+
+// This implements a mutable linked list of Pending policies.
+contract StringToOrderList {
+    asset state HasNext {
+        StringToOrderList@Owned next;
+    }
+
+    asset state NoNext;
+    state Empty;
+
+    string key available in HasNext, NoNext;
+    Order@Owned val available in HasNext, NoNext;
+
+
+    StringToOrderList@Empty() {
+        ->Empty;
+    }
+
+    transaction getKey(StringToOrderList@HasNext this) returns string {
+        return key;
+    }
+
+    transaction getValue(StringToOrderList@HasNext this) returns Order@Unowned {
+        return val;
+    }
+
+    transaction disconnectNext(StringToOrderList@HasNext >> NoNext this) returns StringToOrderList@Owned {
+        StringToOrderList removedNext = next;
+        ->NoNext;
+        return removedNext;
+    }
+
+    transaction reconnectNext(StringToOrderList@NoNext >> HasNext this, StringToOrderList@Owned >> Unowned newNext) {
+        ->HasNext(next = newNext);
+    }
+
+    transaction getNext(StringToOrderList@Owned this) returns StringToOrderList@Unowned {
+        switch this {
+            case HasNext {
+                return this.next;
+            }
+            case Empty {
+                throw;
+            }
+        }
+    }
+
+    private transaction removeValue(StringToOrderList@NoNext >> Empty this) returns Order@Unowned {
+        Order valCopy = val;
+        ->Empty;
+        return valCopy;
+    }
+
+
+    transaction append(StringToOrderList@Owned this, string k, Order@Owned >> Unowned v) {
+        switch this {
+            case HasNext {
+                next.append(k, v);
+            }
+            case Empty {
+                ->HasNext(key = k, val = v, next = new StringToOrderList());
+            }
+        }
+    }
+
+
+    transaction removeNext(StringToOrderList@HasNext this) returns Order@Unowned {
+        StringToOrderList removedNode = this.next;
+        [removedNode@Owned];
+
+        switch removedNode {
+            case Empty {
+                throw; // this case doesn't make any sense.
+            }
+            case HasNext {
+                this.next = removedNode.disconnectNext();
+                [removedNode@NoNext];
+                return removedNode.removeValue();
+            }
+        }
+    }
+
+    // Assumes "this" is not a match.
+     transaction getInRest(StringToOrderList@Owned this, string order) returns Order@Unowned {
+          switch this {
+               case Empty {
+                   throw; // We didn't find the policy in the list.
+               }
+               case HasNext {
+                   switch next {
+                        case Empty {
+                            throw;
+                        }
+                        case HasNext {
+                            if(next.getKey() == order) {
+                                return this.getValue();
+                            }
+                            else {
+                                return next.getInRest(order);
+                            }
+                        }
+                   }
+               }
+          }
+    }
+}
+
+
+main asset contract StringToOrderMap {
+    StringToOrderList@Owned list;
+
+    StringToOrderMap@Owned() {
+        list = new StringToOrderList(); // Start with an empty list.
+    }
+
+    transaction set(StringToOrderMap@Owned this, string key, Order@Owned >> Unowned val) {
+        list.append(key, val);
+    }
+
+    transaction getList(StringToOrderMap@Owned this) returns StringToOrderList@Owned {
+        return list;
+    }
+
+    transaction get(StringToOrderMap@Owned this, string order) returns Order@Unowned {
+        Order value;
+
+        switch list {
+            case Empty {
+                throw; // Element not in map.
+            }
+            case HasNext {
+                if(list.getKey().equals(order)) {
+                    value = list.getValue();
+                } else {
+                    value = list.getInRest(order);
+                }
+            }
+        }
+
+        return value;
+
+    }
+}

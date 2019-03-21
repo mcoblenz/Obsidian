@@ -1,0 +1,7 @@
+import "resources/case_studies/Augur/Market.obs"
+
+main contract MarketClient {
+    transaction main() {
+
+    }
+}

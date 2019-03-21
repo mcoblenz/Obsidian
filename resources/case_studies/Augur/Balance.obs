@@ -1,0 +1,29 @@
+import "resources/case_studies/Augur/StringToIntMap.obs"
+
+//create a contract that stores the balances of each different user
+
+main asset contract Balance {
+    StringToIntMap@Owned balances;
+
+    transaction addToBalance(string address, int extraAmount) returns int {
+        balances.putIfAbsent(address, 0);
+        int currentBalance = balances.get(address);
+        int newBalance = currentBalance + extraAmount;
+        balances.put(address, newBalance);
+        return newBalance;
+    }
+
+    transaction removeFromBalance(string address, int amount) returns int {
+        int currentBalance = balances.get(address);
+        int newBalance = currentBalance - amount;
+        if (newBalance < 0) {
+            throw; //this should not be able to happen => how to use State for this?
+        }
+        balances.put(address, newBalance);
+        return newBalance;
+    }
+
+    transaction getBalance(string address) returns int {
+        return balances.get(address);
+    }
+}

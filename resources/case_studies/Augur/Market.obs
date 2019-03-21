@@ -1,0 +1,102 @@
+import "resources/case_studies/Augur/StringMap.obs"
+import "resources/case_studies/Augur/StringToOrderMap.obs"
+import "resources/case_studies/Augur/Balance.obs"
+
+
+main contract Market {
+    Balance@Shared balances;
+
+    string marketContractAddress;
+    string marketDescription;
+
+    asset state Open {
+        StringToOrderMap@Owned longOrders;
+        StringToOrderMap@Owned shortOrders;
+        int totalLongOrders;
+        int totalShortOrders;
+    }
+
+    asset state Closed {
+
+    }
+
+    Market@Open (Balance@Shared bal, string description) {
+        balances = bal;
+        marketDescription = description;
+        marketContractAddress = "123"; //need sha256 here too
+        balances.addToBalance(marketContractAddress, 0);
+        ->Open(longOrders = new StringToOrderMap(), shortOrders = new StringToOrderMap(), totalLongOrders = 0, totalShortOrders = 0);
+    }
+
+    transaction addOrder(Market@Open this, Order@Unlinked >> LinkedToMarket order) {
+        string creator = order.getCreator();
+        int amount = order.getAmount();
+        bool isLong = order.getIsLong();
+        int balance = this.balances.getBalance(creator);
+        if (balance - amount < 0) {
+            throw;
+        }
+        if (isLong) {
+            longOrders.set(creator, order);
+            this.totalLongOrders = this.totalLongOrders + amount;
+        } else {
+            shortOrders.set(creator, order);
+            this.totalShortOrders = this.totalShortOrders + amount;
+        }
+
+        //put funds in escrow in contract
+        balances.removeFromBalance(creator, amount);
+        balances.addToBalance(this.marketContractAddress, amount);
+        order.linkToMarket();
+    }
+
+    //later: possibility to cancel order. for now: not possible
+
+    transaction settleMarket(Market@Open >> Closed this, bool outcomeIsLong) {
+        //for all losing parties, nothing happens: they lost their escrowed funds
+        //for all winning ones, calculate their percentage, and give them funds
+        StringToOrderList@Owned list;
+        int totalAmount = 0;
+        if (outcomeIsLong) {
+            list = this.longOrders.getList();
+            totalAmount = this.totalLongOrders;
+        } else {
+            list = this.shortOrders.getList();
+            totalAmount = this.totalShortOrders;
+        }
+        int total = this.totalLongOrders + this.totalShortOrders;
+        recursiveSettlement(list, totalAmount, total);
+        ->Closed;
+    }
+
+    transaction recursiveSettlement(StringToOrderList@Owned list, int totalAmount, int total) {
+        Order@Owned nextOrder;
+        nextOrder = list.getValue();
+        int amount = nextOrder.getAmount();
+        int fraction = (amount / totalAmount);
+        int fractionWorth = fraction * total;
+        int currentBalance = this.balances.getBalance(nextOrder.getCreator());
+        this.balances.removeFromBalance(this.marketContractAddress, fractionWorth);
+        this.balances.addToBalance(nextOrder.getCreator(), fractionWorth);
+        switch list {
+            case HasNext {
+                list = list.getNext();
+                recursiveSettlement(list, totalAmount, total);
+            }
+            case Empty {
+               //that's the end
+            }
+        }
+    }
+
+
+}
+
+//transaction wanted here: create a market
+
+//simplified version: we get all orders (long & short)
+//on market close, we determine which direction has won
+//then we compute the % of all orders of the winning direction each order has
+//and we pay out that % of the losing side to that specific order creator
+
+//market needs to escrow the funds => can have its own address in Balance contract

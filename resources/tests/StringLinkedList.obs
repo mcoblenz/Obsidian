@@ -1,0 +1,81 @@
+asset contract StringNode {
+    StringNode(string elem) {
+        ->HasElement(nextNode = new StringNode(), element = elem);
+    }
+
+    StringNode() {
+        ->Empty();
+    }
+
+    state HasElement {
+        StringNode@Unowned nextNode;
+        string element;
+    }
+
+    state Empty { }
+
+    transaction getElem(StringNode@HasElement this) returns string {
+        return this.element;
+    }
+
+    transaction getNext(StringNode@HasElement this) returns StringNode@Unowned {
+        return this.next;
+    }
+
+    transaction length(StringNode@Owned this) returns int {
+        int length = 1;
+        switch nextNode {
+            case HasElement {
+                length = length + nextNode.length();
+            }
+        }
+        return length;
+    }
+
+    transaction setElement(StringNode@Owned this, string elem) returns StringNode@Owned {
+        switch this {
+            case HasElement {
+                this.element = elem;
+            }
+
+            case Empty {
+                ->HasElement(nextNode = new StringNode(), element = elem);
+            }
+        }
+        return this;
+    }
+
+    transaction postpend(StringNode@Owned this, string elem) returns StringNode@Owned {
+         switch nextNode {
+             case HasElement {
+                 return nextNode.postpend(elem);
+             }
+
+             case Empty {
+                 return nextNode.setElement(elem);
+             }
+         }
+    }
+}
+
+main contract StringLinkedList {
+
+    StringNode@Owned first;
+
+    StringLinkedList() {
+        first = new StringNode();
+    }
+
+    transaction prepend(string elem) {
+        StringNode newFirst = new StringNode(elem, first);
+        first = newFirst;
+    }
+
+    transaction length(StringLinkedList@Unowned this) returns int {
+        return this.first.length();
+    }
+
+    transaction postpend(StringLinkedList@Unowned this, string elem) returns StringNode@Owned {
+        return this.first.postpend(elem);
+    }
+}

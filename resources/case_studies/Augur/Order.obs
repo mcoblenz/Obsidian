@@ -1,0 +1,39 @@
+//hardcode a getCreator function to get something there
+//have to create the client side contracts
+
+//needs equal method
+
+main contract Order {
+
+    asset state LinkedToMarket {}
+    asset state Unlinked {}
+
+    string creator;
+    bool isLong;
+    int amount;
+
+    Order@Unlinked(string c, bool l, int a) {
+        creator = c;
+        isLong = l;
+        amount = a;
+        ->Unlinked();
+    }
+
+    transaction linkToMarket(Order@Unlinked >> LinkedToMarket this) {
+        ->LinkedToMarket;
+    }
+
+    transaction getCreator(Order@Unowned this) returns string {
+        return this.creator;
+    }
+
+    transaction getIsLong(Order@Unowned this) returns bool {
+        return this.isLong;
+    }
+
+    transaction getAmount(Order@Unowned this) returns int {
+        return this.amount;
+    }
+}
+
+//need sha256 support
