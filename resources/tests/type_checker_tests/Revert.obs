@@ -1,0 +1,14 @@
+main contract Revert {
+    transaction t1() {
+        revert;
+    }
+
+    transaction t2() {
+        revert "error";
+    }
+
+    transaction t3() {
+        // ERROR: revert requires a string.
+        revert 3;
+    }
+}
