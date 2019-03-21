@@ -42,7 +42,7 @@ contract Lottery {
            this.prizeMoneyAmount = 0;
            return prizeMoney;
        } else {
-           throw;
+           revert;
        }
     }
 }

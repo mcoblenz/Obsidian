@@ -15,7 +15,7 @@ main contract Stack {
 
     transaction pop(Stack@Unowned this) returns int {
         if (this.head.isEmpty()) {
-            throw;
+            revert;
         } else {
             Node@Unowned old = head;
             head = head.getNext();

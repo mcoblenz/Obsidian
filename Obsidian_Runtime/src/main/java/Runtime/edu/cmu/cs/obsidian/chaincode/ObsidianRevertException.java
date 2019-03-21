@@ -2,10 +2,10 @@
 
 package edu.cmu.cs.obsidian.chaincode;
 
-public class ObsidianThrowException extends ObsidianChaincodeException {
+public class ObsidianRevertException extends ObsidianChaincodeException {
     String message;
 
-    public ObsidianThrowException(String f, int l, String message) {
+    public ObsidianRevertException(String f, int l, String message) {
         super (f, l);
 
         this.message = message;

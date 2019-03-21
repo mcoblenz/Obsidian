@@ -101,10 +101,10 @@ main asset contract InsuranceService {
     transaction claim(InsuranceService@Ready this, Policy@Active >> Claimed policy, WeatherRecord@Shared weatherRecord, Signature s) returns Money@Owned {
         if (not s.verify(weatherRecord)) {
             // Invalid signature; can't pay a claim with it.
-            throw;
+            revert;
         }
 
-        // get will throw if the policy isn't found.
+        // get will revert if the policy isn't found.
         PolicyRecord record = activePolicies.get(policy);
         Money payment = record.claim();
 

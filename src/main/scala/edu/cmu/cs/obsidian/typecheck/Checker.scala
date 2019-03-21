@@ -686,7 +686,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
             statement match {
-                case Return() | ReturnExpr(_) | Throw() => hasRet = true
+                case Return() | ReturnExpr(_) | Revert(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
                 case Switch(e, cases) =>
@@ -1372,10 +1372,19 @@ private def checkStatement(
                 logError(s, AssignmentError())
                 contextPrime
 
-            case Throw() =>
+            case Revert(e) =>
+                val contextPrime =
+                    e match {
+                        case None => context
+                        case Some(expr) =>
+                            val (eTyp, exprContext) = inferAndCheckExpr(decl, context, e.get, NoOwnershipConsumption())
+                            checkIsSubtype(expr, eTyp, StringType())
+                            exprContext
+                    }
+
                 // If exceptions are ever catchable, we will need to make sure the fields of this have types consistent with their declarations.
                 // For now, we treat this like a permanent abort.
-                context.makeThrown
+                contextPrime.makeThrown
 
             case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())

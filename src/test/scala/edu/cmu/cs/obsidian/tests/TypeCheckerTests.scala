@@ -643,4 +643,9 @@ class TypeCheckerTests extends JUnitSuite {
              (UninitializedFieldError("z"), 7) ::
                 Nil))
     }
+
+    @Test def revertTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/Revert.obs",
+            (SubtypingError(IntType(), StringType()), 12) :: Nil)
+    }
 }

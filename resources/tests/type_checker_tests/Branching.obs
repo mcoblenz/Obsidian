@@ -40,7 +40,7 @@ main contract C {
         if (true) {
             LinearContract o2 = o1;
         } else {
-            throw;
+            revert;
         }
     }
 
@@ -65,7 +65,7 @@ main contract C {
         if (true) {
             return 5;
         } else {
-            throw;
+            revert;
         }
     }
 

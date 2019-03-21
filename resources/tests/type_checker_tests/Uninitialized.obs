@@ -16,7 +16,7 @@ main contract Uninitialized {
             a = 5;
         }
         else {
-            throw;
+            revert;
         }
     }
 }

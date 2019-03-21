@@ -12,7 +12,7 @@ asset contract Money {
 
     transaction split(Money@Owned this, int v) returns Money@Owned {
         if (v > value) {
-            throw;
+            revert;
         }
         value = value - v;
         Money result = new Money(v);
@@ -74,7 +74,7 @@ contract AccountList {
     transaction find(AccountList this, int addressToFind) returns Account@Unowned {
         switch this {
             case Empty {
-                throw;
+                revert;
             }
             case HasNext {
                 if (account.getAddress() == addressToFind) {
