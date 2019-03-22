@@ -14,6 +14,7 @@ main contract PolicyRecord {
     }
 
     state Expired {}
+    state Claimed {}
 
     PolicyRecord@Pending(Policy@Unowned p, Money@Owned >> Unowned m) {
         policy = p;
@@ -25,7 +26,7 @@ main contract PolicyRecord {
         return policy;
     }
 
-    transaction refund(PolicyRecord@Pending >> Expired this) returns Money@Owned{
+    transaction refund(PolicyRecord@Pending >> Expired this) returns Money@Owned {
          Money refund = payout;
          ->Expired;
          return refund;
@@ -35,6 +36,12 @@ main contract PolicyRecord {
          payout.addMoney(policyCost);
          Active::claim = payout;
          ->Active;
+    }
+
+    transaction claim(PolicyRecord@Active >> Claimed this) returns Money@Owned {
+        Money m = claim;
+        ->Claimed;
+        return m;
     }
 
 }

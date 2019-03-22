@@ -30,7 +30,7 @@ object Lexer extends RegexParsers {
         case "state" => StateT()
         case "try" => TryT()
         case "catch" => CatchT()
-        case "throw" => ThrowT()
+        case "revert" => RevertT()
         case "not" => NotT()
         case "and" => AndT()
         case "or" => OrT()

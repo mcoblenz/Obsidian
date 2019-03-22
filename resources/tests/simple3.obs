@@ -10,7 +10,7 @@ main contract Simple3 {
         if y > 3 {
             y = 0;
         } else {
-            throw;
+            revert;
         }
     }
 }

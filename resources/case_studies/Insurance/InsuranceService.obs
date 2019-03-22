@@ -1,4 +1,6 @@
 import "resources/case_studies/Insurance/Insurer.obs"
+import "resources/case_studies/Insurance/WeatherRecord.obs"
+import "resources/case_studies/Insurance/Signature.obs"
 import "resources/case_studies/Insurance/PolicyRecord.obs"
 import "resources/case_studies/Insurance/PendingPolicyMap.obs"
 import "resources/case_studies/Insurance/ActivePolicyMap.obs"
@@ -93,7 +95,22 @@ main asset contract InsuranceService {
             policy.activate();
             return money;
         }
+    }
 
+    // Returns a payment.
+    transaction claim(InsuranceService@Ready this, Policy@Active >> Claimed policy, WeatherRecord@Shared weatherRecord, Signature s) returns Money@Owned {
+        if (not s.verify(weatherRecord)) {
+            // Invalid signature; can't pay a claim with it.
+            revert;
+        }
+
+        // get will revert if the policy isn't found.
+        PolicyRecord record = activePolicies.get(policy);
+        Money payment = record.claim();
+
+        policy.claim();
+
+        return payment;
     }
 
 }

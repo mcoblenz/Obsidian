@@ -216,8 +216,8 @@ object Parser extends Parsers {
                 Assignment(e1, e2).setLoc(eqSign)
         }
 
-        val parseThrow = ThrowT() ~! SemicolonT() ^^ {
-            case t ~ _ => Throw().setLoc(t)
+        val parseRevert = RevertT() ~! opt(parseExpr) ~! SemicolonT() ^^ {
+            case t ~ expr ~ _ => Revert(expr).setLoc(t)
         }
 
         val parseOnlyIf = IfT() ~! parseExpr ~! LBraceT() ~! parseBody ~! RBraceT()
@@ -257,7 +257,7 @@ object Parser extends Parsers {
             }
         }
 
-        parseReturn | parseTransition | parseThrow |
+        parseReturn | parseTransition | parseRevert |
         parseVarDeclAssn | parseVarDecl | parseIf | parseSwitch |
         parseTryCatch | parseExprFirst | parseStaticAssertion
     }

@@ -132,13 +132,13 @@ case class MergeIncompatibleError(name: String, t1: ObsidianType, t2: ObsidianTy
     val msg: String = s"Variable '$name' is incompatibly typed as both '$t1' and '$t2' after branch."
 }
 case class MustReturnError(methName: String) extends Error {
-    val msg: String = s"'$methName' specifies a return type, but no return value is given"
+    val msg: String = s"'$methName' specifies a return type, but no return value is given."
 }
 case class CannotReturnError(methName: String) extends Error {
-    val msg: String = s"'$methName' does not return anything, but a return value was given"
+    val msg: String = s"'$methName' does not return anything, but a return value was given."
 }
 case class NotAValueError(methName: String) extends Error {
-    val msg: String = s"'$methName' does not return anything, but is used here as a value"
+    val msg: String = s"'$methName' does not return anything, but is used here as a value."
 }
 
 case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
@@ -146,17 +146,17 @@ case class TransitionUpdateError(mustSupply: Set[String]) extends Error {
     val msg: String = s"The following fields in the destination state may not be initialized: '$fieldNames'"
 }
 case class AssignmentError() extends Error {
-    val msg: String = s"Assignment target must be a variable or a field"
+    val msg: String = s"Assignment target must be a variable or a field."
 }
 //case class AlreadyKnowStateError(e: Expression, sName: String) extends Error {
 //    val msg: String = s"'$e' is already known to be in state '$sName': a dynamic check is not needed"
 //}
 
 case class LeakReturnValueError(methName: String) extends Error {
-    val msg: String = s"Invocation of '$methName' leaks ownership of return value"
+    val msg: String = s"Invocation of '$methName' leaks ownership of return value."
 }
 case class NoEffectsError(s: Statement) extends Error {
-    val msg: String = s"Statement '$s' has no side-effects"
+    val msg: String = s"Statement '$s' has no side-effects."
 }
 
 case class UnusedOwnershipError(name: String) extends Error {

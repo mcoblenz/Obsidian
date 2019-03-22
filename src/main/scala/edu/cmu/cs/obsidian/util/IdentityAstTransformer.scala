@@ -276,7 +276,7 @@ class IdentityAstTransformer {
                 }
             case a@Assignment(assignTo, e) =>
                 (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())
-            case t@Throw() => (t, context, Seq())
+            case t@Revert(e) => (t, context, Seq())
             case oldIf@If(eCond, sIf) =>
                 val (sIfNew, newContext, errors) = transformBody(table, lexicallyInsideOf, context, sIf)
                 val newIf = oldIf.copy(s = sIfNew, eCond = transformExpression(eCond)).setLoc(oldIf)

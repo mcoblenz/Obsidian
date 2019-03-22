@@ -951,7 +951,7 @@ class CodeGen (val target: Target) {
         initMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
-        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         // have to check that the args parameter has the correct number of arguments
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
@@ -986,7 +986,7 @@ class CodeGen (val target: Target) {
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
-        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
@@ -1916,7 +1916,7 @@ class CodeGen (val target: Target) {
 
         val methodName = "new_" + newClass.name()
         var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
 
         mainConstructor = Some(meth)
@@ -1952,7 +1952,7 @@ class CodeGen (val target: Target) {
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
         val constructor = newClass.constructor(JMod.PUBLIC)
-        constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+        constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         val invocation = constructor.body().invoke(methodName)
 
@@ -2037,7 +2037,7 @@ class CodeGen (val target: Target) {
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
 
         /* ensure the object is loaded before trying to do anything.
@@ -2232,11 +2232,15 @@ class CodeGen (val target: Target) {
                 translationContext.pendingFieldAssignments = translationContext.pendingFieldAssignments + fieldName._1
             }
 
-            case Throw() =>
-                val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ObsidianThrowException"))
+            case Revert(e) =>
+                val translatedExpr = e match {
+                    case None => JExpr._null()
+                    case Some (expr) => translateExpr(expr, translationContext, localContext)
+                }
+                val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
                 exception.arg(translationContext.contract.sourcePath)
                 exception.arg(statement.loc.line)
-                exception.arg(JExpr._null())
+                exception.arg(translatedExpr)
                 body._throw(exception)
 
             case If(e, s) =>

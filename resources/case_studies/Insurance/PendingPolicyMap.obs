@@ -64,7 +64,7 @@ contract PendingPolicyList {
 
         switch removedNode {
             case Empty {
-                throw; // this case doesn't make any sense.
+                revert; // this case doesn't make any sense.
             }
             case HasNext {
                 this.next = removedNode.disconnectNext();
@@ -78,12 +78,12 @@ contract PendingPolicyList {
      transaction removeInRest(PendingPolicyList@Owned this, Policy@Unowned policy) returns PolicyRecord@Pending {
           switch this {
                case Empty {
-                   throw; // We didn't find the policy in the list.
+                   revert; // We didn't find the policy in the list.
                }
                case HasNext {
                    switch next {
                         case Empty {
-                            throw;
+                            revert;
                         }
                         case HasNext {
                             if(next.getKey().equals(policy)) {
@@ -120,7 +120,7 @@ main asset contract PendingPolicyMap {
 
         switch list {
             case Empty {
-                throw; // Element not in map.
+                revert; // Element not in map.
             }
             case HasNext {
                 if(list.getKey().equals(policy)) {
