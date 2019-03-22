@@ -2,8 +2,9 @@
 
 function printHelp() {
   echo "Usage: "
-  echo "  instantiateOther.sh contract [arg] ..."
+  echo "  instantiateOther.sh [-q] contract [arg] ..."
   echo "    where arg is an argument to be passed to the other contract's constructor."
+  echo " use the option q to run in quiet mode and only output payload"
 }
 
 confirmNetworkUp() {
