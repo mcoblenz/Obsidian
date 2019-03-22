@@ -920,6 +920,10 @@ class CodeGen (val target: Target) {
 
         /* init method */
         generateInitMethod(translationContext, newClass, stubType, constructorTypes)
+
+        if (constructor.isEmpty) {
+            generateConstructorReturnsOwnedReference(newClass, true)
+        }
     }
 
     private def translateInnerContract(aContract: Contract,
@@ -2000,16 +2004,22 @@ class CodeGen (val target: Target) {
         constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         invocation.arg(JExpr.ref(serializationParamName))
 
+        generateConstructorReturnsOwnedReference(newClass, c.resultType.isOwned)
+    }
+
+    private def generateConstructorReturnsOwnedReference(newClass: JDefinedClass, returnsOwned : Boolean): Unit = {
         val ownedRefMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "constructorReturnsOwnedReference")
         ownedRefMethod.annotate(model.ref("Override"));
-        val returnTypeIsOwned =
-            if (c.resultType.isOwned) {
+        val returnsOwnedExpr =
+            if (returnsOwned) {
                 JExpr.TRUE
             }
             else {
                 JExpr.FALSE
             }
-        ownedRefMethod.body()._return(returnTypeIsOwned)
+
+        ownedRefMethod.body()._return(returnsOwnedExpr)
+
     }
 
     // Generates a new_Foo() method, which takes the serialization state as a parameter, and initializes all the fields.
