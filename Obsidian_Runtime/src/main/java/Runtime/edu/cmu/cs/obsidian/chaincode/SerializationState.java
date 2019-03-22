@@ -25,7 +25,8 @@ public class SerializationState {
      * On lookup, we need to be able to create a lazily-initialized object, which requires that we know the name of its class.
      *
      * */
-    private Map<String, ReturnedReferenceState> returnedObjectClassMap;
+    private HashMap<String, ReturnedReferenceState> returnedObjectClassMapAtBeginningOfTransaction;
+    private HashMap<String, ReturnedReferenceState> returnedObjectClassMap;
 
 
     static final String s_returnedObjectsClassMapKey = "ReturnedObject";
@@ -69,13 +70,29 @@ public class SerializationState {
         }
     }
 
+    public void beginTransaction() {
+        // Shallow clone suffices because ReturnedReferenceState is immutable.
+        if (returnedObjectClassMap != null) {
+            returnedObjectClassMapAtBeginningOfTransaction = (HashMap<String, ReturnedReferenceState>) returnedObjectClassMap.clone();
+        }
+    }
+
+    public void transactionSucceeded() {
+        returnedObjectClassMapAtBeginningOfTransaction = null;
+    }
+
+    public void transactionFailed() {
+        returnedObjectClassMap = returnedObjectClassMapAtBeginningOfTransaction;
+        returnedObjectClassMapAtBeginningOfTransaction = null;
+    }
+
     // If the returned reference is owned, record that so that we can re-claim ownership when we see the object again.
     public void mapReturnedObject(ObsidianSerialized obj, boolean returnedReferenceIsOwned) {
         if (returnedObjectClassMap == null) {
             returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
         }
 
-        System.out.println("mapReturnedObject: " + obj.__getGUID());
+        System.out.println("mapReturnedObject: " + obj.__getGUID() + ". new external ownership status: " + returnedReferenceIsOwned);
         returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
     }
 

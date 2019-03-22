@@ -1103,8 +1103,8 @@ class CodeGen (val target: Target) {
 
                 val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
                 exception.arg(txName)
-                exception.arg(tx.args.length)
                 exception.arg(runArgs.ref("length"))
+                exception.arg(tx.args.length)
                 notEnoughArgs._throw(exception)
 
                 /* parse the (typed) args from raw bytes */
