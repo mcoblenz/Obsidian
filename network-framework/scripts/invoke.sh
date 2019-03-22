@@ -74,17 +74,37 @@ parseParameters() {
   PARAMS="$PARAMS]}"
 }
 
+# Check if invocation is run in quiet mode
+isQuiet=0
+while getopts "q" opt; do
+  case "$opt" in
+  q)
+    isQuiet=1
+    ;;
+   esac
+done
+
+# Discard the option
+while [[ $1 =~ ^- ]]; do
+    shift
+done
 
 parseParameters $@
 res=$?
 verifyResult $res "Invoke transaction failed on channel '$CHANNEL_NAME' due to uneven number of peer and org parameters
 or lack of function name"
-set -x
-echo $PARAMS
-peer chaincode invoke -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
-res=$?
-set +x
-cat log.txt
-verifyResult $res "Invoke execution on $PEERS failed "
-echo "===================== Invoke transaction successful on $PEERS on channel '$CHANNEL_NAME' ===================== "
-echo
+if [ $isQuiet -eq 1 ]; then
+  peer chaincode invoke -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
+  res=$?
+  verifyResult $res "Invoke execution on $PEERS failed "
+  cat log.txt | sed -nr 's/^.*?payload:\"(.*)\".*$/\1/p'
+else
+  set -x
+  peer chaincode invoke -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
+  res=$?
+  set +x
+  cat log.txt
+  verifyResult $res "Invoke execution on $PEERS failed "
+  echo "===================== Invoke transaction successful on $PEERS on channel '$CHANNEL_NAME' ===================== "
+  echo
+fi

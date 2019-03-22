@@ -3,7 +3,8 @@
 printHelp() {
     echo
     echo "You can make a single function invocation with any number of arguments"
-    echo "The format is ./invoke.sh [function name] [arg1] [arg2] ..."
+    echo "The format is ./invoke.sh [-q] [function name] [arg1] [arg2] ..."
+    echo "-q will only print the payload, so one can store the payload in some variable"
     echo "To print this info again, do ./invoke.sh -h or ./invoke.sh -?"
     echo
 }
