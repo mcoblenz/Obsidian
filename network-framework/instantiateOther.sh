@@ -2,8 +2,9 @@
 
 function printHelp() {
   echo "Usage: "
-  echo "  instantiateOther.sh contract [arg] ..."
+  echo "  instantiateOther.sh [-q] contract [arg] ..."
   echo "    where arg is an argument to be passed to the other contract's constructor."
+  echo " use the option q to run in quiet mode and only output payload"
 }
 
 confirmNetworkUp() {
@@ -21,15 +22,24 @@ then
     exit 0
 fi
 
+quietMode=0
 
-while getopts "h?" opt; do
+while getopts "h?:q" opt; do
   case "$opt" in
   h | \?)
     printHelp
     exit 0
     ;;
+  q)
+    quietMode=1
+    shift # shift off the option
+    ;;
    esac
 done
 
 confirmNetworkUp
-./invoke.sh __instantiateOther $@
+if [ $quietMode -eq 1 ] ; then
+    ./invoke.sh -q __instantiateOther $@
+else
+    ./invoke.sh __instantiateOther $@
+fi

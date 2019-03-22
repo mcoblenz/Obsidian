@@ -130,8 +130,8 @@ sub parse_obstest {
 sub compile {
     # Run obsidian compiler on an .obs file.
     my ($file, $flags) = @_;
-    my $compile = qq(sbt "run --verbose $flags --dump-debug obs_output)
-                 .qq( --output-path obs_output $file");
+    my $compile = qq(sbt "run --verbose $flags --dump-debug obs_output")
+                 .qq("--output-path obs_output $file");
     print "$compile\n";
     my $result = `$compile`;
 
