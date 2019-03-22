@@ -107,10 +107,12 @@ class CodeGen (val target: Target) {
         for (c <- program.contracts) {
             // TODO : generate code for interfaces (issue #117)
             if(!c.isInterface) {
-                translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+                val newClass: JDefinedClass = programPackage._class(c.name)
+                val translationContext = makeTranslationContext(c, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
+                translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
 
                 if (c.isImport) {
-                    translateStubContract(c, programPackage)
+                    translateStubContract(c, programPackage, translationContext)
                 }
             }
         }
@@ -134,7 +136,8 @@ class CodeGen (val target: Target) {
     }
 
     private def translateStubContract(contract: Contract,
-                                      programPackage: JPackage): Unit = {
+                                      programPackage: JPackage,
+                                      translationContext: TranslationContext): Unit = {
         var contractClass = programPackage._class(JMod.PUBLIC, classNameForStub(contract.name))
         contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
 
@@ -150,24 +153,25 @@ class CodeGen (val target: Target) {
       val txNames: mutable.Set[String] = new mutable.HashSet[String]()
 
         for (decl <- contract.declarations) {
-            translateStubDeclaration(decl, contractClass, None, txNames)
+            translateStubDeclaration(decl, contractClass, None, txNames, translationContext)
         }
     }
 
     private def translateStubDeclaration(decl: Declaration,
                                          inClass: JDefinedClass,
                                          stOption: Option[State],
-                                         txNames: mutable.Set[String]) : Unit = {
+                                         txNames: mutable.Set[String],
+                                         translationContext: TranslationContext) : Unit = {
 
           decl match {
             case _: TypeDecl => assert(false, "unsupported"); // TODO
             case f: Field => translateStubField(f, inClass)
             case c: Constructor => // Constructors aren't translated because stubs are only for remote instances.
-            case t: Transaction => if (!txNames.contains(t.name)) translateStubTransaction(t, inClass, stOption)
+            case t: Transaction => if (!txNames.contains(t.name)) translateStubTransaction(t, inClass, stOption, translationContext)
                                                  txNames.add(t.name)
-            case s: State => translateStubState(s, inClass, txNames)
+            case s: State => translateStubState(s, inClass, txNames, translationContext)
             case c: Contract => translateStubContract(c,
-              inClass.getPackage())
+              inClass.getPackage(), translationContext)
           }
     }
 
@@ -199,7 +203,7 @@ class CodeGen (val target: Target) {
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                 toByteArrayInvocation.arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
-            case _ => unmarshalledExpr.invoke("__archiveBytes")
+            case _ => unmarshalledExpr.invoke("__archiveWrapperBytes")
 
         }
 
@@ -313,7 +317,8 @@ class CodeGen (val target: Target) {
 
     private def translateStubTransaction(transaction: Transaction,
                                          newClass: JDefinedClass,
-                                         stOption: Option[State]) : JMethod = {
+                                         stOption: Option[State],
+                                         translationContext: TranslationContext) : JMethod = {
         val stName = stOption match {
             case Some(st) => Some(st.name)
             case None => None
@@ -376,15 +381,15 @@ class CodeGen (val target: Target) {
             // return result
             val marshalledResultDecl = tryBlock.body().decl(newClass.owner().ref("byte[]"), "marshalledResult", doTransactionInvocation)
 
-
             val errorBlock = new JBlock()
-            val expr = unmarshallExprExpectingUUIDObjects(marshalledResultDecl, obsidianRetType.get, errorBlock)
+
+            val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(translationContext, tryBlock.body(), marshalledResultDecl,transaction.retType.get,errorBlock, 0)
 
             if (!errorBlock.isEmpty) {
                 tryBlock.body().add(errorBlock)
             }
 
-            val resultDecl = tryBlock.body().decl(javaRetType, "result", expr)
+            val resultDecl = tryBlock.body().decl(javaRetType, "result", deserializedArg)
             tryBlock.body()._return(resultDecl)
         }
         else {
@@ -402,9 +407,9 @@ class CodeGen (val target: Target) {
         meth
     }
 
-    private def translateStubState(s: State, inClass: JDefinedClass, txNames: mutable.Set[String]) : Unit = {
+    private def translateStubState(s: State, inClass: JDefinedClass, txNames: mutable.Set[String],  translationContext: TranslationContext) : Unit = {
         for (decl <- s.fields) {
-            translateStubDeclaration(decl, inClass, Some(s), txNames)
+            translateStubDeclaration(decl, inClass, Some(s), txNames, translationContext)
         }
     }
 
@@ -839,13 +844,9 @@ class CodeGen (val target: Target) {
                                        programPackage: JPackage,
                                        protobufOuterClassName: String,
                                        contractNameResolutionMap: Map[Contract, String],
-                                       protobufOuterClassNames: Map[String, String]) = {
-        val newClass: JDefinedClass = programPackage._class(aContract.name)
-
-        val translationContext = makeTranslationContext(aContract, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
-
-
-
+                                       protobufOuterClassNames: Map[String, String],
+                                       translationContext: TranslationContext,
+                                       newClass: JDefinedClass) = {
 
         translateContract(aContract, newClass, translationContext)
         generateReentrantFlag(newClass, translationContext)
@@ -1233,6 +1234,7 @@ class CodeGen (val target: Target) {
                     inClass: JDefinedClass,
                     translationContext: TranslationContext): Unit = {
         generateSerializer(contract, inClass)
+        generateWrapperSerializer(contract, inClass, translationContext)
         generateArchiver(contract, inClass, translationContext)
         generateArchiveInitializer(contract, inClass, translationContext)
 
@@ -1458,6 +1460,29 @@ class CodeGen (val target: Target) {
         val archiveBody = archiveMethod.body()
 
         val archive = JExpr.invoke(JExpr._this(), "archive")
+        val archiveBytes = archive.invoke("toByteArray")
+        archiveBody._return(archiveBytes);
+    }
+
+    // Generates a method, __archiveWrapperBytes(), which wraps Foo in a FooOrGuid object and outputs as bytes
+    private def generateWrapperSerializer(contract: Contract, inClass: JDefinedClass, translationContext: TranslationContext): Unit = {
+        val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__archiveWrapperBytes")
+        val contractName = contract.name
+
+        val protobufClassName = translationContext.getProtobufClassName(contract)
+        val archiveType = model.directClass(protobufClassName + "OrGUID")
+
+        val archiveBody = archiveMethod.body()
+
+        archiveBody.decl(archiveType, "builder", archiveType.staticInvoke("newBuilder"))
+
+        val builderVariable = JExpr.ref("builder")
+
+        archiveBody.invoke(builderVariable, "set" + contractName).arg(JExpr._this())
+
+        val buildInvocation = JExpr.invoke(builderVariable, "build")
+
+        val archive = JExpr.invoke(buildInvocation, "archive")
         val archiveBytes = archive.invoke("toByteArray")
         archiveBody._return(archiveBytes);
     }
