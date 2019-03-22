@@ -80,13 +80,9 @@ while getopts "q" opt; do
   case "$opt" in
   q)
     isQuiet=1
+    shift
     ;;
    esac
-done
-
-# Discard the option
-while [[ $1 =~ ^- ]]; do
-    shift
 done
 
 parseParameters $@

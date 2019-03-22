@@ -21,15 +21,24 @@ then
     exit 0
 fi
 
+quietMode=0
 
-while getopts "h?" opt; do
+while getopts "h?:q" opt; do
   case "$opt" in
   h | \?)
     printHelp
     exit 0
     ;;
+  q)
+    quietMode=1
+    shift # shift off the option
+    ;;
    esac
 done
 
 confirmNetworkUp
-./invoke.sh __instantiateOther $@
+if [ $quietMode -eq 1 ] ; then
+    ./invoke.sh -q __instantiateOther $@
+else
+    ./invoke.sh __instantiateOther $@
+fi
