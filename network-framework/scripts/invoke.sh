@@ -76,7 +76,7 @@ parseParameters() {
 
 # Check if invocation is run in quiet mode
 isQuiet=0
-while getopts "q" opt; do
+while getopts ":q" opt; do
   case "$opt" in
   q)
     isQuiet=1
