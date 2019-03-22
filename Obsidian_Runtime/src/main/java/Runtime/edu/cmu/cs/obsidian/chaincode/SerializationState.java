@@ -18,7 +18,6 @@ import java.lang.reflect.InvocationTargetException;
 
 
 
-
 public class SerializationState {
     private Map<String, ObsidianSerialized> guidMap;
 
@@ -26,10 +25,14 @@ public class SerializationState {
      * On lookup, we need to be able to create a lazily-initialized object, which requires that we know the name of its class.
      *
      * */
-    private Map<String, Class> returnedObjectClassMap;
+    private Map<String, ReturnedReferenceState> returnedObjectClassMap;
 
-    static final String s_returnedObjectsMapKey = "ReturnedObject";
 
+    static final String s_returnedObjectsClassMapKey = "ReturnedObject";
+    static final String s_returnedObjectsIsOwnedMapKey = "ReturnedObjectIsOwned";
+
+    final byte[] FALSE_BYTE = {0};
+    final byte[] TRUE_BYTE = {1};
 
     private ChaincodeStub stub;
     UUIDFactory uuidFactory;
@@ -66,15 +69,17 @@ public class SerializationState {
         }
     }
 
-    public void mapReturnedObject(ObsidianSerialized obj) {
+    // If the returned reference is owned, record that so that we can re-claim ownership when we see the object again.
+    public void mapReturnedObject(ObsidianSerialized obj, boolean returnedReferenceIsOwned) {
         if (returnedObjectClassMap == null) {
-            returnedObjectClassMap = new HashMap<String, Class>();
+            returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
         }
 
-        returnedObjectClassMap.put(obj.__getGUID(), obj.getClass());
+        System.out.println("mapReturnedObject: " + obj.__getGUID());
+        returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
     }
 
-    public Class getReturnedObjectClass(ChaincodeStub stub, String guid) {
+    public ReturnedReferenceState getReturnedReferenceState(ChaincodeStub stub, String guid) {
         loadReturnedObjectsMap(stub);
 
         return returnedObjectClassMap.get(guid);
@@ -82,25 +87,36 @@ public class SerializationState {
 
     public void archiveReturnedObjectsMap (ChaincodeStub stub) {
         // TODO: remove old, stale entries?
+        System.out.println("archiveReturnedObjectsMap");
 
-
-        for (Map.Entry<String, Class> entry : returnedObjectClassMap.entrySet()) {
-            CompositeKey key = stub.createCompositeKey(s_returnedObjectsMapKey, entry.getKey());
-            stub.putStringState(key.toString(), entry.getValue().getCanonicalName());
-            System.out.println("archiving returned object: " + key + "->" + entry.getValue().getCanonicalName());
+        if (returnedObjectClassMap != null) {
+            for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
+                CompositeKey classKey = stub.createCompositeKey(s_returnedObjectsClassMapKey, entry.getKey());
+                stub.putStringState(classKey.toString(), entry.getValue().getClassRef().getCanonicalName());
+                CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, entry.getKey());
+                boolean isOwned = entry.getValue().getIsOwnedReference();
+                byte[] isOwnedByteArray = isOwned ? TRUE_BYTE : FALSE_BYTE;
+                stub.putState(isOwnedKey.toString(), isOwnedByteArray);
+                System.out.println("archiving returned object: " + classKey + "->" + entry.getValue().getClassRef().getCanonicalName());
+            }
         }
     }
 
     private void loadReturnedObjectsMap (ChaincodeStub stub) {
         if (returnedObjectClassMap == null) {
-            returnedObjectClassMap = new HashMap<String, Class>();
+            returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
 
-            QueryResultsIterator<KeyValue> results = stub.getStateByPartialCompositeKey(s_returnedObjectsMapKey);
+            QueryResultsIterator<KeyValue> results = stub.getStateByPartialCompositeKey(s_returnedObjectsClassMapKey);
 
             for (KeyValue kv : results) {
                 try {
                     Class c = Class.forName(kv.getStringValue());
-                    returnedObjectClassMap.put(kv.getKey(), c);
+
+                    CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, kv.getKey());
+                    byte[] isOwnedByteArray = stub.getState(isOwnedKey.toString());
+                    boolean isOwned = (isOwnedByteArray == TRUE_BYTE) ? true : false;
+
+                    returnedObjectClassMap.put(kv.getKey(), new ReturnedReferenceState(c, isOwned));
                     System.out.println("loading map: " + kv.getKey() + " -> " + c);
                 }
                 catch (ClassNotFoundException e) {
@@ -115,24 +131,41 @@ public class SerializationState {
     }
 
 
-    public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid) {
+    // If we are loading an object and plan to take ownership, ensure this is allowed (and record that ownership has been taken).
+    public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid, boolean requireOwnership) throws BadArgumentException, IllegalOwnershipConsumptionException {
         ObsidianSerialized receiverContract = getEntry(guid);
-        // If it's not in our map, maybe we just haven't loaded it yet.
-        if (receiverContract == null) {
-            Class objectClass = getReturnedObjectClass(stub, guid);
-            if (objectClass == null) {
-                System.err.println("Unable to find class of object to look up: " + guid);
-                return null;
-            } else {
+
+        ReturnedReferenceState refState = getReturnedReferenceState(stub, guid);
+        if (refState == null) {
+            System.err.println("Unable to find class of object to look up: " + guid);
+            return null;
+        } else {
+            if (requireOwnership) {
+                boolean outstandingOwnedReference = refState.getIsOwnedReference();
+                if (!outstandingOwnedReference) {
+                    throw new IllegalOwnershipConsumptionException(guid);
+                }
+                else {
+                    // We've now consumed ownership, so record that fact.
+                    // We can't remove the object from the map because the client may well still have a reference.
+                    mapReturnedObject(receiverContract, false);
+                }
+            }
+
+            if (receiverContract == null) {
                 try {
+                    Class objectClass = refState.getClassRef();
                     Constructor constructor = objectClass.getConstructor(String.class);
                     Object loadedObject = constructor.newInstance(guid);
                     if ((loadedObject instanceof ObsidianSerialized)) {
-                        receiverContract = (ObsidianSerialized)loadedObject;
-                        putEntry(guid, receiverContract);
-                    }
-                    else {
+                        receiverContract = (ObsidianSerialized) loadedObject;
+                        if (getEntry(guid) == null) {
+                            putEntry(guid, receiverContract);
+                        }
+
+                    } else {
                         System.err.println("Loaded object is not an Obsidian object.");
+                        throw new BadArgumentException(guid);
                     }
                 } catch (NoSuchMethodException |
                         InstantiationException |

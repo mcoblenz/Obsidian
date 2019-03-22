@@ -290,6 +290,7 @@ class CodeGen (val target: Target) {
                 val stub = JExpr.ref(serializationParamName).invoke("getStub")
                 val guid = archive.invoke("getGuid")
                 val loadInvocation = JExpr.ref(serializationParamName).invoke("loadContractWithGUID").arg(stub).arg(guid)
+                loadInvocation.arg(np.isOwned)
                 cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(typ), loadInvocation))
 
                 // If we have an object…
@@ -831,7 +832,37 @@ class CodeGen (val target: Target) {
         */
         newClass.constructor(JMod.PUBLIC)
 
+        generateReceiverOwnershipMethod(aContract, newClass)
+
         translationContext
+    }
+
+    // When a client invokes a method from off-blockchain, the receiver might need to be owned.
+    // The runtime needs to check, but the types are erased at compile time. This generated method is invoked
+    // by the runtime when it needs to know whether a method takes ownership of its receiver.
+    // boolean methodReceiverIsOwned(String methodName);
+    private def generateReceiverOwnershipMethod(contract: Contract, newClass: JDefinedClass): Unit = {
+        val hashSetType = model.ref("java.util.HashSet").narrow(model.ref("java.lang.String"))
+        val field = newClass.field(JMod.STATIC, hashSetType, "transactionsWithOwnedReceivers")
+
+        val method = newClass.method(JMod.PUBLIC, model.BOOLEAN, "methodReceiverIsOwned")
+        method.annotate(model.ref("Override"));
+        val methodNameParam = method.param(model.ref("java.lang.String"), "methodName")
+        val body = method.body()
+        val initTest = body._if(field.eq(JExpr._null()))
+        initTest._then().assign(field, JExpr._new(hashSetType))
+
+        for (decl <- contract.declarations) {
+            decl match {
+                case iv: InvokableDeclaration =>
+                    if (iv.thisType.isOwned) {
+                        initTest._then().invoke(field, "add").arg(decl.name)
+                    }
+                case _ => ()
+            }
+        }
+
+        body._return(field.invoke("contains").arg(methodNameParam))
     }
 
     // Contracts translate to compilation units containing one class.
@@ -952,6 +983,7 @@ class CodeGen (val target: Target) {
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
 
         // have to check that the args parameter has the correct number of arguments
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
@@ -987,6 +1019,8 @@ class CodeGen (val target: Target) {
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
+
 
         runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
@@ -1105,6 +1139,7 @@ class CodeGen (val target: Target) {
                         case np: NonPrimitiveType =>
                             val mapInvocation = enoughArgs.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
                             mapInvocation.arg(returnObj)
+                            mapInvocation.arg(np.isOwned)
                         case _ => ()
                     }
 
@@ -1964,6 +1999,17 @@ class CodeGen (val target: Target) {
 
         constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         invocation.arg(JExpr.ref(serializationParamName))
+
+        val ownedRefMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "constructorReturnsOwnedReference")
+        ownedRefMethod.annotate(model.ref("Override"));
+        val returnTypeIsOwned =
+            if (c.resultType.isOwned) {
+                JExpr.TRUE
+            }
+            else {
+                JExpr.FALSE
+            }
+        ownedRefMethod.body()._return(returnTypeIsOwned)
     }
 
     // Generates a new_Foo() method, which takes the serialization state as a parameter, and initializes all the fields.
