@@ -39,9 +39,17 @@ main asset contract InsuranceService {
         // Convenience transaction for testing.
         TimeService ts = new TimeService();
         Bank b = new Bank();
-        Money m = b.requestMoney(10);
+        Money m = b.withdrawMoney(1000);
         Insurer ins = new Insurer(ts, b, m);
         ->Ready(insurer = ins, timeService = ts, bank = b);
+    }
+
+    transaction getTimeService(InsuranceService@Ready this) returns TimeService@Shared {
+        return timeService;
+    }
+
+    transaction getBank(InsuranceService@Ready this) returns Bank@Shared {
+        return bank;
     }
 
 /*
@@ -50,16 +58,18 @@ main asset contract InsuranceService {
         insurer = insurer;
     }
 */
-    // TODO: information to calculate bids, Collection of Bid and Token
-    transaction requestBids(InsuranceService@Ready this, int i) returns Policy@Offered {
-        InsuranceBid insBid = insurer.requestBid(i);
+
+    // All bids (for now) are for one-month periods. They insure within "radius" of the given coordinate:
+    // if the moisture content ever drops below the threshold, then the policy pays out.
+    transaction requestBid(InsuranceService@Ready this, int longitude, int latitude, int radius, int moistureContent, int payout) returns Policy@Offered {
+        InsuranceBid insBid = insurer.requestBid(longitude, latitude, radius, moistureContent, payout);
 
         int cost = insBid.getCost();
         int expiration = insBid.getExpirationTime();
-        Money payout = insBid.getPayout();
+        Money m = insBid.getPayout();
 
         Policy policy = new Policy(cost, expiration);
-        PolicyRecord pendingPolicy = new PolicyRecord(policy, payout);
+        PolicyRecord pendingPolicy = new PolicyRecord(policy, m);
 
         pendingPolicies.set(policy, pendingPolicy);
 
@@ -101,7 +111,7 @@ main asset contract InsuranceService {
     transaction claim(InsuranceService@Ready this, Policy@Active >> Claimed policy, WeatherRecord@Shared weatherRecord, Signature s) returns Money@Owned {
         if (not s.verify(weatherRecord)) {
             // Invalid signature; can't pay a claim with it.
-            revert;
+            revert "Unable to verify weather record signature.";
         }
 
         // get will revert if the policy isn't found.

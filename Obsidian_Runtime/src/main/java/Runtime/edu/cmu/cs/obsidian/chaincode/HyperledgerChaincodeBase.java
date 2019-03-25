@@ -87,6 +87,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
 
         int paramsConsumed = 0;
 
+        serializationState.beginTransaction();
         if (function.equals("__instantiateOther")) {
             // Expect the first arg to be the contract name of the reciever.
             if (params.size() > 0) {
@@ -104,22 +105,32 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                     ObsidianSerialized newContract = instantiateOtherContract(otherClassName, restArgs);
                     if (newContract != null) {
                         __saveModifiedData(stub, newContract);
+                        serializationState.transactionSucceeded();
                         return newSuccessResponse(newContract.__getGUID().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     } else {
+                        serializationState.transactionFailed();
                         return newErrorResponse("Failed to instantiate contract " + otherContractName);
                     }
                 }
                 catch (BadArgumentException e) {
+                    serializationState.transactionFailed();
                     return newErrorResponse("Failed to instantiate contract; arguments were invalid.");
                 }
                 catch (WrongNumberOfArgumentsException e) {
+                    serializationState.transactionFailed();
                     return newErrorResponse("Failed to instantiate contract: " + e);
                 }
                 catch (ObsidianRevertException e) {
+                    serializationState.transactionFailed();
                     return newErrorResponse(e.getMessage());
+                }
+                catch (IllegalOwnershipConsumptionException e) {
+                    serializationState.transactionFailed();
+                    return newErrorResponse("Failed to invoke method: a parameter that the client does not own needs to be owned.");
                 }
             }
             else {
+                serializationState.transactionFailed();
                 return newErrorResponse("Instantiating another contract requires specifying a contract class name.");
 
             }
@@ -133,13 +144,27 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                 // Expect the second arg to be the GUID of the reciever.
                 if (params.size() > 1) {
                     String receiverGUID = new String(params.get(1), java.nio.charset.StandardCharsets.UTF_8);
-                    invocationReceiver = serializationState.loadContractWithGUID(stub, receiverGUID);
+                    boolean receiverIsOwned = methodReceiverIsOwned(function);
+                    try {
+                        invocationReceiver = serializationState.loadContractWithGUID(stub, receiverGUID, receiverIsOwned);
+                    }
+                    catch (BadArgumentException e) {
+                        serializationState.transactionFailed();
+                        return newErrorResponse("Failed to load receiver contract with GUID " + receiverGUID);
+                    }
+                    catch (IllegalOwnershipConsumptionException e) {
+                        serializationState.transactionFailed();
+                        return newErrorResponse("Failed to invoke method: receiver must be owned, and the client does not own it.");
+                    }
+
                     if (invocationReceiver == null) {
+                        serializationState.transactionFailed();
                         return newErrorResponse("Failed to load receiver contract with GUID " + receiverGUID);
                     }
 
                     paramsConsumed = 2;
                 } else {
+                    serializationState.transactionFailed();
                     return newErrorResponse("Invoking on a non-main contract requires specifying a receiver.");
                 }
             }
@@ -163,14 +188,17 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
 
             byte result[] = invocationReceiver.run(serializationState, function, paramsBytes);
             __saveModifiedData(stub, invocationReceiver);
+            serializationState.transactionSucceeded();
             return newSuccessResponse(result);
         } catch (NoSuchTransactionException e) {
             /* This will be returned when calling an invalid transaction
              * from the command line -- referencing an invalid transaction
              * in the client will give a compile-time error. */
+            serializationState.transactionFailed();
             return newErrorResponse("No such transaction: " + function);
         } catch (ObsidianRevertException e) {
-                return newErrorResponse(e.getMessage());
+            serializationState.transactionFailed();
+            return newErrorResponse(e.getMessage());
         } catch (Throwable e) {
             System.err.println("Caught exception dispatching invocation: " + e);
 
@@ -182,6 +210,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             if (message == null) {
                 message = e.toString();
             }
+            serializationState.transactionFailed();
             return newErrorResponse(message, printStackTrace(e));
         }
     }
@@ -205,7 +234,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     }
 
     // Returns the GUID of the new instance if initialization was successful, and null otherwise.
-    private ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) throws BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException {
+    private ObsidianSerialized instantiateOtherContract(String contractClassName, byte[][] args) throws BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException {
         if (!contractClassName.startsWith("org.hyperledger.fabric.example")) {
             // We don't permit looking up arbitrary Java classes for security reasons!
             return null;
@@ -221,6 +250,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                 System.err.println("Unable to initialize contract: " + e);
                 return null;
             }
+
+            boolean resultIsOwned = contract.constructorReturnsOwnedReference();
+            serializationState.mapReturnedObject(contract, resultIsOwned);
             return contract;
 
         }
@@ -241,6 +273,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             System.out.println("Saving modified data: ("+field+" @ <"+archiveKey+"> => "+archiveValue+")");
             stub.putStringState(archiveKey, archiveValue);
         }
+
+        serializationState.archiveReturnedObjectsMap(stub);
         __unload();
     }
 
@@ -249,13 +283,15 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract String __getGUID();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-                   BadTransactionException, NoSuchTransactionException, BadArgumentException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException;
+                   BadTransactionException, NoSuchTransactionException, BadArgumentException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException, IllegalOwnershipConsumptionException;
     public abstract byte[] init(SerializationState st, byte[][] args)
-            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException;
+            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException;
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes, SerializationState __st)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();
     public abstract void __restoreObject(SerializationState st)
         throws InvalidProtocolBufferException;
     protected abstract void __unload();
+    public abstract boolean methodReceiverIsOwned(String transactionName);
+    public abstract boolean constructorReturnsOwnedReference();
 }

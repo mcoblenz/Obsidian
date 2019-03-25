@@ -16,16 +16,22 @@ main asset contract Insurer {
     }
 
     // TODO : Calculate Bid using some needed information, for now just int
-    transaction requestBid(int i) returns InsuranceBid@Owned {
-        int costOfBid = i + 4;
-        int costOfPayout = i + 6;
+    transaction requestBid(int longitude, int latitude, int radius, int moistureContent, int payout) returns InsuranceBid@Owned {
+        // For now, assume 10% of policies will have to pay out, and we're keeping a $10 profit.
+        // Obviously this is oversimplified.
+        int costOfBid = payout / 10 + 10;
+
 
         // available for 24 hours
         int twentyFourHours = timeService.hoursToMillis(24);
         int expirationTime = timeService.getTime() + twentyFourHours;
 
+        if (money.getAmount() < payout) {
+            revert "Insurer does not have sufficient funds to offer another bid.";
+        }
+
         // get correct amount of money from owned money
-        Money m = money.getAmountOfMoney(costOfPayout);
+        Money m = money.getAmountOfMoney(payout);
 
         InsuranceBid b = new InsuranceBid(costOfBid, expirationTime, m);
 

@@ -22,7 +22,7 @@ main contract TimeService {
             currentTimeInMillis = newMillis;
         }
         else {
-            revert;
+            revert "Can't move time backwards.";
         }
     }
 }

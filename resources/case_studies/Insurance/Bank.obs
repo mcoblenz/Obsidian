@@ -7,12 +7,16 @@ main asset contract Bank {
 
     Bank@Owned() {
         // TODO: generate key
-        mon = new Money(100);
+        mon = new Money(10000);
         key = 35;
     }
 
-    transaction requestMoney(int amount) returns Money@Owned{
+    transaction withdrawMoney(int amount) returns Money@Owned{
          return mon.getAmountOfMoney(amount);
+    }
+
+    transaction depositMoney(Money@Owned >> Unowned m) {
+        mon.addMoney(m);
     }
 
 }
