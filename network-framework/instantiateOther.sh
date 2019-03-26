@@ -24,9 +24,9 @@ fi
 
 quietMode=0
 
-while getopts "h?:q" opt; do
+while getopts ":h?:q" opt; do
   case "$opt" in
-  h | \?)
+  h )
     printHelp
     exit 0
     ;;
