@@ -69,8 +69,6 @@ parseParameters() {
         PARAMS="$PARAMS\"$1\""
     fi
 
-
-
   PARAMS="$PARAMS]}"
 }
 

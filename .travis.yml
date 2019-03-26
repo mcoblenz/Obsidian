@@ -16,6 +16,9 @@ before_install:
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++2.12.4 test
-# Since the mock environment is deprecated, the tests need to be updated.
-# For now, disable the integration tests.
-#  - cat resources/tests/tests_to_run.txt | xargs perl obstest.pl -v
+
+deploy:
+  provider: script
+  script: bash network-framework/tests/IntContainerTest.sh
+  on:
+    branch: getGuid
