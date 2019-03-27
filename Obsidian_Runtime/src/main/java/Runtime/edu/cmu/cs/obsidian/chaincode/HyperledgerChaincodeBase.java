@@ -108,29 +108,29 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                         serializationState.transactionSucceeded();
                         return newSuccessResponse(newContract.__getGUID().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     } else {
-                        serializationState.transactionFailed();
+                        revertState();
                         return newErrorResponse("Failed to instantiate contract " + otherContractName);
                     }
                 }
                 catch (BadArgumentException e) {
-                    serializationState.transactionFailed();
+                    revertState();
                     return newErrorResponse("Failed to instantiate contract; arguments were invalid.");
                 }
                 catch (WrongNumberOfArgumentsException e) {
-                    serializationState.transactionFailed();
+                    revertState();
                     return newErrorResponse("Failed to instantiate contract: " + e);
                 }
                 catch (ObsidianRevertException e) {
-                    serializationState.transactionFailed();
+                    revertState();
                     return newErrorResponse(e.getMessage());
                 }
                 catch (IllegalOwnershipConsumptionException e) {
-                    serializationState.transactionFailed();
+                    revertState();
                     return newErrorResponse("Failed to invoke method: a parameter that the client does not own needs to be owned.");
                 }
             }
             else {
-                serializationState.transactionFailed();
+                revertState();
                 return newErrorResponse("Instantiating another contract requires specifying a contract class name.");
 
             }
@@ -150,22 +150,22 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                         invocationReceiver = serializationState.loadContractWithGUID(stub, receiverGUID, receiverIsOwnedAtBeginning, receiverIsOwnedAtEnd);
                     }
                     catch (BadArgumentException e) {
-                        serializationState.transactionFailed();
+                        revertState();
                         return newErrorResponse("Failed to load receiver contract with GUID " + receiverGUID);
                     }
                     catch (IllegalOwnershipConsumptionException e) {
-                        serializationState.transactionFailed();
+                        revertState();
                         return newErrorResponse("Failed to invoke method: receiver must be owned, and the client does not own it.");
                     }
 
                     if (invocationReceiver == null) {
-                        serializationState.transactionFailed();
+                        revertState();
                         return newErrorResponse("Failed to load receiver contract with GUID " + receiverGUID);
                     }
 
                     paramsConsumed = 2;
                 } else {
-                    serializationState.transactionFailed();
+                    revertState();
                     return newErrorResponse("Invoking on a non-main contract requires specifying a receiver.");
                 }
             }
@@ -195,10 +195,10 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             /* This will be returned when calling an invalid transaction
              * from the command line -- referencing an invalid transaction
              * in the client will give a compile-time error. */
-            serializationState.transactionFailed();
+            revertState();
             return newErrorResponse("No such transaction: " + function);
         } catch (ObsidianRevertException e) {
-            serializationState.transactionFailed();
+            revertState();
             return newErrorResponse(e.getMessage());
         } catch (Throwable e) {
             System.err.println("Caught exception dispatching invocation: " + e);
@@ -211,7 +211,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             if (message == null) {
                 message = e.toString();
             }
-            serializationState.transactionFailed();
+            revertState();
             return newErrorResponse(message, printStackTrace(e));
         }
     }
@@ -221,6 +221,20 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         final StringWriter buffer = new StringWriter();
         throwable.printStackTrace(new PrintWriter(buffer));
         return buffer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private void revertState() {
+        serializationState.transactionFailed();
+
+        // Reset the heap to the prior state by re-loading the state from the ledger.
+        __unload();
+        try {
+            __restoreObject(serializationState);
+        }
+        catch (InvalidProtocolBufferException e) {
+            // Unrecoverable error; something is wrong with our archive!
+            System.err.println("Failed to restore previous state!");
+        }
     }
 
     public void delegatedMain(String args[]) {

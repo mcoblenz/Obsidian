@@ -84,6 +84,7 @@ public class SerializationState {
     public void transactionFailed() {
         returnedObjectClassMap = returnedObjectClassMapAtBeginningOfTransaction;
         returnedObjectClassMapAtBeginningOfTransaction = null;
+        guidMap.clear();
     }
 
     // If the returned reference is owned, record that so that we can re-claim ownership when we see the object again.
