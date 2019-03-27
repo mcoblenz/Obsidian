@@ -41,6 +41,7 @@ sealed abstract class InvokableDeclaration() extends Declaration {
     val retType: Option[ObsidianType]
     val body: Seq[Statement]
     val thisType: ObsidianType
+    val thisFinalType: ObsidianType
     val isStatic: Boolean
 }
 
@@ -128,6 +129,7 @@ case class Constructor(name: String,
     val retType: Option[ObsidianType] = None
     val tag: DeclarationTag = ConstructorDeclTag
     val thisType: ObsidianType = resultType
+    val thisFinalType: ObsidianType = resultType
     val isStatic: Boolean = false
 }
 

@@ -144,9 +144,10 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                 // Expect the second arg to be the GUID of the reciever.
                 if (params.size() > 1) {
                     String receiverGUID = new String(params.get(1), java.nio.charset.StandardCharsets.UTF_8);
-                    boolean receiverIsOwned = methodReceiverIsOwned(function);
+                    boolean receiverIsOwnedAtBeginning= methodReceiverIsOwnedAtBeginning(function);
+                    boolean receiverIsOwnedAtEnd = methodReceiverIsOwnedAtEnd(function);
                     try {
-                        invocationReceiver = serializationState.loadContractWithGUID(stub, receiverGUID, receiverIsOwned);
+                        invocationReceiver = serializationState.loadContractWithGUID(stub, receiverGUID, receiverIsOwnedAtBeginning, receiverIsOwnedAtEnd);
                     }
                     catch (BadArgumentException e) {
                         serializationState.transactionFailed();
@@ -292,6 +293,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract void __restoreObject(SerializationState st)
         throws InvalidProtocolBufferException;
     protected abstract void __unload();
-    public abstract boolean methodReceiverIsOwned(String transactionName);
+    public abstract boolean methodReceiverIsOwnedAtBeginning(String transactionName);
+    public abstract boolean methodReceiverIsOwnedAtEnd(String transactionName);
     public abstract boolean constructorReturnsOwnedReference();
 }

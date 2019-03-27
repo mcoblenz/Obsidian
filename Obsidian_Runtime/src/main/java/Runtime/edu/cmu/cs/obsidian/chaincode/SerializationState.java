@@ -149,7 +149,7 @@ public class SerializationState {
 
 
     // If we are loading an object and plan to take ownership, ensure this is allowed (and record that ownership has been taken).
-    public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid, boolean requireOwnership) throws BadArgumentException, IllegalOwnershipConsumptionException {
+    public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid, boolean requireOwnership, boolean ownershipRemains) throws BadArgumentException, IllegalOwnershipConsumptionException {
         ObsidianSerialized receiverContract = getEntry(guid);
 
         ReturnedReferenceState refState = getReturnedReferenceState(stub, guid);
@@ -157,16 +157,20 @@ public class SerializationState {
             System.err.println("Unable to find class of object to look up: " + guid);
             return null;
         } else {
+            boolean outstandingOwnedReference = refState.getIsOwnedReference();
+
             if (requireOwnership) {
-                boolean outstandingOwnedReference = refState.getIsOwnedReference();
                 if (!outstandingOwnedReference) {
                     throw new IllegalOwnershipConsumptionException(guid);
                 }
-                else {
+                else if (!ownershipRemains) {
                     // We've now consumed ownership, so record that fact.
                     // We can't remove the object from the map because the client may well still have a reference.
                     mapReturnedObject(receiverContract, false);
                 }
+            }
+            else if (ownershipRemains && !outstandingOwnedReference) {
+                mapReturnedObject(receiverContract, true);
             }
 
             if (receiverContract == null) {

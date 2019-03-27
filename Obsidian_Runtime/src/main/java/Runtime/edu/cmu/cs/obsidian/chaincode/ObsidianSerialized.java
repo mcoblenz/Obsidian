@@ -14,6 +14,7 @@ public interface ObsidianSerialized {
             throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException;
 
     public void flush();
-    public abstract boolean methodReceiverIsOwned(String transactionName);
+    public abstract boolean methodReceiverIsOwnedAtBeginning(String transactionName);
+    public abstract boolean methodReceiverIsOwnedAtEnd(String transactionName);
     public abstract boolean constructorReturnsOwnedReference();
 }
