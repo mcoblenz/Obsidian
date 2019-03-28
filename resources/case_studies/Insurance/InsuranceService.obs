@@ -35,7 +35,7 @@ main asset contract InsuranceService {
         ->Ready(insurer = ins, timeService = ts, bank = b);
     }
 
-    transaction testSetup() {
+    transaction testSetup(InsuranceService@New >> Ready this) {
         // Convenience transaction for testing.
         TimeService ts = new TimeService();
         Bank b = new Bank();
