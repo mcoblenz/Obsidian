@@ -12,10 +12,10 @@ class CompilerTests extends JUnitSuite {
 
   def testContract(contractName : String) = {
     var result = true
-    val inputArgs: Array[String] = Array(s"resources/tests/compilerTests/$contractName.obs")
+    val inputArgs: Array[String] = Array(s"--output-path", s"obs_output/", s"resources/tests/compilerTests/$contractName.obs")
     result = Main.compileProgram(inputArgs)
     assertTrue(result)
-    val gradleCmd = s"gradle compileJava -b --output-path obs_output $contractName/build.gradle"
+    val gradleCmd = s"gradle compileJava -b obs_output/$contractName/build.gradle"
     val gradleResult = gradleCmd.!
     assertTrue(gradleResult == 0)
   }
