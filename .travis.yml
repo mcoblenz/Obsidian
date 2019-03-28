@@ -19,6 +19,6 @@ script:
 
 deploy:
   provider: script
-  script: bash network-framework/tests/IntContainerTest.sh
+  script: bash resources/tests/endToEndTests/IntContainerTest.sh
   on:
     branch: getGuid

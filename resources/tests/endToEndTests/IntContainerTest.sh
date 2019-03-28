@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-cd ../
+pwd
+cd network-framework
 ./down.sh
 ./up.sh -s IntContainer
 
