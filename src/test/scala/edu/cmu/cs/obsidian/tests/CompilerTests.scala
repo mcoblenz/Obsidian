@@ -15,10 +15,9 @@ class CompilerTests extends JUnitSuite {
     val inputArgs: Array[String] = Array(s"resources/tests/compilerTests/$contractName.obs")
     result = Main.compileProgram(inputArgs)
     assertTrue(result)
-    val gradleCmd = s"gradle compileJava -b $contractName/build.gradle"
+    val gradleCmd = s"gradle compileJava -b --output-path obs_output $contractName/build.gradle"
     val gradleResult = gradleCmd.!
     assertTrue(gradleResult == 0)
-
   }
 
   @Test def intContainer(): Unit = {

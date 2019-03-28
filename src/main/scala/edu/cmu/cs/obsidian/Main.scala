@@ -231,19 +231,19 @@ object Main {
             copyFabricFolderInvocation.!
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
-            val javaTargetLocation = Paths.get(mainName, "src", "main", "java", "org", "hyperledger", "fabric", "example")
+            val javaTargetLocation = Paths.get(path.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
             val copyAllGeneratedClasses : String =
                 "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
             println("copying: " + copyAllGeneratedClasses)
             copyAllGeneratedClasses.!
 
             //place the correct class name in the build.gradle
-            val gradlePath = Paths.get(mainName, "build.gradle")
+            val gradlePath = Paths.get(path.toString, "build.gradle")
             val replaceClassNameInGradleBuild: String =
                 "sed -i.backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
 
             //sed automatically creates a backup of the original file, has to be deleted
-            val gradleBackupPath = Paths.get(mainName, "build.gradle.backup")
+            val gradleBackupPath = Paths.get(path.toString, "build.gradle.backup")
             val deleteSedBackupFile: String =
                 "rm " + gradleBackupPath.toString
 
