@@ -1,11 +1,13 @@
 package edu.cmu.cs.obsidian.tests
 
 
+import java.nio.file.Files
+
 import org.scalatest.junit.JUnitSuite
 import org.junit.Assert.{assertTrue, fail}
 import _root_.org.junit.Test
-import scala.sys.process._
 
+import scala.sys.process._
 import edu.cmu.cs.obsidian._
 
 class CompilerTests extends JUnitSuite {
@@ -18,6 +20,8 @@ class CompilerTests extends JUnitSuite {
     val gradleCmd = s"gradle compileJava -b obs_output/$contractName/build.gradle"
     val gradleResult = gradleCmd.!
     assertTrue(gradleResult == 0)
+    val deleteCmd = s"rm -rf obs_output/$contractName"
+    deleteCmd.!
   }
 
   @Test def intContainer(): Unit = {
