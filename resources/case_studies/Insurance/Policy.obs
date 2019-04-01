@@ -1,15 +1,12 @@
-main contract Policy {
-
+contract Policy {
     state Offered {
         int cost;
         int expirationTime;
     }
 
-    state Active {}
-
-    state Expired {}
-
-    state Claimed {}
+    state Active;
+    state Expired;
+    state Claimed;
 
     Policy@Offered(int c, int expiration) {
         ->Offered(cost = c, expirationTime = expiration);
@@ -39,5 +36,4 @@ main contract Policy {
     transaction equals(Policy@Unowned this, Policy@Unowned p) returns bool {
         return true;
     }
-
 }
