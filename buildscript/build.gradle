@@ -36,7 +36,7 @@ dependencies {
     compile 'org.hyperledger.fabric-chaincode-java:fabric-chaincode-shim:1.4.+'
     compile 'org.glassfish:javax.json:1.1.0-M1'
     compile 'org.json:json:20171018'
-    compile 'com.google.protobuf:protobuf-java:3.5.1'
+    compile 'com.google.protobuf:protobuf-java:3.7.0'
 }
 
 version = '1.0'

@@ -5,9 +5,9 @@ import org.json.JSONTokener;
 import org.json.JSONWriter;
 
 import java.util.ArrayList;
-import java.util.UUID;
 import java.util.Base64;
-import java.io.*;
+import java.util.StringJoiner;
+import org.apache.commons.io.IOUtils;
 
 /**
  * Created by mcoblenz on 4/3/17.
@@ -19,14 +19,15 @@ public class ChaincodeClientConnectionManager {
         this.printDebug = printDebug;
     }
 
-    public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, UUID receiverUUID, boolean returnsNonvoid)
+    public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, String receiverUUID, boolean returnsNonvoid)
             throws java.io.IOException,
                 ChaincodeClientTransactionFailedException,
                 ChaincodeClientTransactionBugException
     {
         StringJoiner sj = new StringJoiner(" ");
+        sj.add("-q");
         sj.add(transactionName);
-        sj.add("__receiver").add(receiverUUID.toString());
+        sj.add("__receiver").add(receiverUUID);
         for (int i = 0; i < args.size(); i++) {
             byte[] bytes = args.get(i);
             String byteString = Base64.getEncoder().encodeToString(bytes);
@@ -34,10 +35,9 @@ public class ChaincodeClientConnectionManager {
         }
 
         String parameterForInvoke = sj.toString();
-
-        Process pb = new ProcessBuilder("../network-framework/invoke.sh", parameterForInvoke);
+        System.out.println(parameterForInvoke);
+        ProcessBuilder pb = new ProcessBuilder("../../../network-framework/invoke.sh", parameterForInvoke);
         String output = IOUtils.toString(pb.start().getInputStream());
-
         return output.getBytes();
     }
 }

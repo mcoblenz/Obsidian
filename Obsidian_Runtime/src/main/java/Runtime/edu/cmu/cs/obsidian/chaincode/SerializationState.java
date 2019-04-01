@@ -114,6 +114,8 @@ public class SerializationState {
         return uuidFactory;
     }
 
+    public void setUUIDFactory(UUIDFactory factory) { uuidFactory = factory; }
+
 
     public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid) {
         ObsidianSerialized receiverContract = getEntry(guid);
