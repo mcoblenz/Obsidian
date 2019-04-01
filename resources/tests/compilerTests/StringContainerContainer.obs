@@ -1,12 +1,18 @@
 contract StringContainer {
     string str;
+    int i;
 
-    StringContainer@Owned(string s) {
+    StringContainer@Owned(string s, int new_i) {
         str = s;
+        i = new_i;
     }
 
     transaction getString() returns string {
         return str;
+    }
+
+    transaction getInt() returns int {
+        return i;
     }
 }
 
@@ -15,7 +21,7 @@ main contract StringContainerContainer {
     StringContainer@Owned container;
 
     StringContainerContainer() {
-        container = new StringContainer("hello, world");
+        container = new StringContainer("hello, world", 5);
     }
 
     transaction setContainer(StringContainer@Owned >> Unowned s) {
