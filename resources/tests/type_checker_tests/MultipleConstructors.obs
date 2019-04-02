@@ -4,7 +4,7 @@ main contract C {
     int x;
     int y;
 
-    C(int first) {
+    C@Owned(int first) {
         x = first;
         y = 0;
     }

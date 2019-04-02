@@ -2,7 +2,7 @@ contract LightSwitch {
     state On;
     state Off;
 
-    LightSwitch() {
+    LightSwitch@Off() {
         ->Off;
     }
 

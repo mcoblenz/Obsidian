@@ -2,7 +2,7 @@
 
 main asset contract BogusMoney {
 	 // Error: constructor must return an owned reference
-	 BogusMoney() {
+	 BogusMoney@Shared() {
 	 }
 }
 
