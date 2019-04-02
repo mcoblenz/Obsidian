@@ -1408,7 +1408,7 @@ private def checkStatement(
             case IfInState(e, state, body1, body2) =>
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
 
-                var confirmOwnershipIsRetained = false;
+                var resetOwnership: Option[(String, NonPrimitiveType)] = None
 
                 val contextForCheckingTrueBranch =
                     e match {
@@ -1429,7 +1429,7 @@ private def checkStatement(
                                             // What stops the body from giving away ownership of the object permanently?? Nothing.
                                             //
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
-                                            confirmOwnershipIsRetained = true
+                                            resetOwnership = Some((x, np))
                                             contextPrime.updated(x, newType)
                                     }
                             }
@@ -1443,8 +1443,11 @@ private def checkStatement(
                 val contextIfFalse = pruneContext(s,
                     checkStatementSequence(decl, contextPrime, body2),
                     contextPrime)
-                mergeContext(s, contextIfFalse, contextIfTrue)
-
+                val mergedContext = mergeContext(s, contextIfFalse, contextIfTrue)
+                resetOwnership match {
+                    case None => mergedContext
+                    case Some((x, oldType)) => mergedContext.updated(x, oldType)
+                }
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val contextIfTry = pruneContext(s,
                     checkStatementSequence(decl, context, s1),

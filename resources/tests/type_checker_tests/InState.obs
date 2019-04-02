@@ -1,0 +1,28 @@
+contract LightSwitch {
+    state On;
+    state Off;
+
+    LightSwitch() {
+        ->Off;
+    }
+
+    transaction turnOn(LightSwitch@Off >> On this) {
+        ->On;
+    }
+
+    transaction turnOff(LightSwitch@On >> Off this) {
+        ->Off;
+    }
+}
+
+main contract InState {
+    transaction t1(LightSwitch@Shared s) {
+        if (s in On) {
+            s.turnOff();
+        }
+        if (s in Off) {
+            s.turnOn();
+        }
+    }
+
+}

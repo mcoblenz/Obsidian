@@ -220,17 +220,19 @@ object Parser extends Parsers {
             case t ~ expr ~ _ => Revert(expr).setLoc(t)
         }
 
-        val parseOnlyIf = IfT() ~! parseExpr ~! opt(InT() ~! parseId) ~! LBraceT() ~! parseBody ~! RBraceT()
+
+
+        val parseOnlyIf = IfT() ~! opt(LParenT()) ~ parseExpr ~! opt(InT() ~! parseId) ~ opt(RParenT()) ~! LBraceT() ~! parseBody ~! RBraceT()
         val parseElse = ElseT() ~! LBraceT() ~! parseBody ~! RBraceT()
 
         val parseIf = parseOnlyIf ~ opt(parseElse) ^^ {
-            case _if ~ e ~ stOpt ~ _ ~ s ~ _ ~ None =>
+            case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s ~ _ ~ None =>
                 stOpt match {
                     case None => If(e, s).setLoc(_if)
                     case Some(_ ~ stateName) => IfInState(e, stateName, s, Seq.empty).setLoc(_if)
                 }
 
-            case _if ~ e ~ stOpt ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) =>
+            case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) =>
                 stOpt match {
                     case None => IfThenElse(e, s1, s2).setLoc(_if)
                     case Some(_ ~ stateName) => IfInState(e, stateName, s1, s2).setLoc(_if)
