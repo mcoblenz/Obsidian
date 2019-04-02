@@ -7,7 +7,7 @@ main asset contract Bank {
 
     Bank@Owned() {
         // TODO: generate key
-        mon = new Money(10000);
+        mon = new Money(1000000);
         key = 35;
     }
 

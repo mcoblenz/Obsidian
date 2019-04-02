@@ -39,7 +39,7 @@ main asset contract InsuranceService {
         // Convenience transaction for testing.
         TimeService ts = new TimeService();
         Bank b = new Bank();
-        Money m = b.withdrawMoney(1000);
+        Money m = b.withdrawMoney(10000);
         Insurer ins = new Insurer(ts, b, m);
         ->Ready(insurer = ins, timeService = ts, bank = b);
     }
