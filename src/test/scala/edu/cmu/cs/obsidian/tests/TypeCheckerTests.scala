@@ -650,4 +650,16 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Revert.obs",
             (SubtypingError(IntType(), StringType()), 12) :: Nil)
     }
+
+    @Test def inStateTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/InState.obs",
+            (ReceiverTypeIncompatibleError("turnOff",
+                ContractReferenceType(ContractType("LightSwitch"), Unowned(), false),
+                StateType("LightSwitch", "On", false)), 33) ::
+            (ReceiverTypeIncompatibleError("turnOn",
+                ContractReferenceType(ContractType("LightSwitch"), Unowned(), false),
+                StateType("LightSwitch", "Off", false)), 37) ::
+            (StateCheckOnPrimitiveError(), 45) ::
+                 Nil)
+    }
 }

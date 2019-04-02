@@ -1192,12 +1192,12 @@ private def checkStatement(
 
 
                 val argsSetToExclude =
-                 decl match {
-                     case tx: Transaction =>
-                         val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
-                         ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
-                     case _ => Set.empty
-                 }
+                    decl match {
+                        case tx: Transaction =>
+                            val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
+                            ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
+                        case _ => Set.empty
+                    }
 
                 checkForUnusedOwnershipErrors(s, contextPrime, thisSetToExclude ++ argsSetToExclude)
 
@@ -1234,13 +1234,13 @@ private def checkStatement(
                 //   we can't be sure when the current state is a union.
 
                 val possibleCurrentStates =
-                        oldType match {
-                            case ContractReferenceType(_, _, _) => thisTable.possibleStates
-                            case InterfaceContractType(_, _) => thisTable.possibleStates
-                            case StateType(_, stateNames, _) => stateNames
-                        }
+                    oldType match {
+                        case ContractReferenceType(_, _, _) => thisTable.possibleStates
+                        case InterfaceContractType(_, _) => thisTable.possibleStates
+                        case StateType(_, stateNames, _) => stateNames
+                    }
 
-                def fieldsAvailableInState(stateName: String) : Set[Field] = {
+                def fieldsAvailableInState(stateName: String): Set[Field] = {
                     val allFields = thisTable.allFields
                     allFields.filter((f: Field) =>
                         f.availableIn.isEmpty || f.availableIn.get.contains(stateName))
@@ -1289,7 +1289,7 @@ private def checkStatement(
                 }
 
                 val updatedFieldNames = updatedInTransition ++ updatedViaAssignment // Fields updated by either assignment or transition initialization
-                val uninitializedFieldNames = fieldsToInitialize.map((f: Field) => f.name) -- updatedFieldNames
+            val uninitializedFieldNames = fieldsToInitialize.map((f: Field) => f.name) -- updatedFieldNames
 
                 if (uninitializedFieldNames.nonEmpty) {
                     logError(s, TransitionUpdateError(uninitializedFieldNames))
@@ -1411,15 +1411,15 @@ private def checkStatement(
                 var resetOwnership: Option[(String, NonPrimitiveType)] = None
 
                 val contextForCheckingTrueBranch =
-                    e match {
-                            // If e is a variable, we might be able to put it in the context with the appropriate state.
-                            // If it's not a variable, we just check the state and move on (no context changes).
-                        case ReferenceIdentifier(x) =>
-                            t match {
-                                case p: PrimitiveType =>
-                                    logError(s, StateCheckOnPrimitiveError())
-                                    contextPrime
-                                case np: NonPrimitiveType =>
+                    t match {
+                        case p: PrimitiveType =>
+                            logError(s, StateCheckOnPrimitiveError())
+                            contextPrime
+                        case np: NonPrimitiveType =>
+                            e match {
+                                // If e is a variable, we might be able to put it in the context with the appropriate state.
+                                // If it's not a variable, we just check the state and move on (no context changes).
+                                case ReferenceIdentifier(x) =>
                                     np.permission match {
                                         case Owned() =>
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
@@ -1432,10 +1432,10 @@ private def checkStatement(
                                             resetOwnership = Some((x, np))
                                             contextPrime.updated(x, newType)
                                     }
+                                case _ => contextPrime
                             }
-                        case _ => contextPrime
+                        case BottomType() => contextPrime
                     }
-
 
                 val contextIfTrue = pruneContext(s,
                     checkStatementSequence(decl, contextForCheckingTrueBranch, body1),
