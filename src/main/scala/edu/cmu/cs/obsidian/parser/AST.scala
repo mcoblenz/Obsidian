@@ -77,6 +77,7 @@ case class Dereference(e: Expression, f: String) extends Expression {
         s"$e.$f"
     }
 }
+
 case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
 case class Invocation(recipient: Expression, name: String, args: Seq[Expression]) extends Expression {
     override def toString: String = {
@@ -101,6 +102,7 @@ case class Assignment(assignTo: Expression, e: Expression) extends Statement
 case class Revert(maybeExpr: Option[Expression]) extends Statement
 case class If(eCond: Expression, s: Seq[Statement]) extends Statement
 case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) extends Statement
+case class IfInState(e: Expression, state: Identifier, s1: Seq[Statement], s2: Seq[Statement]) extends Statement
 case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement
 case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST

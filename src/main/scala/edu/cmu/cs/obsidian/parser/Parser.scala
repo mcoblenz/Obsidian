@@ -220,12 +220,22 @@ object Parser extends Parsers {
             case t ~ expr ~ _ => Revert(expr).setLoc(t)
         }
 
-        val parseOnlyIf = IfT() ~! parseExpr ~! LBraceT() ~! parseBody ~! RBraceT()
+        val parseOnlyIf = IfT() ~! parseExpr ~! opt(InT() ~! parseId) ~! LBraceT() ~! parseBody ~! RBraceT()
         val parseElse = ElseT() ~! LBraceT() ~! parseBody ~! RBraceT()
 
         val parseIf = parseOnlyIf ~ opt(parseElse) ^^ {
-            case _if ~ e ~ _ ~ s ~ _ ~ None => If(e, s).setLoc(_if)
-            case _if ~ e ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) => IfThenElse(e, s1, s2).setLoc(_if)
+            case _if ~ e ~ stOpt ~ _ ~ s ~ _ ~ None =>
+                stOpt match {
+                    case None => If(e, s).setLoc(_if)
+                    case Some(_ ~ stateName) => IfInState(e, stateName, s, Seq.empty).setLoc(_if)
+                }
+
+            case _if ~ e ~ stOpt ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) =>
+                stOpt match {
+                    case None => IfThenElse(e, s1, s2).setLoc(_if)
+                    case Some(_ ~ stateName) => IfInState(e, stateName, s1, s2).setLoc(_if)
+                }
+
         }
 
         val parseTryCatch = TryT() ~! LBraceT() ~! parseBody ~! RBraceT() ~!
@@ -437,6 +447,7 @@ object Parser extends Parsers {
             case _ ~ s => AvailableIn(s)
         }
     }
+
 
     case class AvailableIn (val identifiers: Set[Identifier])
     case class EndsInState (val identifiers: Set[Identifier])

@@ -157,7 +157,6 @@ class IdentityAstTransformer {
             case d@Disown(e) =>
                 Disown(transformExpression(e)).setLoc(d)
             case s: StateInitializer => s.copy().setLoc(s)
-
         }
     }
 
@@ -288,6 +287,15 @@ class IdentityAstTransformer {
                     s1 = s1New,
                     s2 = s2New,
                     eCond = transformExpression(eCond)
+                ).setLoc(oldIf)
+                (newIf, context, errors1 ++ errors2)
+            case oldIf@IfInState(e, state, s1, s2) =>
+                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1)
+                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2)
+                val newIf = oldIf.copy(
+                    s1 = s1New,
+                    s2 = s2New,
+                    e = transformExpression(e)
                 ).setLoc(oldIf)
                 (newIf, context, errors1 ++ errors2)
             case oldTry@TryCatch(s1, s2) =>

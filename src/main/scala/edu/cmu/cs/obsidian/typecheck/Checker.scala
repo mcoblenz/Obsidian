@@ -1405,6 +1405,46 @@ private def checkStatement(
                     contextPrime)
                 mergeContext(s, contextIfFalse, contextIfTrue)
 
+            case IfInState(e, state, body1, body2) =>
+                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
+
+                var confirmOwnershipIsRetained = false;
+
+                val contextForCheckingTrueBranch =
+                    e match {
+                            // If e is a variable, we might be able to put it in the context with the appropriate state.
+                            // If it's not a variable, we just check the state and move on (no context changes).
+                        case ReferenceIdentifier(x) =>
+                            t match {
+                                case p: PrimitiveType =>
+                                    logError(s, StateCheckOnPrimitiveError())
+                                    contextPrime
+                                case np: NonPrimitiveType =>
+                                    np.permission match {
+                                        case Owned() =>
+                                            val newType = StateType(np.contractName, Set(state._1), np.isRemote)
+                                            contextPrime.updated(x, newType)
+                                        case Unowned() => contextPrime
+                                        case Shared() =>
+                                            // What stops the body from giving away ownership of the object permanently?? Nothing.
+                                            //
+                                            val newType = StateType(np.contractName, Set(state._1), np.isRemote)
+                                            confirmOwnershipIsRetained = true
+                                            contextPrime.updated(x, newType)
+                                    }
+                            }
+                        case _ => contextPrime
+                    }
+
+
+                val contextIfTrue = pruneContext(s,
+                    checkStatementSequence(decl, contextForCheckingTrueBranch, body1),
+                    contextForCheckingTrueBranch)
+                val contextIfFalse = pruneContext(s,
+                    checkStatementSequence(decl, contextPrime, body2),
+                    contextPrime)
+                mergeContext(s, contextIfFalse, contextIfTrue)
+
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val contextIfTry = pruneContext(s,
                     checkStatementSequence(decl, context, s1),
