@@ -1900,7 +1900,8 @@ private def checkStatement(
             logError(contract, NoConstructorError(contract.name))
         }
 
-        if (constructors.length > 1 && contract.isMain) {
+        // TODO: enable multiple constructors. by adding appropriate dispatch logic in init. For now, we only support one constructor per contract.
+        if (constructors.length > 1) {
             logError(contract, MultipleConstructorsError(contract.name))
         }
 

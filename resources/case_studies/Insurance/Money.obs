@@ -21,7 +21,7 @@ main asset contract Money {
 
     transaction getAmountOfMoney(Money this, int amt) returns Money@Owned {
         if (amt > amount) {
-            revert; // TODO: or should this return as much as they have (amount)
+            revert "Can't split out more money than is available in a given Money object."; // TODO: or should this return as much as they have (amount)
         } else {
             amount = amount - amt;
             return new Money(amt);

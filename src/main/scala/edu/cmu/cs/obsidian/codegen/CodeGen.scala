@@ -243,15 +243,21 @@ class CodeGen (val target: Target) {
         }
     }
 
-    private def unmarshallExprExpectingFullObjects(translationContext: TranslationContext, body: JBlock, marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock, paramIndex: Integer): IJExpression = {
-        typ match
+    private def unmarshallExprExpectingFullObjects(translationContext: TranslationContext,
+                                                   body: JBlock,
+                                                   marshalledExpr: IJExpression,
+                                                   initialTyp: ObsidianType,
+                                                   finalTyp: ObsidianType,
+                                                   errorBlock: JBlock,
+                                                   paramIndex: Integer): IJExpression = {
+        initialTyp match
         {
             case IntType() =>
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                 val stringType = model.ref("java.lang.String")
                 val intAsString = JExpr._new(stringType).arg(marshalledExpr)
                 intAsString.arg(charset)
-                val intType = resolveType(typ)
+                val intType = resolveType(initialTyp)
                 val decl = body.decl(intType, "unmarshalledInt" + paramIndex, JExpr._new(intType).arg(intAsString))
                 val test = body._if(decl.eq(JExpr._null()))
                 val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
@@ -286,7 +292,7 @@ class CodeGen (val target: Target) {
                 val enumGetter = "getEitherCase"
                 val guidEnumName = protobufClassName + "OrGUID" + "." + "EitherCase" + "." + "GUID"
 
-                val unarchivedObjDecl = body.decl(resolveType(typ), "unarchivedObj" + paramIndex)
+                val unarchivedObjDecl = body.decl(resolveType(initialTyp), "unarchivedObj" + paramIndex)
                 // If we have a GUID…
                 val hasGUID = archive.invoke(enumGetter).invoke("equals").arg(JExpr.direct(guidEnumName))
 
@@ -295,10 +301,12 @@ class CodeGen (val target: Target) {
                 val stub = JExpr.ref(serializationParamName).invoke("getStub")
                 val guid = archive.invoke("getGuid")
                 val loadInvocation = JExpr.ref(serializationParamName).invoke("loadContractWithGUID").arg(stub).arg(guid)
-                cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(typ), loadInvocation))
+                loadInvocation.arg(np.isOwned)
+                loadInvocation.arg(finalTyp.isOwned)
+                cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(initialTyp), loadInvocation))
 
                 // If we have an object…
-                val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
+                val targetClass = resolveType(initialTyp).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
 
                 cond._else().assign(unarchivedObjDecl, classInstance)
@@ -863,7 +871,52 @@ class CodeGen (val target: Target) {
         */
         newClass.constructor(JMod.PUBLIC)
 
+        generateReceiverOwnershipMethod(aContract, newClass)
+
         translationContext
+    }
+
+    // When a client invokes a method from off-blockchain, the receiver might need to be owned.
+    // The runtime needs to check, but the types are erased at compile time. This generated method is invoked
+    // by the runtime when it needs to know whether a method takes ownership of its receiver.
+    // boolean methodReceiverIsOwnedAtBeginning(String methodName);
+    // boolean methodReceiverIsOwnedAtEnd(String methodName);
+    private def generateReceiverOwnershipMethod(contract: Contract, newClass: JDefinedClass): Unit = {
+        val hashSetType = model.ref("java.util.HashSet").narrow(model.ref("java.lang.String"))
+        val beginningField = newClass.field(JMod.STATIC, hashSetType, "transactionsWithOwnedReceiversAtBeginning")
+        val endField = newClass.field(JMod.STATIC, hashSetType, "transactionsWithOwnedReceiversAtEnd")
+
+
+        val beginMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "methodReceiverIsOwnedAtBeginning")
+        val endMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "methodReceiverIsOwnedAtEnd")
+        beginMethod.annotate(model.ref("Override"));
+        endMethod.annotate(model.ref("Override"));
+        val beginMethodNameParam = beginMethod.param(model.ref("java.lang.String"), "methodName")
+        val endMethodNameParam = endMethod.param(model.ref("java.lang.String"), "methodName")
+
+        val beginBody = beginMethod.body()
+        val beginInitTest = beginBody._if(beginningField.eq(JExpr._null()))
+        beginInitTest._then().assign(beginningField, JExpr._new(hashSetType))
+
+        val endBody = endMethod.body()
+        val endInitTest = endBody._if(endField.eq(JExpr._null()))
+        endInitTest._then().assign(endField, JExpr._new(hashSetType))
+
+        for (decl <- contract.declarations) {
+            decl match {
+                case iv: Transaction =>
+                    if (iv.thisType.isOwned) {
+                        beginInitTest._then().invoke(beginningField, "add").arg(decl.name)
+                    }
+                    if (iv.thisFinalType.isOwned) {
+                        endInitTest._then().invoke(beginningField, "add").arg(decl.name)
+                    }
+                case _ => ()
+            }
+        }
+
+        beginBody._return(beginningField.invoke("contains").arg(beginMethodNameParam))
+        endBody._return(endField.invoke("contains").arg(endMethodNameParam))
     }
 
     // Contracts translate to compilation units containing one class.
@@ -910,9 +963,9 @@ class CodeGen (val target: Target) {
         // find the first declaration that is a constructor
         val constructor: Option[Declaration] = translationContext.contract.declarations.find(_.isInstanceOf[Constructor])
         // gather the types of its arguments
-        val constructorTypes: Seq[ObsidianType] =
+        val constructorTypes: Seq[(ObsidianType, ObsidianType)] =
             constructor match {
-                case Some(constr: Constructor) => constr.args.map(_.typIn)
+                case Some(constr: Constructor) => constr.args.map((d: VariableDeclWithSpec) => (d.typIn, d.typOut))
                 case _ => List.empty
             }
 
@@ -924,6 +977,9 @@ class CodeGen (val target: Target) {
                 }
             case Server(_) =>
                 generateInitMethod(translationContext, newClass, stubType, constructorTypes)
+
+        if (constructor.isEmpty) {
+            generateConstructorReturnsOwnedReference(newClass, true)
         }
     }
 
@@ -978,7 +1034,7 @@ class CodeGen (val target: Target) {
                                     translationContext: TranslationContext,
                                     newClass: JDefinedClass,
                                     stubType: AbstractJClass,
-                                    types: Seq[ObsidianType]): Unit = {
+                                    types: Seq[(ObsidianType, ObsidianType)]): Unit = {
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
         initMeth.param(stubType, serializationParamName)
         val runArgs = initMeth.param(model.BYTE.array().array(), "args")
@@ -988,6 +1044,7 @@ class CodeGen (val target: Target) {
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
         initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
 
         // have to check that the args parameter has the correct number of arguments
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
@@ -999,8 +1056,14 @@ class CodeGen (val target: Target) {
 
             var runArgsIndex = 0
 
-            for (t <- types) {
-                val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(translationContext, initMeth.body(), runArgs.component(runArgsIndex),t,errorBlock, runArgsIndex)
+            for ((typIn, typOut) <- types) {
+                val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(translationContext,
+                    initMeth.body(),
+                    runArgs.component(runArgsIndex),
+                    typIn,
+                    typOut,
+                    errorBlock,
+                    runArgsIndex)
                 invocation.arg(deserializedArg)
                 runArgsIndex += 1
             }
@@ -1023,6 +1086,8 @@ class CodeGen (val target: Target) {
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
+
 
         runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
@@ -1101,28 +1166,25 @@ class CodeGen (val target: Target) {
 
                 val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
                 exception.arg(txName)
-                exception.arg(tx.args.length)
                 exception.arg(runArgs.ref("length"))
+                exception.arg(tx.args.length)
                 notEnoughArgs._throw(exception)
 
                 /* parse the (typed) args from raw bytes */
                 var txArgsList: List[JVar] = List.empty
                 var runArgNumber = 0
                 for (txArg <- tx.args) {
-
-
                     val runArg = runArgs.component(JExpr.lit(runArgNumber))
                     val javaArgType = resolveType(txArg.typIn)
                     val errorBlock = new JBlock()
 
-                    val transactionArgExpr = unmarshallExprExpectingFullObjects(translationContext, enoughArgs, runArg, txArg.typIn, errorBlock, runArgNumber)
+                    val transactionArgExpr = unmarshallExprExpectingFullObjects(translationContext, enoughArgs, runArg, txArg.typIn, txArg.typOut, errorBlock, runArgNumber)
 
                     val newTxArg: JVar = enoughArgs.decl(
                         javaArgType,
                         txArg.varName,
                         transactionArgExpr
                     )
-
 
                     txArgsList = newTxArg :: txArgsList
                     runArgNumber += 1
@@ -1141,6 +1203,7 @@ class CodeGen (val target: Target) {
                         case np: NonPrimitiveType =>
                             val mapInvocation = enoughArgs.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
                             mapInvocation.arg(returnObj)
+                            mapInvocation.arg(np.isOwned)
                         case _ => ()
                     }
 
@@ -2039,6 +2102,23 @@ class CodeGen (val target: Target) {
 
         constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         invocation.arg(JExpr.ref(serializationParamName))
+
+        generateConstructorReturnsOwnedReference(newClass, c.resultType.isOwned)
+    }
+
+    private def generateConstructorReturnsOwnedReference(newClass: JDefinedClass, returnsOwned : Boolean): Unit = {
+        val ownedRefMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "constructorReturnsOwnedReference")
+        ownedRefMethod.annotate(model.ref("Override"));
+        val returnsOwnedExpr =
+            if (returnsOwned) {
+                JExpr.TRUE
+            }
+            else {
+                JExpr.FALSE
+            }
+
+        ownedRefMethod.body()._return(returnsOwnedExpr)
+
     }
 
     // Generates a new_Foo() method, which takes the serialization state as a parameter, and initializes all the fields.
