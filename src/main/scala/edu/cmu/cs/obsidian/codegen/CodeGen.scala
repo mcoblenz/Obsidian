@@ -39,30 +39,38 @@ class CodeGen (val target: Target) {
     private final val modifiedFieldName: String = "__modified"
     private final val loadedFieldName: String = "__loaded"
     private final val serializationParamName: String = "__st"
+
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
     }
+
     private def fieldGetMethodName(fieldName: String): String = {
         "__getField__" + fieldName
     }
+
     private def fieldSetMethodName(fieldName: String): String = {
         "__setField__" + fieldName
     }
+
     private def innerClassName(stName: String): String = {
         "State_" + stName
     }
+
     private def innerClassFieldName(stName: String): String = {
         "__state" + stName
     }
+
     private def isInsideInvocationFlag(): JFieldRef = {
         JExpr.ref("__isInsideInvocation")
     }
+
     private def transactionGetMethodName(txName: String, stOption: Option[String]): String = {
         stOption match {
-          case Some(stName) => txName + "__" + "state" + stName
-          case None => txName
+            case Some(stName) => txName + "__" + "state" + stName
+            case None => txName
         }
     }
+
     /* This method dynamically checks type state and copies the value of conserved fields
      * (i.e. defined in both states) from one state to another */
     private final val conserveFieldsName = "__conserveFields"
@@ -72,10 +80,10 @@ class CodeGen (val target: Target) {
 
     final val packageName: String = "org.hyperledger.fabric.example"
 
-    def populateProtobufOuterClassNames (contract: Contract,
-                                         protobufOuterClassName: String,
-                                         contractNameResolutionMap: Map[Contract, String],
-                                         protobufOuterClassNames: mutable.HashMap[String, String]): Unit = {
+    def populateProtobufOuterClassNames(contract: Contract,
+                                        protobufOuterClassName: String,
+                                        contractNameResolutionMap: Map[Contract, String],
+                                        protobufOuterClassNames: mutable.HashMap[String, String]): Unit = {
         protobufOuterClassNames += (contractNameResolutionMap(contract) -> (packageName + "." + protobufOuterClassName))
 
         for (d <- contract.declarations if d.isInstanceOf[Contract]) {
@@ -93,8 +101,7 @@ class CodeGen (val target: Target) {
 
     private def translateProgramInPackage(program: Program,
                                           protobufOuterClassName: String,
-                                          programPackage: JPackage): JCodeModel =
-    {
+                                          programPackage: JPackage): JCodeModel = {
         val contractNameResolutionMap: Map[Contract, String] = TranslationContext.contractNameResolutionMapForProgram(program)
         val protobufOuterClassNames = mutable.HashMap.empty[String, String]
 
@@ -106,7 +113,7 @@ class CodeGen (val target: Target) {
 
         for (c <- program.contracts) {
             // TODO : generate code for interfaces (issue #117)
-            if(!c.isInterface) {
+            if (!c.isInterface) {
                 val newClass: JDefinedClass = programPackage._class(c.name)
                 val translationContext = makeTranslationContext(c, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
                 translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
@@ -149,7 +156,7 @@ class CodeGen (val target: Target) {
         superConstructorInvocation.arg(uuid)
 
 
-      val txNames: mutable.Set[String] = new mutable.HashSet[String]()
+        val txNames: mutable.Set[String] = new mutable.HashSet[String]()
 
         for (decl <- contract.declarations) {
             translateStubDeclaration(decl, contractClass, None, txNames, translationContext)
@@ -160,18 +167,18 @@ class CodeGen (val target: Target) {
                                          inClass: JDefinedClass,
                                          stOption: Option[State],
                                          txNames: mutable.Set[String],
-                                         translationContext: TranslationContext) : Unit = {
+                                         translationContext: TranslationContext): Unit = {
 
-          decl match {
+        decl match {
             case _: TypeDecl => assert(false, "unsupported"); // TODO
             case f: Field => translateStubField(f, inClass)
             case c: Constructor => // Constructors aren't translated because stubs are only for remote instances.
             case t: Transaction => if (!txNames.contains(t.name)) translateStubTransaction(t, inClass, stOption, translationContext)
-                                                 txNames.add(t.name)
+                txNames.add(t.name)
             case s: State => translateStubState(s, inClass, txNames, translationContext)
             case c: Contract => translateStubContract(c,
-              inClass.getPackage(), translationContext)
-          }
+                inClass.getPackage(), translationContext)
+        }
     }
 
 
@@ -193,8 +200,7 @@ class CodeGen (val target: Target) {
 
 
     private def marshallExprWithFullObjects(unmarshalledExpr: IJExpression, typ: ObsidianType): IJExpression = {
-        val marshalledArg = typ match
-        {
+        val marshalledArg = typ match {
             case IntType() => unmarshalledExpr.invoke("toByteArray");
             case BoolType() => JExpr.cond(unmarshalledExpr, JExpr.ref("TRUE_ARRAY"), JExpr.ref("FALSE_ARRAY"))
             case StringType() =>
@@ -211,8 +217,7 @@ class CodeGen (val target: Target) {
 
     // Returns a pair of an error-checking block option and the resulting expression.
     private def unmarshallExprExpectingUUIDObjects(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock): IJExpression = {
-        typ match
-        {
+        typ match {
             case IntType() =>
                 val stringClass = model.ref("java.lang.String")
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
@@ -250,8 +255,7 @@ class CodeGen (val target: Target) {
                                                    finalTyp: ObsidianType,
                                                    errorBlock: JBlock,
                                                    paramIndex: Integer): IJExpression = {
-        initialTyp match
-        {
+        initialTyp match {
             case IntType() =>
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                 val stringType = model.ref("java.lang.String")
@@ -284,7 +288,7 @@ class CodeGen (val target: Target) {
                 val decodedArg = body.decl(model.parseType("byte[]"),
                     "decoded" + paramIndex,
                     model.directClass("java.util.Base64").staticInvoke("getDecoder").invoke("decode").arg(marshalledExpr)
-                    )
+                )
 
 
                 val archive = body.decl(archiveType, "archive" + paramIndex, archiveType.staticInvoke("parseFrom").arg(decodedArg))
@@ -325,7 +329,7 @@ class CodeGen (val target: Target) {
     private def translateStubTransaction(transaction: Transaction,
                                          newClass: JDefinedClass,
                                          stOption: Option[State],
-                                         translationContext: TranslationContext) : JMethod = {
+                                         translationContext: TranslationContext): JMethod = {
         val stName = stOption match {
             case Some(st) => Some(st.name)
             case None => None
@@ -335,10 +339,10 @@ class CodeGen (val target: Target) {
 
         val obsidianRetType = transaction.retType match {
             case Some(typ) =>
-                    typ match {
-                        case np: NonPrimitiveType => Some(np.remoteType)
-                        case _ => Some(typ)
-                    }
+                typ match {
+                    case np: NonPrimitiveType => Some(np.remoteType)
+                    case _ => Some(typ)
+                }
             case None => None
         }
 
@@ -418,16 +422,14 @@ class CodeGen (val target: Target) {
         meth
     }
 
-    private def translateStubState(s: State, inClass: JDefinedClass, txNames: mutable.Set[String],  translationContext: TranslationContext) : Unit = {
+    private def translateStubState(s: State, inClass: JDefinedClass, txNames: mutable.Set[String], translationContext: TranslationContext): Unit = {
         for (decl <- s.fields) {
             translateStubDeclaration(decl, inClass, Some(s), txNames, translationContext)
         }
     }
 
-
     /* the make_X_Info functions setup necessary helper methods for a state-specific declaration
      * (i.e. defined in some states but not in the entire contract) of type X */
-
     def makeFieldInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
                      (name: String, declSeq: Seq[(State, Field)]): FieldInfo = {
         val fieldType = resolveType(declSeq.head._2.typ)
@@ -977,7 +979,7 @@ class CodeGen (val target: Target) {
                 }
             case Server(_) =>
                 generateInitMethod(translationContext, newClass, stubType, constructorTypes)
-
+        }
         if (constructor.isEmpty) {
             generateConstructorReturnsOwnedReference(newClass, true)
         }
@@ -1322,6 +1324,8 @@ class CodeGen (val target: Target) {
             val generateUUID = stubType match {
                 case n: NonPrimitiveType =>
                     n.contractName.toString
+                case _ => assert(false, "Stub must be of nonprimitive type.")
+                    ""
             }
             newStubExpr.arg(generateUUID)
             val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
