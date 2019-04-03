@@ -68,7 +68,7 @@ main asset contract InsuranceService {
         int expiration = insBid.getExpirationTime();
         Money m = insBid.getPayout();
 
-        Policy policy = new Policy(cost, expiration);
+        Policy policy = new Policy(cost, expiration); // TODO
         PolicyRecord pendingPolicy = new PolicyRecord(policy, m);
 
         pendingPolicies.set(policy, pendingPolicy);
@@ -113,6 +113,8 @@ main asset contract InsuranceService {
             // Invalid signature; can't pay a claim with it.
             revert "Unable to verify weather record signature.";
         }
+
+        // TODO: check weather record against policy
 
         // get will revert if the policy isn't found.
         PolicyRecord record = activePolicies.get(policy);
