@@ -11,7 +11,10 @@ jdk:
 
 before_install:
   - ./install-protobuf.sh
+  - ./install-bin.sh
   - export PATH=${PATH}:${HOME}/protobuf/
+  - export PATH=/bin:$PATH
+
 
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
