@@ -8,6 +8,8 @@ repositories {
     mavenCentral()
 }
 
+targetCompatibility = 1.8
+
 dependencies {
     implementation 'org.json:json:20171018'
     implementation 'commons-io:commons-io:2.5'

@@ -300,11 +300,9 @@ class CodeGen (val target: Target) {
                 // If we have an object…
                 val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
-                val invocation = classInstance.invoke("__initFromArchiveBytes")
-                invocation.arg(decodedArg)
-                invocation.arg(JExpr.ref(serializationParamName))
 
-                cond._else().assign(unarchivedObjDecl, invocation)
+                cond._else().assign(unarchivedObjDecl, classInstance)
+                cond._else().invoke(unarchivedObjDecl, "initFromArchive").arg(archive.invoke("getObj")).arg(JExpr.ref(serializationParamName))
                 unarchivedObjDecl
             case BottomType() =>
                 assert(false)
@@ -335,6 +333,7 @@ class CodeGen (val target: Target) {
                     }
             case None => None
         }
+
         val javaRetType = obsidianRetType match {
             case Some(retType) => resolveType(retType)
             case None => model.VOID
@@ -1257,7 +1256,10 @@ class CodeGen (val target: Target) {
             val stubJavaType = resolveType(stubType)
             val newStubExpr = JExpr._new(stubJavaType)
             newStubExpr.arg(JExpr.ref("connectionManager"))
-            val generateUUID = model.ref("java.util.UUID").staticInvoke("randomUUID").invoke("toString")
+            val generateUUID = stubType match {
+                case n: NonPrimitiveType =>
+                    n.contractName.toString
+            }
             newStubExpr.arg(generateUUID)
             val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
             // generate a new serialization state to be compatible
@@ -2016,6 +2018,11 @@ class CodeGen (val target: Target) {
 
         putEntryInvocation.arg(newClass.fields get guidFieldName)
         putEntryInvocation.arg(JExpr._this())
+
+        // Put the class in the returned object map so we can invoke transaction with -receiver on it
+
+        val mapReturnedObjectInvocation = meth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+        mapReturnedObjectInvocation.arg(JExpr._this())
 
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
