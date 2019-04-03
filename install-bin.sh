@@ -139,3 +139,5 @@ echo
 echo "Installing Hyperledger Fabric binaries"
 echo
 binariesInstall
+
+mv bin $HOME
