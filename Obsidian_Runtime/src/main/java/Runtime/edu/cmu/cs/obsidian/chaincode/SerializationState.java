@@ -13,6 +13,7 @@ import org.hyperledger.fabric.shim.ledger.*;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
@@ -29,6 +30,8 @@ public class SerializationState {
     private HashMap<String, ReturnedReferenceState> returnedObjectClassMap;
 
 
+    private HashSet<ObsidianSerialized> stateLockedObjects;
+
     static final String s_returnedObjectsClassMapKey = "ReturnedObject";
     static final String s_returnedObjectsIsOwnedMapKey = "ReturnedObjectIsOwned";
 
@@ -40,6 +43,7 @@ public class SerializationState {
 
     public SerializationState() {
         guidMap = new HashMap<String, ObsidianSerialized>();
+        stateLockedObjects = new HashSet<ObsidianSerialized>();
     }
 
     public void setStub(ChaincodeStub newStub) {
@@ -68,6 +72,19 @@ public class SerializationState {
         for (ObsidianSerialized obj : guidMap.values()) {
             obj.flush();
         }
+    }
+
+    // TODO: move this to another class, since it pertains to clients too (and does not pertain to serialization).
+    public void beginStateLock(ObsidianSerialized obj) {
+        stateLockedObjects.add(obj);
+    }
+
+    public void endStateLock(ObsidianSerialized obj) {
+        stateLockedObjects.remove(obj);
+    }
+
+    public boolean objectIsStateLocked(ObsidianSerialized obj) {
+        return stateLockedObjects.contains(obj);
     }
 
     public void beginTransaction() {

@@ -264,14 +264,14 @@ class IdentityAstTransformer {
                 (newDecl, context.updated(varName, newTyp), errors)
             case r@Return() => (r, context, Seq())
             case r@ReturnExpr(e) => (ReturnExpr(transformExpression(e)).setLoc(r), context, Seq())
-            case t@Transition(newStateName, updates) =>
+            case t@Transition(newStateName, updates, p) =>
                 updates match {
-                    case None => (Transition(newStateName, updates).setLoc(t), context, Seq())
+                    case None => (Transition(newStateName, updates, p).setLoc(t), context, Seq())
                     case Some(u) =>
                         val mapFun = (p: (ReferenceIdentifier, Expression)) => (p._1, transformExpression(p._2))
                         val transformedUpdates = u.map(mapFun)
 
-                        (Transition(newStateName, Some(transformedUpdates)).setLoc(t), context, Seq())
+                        (Transition(newStateName, Some(transformedUpdates), p).setLoc(t), context, Seq())
                 }
             case a@Assignment(assignTo, e) =>
                 (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())

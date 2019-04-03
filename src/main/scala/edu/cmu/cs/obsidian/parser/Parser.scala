@@ -198,7 +198,7 @@ object Parser extends Parsers {
 
         val parseTransition = RightArrowT() ~ parseId ~
                               opt(parseUpdate) ~! SemicolonT() ^^ {
-            case arrow ~ name ~ updates ~ _ => Transition(name._1, updates).setLoc(arrow)
+            case arrow ~ name ~ updates ~ _ => Transition(name._1, updates, Inferred()).setLoc(arrow)
         }
 
         val parseVarDeclAssn =

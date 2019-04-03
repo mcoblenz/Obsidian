@@ -332,7 +332,7 @@ object Main {
 //            val inferredTable = new SymbolTable(transformedTable.ast)
 
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
-            val typecheckingErrors = checker.checkProgram()
+            val (typecheckingErrors, checkedTable) = checker.checkProgram()
 
             val allSortedErrors = (importErrors ++ transformErrors ++ typecheckingErrors)//.sorted
 
@@ -353,13 +353,13 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(transformedTable.ast, protobufOuterClassName)
-            else translateServerASTToJava(transformedTable.ast, protobufOuterClassName)
+            val javaModel = if (options.buildClient) translateClientASTToJava(checkedTable.ast, protobufOuterClassName)
+            else translateServerASTToJava(checkedTable.ast, protobufOuterClassName)
             javaModel.build(srcDir.toFile)
 
-            val mainName = findMainContractName(transformedTable.ast)
+            val mainName = findMainContractName(checkedTable.ast)
 
-            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(transformedTable.ast, sourceFilename)
+            val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(checkedTable.ast, sourceFilename)
 
             // Each import results in a .proto file, which needs to be compiled.
             for (p <- protobufs) {

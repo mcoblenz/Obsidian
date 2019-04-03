@@ -30,7 +30,7 @@ class TypeCheckerTests extends JUnitSuite {
         val (globalTable: SymbolTable, transformErrors) = StateNameValidator.transformProgram(table)
 
         val checker = new Checker(globalTable)
-        val errs = (checker.checkProgram() ++ transformErrors).sorted
+        val errs = (checker.checkProgram()._1 ++ transformErrors).sorted
 
         val remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
         for (ErrorRecord(err, loc, _) <- errs) {

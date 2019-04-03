@@ -29,9 +29,6 @@ class CodeGen (val target: Target) {
     private val mainTransactions: mutable.Set[Transaction] =
         new mutable.HashSet[Transaction]()
 
-    /* we track the constructor for essentially the same reason */
-    private var mainConstructor: Option[JMethod] = None
-
     /* naming conventions for various generated Java constructs */
     private final val stateField: String = "__state"
     private final val getStateMeth: String = "getState"
@@ -824,10 +821,10 @@ class CodeGen (val target: Target) {
             translateDeclaration(decl, newClass, translationContext, aContract)
         }
 
-        /* If the main contract didn't already have a new_X() method with zero parameters,
+        /* If the contract didn't already have a new_X() method with zero parameters,
          * add one that sets all the fields to default values.
          */
-        if (!hasEmptyConstructor(aContract) && aContract.isMain) {
+        if (!hasEmptyConstructor(aContract)) {
             generateInitializer(newClass, translationContext, aContract)
         }
 
@@ -1015,27 +1012,27 @@ class CodeGen (val target: Target) {
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
         initMeth.body()._if(cond)._then()._throw(JExpr._new(exceptionType).arg("Incorrect number of arguments to constructor."))
 
-        mainConstructor.foreach(c =>  {
-            val errorBlock: JBlock = new JBlock()
-            val invocation: JInvocation = JExpr.invoke(c)
+        val constructorName = "new_" + newClass.name()
 
-            var runArgsIndex = 0
+        val errorBlock: JBlock = new JBlock()
+        val invocation: JInvocation = JExpr.invoke(constructorName)
 
-            for ((typIn, typOut) <- types) {
-                val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(translationContext,
-                    initMeth.body(),
-                    runArgs.component(runArgsIndex),
-                    typIn,
-                    typOut,
-                    errorBlock,
-                    runArgsIndex)
-                invocation.arg(deserializedArg)
-                runArgsIndex += 1
-            }
+        var runArgsIndex = 0
 
-            invocation.arg(JExpr.ref(serializationParamName))
-            initMeth.body().add(invocation)
-        })
+        for ((typIn, typOut) <- types) {
+            val deserializedArg: IJExpression = unmarshallExprExpectingFullObjects(translationContext,
+                initMeth.body(),
+                runArgs.component(runArgsIndex),
+                typIn,
+                typOut,
+                errorBlock,
+                runArgsIndex)
+            invocation.arg(deserializedArg)
+            runArgsIndex += 1
+        }
+
+        invocation.arg(JExpr.ref(serializationParamName))
+        initMeth.body().add(invocation)
         initMeth.body()._return(JExpr.newArray(model.BYTE, 0))
     }
 
@@ -1052,6 +1049,7 @@ class CodeGen (val target: Target) {
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
         runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
+        runMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
 
 
         runMeth.param(stubType, serializationParamName)
@@ -1982,9 +1980,6 @@ class CodeGen (val target: Target) {
         var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
-
-        mainConstructor = Some(meth)
-
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
             (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
@@ -2119,6 +2114,7 @@ class CodeGen (val target: Target) {
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
 
 
         /* ensure the object is loaded before trying to do anything.
@@ -2231,13 +2227,26 @@ class CodeGen (val target: Target) {
                 nextContext = localContext.updated(name, body.decl(resolveType(typ), name, translateExpr(e, translationContext, localContext)))
             case Return() => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
-            case Transition(newStateName, updates) =>
+            case Transition(newStateName, updates, permission) =>
                 /* We must (in this order):
-                 *     1) construct the new state's inner class,
-                 *     2) assign the fields of the new inner class object,
-                 *     3) clean up the old state,
-                 *     4) change the state enum.
+                 *     0) if this reference is shared, check to see if the referenced object is statelocked
+                 *     1) construct the new state's inner class
+                 *     2) assign the fields of the new inner class object
+                 *     3) clean up the old state
+                 *     4) change the state enum
                  */
+                if (permission == Shared()) {
+                    val stateLockCheck = JExpr.ref(serializationParamName).invoke("objectIsStateLocked").arg(JExpr._this())
+
+                    val ifStateLocked = body._if(stateLockCheck)
+                    val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.StateLockException"))
+                    exception.arg(translationContext.contract.sourcePath)
+                    exception.arg(statement.loc.line)
+                    ifStateLocked._then()._throw(exception)
+                }
+
+
+
                 /* construct a new instance of the inner contract */
                 val newStateContext = translationContext.states(newStateName)
 
@@ -2357,6 +2366,34 @@ class CodeGen (val target: Target) {
                 }
                 // If no cases matched, this indicates a bug. Abort.
                 jPrev._else()._throw(JExpr._new(model.ref("RuntimeException")))
+            case IfInState(e, state, s1, s2) =>
+                val jEx = translateExpr(e, translationContext, localContext)
+
+                val eqState = (s: String) =>
+                    JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
+
+                val jIf = body._if(eqState(state._1))
+
+
+                val shouldStateLock = e match {
+                    case ReferenceIdentifier(x) => true
+                    case _ => false
+                }
+
+                if (shouldStateLock) {
+                    val tryBlock = jIf._then()._try()
+                    tryBlock.body().invoke(JExpr.ref(serializationParamName), "beginStateLock").arg(jEx)
+                    translateBody(tryBlock.body(), s1, translationContext, localContext)
+                    tryBlock._finally().invoke(JExpr.ref(serializationParamName), "endStateLock").arg(jEx)
+                }
+                else {
+                    translateBody(jIf._then(), s1, translationContext, localContext)
+                }
+
+                if (!s2.isEmpty) {
+                    translateBody(jIf._else(), s2, translationContext, localContext)
+                }
+
             case LocalInvocation(methName, args) =>
                 addArgs(translationContext.invokeTransaction(methName),
                         args, translationContext, localContext)
