@@ -35,7 +35,6 @@ public class ChaincodeClientConnectionManager {
         }
 
         String parameterForInvoke = sj.toString();
-        System.out.println(parameterForInvoke);
         ProcessBuilder pb = new ProcessBuilder("../../../network-framework/invoke.sh", parameterForInvoke);
         String output = IOUtils.toString(pb.start().getInputStream());
         return output.getBytes();
