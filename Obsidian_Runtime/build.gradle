@@ -8,8 +8,11 @@ repositories {
     mavenCentral()
 }
 
+targetCompatibility = 1.8
+
 dependencies {
     implementation 'org.json:json:20171018'
+    implementation 'commons-io:commons-io:2.5'
     implementation group: 'org.hyperledger.fabric-chaincode-java', name: 'fabric-chaincode-shim', version: '[1.4,)'
 }
 

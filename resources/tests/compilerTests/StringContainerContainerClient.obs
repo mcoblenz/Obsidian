@@ -1,0 +1,9 @@
+import "resources/tests/compilerTests/StringContainerContainer.obs"
+
+main contract StringContainerContainerClient {
+	transaction main(remote StringContainerContainer@Shared c) {
+        StringContainer container = new StringContainer("test", 2);
+        c.setContainer(container);
+        remote StringContainer getCont = c.getContainer();
+	}
+}

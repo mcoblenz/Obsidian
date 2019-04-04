@@ -7,6 +7,7 @@ public interface ObsidianSerialized {
     String __getGUID();
     Set<ObsidianSerialized> __resetModified(Set<ObsidianSerialized> checked);
     byte[] __archiveBytes();
+    byte[] __wrappedArchiveBytes();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
             BadTransactionException, BadArgumentException, NoSuchTransactionException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;

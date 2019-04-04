@@ -165,6 +165,8 @@ public class SerializationState {
         return uuidFactory;
     }
 
+    public void setUUIDFactory(UUIDFactory factory) { uuidFactory = factory; }
+
 
     // If we are loading an object and plan to take ownership, ensure this is allowed (and record that ownership has been taken).
     public ObsidianSerialized loadContractWithGUID(ChaincodeStub stub, String guid, boolean requireOwnership, boolean ownershipRemains) throws BadArgumentException, IllegalOwnershipConsumptionException {

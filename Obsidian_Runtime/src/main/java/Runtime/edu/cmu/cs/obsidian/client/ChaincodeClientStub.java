@@ -6,7 +6,6 @@ import org.json.JSONTokener;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.Charset;
-import java.util.UUID;
 
 /**
  * Created by mcoblenz on 4/3/17.
@@ -14,13 +13,13 @@ import java.util.UUID;
 public abstract class ChaincodeClientStub {
     protected ChaincodeClientConnectionManager connectionManager;
 
-    protected UUID uuid;
+    protected String uuid;
 
     protected final byte[] TRUE_ARRAY = {1};
     protected final byte[] FALSE_ARRAY = {0};
 
     // This constructor is used AFTER main finishes setting up the connection.
-    public ChaincodeClientStub(ChaincodeClientConnectionManager connectionManager, UUID uuid) {
+    public ChaincodeClientStub(ChaincodeClientConnectionManager connectionManager, String uuid) {
         this.connectionManager = connectionManager;
         this.uuid = uuid;
     }
@@ -29,7 +28,7 @@ public abstract class ChaincodeClientStub {
     ChaincodeClientStub() {
     }
 
-    public UUID __getGUID() {
+    public String __getGUID() {
         return uuid;
     }
 }
