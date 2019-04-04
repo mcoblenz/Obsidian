@@ -2141,6 +2141,8 @@ class CodeGen (val target: Target) {
 
         val body: JBlock = meth.body()
 
+        assignNewGUID(newClass, aContract, meth)
+
         for (decl <- aContract.declarations) {
             decl match {
                 /* Initialize all fields to suitable default values. */
