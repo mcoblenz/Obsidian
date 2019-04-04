@@ -1,5 +1,5 @@
 /**
- * Created by Miles Baker, 7/25/18.
+ * Created by Yannick Bloem, 4/3/2019.
  *
  * Holds the current serialization state of a contract.
  * It contains a map of GUIDs to already-deserialized
@@ -40,7 +40,7 @@ public class ChaincodeClientSerializationState extends SerializationState {
     }
 
     @Override
-    public void mapReturnedObject(ObsidianSerialized obj) {
+    public void mapReturnedObject(ObsidianSerialized obj, boolean returnedReferenceIsOwned) {
     }
 
     @Override

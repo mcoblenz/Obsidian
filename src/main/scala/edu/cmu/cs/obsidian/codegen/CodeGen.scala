@@ -2085,6 +2085,7 @@ class CodeGen (val target: Target) {
 
         val mapReturnedObjectInvocation = meth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
         mapReturnedObjectInvocation.arg(JExpr._this())
+        mapReturnedObjectInvocation.arg(JExpr.FALSE)
 
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
