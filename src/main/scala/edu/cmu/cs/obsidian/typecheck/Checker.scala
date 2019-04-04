@@ -707,8 +707,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case Return() | ReturnExpr(_) | Revert(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
-                case If(eCond, s) =>
-                    hasRet = hasReturnStatement(tx, s)
                 case IfInState(e, state, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
                 case Switch(e, cases) =>
