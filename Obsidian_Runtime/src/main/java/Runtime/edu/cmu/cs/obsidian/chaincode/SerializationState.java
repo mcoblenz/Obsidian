@@ -109,6 +109,8 @@ public class SerializationState {
         if (returnedObjectClassMap == null) {
             returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
         }
+        // TODO: put this back
+        //  loadReturnedObjectsMap(stub);
 
         System.out.println("mapReturnedObject: " + obj.__getGUID() + ". new external ownership status: " + returnedReferenceIsOwned);
         returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
@@ -127,7 +129,11 @@ public class SerializationState {
         if (returnedObjectClassMap != null) {
             for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
                 CompositeKey classKey = stub.createCompositeKey(s_returnedObjectsClassMapKey, entry.getKey());
+                // the class key is s_returnedObjectsClassMapKey + the ID of the object.
+                // Store the key -> canonical name of the class.
                 stub.putStringState(classKey.toString(), entry.getValue().getClassRef().getCanonicalName());
+
+                // The owned key is s_returnedObjectsIsOwnedMapKey + the ID of the object.
                 CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, entry.getKey());
                 boolean isOwned = entry.getValue().getIsOwnedReference();
                 byte[] isOwnedByteArray = isOwned ? TRUE_BYTE : FALSE_BYTE;
@@ -145,6 +151,8 @@ public class SerializationState {
 
             for (KeyValue kv : results) {
                 try {
+                    System.out.println("key to load: " + kv.getKey());
+                    System.out.println("class name: " + kv.getStringValue());
                     Class c = Class.forName(kv.getStringValue());
 
                     CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, kv.getKey());

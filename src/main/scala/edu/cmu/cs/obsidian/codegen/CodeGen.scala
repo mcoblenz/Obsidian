@@ -1115,6 +1115,10 @@ class CodeGen (val target: Target) {
             }
         }
 
+        val mapReturnedObjectInvocation = runMeth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+        mapReturnedObjectInvocation.arg(JExpr._this())
+        mapReturnedObjectInvocation.arg(JExpr.FALSE)
+
         var lastTransactionElse: Option[JBlock] = None
 
         /* for each transaction name, we have a branch in the run method */
