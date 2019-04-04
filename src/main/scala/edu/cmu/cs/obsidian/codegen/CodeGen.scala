@@ -2133,9 +2133,9 @@ class CodeGen (val target: Target) {
                                             newClass: JDefinedClass,
                                             translationContext: TranslationContext,
                                             aContract: Contract) {
-        val name = "new_" + newClass.name()
+        val methodName = "new_" + newClass.name()
 
-        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, name)
+        val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, methodName)
 
         meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
 
@@ -2157,6 +2157,19 @@ class CodeGen (val target: Target) {
         }
 
         body.invoke(JExpr.ref(serializationParamName), "flushEntries")
+
+
+        // -----------------------------------------------------------------------------
+        // Also generate a constructor that calls the new_ method that we just generated.
+        val constructor = newClass.constructor(JMod.PUBLIC)
+        constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+
+        val invocation = constructor.body().invoke(methodName)
+
+        /* add args to method and collect them in a list */
+
+        constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        invocation.arg(JExpr.ref(serializationParamName))
     }
 
     private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
