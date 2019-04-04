@@ -1304,6 +1304,7 @@ class CodeGen (val target: Target) {
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
 
         val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
                                                                   .asInstanceOf[Option[Transaction]]
