@@ -1469,21 +1469,24 @@ private def checkStatement(
 
                 val (trueContext, checkedTrueStatements) = checkStatementSequence(decl, contextForCheckingTrueBranch, body1)
 
+                val resetTrueContext = resetOwnership match {
+                    case None => trueContext
+                    case Some((x, oldType)) => trueContext.updated(x, oldType)
+                }
+
                 val contextIfTrue = pruneContext(s,
-                    trueContext,
+                    resetTrueContext,
                     contextForCheckingTrueBranch)
 
                 val (falseContext, checkedFalseStatements) = checkStatementSequence(decl, contextPrime, body2)
                 val contextIfFalse = pruneContext(s,
                     falseContext,
                     contextPrime)
+
                 val mergedContext = mergeContext(s, contextIfFalse, contextIfTrue)
                 val newStatement = IfInState(e, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
 
-                resetOwnership match {
-                    case None => (mergedContext, newStatement)
-                    case Some((x, oldType)) => (mergedContext.updated(x, oldType), newStatement)
-                }
+                (mergedContext, newStatement)
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val (tryContext, checkedTryStatements) = checkStatementSequence(decl, context, s1)
                 val (catchContext, checkedCatchStatements) = checkStatementSequence(decl, context, s2)
