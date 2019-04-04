@@ -26,14 +26,16 @@ main asset contract Insurer {
         int twentyFourHours = timeService.hoursToMillis(24);
         int expirationTime = timeService.getTime() + twentyFourHours;
 
-        if (money.getAmount() < payout) {
+        int insurerEscrowAmount = payout - costOfBid;
+
+        if (money.getAmount() < insurerEscrowAmount) {
             revert "Insurer does not have sufficient funds to offer another bid.";
         }
 
         // get correct amount of money from owned money
-        Money m = money.getAmountOfMoney(payout);
+        Money escrowMoney = money.getAmountOfMoney(insurerEscrowAmount);
 
-        InsuranceBid b = new InsuranceBid(costOfBid, expirationTime, m);
+        InsuranceBid b = new InsuranceBid(costOfBid, expirationTime, escrowMoney);
 
         return b;
     }

@@ -1,0 +1,63 @@
+contract LightSwitch {
+    state On;
+    state Off;
+
+    LightSwitch@Off() {
+        ->Off;
+    }
+
+    transaction turnOn(LightSwitch@Off >> On this) {
+        ->On;
+    }
+
+    transaction turnOff(LightSwitch@On >> Off this) {
+        ->Off;
+    }
+}
+
+main contract InState {
+    transaction t1(LightSwitch@Shared s) {
+        if (s in On) {
+            s.turnOff();
+        }
+        if (s in Off) {
+            s.turnOn();
+        }
+
+        [s @ Shared];
+    }
+
+    transaction t2(LightSwitch@Unowned s) {
+        if (s in On) {
+                // ERROR
+                s.turnOff();
+            }
+        if (s in Off) {
+                // ERROR
+                s.turnOn();
+        }
+
+        [s @ Unowned];
+    }
+
+    transaction t3() {
+        // ERROR: can't check state of primitive
+        if (3 in On) {
+        }
+    }
+
+    transaction t4(LightSwitch@Owned s) {
+        if (s in On) {
+             s.turnOff();
+        }
+
+        // TODO: Make the type checker smart enough for this assertion to pass.
+        // [s @ Off];
+
+        if (s in Off) {
+             s.turnOn();
+        }
+
+        [s @ Owned];
+    }
+}

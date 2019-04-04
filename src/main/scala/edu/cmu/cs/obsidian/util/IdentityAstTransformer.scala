@@ -157,7 +157,6 @@ class IdentityAstTransformer {
             case d@Disown(e) =>
                 Disown(transformExpression(e)).setLoc(d)
             case s: StateInitializer => s.copy().setLoc(s)
-
         }
     }
 
@@ -265,14 +264,14 @@ class IdentityAstTransformer {
                 (newDecl, context.updated(varName, newTyp), errors)
             case r@Return() => (r, context, Seq())
             case r@ReturnExpr(e) => (ReturnExpr(transformExpression(e)).setLoc(r), context, Seq())
-            case t@Transition(newStateName, updates) =>
+            case t@Transition(newStateName, updates, p) =>
                 updates match {
-                    case None => (Transition(newStateName, updates).setLoc(t), context, Seq())
+                    case None => (Transition(newStateName, updates, p).setLoc(t), context, Seq())
                     case Some(u) =>
                         val mapFun = (p: (ReferenceIdentifier, Expression)) => (p._1, transformExpression(p._2))
                         val transformedUpdates = u.map(mapFun)
 
-                        (Transition(newStateName, Some(transformedUpdates)).setLoc(t), context, Seq())
+                        (Transition(newStateName, Some(transformedUpdates), p).setLoc(t), context, Seq())
                 }
             case a@Assignment(assignTo, e) =>
                 (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())
@@ -288,6 +287,15 @@ class IdentityAstTransformer {
                     s1 = s1New,
                     s2 = s2New,
                     eCond = transformExpression(eCond)
+                ).setLoc(oldIf)
+                (newIf, context, errors1 ++ errors2)
+            case oldIf@IfInState(e, state, s1, s2) =>
+                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1)
+                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2)
+                val newIf = oldIf.copy(
+                    s1 = s1New,
+                    s2 = s2New,
+                    e = transformExpression(e)
                 ).setLoc(oldIf)
                 (newIf, context, errors1 ++ errors2)
             case oldTry@TryCatch(s1, s2) =>

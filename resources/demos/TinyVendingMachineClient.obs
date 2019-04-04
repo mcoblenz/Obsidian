@@ -1,0 +1,24 @@
+import "resources/demos/TinyVendingMachine.obs"
+
+main contract TinyVendingMachineClient {
+    transaction main(remote TinyVendingMachine@Shared machine) {
+        restock(machine);
+
+        if (machine in Full) {
+            Coin c = new Coin();
+            remote Candy candy = machine.buy(c);
+            eat(candy);
+        }
+    }
+
+    transaction restock(TinyVendingMachine@Shared machine) {
+        if (machine in Empty) {
+            Candy candy = new Candy();
+            machine.restock(candy);
+        }
+    }
+
+    transaction eat(Candy @ Owned >> Unowned c) {
+        disown c;
+    }
+}

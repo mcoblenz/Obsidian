@@ -88,13 +88,13 @@ res=$?
 verifyResult $res "Invoke transaction failed on channel '$CHANNEL_NAME' due to uneven number of peer and org parameters
 or lack of function name"
 if [ $isQuiet -eq 1 ]; then
-  peer chaincode invoke -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
+  peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
   res=$?
   verifyResult $res "Invoke execution on $PEERS failed "
   cat log.txt | sed -nr 's/^.*?payload:\"(.*)\".*$/\1/p'
 else
   set -x
-  peer chaincode invoke -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
+  peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
   res=$?
   set +x
   cat log.txt

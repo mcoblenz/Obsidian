@@ -77,6 +77,7 @@ case class Dereference(e: Expression, f: String) extends Expression {
         s"$e.$f"
     }
 }
+
 case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
 case class Invocation(recipient: Expression, name: String, args: Seq[Expression]) extends Expression {
     override def toString: String = {
@@ -96,11 +97,12 @@ case class Return() extends Statement
 case class ReturnExpr(e: Expression) extends Statement
 
 // We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
-case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]]) extends Statement
+case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]], thisPermission: Permission) extends Statement
 case class Assignment(assignTo: Expression, e: Expression) extends Statement
 case class Revert(maybeExpr: Option[Expression]) extends Statement
 case class If(eCond: Expression, s: Seq[Statement]) extends Statement
 case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) extends Statement
+case class IfInState(e: Expression, state: Identifier, s1: Seq[Statement], s2: Seq[Statement]) extends Statement
 case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement
 case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST

@@ -30,8 +30,6 @@ import org.hyperledger.fabric.shim.ledger.*;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
-import javax.xml.bind.DatatypeConverter;
-
 
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
     SerializationState serializationState;
@@ -187,6 +185,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
              * the root object.) */
             __restoreObject(serializationState);
 
+            System.out.println("Invoking transaction " + function);
             byte result[] = invocationReceiver.run(serializationState, function, paramsBytes);
             __saveModifiedData(stub, invocationReceiver);
             serializationState.transactionSucceeded();
@@ -197,7 +196,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
              * in the client will give a compile-time error. */
             revertState();
             return newErrorResponse("No such transaction: " + function);
-        } catch (ObsidianRevertException e) {
+        } catch (ObsidianRevertException | StateLockException e) {
             revertState();
             return newErrorResponse(e.getMessage());
         } catch (Throwable e) {
@@ -271,7 +270,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             return contract;
 
         }
-        catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+        catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | StateLockException e) {
             System.err.println("Unable to instantiate contract: " + e);
             return null;
         }
@@ -298,9 +297,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract String __getGUID();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-                   BadTransactionException, NoSuchTransactionException, BadArgumentException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException, IllegalOwnershipConsumptionException;
+                   BadTransactionException, NoSuchTransactionException, BadArgumentException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;
     public abstract byte[] init(SerializationState st, byte[][] args)
-            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException;
+            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes, SerializationState __st)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes();

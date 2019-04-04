@@ -13,6 +13,7 @@ import org.hyperledger.fabric.shim.ledger.*;
 import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
@@ -29,6 +30,8 @@ public class SerializationState {
     private HashMap<String, ReturnedReferenceState> returnedObjectClassMap;
 
 
+    private HashSet<Object> stateLockedObjects;
+
     static final String s_returnedObjectsClassMapKey = "ReturnedObject";
     static final String s_returnedObjectsIsOwnedMapKey = "ReturnedObjectIsOwned";
 
@@ -40,6 +43,7 @@ public class SerializationState {
 
     public SerializationState() {
         guidMap = new HashMap<String, ObsidianSerialized>();
+        stateLockedObjects = new HashSet<Object>();
     }
 
     public void setStub(ChaincodeStub newStub) {
@@ -70,6 +74,19 @@ public class SerializationState {
         }
     }
 
+    // TODO: move this to another class, since it pertains to clients too (and does not pertain to serialization).
+    public void beginStateLock(Object obj) {
+        stateLockedObjects.add(obj);
+    }
+
+    public void endStateLock(Object obj) {
+        stateLockedObjects.remove(obj);
+    }
+
+    public boolean objectIsStateLocked(Object obj) {
+        return stateLockedObjects.contains(obj);
+    }
+
     public void beginTransaction() {
         // Shallow clone suffices because ReturnedReferenceState is immutable.
         if (returnedObjectClassMap != null) {
@@ -92,6 +109,8 @@ public class SerializationState {
         if (returnedObjectClassMap == null) {
             returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
         }
+        // TODO: put this back
+        //  loadReturnedObjectsMap(stub);
 
         System.out.println("mapReturnedObject: " + obj.__getGUID() + ". new external ownership status: " + returnedReferenceIsOwned);
         returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
@@ -110,7 +129,11 @@ public class SerializationState {
         if (returnedObjectClassMap != null) {
             for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
                 CompositeKey classKey = stub.createCompositeKey(s_returnedObjectsClassMapKey, entry.getKey());
+                // the class key is s_returnedObjectsClassMapKey + the ID of the object.
+                // Store the key -> canonical name of the class.
                 stub.putStringState(classKey.toString(), entry.getValue().getClassRef().getCanonicalName());
+
+                // The owned key is s_returnedObjectsIsOwnedMapKey + the ID of the object.
                 CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, entry.getKey());
                 boolean isOwned = entry.getValue().getIsOwnedReference();
                 byte[] isOwnedByteArray = isOwned ? TRUE_BYTE : FALSE_BYTE;
@@ -128,6 +151,8 @@ public class SerializationState {
 
             for (KeyValue kv : results) {
                 try {
+                    System.out.println("key to load: " + kv.getKey());
+                    System.out.println("class name: " + kv.getStringValue());
                     Class c = Class.forName(kv.getStringValue());
 
                     CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, kv.getKey());
@@ -147,6 +172,8 @@ public class SerializationState {
     public UUIDFactory getUUIDFactory() {
         return uuidFactory;
     }
+
+    public void setUUIDFactory(UUIDFactory factory) { uuidFactory = factory; }
 
 
     // If we are loading an object and plan to take ownership, ensure this is allowed (and record that ownership has been taken).

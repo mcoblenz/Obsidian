@@ -312,3 +312,11 @@ case class ImportError(msg: String) extends Error {
 case class UninitializedFieldError(fieldName: String) extends Error {
     val msg: String = s"Field $fieldName may not be initialized in this constructor."
 }
+
+case class StateCheckOnPrimitiveError() extends Error {
+    val msg: String = s"Can't check the state of a primitive-type expression."
+}
+
+case class InvalidValAssignmentError() extends Error {
+    val msg: String = s"Can't reassign to variables that are formal parameters or which are used in a dynamic state check."
+}

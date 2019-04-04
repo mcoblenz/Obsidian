@@ -31,7 +31,7 @@ contract C {
     int i;
 
     transaction t(int a) {
-        a = 3;
+
         int b = 2;
         b = 1;
         // should fail: bool is not int

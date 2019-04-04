@@ -1,6 +1,6 @@
 main contract C {
 
-    C(){
+    C@S1(){
         ->S1(x=1,shared=1,test=1);
     }
 

@@ -1,0 +1,47 @@
+asset contract Candy {
+}
+
+asset contract Coin {
+}
+
+asset contract Coins {
+    // Currently implemented as a bottomless void for convenience.
+
+    transaction deposit(Coin @ Owned >> Unowned c) {
+        disown c;
+    }
+}
+
+// This vending machine sells candy in exchange for candy tokens.
+main asset contract TinyVendingMachine {
+    Coins @ Owned coinBin;
+
+    state Full {
+        Candy @ Owned inventory;
+    }
+    state Empty; // No candy if the machine is empty.
+
+    TinyVendingMachine() {
+        coinBin = new Coins(); // Start with an empty coin bin.
+        ->Empty;
+    }
+
+    transaction restock(TinyVendingMachine @ Empty >> Full this,
+                        Candy @ Owned >> Unowned c) {
+        ->Full(inventory = c);
+    }
+
+    transaction buy(TinyVendingMachine @ Full >> Empty this,
+                    Coin @ Owned >> Unowned c) returns Candy @ Owned {
+        coinBin.deposit(c);
+        Candy result = inventory;
+        ->Empty;
+        return result;
+    }
+
+    transaction withdrawCoins() returns Coins @ Owned {
+        Coins result = coinBin;
+        coinBin = new Coins();
+        return result;
+    }
+}

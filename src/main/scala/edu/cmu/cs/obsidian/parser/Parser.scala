@@ -87,7 +87,7 @@ object Parser extends Parsers {
              opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseIdAlternatives) ^^ {
                 case remote ~ id ~ permissionToken => {
                     val isRemote = remote.isDefined
-                    val typ = extractTypeFromPermission(permissionToken, id._1, isRemote)
+                    val typ = extractTypeFromPermission(permissionToken, id._1, isRemote, false)
                     typ.setLoc(id)
                 }
             }
@@ -100,9 +100,10 @@ object Parser extends Parsers {
         parseNonPrimitive | intPrim | boolPrim | stringPrim
     }
 
-    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]], name: String, isRemote: Boolean): NonPrimitiveType = {
+    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]], name: String, isRemote: Boolean, defaultOwned: Boolean): NonPrimitiveType = {
+        val defaultPermission = if (defaultOwned) Owned() else Inferred()
         permission match {
-            case None => ContractReferenceType(ContractType(name), Inferred(), isRemote)
+            case None => ContractReferenceType(ContractType(name), defaultPermission, isRemote)
             case Some(_ ~ permissionIdentSeq) =>
                 if (permissionIdentSeq.size == 1) {
                     val thePermissionOrState = permissionIdentSeq.head
@@ -164,7 +165,7 @@ object Parser extends Parsers {
                                 }
                                 (correctedType, correctedType)
                             case Some(_ ~ idSeq) => {
-                                val typOut = extractTypeFromPermission(permission, t.contractName, t.isRemote)
+                                val typOut = extractTypeFromPermission(permission, t.contractName, t.isRemote, false)
                                 (t, typOut)
                             }
                         }
@@ -197,7 +198,7 @@ object Parser extends Parsers {
 
         val parseTransition = RightArrowT() ~ parseId ~
                               opt(parseUpdate) ~! SemicolonT() ^^ {
-            case arrow ~ name ~ updates ~ _ => Transition(name._1, updates).setLoc(arrow)
+            case arrow ~ name ~ updates ~ _ => Transition(name._1, updates, Inferred()).setLoc(arrow)
         }
 
         val parseVarDeclAssn =
@@ -220,12 +221,24 @@ object Parser extends Parsers {
             case t ~ expr ~ _ => Revert(expr).setLoc(t)
         }
 
-        val parseOnlyIf = IfT() ~! parseExpr ~! LBraceT() ~! parseBody ~! RBraceT()
+
+
+        val parseOnlyIf = IfT() ~! opt(LParenT()) ~ parseExpr ~! opt(InT() ~! parseId) ~ opt(RParenT()) ~! LBraceT() ~! parseBody ~! RBraceT()
         val parseElse = ElseT() ~! LBraceT() ~! parseBody ~! RBraceT()
 
         val parseIf = parseOnlyIf ~ opt(parseElse) ^^ {
-            case _if ~ e ~ _ ~ s ~ _ ~ None => If(e, s).setLoc(_if)
-            case _if ~ e ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) => IfThenElse(e, s1, s2).setLoc(_if)
+            case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s ~ _ ~ None =>
+                stOpt match {
+                    case None => If(e, s).setLoc(_if)
+                    case Some(_ ~ stateName) => IfInState(e, stateName, s, Seq.empty).setLoc(_if)
+                }
+
+            case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) =>
+                stOpt match {
+                    case None => IfThenElse(e, s1, s2).setLoc(_if)
+                    case Some(_ ~ stateName) => IfInState(e, stateName, s1, s2).setLoc(_if)
+                }
+
         }
 
         val parseTryCatch = TryT() ~! LBraceT() ~! parseBody ~! RBraceT() ~!
@@ -438,6 +451,7 @@ object Parser extends Parsers {
         }
     }
 
+
     case class AvailableIn (val identifiers: Set[Identifier])
     case class EndsInState (val identifiers: Set[Identifier])
 
@@ -545,8 +559,7 @@ object Parser extends Parsers {
     private def parseConstructor = {
         parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false)
-
+                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, true)
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }
