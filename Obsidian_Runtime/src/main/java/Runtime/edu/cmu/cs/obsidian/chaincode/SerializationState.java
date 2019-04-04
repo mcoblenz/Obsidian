@@ -30,7 +30,7 @@ public class SerializationState {
     private HashMap<String, ReturnedReferenceState> returnedObjectClassMap;
 
 
-    private HashSet<ObsidianSerialized> stateLockedObjects;
+    private HashSet<Object> stateLockedObjects;
 
     static final String s_returnedObjectsClassMapKey = "ReturnedObject";
     static final String s_returnedObjectsIsOwnedMapKey = "ReturnedObjectIsOwned";
@@ -43,7 +43,7 @@ public class SerializationState {
 
     public SerializationState() {
         guidMap = new HashMap<String, ObsidianSerialized>();
-        stateLockedObjects = new HashSet<ObsidianSerialized>();
+        stateLockedObjects = new HashSet<Object>();
     }
 
     public void setStub(ChaincodeStub newStub) {
@@ -75,15 +75,15 @@ public class SerializationState {
     }
 
     // TODO: move this to another class, since it pertains to clients too (and does not pertain to serialization).
-    public void beginStateLock(ObsidianSerialized obj) {
+    public void beginStateLock(Object obj) {
         stateLockedObjects.add(obj);
     }
 
-    public void endStateLock(ObsidianSerialized obj) {
+    public void endStateLock(Object obj) {
         stateLockedObjects.remove(obj);
     }
 
-    public boolean objectIsStateLocked(ObsidianSerialized obj) {
+    public boolean objectIsStateLocked(Object obj) {
         return stateLockedObjects.contains(obj);
     }
 
