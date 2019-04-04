@@ -24,19 +24,35 @@ public class ChaincodeClientConnectionManager {
                 ChaincodeClientTransactionFailedException,
                 ChaincodeClientTransactionBugException
     {
-        StringJoiner sj = new StringJoiner(" ");
-        sj.add("-q");
-        sj.add(transactionName);
-        sj.add("__receiver").add(receiverUUID);
+        ArrayList<String> cmdArgs = new ArrayList<String>();
+        cmdArgs.add("../../../network-framework/invoke.sh");
+
+        cmdArgs.add("-q");
+        cmdArgs.add(transactionName);
+        cmdArgs.add("__receiver");
+        cmdArgs.add(receiverUUID);
         for (int i = 0; i < args.size(); i++) {
             byte[] bytes = args.get(i);
             String byteString = Base64.getEncoder().encodeToString(bytes);
-            sj.add(byteString);
+            cmdArgs.add(byteString);
         }
 
-        String parameterForInvoke = sj.toString();
-        ProcessBuilder pb = new ProcessBuilder("../../../network-framework/invoke.sh", parameterForInvoke);
-        String output = IOUtils.toString(pb.start().getInputStream());
+        if (printDebug) {
+            System.err.println("invocation parameters: " + cmdArgs);
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(cmdArgs);
+        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+        Process process = pb.start();
+
+        String output = IOUtils.toString(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            process.waitFor();
+        }
+        catch (InterruptedException e) {
+            System.err.println("Process interrupted: e");
+        }
+
         return output.getBytes();
     }
 }

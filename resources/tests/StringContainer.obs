@@ -5,7 +5,11 @@ main contract StringContainer {
         s = "aaa";
     }
 
-    transaction setS(string newS) returns string {
+    transaction getString() returns string {
+        return s;
+    }
+
+    transaction setString(string newS) returns string {
         string oldS = s;
         s = newS;
         return oldS;
