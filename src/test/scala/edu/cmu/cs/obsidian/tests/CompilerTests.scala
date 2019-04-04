@@ -52,4 +52,8 @@ class CompilerTests extends JUnitSuite {
   @Test def negativeNumbers(): Unit = {
     testContract("NegativeNumber")
   }
+
+  @Test def giftCertificate(): Unit = {
+    testContract("GiftCertificate")
+  }
 }
