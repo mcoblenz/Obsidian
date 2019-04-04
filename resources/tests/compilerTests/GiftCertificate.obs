@@ -1,0 +1,45 @@
+contract Date {
+    transaction greaterThan(Date@Unowned this, Date@Unowned other) returns bool {
+        return true;
+    }
+}
+asset contract Money {}
+
+main asset contract GiftCertificate {
+	Date @ Unowned expirationDate; // assume there is a Date contract defined elsewhere
+
+	state Active {
+	    Money @ Owned balance;
+	}
+
+	state Expired;
+	state Redeemed;
+
+	GiftCertificate(Money@Owned >> Unowned b, Date @ Unowned d) {
+	    expirationDate = d;
+	    ->Active(balance = b);
+	}
+
+	transaction checkExpiration(GiftCertificate@Active >> (Active | Expired) this) {
+		if (getCurrentDate().greaterThan(expirationDate)) {
+		    disown balance;
+			->Expired;
+		}
+	}
+	transaction redeem(GiftCertificate@Active >> (Expired | Redeemed) this)
+				returns Money@Owned {
+		checkExpiration();
+
+		if (this in Active) {
+		    Money result = balance;
+		    ->Redeemed;
+			return result;
+		}
+		else {
+		    revert "Can't redeem expired certificate";
+		}
+	}
+	transaction getCurrentDate(GiftCertificate@Unowned this) returns Date@Unowned {
+	    return new Date();
+	}
+}
