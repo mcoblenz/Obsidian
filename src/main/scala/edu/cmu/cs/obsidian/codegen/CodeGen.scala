@@ -198,15 +198,17 @@ class CodeGen (val target: Target) {
 
     private def marshallExprWithFullObjects(unmarshalledExpr: IJExpression, typ: ObsidianType): IJExpression = {
         val marshalledArg = typ match {
-            case IntType() => unmarshalledExpr.invoke("toByteArray");
-            case BoolType() => JExpr.cond(unmarshalledExpr, JExpr.ref("TRUE_ARRAY"), JExpr.ref("FALSE_ARRAY"))
+            case IntType() => unmarshalledExpr.invoke("toString");
+            case BoolType() =>
+                val encoder = model.directClass("java.util.Base64").staticInvoke("getEncoder")
+                val bytes = JExpr.cond(unmarshalledExpr, JExpr.ref("TRUE_ARRAY"), JExpr.ref("FALSE_ARRAY"))
+                encoder.invoke("encodeToString").arg(bytes)
             case StringType() =>
-                val toByteArrayInvocation: JInvocation = JExpr.invoke(unmarshalledExpr, "getBytes")
-                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                toByteArrayInvocation.arg(charset)
-            // this case encompasses [AstContractType] and [AstStateType]
-            case _ => unmarshalledExpr.invoke("__wrappedArchiveBytes")
-
+                unmarshalledExpr
+            case _ =>
+                val encoder = model.directClass("java.util.Base64").staticInvoke("getEncoder")
+                val bytes = unmarshalledExpr.invoke("__wrappedArchiveBytes")
+                encoder.invoke("encodeToString").arg(bytes)
         }
 
         marshalledArg
@@ -364,7 +366,7 @@ class CodeGen (val target: Target) {
 
         // argsArray = new Object[size]
         val body = meth.body()
-        val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("byte[]"))
+        val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("String"))
         val newArrayExpr = JExpr._new(objectArrayType)
         newArrayExpr.arg(JExpr.lit(argExpressions.length))
         val argArray = body.decl(objectArrayType, "argArray", newArrayExpr)

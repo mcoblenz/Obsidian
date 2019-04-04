@@ -37,4 +37,4 @@ confirmNetworkUp() {
 }
 
 confirmNetworkUp
-docker exec cli scripts/invoke.sh $@
+docker exec cli scripts/invoke.sh "$@"

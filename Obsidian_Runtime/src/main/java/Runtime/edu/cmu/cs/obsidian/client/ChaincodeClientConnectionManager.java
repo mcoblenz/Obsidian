@@ -19,7 +19,7 @@ public class ChaincodeClientConnectionManager {
         this.printDebug = printDebug;
     }
 
-    public byte[] doTransaction(String transactionName, ArrayList<byte[]> args, String receiverUUID, boolean returnsNonvoid)
+    public byte[] doTransaction(String transactionName, ArrayList<String> args, String receiverUUID, boolean returnsNonvoid)
             throws java.io.IOException,
                 ChaincodeClientTransactionFailedException,
                 ChaincodeClientTransactionBugException
@@ -31,11 +31,11 @@ public class ChaincodeClientConnectionManager {
         cmdArgs.add(transactionName);
         cmdArgs.add("__receiver");
         cmdArgs.add(receiverUUID);
-        for (int i = 0; i < args.size(); i++) {
-            byte[] bytes = args.get(i);
-            String byteString = Base64.getEncoder().encodeToString(bytes);
-            cmdArgs.add(byteString);
+
+        for (String arg : args) {
+            cmdArgs.add("\"" + arg + "\"");
         }
+
 
         if (printDebug) {
             System.err.println("invocation parameters: " + cmdArgs);
