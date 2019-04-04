@@ -10,8 +10,8 @@ jdk:
   - oraclejdk8
 
 before_install:
-  - ./install-protobuf.sh
-  - ./install-bin.sh
+  - ./travis_specific/install-protobuf.sh
+  - ./travis_specific/install-bin.sh
   - export PATH=${PATH}:${HOME}/protobuf/
   - export PATH=${PATH}:${HOME}/bin/
 
@@ -22,6 +22,6 @@ script:
 
 deploy:
   provider: script
-  script: bash resources/tests/endToEndTests/tests.sh
+  script: bash travis_specific/tests.sh
   on:
     branch: getGuid
