@@ -18,7 +18,7 @@ trait Target {
 
 // We have to keep track of which contract is the main client contract because some of the imported contracts may be main contracts for server processes.
 case class Client(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
-case class Server(generateDebugOutput: Boolean = false) extends Target
+case class Server(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
 
 class CodeGen (val target: Target) {
 
@@ -747,7 +747,7 @@ class CodeGen (val target: Target) {
                     generateResetModifiedMethod(aContract, newClass, translationContext)
                     generateRestoreMethod(aContract, newClass, translationContext)
                 }
-            case Server(_) =>
+            case Server(_, _) =>
                 generateResetModifiedMethod(aContract, newClass, translationContext)
                 generateRestoreMethod(aContract, newClass, translationContext)
         }
@@ -898,7 +898,7 @@ class CodeGen (val target: Target) {
                 if (aContract != mainContract) {
                     newClass._implements(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
                 }
-            case Server(_) =>
+            case Server(_, _) =>
                 newClass._implements(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
         }
         generateLazySerializationCode(aContract, newClass, translationContext)
@@ -995,7 +995,7 @@ class CodeGen (val target: Target) {
                     generateRunMethod(newClass, translationContext, stubType)
                     generateSerialization(aContract, newClass, translationContext)
                 }
-            case Server(_) =>
+            case Server(_, _) =>
                 if (aContract.isMain) {
                     /* We need to generate special methods for the main contract to align */
                     /* with the Hyperledger chaincode format */
@@ -1026,7 +1026,7 @@ class CodeGen (val target: Target) {
                 if (translationContext.contract != mainContract) {
                     generateInitMethod(translationContext, newClass, stubType, constructorTypes)
                 }
-            case Server(_) =>
+            case Server(_, _) =>
                 generateInitMethod(translationContext, newClass, stubType, constructorTypes)
         }
         if (constructor.isEmpty) {
@@ -1169,10 +1169,6 @@ class CodeGen (val target: Target) {
                     txsByName.put(tx.name, mutable.Set(tx))
             }
         }
-
-        val mapReturnedObjectInvocation = runMeth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
-        mapReturnedObjectInvocation.arg(JExpr._this())
-        mapReturnedObjectInvocation.arg(JExpr.FALSE)
 
         var lastTransactionElse: Option[JBlock] = None
 
@@ -2183,10 +2179,16 @@ class CodeGen (val target: Target) {
         putEntryInvocation.arg(JExpr._this())
 
         // Put the class in the returned object map so we can invoke transaction with -receiver on it
-
-        val mapReturnedObjectInvocation = meth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
-        mapReturnedObjectInvocation.arg(JExpr._this())
-        mapReturnedObjectInvocation.arg(JExpr.FALSE)
+        target match {
+            case Client(mainContract, _) =>
+                ()
+            case Server(mainContract, _) =>
+                if (translationContext.contract == mainContract) {
+                    val mapReturnedObjectInvocation = meth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+                    mapReturnedObjectInvocation.arg(JExpr._this())
+                    mapReturnedObjectInvocation.arg(JExpr.FALSE)
+                }
+        }
 
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
@@ -2327,7 +2329,7 @@ class CodeGen (val target: Target) {
                     meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
 
                 }
-            case Server(_) =>
+            case Server(_, _) =>
                 meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
         }
 
@@ -2366,7 +2368,7 @@ class CodeGen (val target: Target) {
                 if ((translationContext.contract == mainContract) && tx.name.equals("main")) {
                     meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
                 }
-            case Server(_) =>
+            case Server(_, _) =>
         }
 
         val argList: Seq[(String, JVar)] =

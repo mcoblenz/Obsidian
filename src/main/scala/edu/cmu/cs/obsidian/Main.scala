@@ -114,7 +114,12 @@ object Main {
     }
 
     def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
-        val codeGen = new CodeGen(Server())
+        // Server must have a main contract.
+        val mainContractOption = findMainContract(ast)
+        if (mainContractOption.isEmpty) {
+            throw new RuntimeException("No main contract found")
+        }
+        val codeGen = new CodeGen(Server(mainContractOption.get))
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 

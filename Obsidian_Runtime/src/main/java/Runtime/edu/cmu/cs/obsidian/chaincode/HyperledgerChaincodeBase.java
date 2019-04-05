@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Collections;
 
 import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
@@ -280,7 +282,9 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
      * Only called for main transactions. */
     public void __saveModifiedData(ChaincodeStub stub, ObsidianSerialized target) {
         Set<ObsidianSerialized> dirtyFields = target.__resetModified(new HashSet<ObsidianSerialized>());
-        for (ObsidianSerialized field : dirtyFields) {
+        List<ObsidianSerialized> dirtyFieldsSorted = dirtyFields.stream().collect(Collectors.toList());
+        Collections.sort(dirtyFieldsSorted, (o1, o2) -> o1.__getGUID().compareTo(o2.__getGUID()));
+        for (ObsidianSerialized field : dirtyFieldsSorted) {
             /* Find key and bytes to archive for each dirty field. */
             String archiveKey = field.__getGUID();
             String archiveValue = new String(field.__archiveBytes(), java.nio.charset.StandardCharsets.UTF_8);
