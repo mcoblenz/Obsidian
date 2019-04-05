@@ -677,7 +677,7 @@ class CodeGen (val target: Target) {
 
                 val stringClass = model.ref("java.lang.String")
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                val enumString = tryBlock.body().decl(stringClass, "enumString", JExpr._new(stringClass).arg(marshalledResultDecl).arg(charset))
+                val enumString = tryBlock.body().decl(stringClass, "enumString", JExpr._new(stringClass).arg(marshalledResultDecl).arg(charset)).invoke("trim")
 
                 val errorBlock = new JBlock()
 
@@ -2311,14 +2311,21 @@ class CodeGen (val target: Target) {
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
 
-
-        /* ensure the object is loaded before trying to do anything.
-         * (even checking the state!) */
+        target match {
+            case Client(mainContract, _) =>
+                if (translationContext.contract == mainContract) {
+                    meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+                }
+            case Server(_) => ()
+        }
+                    /* ensure the object is loaded before trying to do anything.
+                     * (even checking the state!) */
         meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
         target match {
             case Client(mainContract, _) =>
                 if (translationContext.contract != mainContract) {
                     meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+
                 }
             case Server(_) =>
                 meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
@@ -2344,7 +2351,8 @@ class CodeGen (val target: Target) {
         val jTry = meth.body()._try()
 
         /* if the flag has already been set, that means there has been a reentrancy */
-        val jIf = jTry.body()._if(isInsideInvocationFlag())
+        val reentrancyTest = if (tx.isPrivate) JExpr.FALSE else isInsideInvocationFlag()
+        val jIf = jTry.body()._if(reentrancyTest)
         val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
         exception.arg(translationContext.contract.sourcePath)
         exception.arg(tx.loc.line)
@@ -2596,12 +2604,12 @@ class CodeGen (val target: Target) {
                 }
 
             case LocalInvocation(methName, args) =>
-                addArgs(translationContext.invokeTransaction(methName),
-                        args, translationContext, localContext)
+                body.add(addArgs(translationContext.invokeTransaction(methName),
+                        args, translationContext, localContext))
             /* TODO : it's bad that this is a special case */
             case Invocation(This(), methName, args) =>
-                addArgs(translationContext.invokeTransaction(methName),
-                        args, translationContext, localContext)
+                body.add(addArgs(translationContext.invokeTransaction(methName),
+                        args, translationContext, localContext))
 
             case Invocation(e, methName, args) =>
                 addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName),
