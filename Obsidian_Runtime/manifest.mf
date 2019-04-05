@@ -1,4 +1,0 @@
-Class-Path: lib/protobuf-java-3.7.0.jar
-  lib/json-20160810.jar
-  lib/shim-client-1.0.jar
-

@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
 cd ../../../
+# First generate int container java code
+sbt "runMain edu.cmu.cs.obsidian.Main resources/tests/compilerTests/IntContainer.obs"
+# Then go to run the tests
 cd network-framework
 ./down.sh
 ./up.sh -s IntContainer
+
 
 testVals=(5 7 8 9 10)
 for ((i = 0; i < 4; i++)); do
