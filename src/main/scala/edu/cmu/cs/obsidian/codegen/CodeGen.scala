@@ -660,6 +660,7 @@ class CodeGen (val target: Target) {
             if (!isStub) {
                 stateMeth.body()._return(JExpr.ref(stateField))
             } else {
+                stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
                 val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("String"))
                 val newArrayExpr = JExpr._new(objectArrayType)
                 val argArray = stateMeth.body().decl(objectArrayType, "argArray", newArrayExpr)
