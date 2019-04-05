@@ -95,8 +95,8 @@ case class TranslationContext(
 
     def invokeTransaction(name: String): JInvocation = {
         txLookup(name) match {
-            case GlobalTransactionInfo(_) => JExpr.invoke(name)
-            case StateSpecificTransactionInfo(_, meth) => JExpr.invoke(meth)
+            case GlobalTransactionInfo(_) => JExpr.invoke(JExpr._this(), name)
+            case StateSpecificTransactionInfo(_, meth) => JExpr.invoke(JExpr._this(), meth)
         }
     }
 

@@ -152,6 +152,8 @@ class CodeGen (val target: Target) {
         superConstructorInvocation.arg(connectionManager)
         superConstructorInvocation.arg(uuid)
 
+        generateStateEnumAndFields(contract, contractClass, true)
+
 
         val txNames: mutable.Set[String] = new mutable.HashSet[String]()
 
@@ -577,29 +579,8 @@ class CodeGen (val target: Target) {
                                           protobufOuterClassNames: Map[String, String],
                                           generateStub: Boolean
                                       ): TranslationContext = {
-        /* setup the state enum */
-        val stateDeclarations: Seq[State] =
-            aContract.declarations.filter((d: Declaration) => d match {
-                case State(_, _, _) => true
-                case _ => false
-            }).map({ s => s.asInstanceOf[State] })
 
-        var stateEnumOption: Option[JDefinedClass] = None
-        var stateEnumField: Option[JFieldVar] = None
-        if (stateDeclarations.nonEmpty) {
-            val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumNameForClassName(aContract.name))
-            stateEnumOption = Some(stateEnum)
-
-            /* Declare the states in the enum */
-            for (State(name, _, _) <- stateDeclarations) {
-                stateEnum.enumConstant(name)
-            }
-
-            /* setup the state field and the [getState] method */
-            stateEnumField = Some(newClass.field(JMod.PRIVATE, stateEnum, stateField))
-            val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
-            stateMeth.body()._return(JExpr.ref(stateField))
-        }
+        val (stateDeclarations, stateEnumOption, stateEnumField) = generateStateEnumAndFields(aContract, newClass, false)
 
         /* setup state lookup table */
         var stateLookup = new immutable.TreeMap[String, StateContext]()
@@ -645,6 +626,75 @@ class CodeGen (val target: Target) {
             generateStateHelpers(newClass, translationContext)
 
         translationContext
+    }
+
+    private def generateStateEnumAndFields(
+                                          aContract: Contract,
+                                          newClass: JDefinedClass,
+                                          isStub: Boolean
+                                          ): (Seq[State], Option[JDefinedClass], Option[JFieldVar]) = {
+
+        /* setup the state enum */
+        val stateDeclarations: Seq[State] =
+            aContract.declarations.filter((d: Declaration) => d match {
+                case State(_, _, _) => true
+                case _ => false
+            }).map({ s => s.asInstanceOf[State] })
+
+        var stateEnumOption: Option[JDefinedClass] = None
+        var stateEnumField: Option[JFieldVar] = None
+        if (stateDeclarations.nonEmpty) {
+            val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumNameForClassName(aContract.name))
+            stateEnumOption = Some(stateEnum)
+
+            /* Declare the states in the enum */
+            for (State(name, _, _) <- stateDeclarations) {
+                stateEnum.enumConstant(name)
+            }
+
+            /* setup the state field and the [getState] method */
+            stateEnumField = Some(newClass.field(JMod.PRIVATE, stateEnum, stateField))
+            val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
+            if (!isStub) {
+                stateMeth.body()._return(JExpr.ref(stateField))
+            } else {
+                stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+                val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("String"))
+                val newArrayExpr = JExpr._new(objectArrayType)
+                val argArray = stateMeth.body().decl(objectArrayType, "argArray", newArrayExpr)
+
+                //connectionManager.doTransaction(transaction.name, args)
+                val tryBlock = stateMeth.body()._try()
+
+                val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
+                doTransactionInvocation.arg("getState")
+                doTransactionInvocation.arg(argArray)
+                doTransactionInvocation.arg(JExpr.invoke("__getGUID"))
+                doTransactionInvocation.arg(true)
+
+                // return result
+                val marshalledResultDecl = tryBlock.body().decl(newClass.owner().ref("byte[]"), "marshalledResult", doTransactionInvocation)
+
+                val stringClass = model.ref("java.lang.String")
+                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                val enumString = tryBlock.body().decl(stringClass, "enumString", JExpr._new(stringClass).arg(marshalledResultDecl).arg(charset))
+
+                val errorBlock = new JBlock()
+
+                tryBlock.body()._return(stateEnum.staticInvoke("valueOf").arg(enumString))
+
+                val ioExceptionCatchBlock = tryBlock._catch(model.directClass("java.io.IOException"))
+                ioExceptionCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+                val failedCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException"))
+                failedCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+                val bugCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionBugException"))
+                bugCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+            }
+        }
+
+        (stateDeclarations, stateEnumOption, stateEnumField)
     }
 
 
@@ -1095,6 +1145,9 @@ class CodeGen (val target: Target) {
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
 
+        runMeth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+
+
         val returnBytes = runMeth.body().decl(
             model.BYTE.array(), "returnBytes",
             JExpr.newArray(model.BYTE, 0))
@@ -1246,6 +1299,37 @@ class CodeGen (val target: Target) {
             if (transactionIsConditional) {
                 transCondBody._throw(JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.InvalidStateException")))
             }
+        }
+
+        // add the getState method here, only if it actually exists, i.e only if there is a
+        if (translationContext.states.nonEmpty) {
+            val transEq = JExpr.ref("transName").invoke("equals").arg(getStateMeth)
+            val transCond = lastTransactionElse match {
+                case None => runMeth.body()._if(transEq)
+                case Some(e) => e._if(transEq)
+            }
+
+            /* Get the 'else' of this last 'if' statement, to attach the next 'if' to. */
+            lastTransactionElse = Some(transCond._else())
+
+            val transCondBody = transCond._then()
+            // Check to make sure we have enough arguments.
+            val newInteger = JExpr._new(model.parseType("Integer"))
+            newInteger.arg("0")
+            val argsTest = runArgs.ref("length").eq(newInteger)
+            val enoughArgsTest = transCondBody._if(argsTest)
+            val enoughArgs = enoughArgsTest._then()
+            val notEnoughArgs = enoughArgsTest._else()
+
+            notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
+
+            val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
+            exception.arg("getState")
+            exception.arg(runArgs.ref("length"))
+            exception.arg(0)
+            notEnoughArgs._throw(exception)
+
+            enoughArgs.assign(returnBytes, JExpr.invoke(getStateMeth).invoke("name").invoke("getBytes"))
         }
 
         /* Find where to throw a 'no such transaction' error.

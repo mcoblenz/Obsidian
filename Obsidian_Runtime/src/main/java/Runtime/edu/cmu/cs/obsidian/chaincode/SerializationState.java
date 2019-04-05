@@ -118,11 +118,89 @@ public class SerializationState {
 
     public ReturnedReferenceState getReturnedReferenceState(ChaincodeStub stub, String guid) {
         loadReturnedObjectsMap(stub);
-
+        for (Map.Entry<String, ReturnedReferenceState> item : returnedObjectClassMap.entrySet()) {
+            String key = item.getKey();
+            if (key.equals(guid)) {
+                System.out.println("Are equal");
+            } else {
+                System.out.println("Are not equal");
+            }
+            ReturnedReferenceState value = item.getValue();
+            System.out.println("Key: " + key + ", Value: " + value);
+        }
+        System.out.println("GUID: " + guid);
+        System.out.println("Return from map: " + returnedObjectClassMap.get(guid));
         return returnedObjectClassMap.get(guid);
     }
 
     public void archiveReturnedObjectsMap (ChaincodeStub stub) {
+        System.out.println("archiveReturnedObjectsMap 2");
+
+
+        if (returnedObjectClassMap != null) {
+            // Archive the number of returned objects.
+            stub.putStringState("NumReturnedObjects", Integer.toString(returnedObjectClassMap.size()));
+
+
+            int i = 0;
+            for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
+                String objGuid = entry.getKey();
+                String guidKey = "ReturnedObjectGUID" + Integer.toString(i);
+                stub.putStringState(guidKey, objGuid);
+
+                String classNameKey = "ReturnedObjectClass" + Integer.toString(i);
+                stub.putStringState(classNameKey, entry.getValue().getClassRef().getCanonicalName());
+
+                String isOwnedKey = "ReturnedObjectIsOwned" + Integer.toString(i);
+                boolean isOwned = entry.getValue().getIsOwnedReference();
+                String isOwnedValue = isOwned ? "true" : "false";
+                stub.putStringState(isOwnedKey, isOwnedValue);
+
+                i++;
+            }
+        }
+    }
+
+
+    private void loadReturnedObjectsMap (ChaincodeStub stub){
+        if (returnedObjectClassMap == null) {
+            returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
+
+            try {
+                String numAsString =  stub.getStringState("NumReturnedObjects");
+                int numReturnedObjects = Integer.parseInt(numAsString);
+
+                for (int i = 0; i < numReturnedObjects; i++) {
+                    String indexAsString = Integer.toString(i);
+
+                    String guidKey = "ReturnedObjectGUID" + indexAsString;
+                    String classNameKey = "ReturnedObjectClass" + indexAsString;
+                    String isOwnedKey = "ReturnedObjectIsOwned" + indexAsString;
+
+                    String guid = stub.getStringState(guidKey);
+                    String objectClass = stub.getStringState(classNameKey);
+                    Class c = Class.forName(objectClass);
+
+                    String isOwnedStr = stub.getStringState(isOwnedKey);
+                    boolean isOwned = isOwnedStr.equals("true");
+
+                    System.out.println("loaded returned object " + guid + ": " + c + "; is owned: " + isOwnedStr);
+
+                    ReturnedReferenceState refState = new ReturnedReferenceState(c, isOwned);
+                    returnedObjectClassMap.put(guid, refState);
+                }
+            }
+            catch (NumberFormatException e) {
+                System.err.println("Failed to parse the number of returned objects: " + e);
+            }
+            catch (ClassNotFoundException e) {
+                System.err.println("Failed to find a Class object for class name: " + e);
+            }
+
+        }
+    }
+/*
+        public void archiveReturnedObjectsMap (ChaincodeStub stub) {
         // TODO: remove old, stale entries?
         System.out.println("archiveReturnedObjectsMap");
 
@@ -154,12 +232,11 @@ public class SerializationState {
                     System.out.println("key to load: " + kv.getKey());
                     System.out.println("class name: " + kv.getStringValue());
                     Class c = Class.forName(kv.getStringValue());
-
-                    CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, kv.getKey());
+                    CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, kv.getKey().replace("\0", ""));
                     byte[] isOwnedByteArray = stub.getState(isOwnedKey.toString());
                     boolean isOwned = (isOwnedByteArray == TRUE_BYTE) ? true : false;
 
-                    returnedObjectClassMap.put(kv.getKey(), new ReturnedReferenceState(c, isOwned));
+                    returnedObjectClassMap.put(kv.getKey().replace(s_returnedObjectsClassMapKey, "").replace("\0", ""), new ReturnedReferenceState(c, isOwned));
                     System.out.println("loading map: " + kv.getKey() + " -> " + c);
                 }
                 catch (ClassNotFoundException e) {
@@ -168,6 +245,7 @@ public class SerializationState {
             }
         }
     }
+    */
 
     public UUIDFactory getUUIDFactory() {
         return uuidFactory;
