@@ -2058,8 +2058,8 @@ class CodeGen (val target: Target) {
             case TrueLiteral() => JExpr.TRUE
             case FalseLiteral() => JExpr.FALSE
             case This() => JExpr._this()
-            case Conjunction(e1, e2) => recurse(e1).band(recurse(e2))
-            case Disjunction(e1, e2) => recurse(e1).bor(recurse(e2))
+            case Conjunction(e1, e2) => recurse(e1).cand(recurse(e2))
+            case Disjunction(e1, e2) => recurse(e1).cor(recurse(e2))
             case LogicalNegation(e1) => recurse(e1).not()
             case Add(e1, e2) => recurse(e1).invoke("add").arg(recurse(e2))
             case Subtract(e1, e2) => recurse(e1).invoke("subtract").arg(recurse(e2))
@@ -2079,7 +2079,17 @@ class CodeGen (val target: Target) {
                 recurse(e1).invoke("equals").arg(recurse(e2)).not()
             case Dereference(e1, f) => recurse(e1).ref(f) /* TODO : do we ever need this? */
             case LocalInvocation(name, args) =>
-                addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext)
+                if (name == "sqrt" && args.length == 1) {
+                    val arg0 = recurse(args(0))
+                    val doubleResult = model.ref("java.lang.Math").staticInvoke("sqrt").arg(arg0.invoke("doubleValue"))
+                    val intResult = JExpr.cast(model.ref("int"), doubleResult)
+                    val stringResult = model.ref("Integer").staticInvoke("toString").arg(intResult)
+
+                    JExpr._new(model.parseType("java.math.BigInteger")).arg(stringResult)
+                }
+                else {
+                    addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext)
+                }
             /* TODO : this shouldn't be an extra case */
             case Invocation(This(), name, args) =>
                 addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext)

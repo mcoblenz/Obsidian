@@ -52,13 +52,6 @@ main asset contract InsuranceService {
         return bank;
     }
 
-/*
-    When we support a collection of insurer, we should put this back.
-    transaction addInsurer(Insurer@Shared insurer) {
-        insurer = insurer;
-    }
-*/
-
     // All bids (for now) are for one-month periods. They insure within "radius" of the given coordinate:
     // if the moisture content ever drops below the threshold, then the policy pays out.
     transaction requestBid(InsuranceService@Ready this, int longitude, int latitude, int radius, int moistureContent, int payout) returns Policy@Offered {
@@ -68,7 +61,7 @@ main asset contract InsuranceService {
         int expiration = insBid.getExpirationTime();
         Money m = insBid.getPayout();
 
-        Policy policy = new Policy(cost, expiration); // TODO
+        Policy policy = new Policy(cost, expiration, longitude, latitude, radius, moistureContent);
         PolicyRecord pendingPolicy = new PolicyRecord(policy, m);
 
         pendingPolicies.set(policy, pendingPolicy);
@@ -114,15 +107,19 @@ main asset contract InsuranceService {
             revert "Unable to verify weather record signature.";
         }
 
-        // TODO: check weather record against policy
+        if (policy.isClaimableWithWeather(weatherRecord)) {
 
-        // get will revert if the policy isn't found.
-        PolicyRecord record = activePolicies.get(policy);
-        Money payment = record.claim();
+            // get will revert if the policy isn't found.
+            PolicyRecord record = activePolicies.get(policy);
+            Money payment = record.claim();
 
-        policy.claim();
+            policy.claim();
 
-        return payment;
+            return payment;
+        }
+        else {
+            revert "The policy cannot be claimed because it does not apply to the given weather record.";
+        }
     }
 
 }
