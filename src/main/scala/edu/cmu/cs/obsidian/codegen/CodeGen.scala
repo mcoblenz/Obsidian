@@ -647,11 +647,9 @@ class CodeGen (val target: Target) {
             val stateEnum = newClass._enum(JMod.PUBLIC, stateEnumNameForClassName(aContract.name))
             stateEnumOption = Some(stateEnum)
 
-            if (!isStub) {
-                /* Declare the states in the enum */
-                for (State(name, _, _) <- stateDeclarations) {
-                    stateEnum.enumConstant(name)
-                }
+            /* Declare the states in the enum */
+            for (State(name, _, _) <- stateDeclarations) {
+                stateEnum.enumConstant(name)
             }
 
             /* setup the state field and the [getState] method */
