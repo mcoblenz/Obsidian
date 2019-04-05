@@ -418,6 +418,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 args: Seq[Expression]): (ObsidianType, Context) = {
             val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver, NoOwnershipConsumption())
 
+            // Terrible special case just for now. TODO: remove this.
+            if (name == "sqrt" && args.length == 1) {
+                // Int isn't really right either, but it will have to do for now.
+                return (IntType(), context)
+            }
+
             // Eliminate things we can't invoke methods on first.
             val nonPrimitiveReceiverType = receiverType match {
                 case BottomType() => return (BottomType(), contextAfterReceiver)

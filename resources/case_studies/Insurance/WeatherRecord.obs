@@ -4,13 +4,29 @@
 contract WeatherRecord {
     int longitude;
     int latitude;
-    int moistureReading;
+    int moisture;
     int timestamp;
 
     WeatherRecord(int lo, int la, int m, int t) {
         longitude = lo;
         latitude = la;
-        moistureReading = m;
+        moisture = m;
         timestamp = t;
+    }
+
+    transaction getLongitude(WeatherRecord@Unowned this) returns int {
+        return longitude;
+    }
+
+    transaction getLatitude(WeatherRecord@Unowned this) returns int {
+        return latitude;
+    }
+
+    transaction getMoisture(WeatherRecord@Unowned this) returns int {
+        return moisture;
+    }
+
+    transaction getTimestamp(WeatherRecord@Unowned this) returns int {
+        return timestamp;
     }
 }
