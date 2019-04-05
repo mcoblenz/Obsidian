@@ -1145,6 +1145,9 @@ class CodeGen (val target: Target) {
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
 
+        runMeth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+
+
         val returnBytes = runMeth.body().decl(
             model.BYTE.array(), "returnBytes",
             JExpr.newArray(model.BYTE, 0))

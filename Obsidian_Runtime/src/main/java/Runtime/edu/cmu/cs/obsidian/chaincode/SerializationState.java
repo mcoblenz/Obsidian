@@ -134,6 +134,73 @@ public class SerializationState {
     }
 
     public void archiveReturnedObjectsMap (ChaincodeStub stub) {
+        System.out.println("archiveReturnedObjectsMap 2");
+
+
+        if (returnedObjectClassMap != null) {
+            // Archive the number of returned objects.
+            stub.putStringState("NumReturnedObjects", Integer.toString(returnedObjectClassMap.size()));
+
+
+            int i = 0;
+            for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
+                String objGuid = entry.getKey();
+                String guidKey = "ReturnedObjectGUID" + Integer.toString(i);
+                stub.putStringState(guidKey, objGuid);
+
+                String classNameKey = "ReturnedObjectClass" + Integer.toString(i);
+                stub.putStringState(classNameKey, entry.getValue().getClassRef().getCanonicalName());
+
+                String isOwnedKey = "ReturnedObjectIsOwned" + Integer.toString(i);
+                boolean isOwned = entry.getValue().getIsOwnedReference();
+                String isOwnedValue = isOwned ? "true" : "false";
+                stub.putStringState(isOwnedKey, isOwnedValue);
+
+                i++;
+            }
+        }
+    }
+
+
+    private void loadReturnedObjectsMap (ChaincodeStub stub){
+        if (returnedObjectClassMap == null) {
+            returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
+
+            try {
+                String numAsString =  stub.getStringState("NumReturnedObjects");
+                int numReturnedObjects = Integer.parseInt(numAsString);
+
+                for (int i = 0; i < numReturnedObjects; i++) {
+                    String indexAsString = Integer.toString(i);
+
+                    String guidKey = "ReturnedObjectGUID" + indexAsString;
+                    String classNameKey = "ReturnedObjectClass" + indexAsString;
+                    String isOwnedKey = "ReturnedObjectIsOwned" + indexAsString;
+
+                    String guid = stub.getStringState(guidKey);
+                    String objectClass = stub.getStringState(classNameKey);
+                    Class c = Class.forName(objectClass);
+
+                    String isOwnedStr = stub.getStringState(isOwnedKey);
+                    boolean isOwned = isOwnedStr.equals("true");
+
+                    System.out.println("loaded returned object " + guid + ": " + c + "; is owned: " + isOwnedStr);
+
+                    ReturnedReferenceState refState = new ReturnedReferenceState(c, isOwned);
+                    returnedObjectClassMap.put(guid, refState);
+                }
+            }
+            catch (NumberFormatException e) {
+                System.err.println("Failed to parse the number of returned objects: " + e);
+            }
+            catch (ClassNotFoundException e) {
+                System.err.println("Failed to find a Class object for class name: " + e);
+            }
+
+        }
+    }
+/*
+        public void archiveReturnedObjectsMap (ChaincodeStub stub) {
         // TODO: remove old, stale entries?
         System.out.println("archiveReturnedObjectsMap");
 
@@ -178,6 +245,7 @@ public class SerializationState {
             }
         }
     }
+    */
 
     public UUIDFactory getUUIDFactory() {
         return uuidFactory;
