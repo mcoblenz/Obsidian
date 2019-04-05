@@ -312,6 +312,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case Owned() => true
             case Unowned() => p2 == Unowned()
             case Shared() => (p2 == Shared()) || (p2 == Unowned())
+            case Inferred() => false
         }
     }
     //-------------------------------------------------------------------------
@@ -705,6 +706,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             statement match {
                 case Return() | ReturnExpr(_) | Revert(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
+                    hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
+                case IfInState(e, state, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
                 case Switch(e, cases) =>
                     hasRet = cases.foldLeft(true)((prev, aCase) => prev && hasReturnStatement(tx, aCase.body))
@@ -1447,10 +1450,15 @@ private def checkStatement(
                             logError(s, StateCheckOnPrimitiveError())
                             contextPrime
                         case np: NonPrimitiveType =>
-                            e match {
+                            val ident = e match {
                                 // If e is a variable, we might be able to put it in the context with the appropriate state.
                                 // If it's not a variable, we just check the state and move on (no context changes).
-                                case ReferenceIdentifier(x) =>
+                                case ReferenceIdentifier(x) => Some(x)
+                                case This() => Some("this")
+                                case _ => None
+                            }
+                            ident match {
+                                case Some(x) =>
                                     np.permission match {
                                         case Owned() =>
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
@@ -1462,7 +1470,7 @@ private def checkStatement(
                                             resetOwnership = Some((x, np))
                                             contextPrime.updated(x, newType).updatedMakingVariableVal(x)
                                     }
-                                case _ => contextPrime
+                                case None => contextPrime
                             }
                         case BottomType() => contextPrime
                     }
