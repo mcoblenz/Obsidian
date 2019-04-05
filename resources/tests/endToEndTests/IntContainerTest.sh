@@ -23,3 +23,5 @@ for ((i = 0; i < 4; i++)); do
 done
 
 ./down.sh
+cd ../
+rm -rf IntContainer
