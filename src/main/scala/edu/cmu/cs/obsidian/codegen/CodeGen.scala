@@ -1147,6 +1147,18 @@ class CodeGen (val target: Target) {
 
         runMeth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
 
+        // Put the class in the returned object map so we can invoke transaction with -receiver on it
+        target match {
+            case Client(mainContract, _) =>
+                ()
+            case Server(mainContract, _) =>
+                if (translationContext.contract == mainContract) {
+                    val mapReturnedObjectInvocation = runMeth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+                    mapReturnedObjectInvocation.arg(JExpr._this())
+                    mapReturnedObjectInvocation.arg(JExpr.FALSE)
+                }
+        }
+
 
         val returnBytes = runMeth.body().decl(
             model.BYTE.array(), "returnBytes",
@@ -2318,7 +2330,7 @@ class CodeGen (val target: Target) {
                 if (translationContext.contract == mainContract) {
                     meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
                 }
-            case Server(_) => ()
+            case Server(_, _) => ()
         }
                     /* ensure the object is loaded before trying to do anything.
                      * (even checking the state!) */

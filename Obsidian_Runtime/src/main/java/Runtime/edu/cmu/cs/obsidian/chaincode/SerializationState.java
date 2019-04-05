@@ -72,6 +72,8 @@ public class SerializationState {
         for (ObsidianSerialized obj : guidMap.values()) {
             obj.flush();
         }
+
+        returnedObjectClassMap = null;
     }
 
     // TODO: move this to another class, since it pertains to clients too (and does not pertain to serialization).
