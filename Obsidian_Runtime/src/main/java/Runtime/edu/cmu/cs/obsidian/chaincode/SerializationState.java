@@ -144,20 +144,14 @@ public class SerializationState {
             for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
                 String objGuid = entry.getKey();
                 String guidKey = "ReturnedObjectGUID" + Integer.toString(i);
-                System.out.println("objGuid: "+ objGuid);
-                System.out.println("guidKey: "+ guidKey);
                 stub.putStringState(guidKey, objGuid);
 
                 String classNameKey = "ReturnedObjectClass" + Integer.toString(i);
-                System.out.println("classNameKey: " + classNameKey);
-                System.out.println("value: " + entry.getValue().getClassRef().getCanonicalName());
                 stub.putStringState(classNameKey, entry.getValue().getClassRef().getCanonicalName());
 
                 String isOwnedKey = "ReturnedObjectIsOwned" + Integer.toString(i);
                 boolean isOwned = entry.getValue().getIsOwnedReference();
                 String isOwnedValue = isOwned ? "true" : "false";
-                System.out.println("isOwnedKey: " + isOwnedKey);
-                System.out.println("isOwnedValue: " + isOwnedValue);
                 stub.putStringState(isOwnedKey, isOwnedValue);
 
                 i++;
