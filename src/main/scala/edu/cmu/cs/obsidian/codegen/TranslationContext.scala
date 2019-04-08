@@ -68,14 +68,19 @@ case class TranslationContext(
 
     /* assigns a variable (can be either a field or a local variable/argument).
      * Because of JCodeModel's design, [assignField] appends the code onto [body]. */
-    def assignVariable(name: String, assignExpr: IJExpression, body: JBlock): Unit = {
-        (currentStateName, fieldLookup(name)) match {
-            /* if "f" is defined in the outer class, "this.f" isn't a valid reference of the field
+    def assignVariable(name: String, assignExpr: IJExpression, body: JBlock, forceFieldAssignment: Boolean): Unit = {
+        if (forceFieldAssignment) {
+            body.assign(JExpr._this().ref(name), assignExpr)
+        }
+        else {
+            (currentStateName, fieldLookup(name)) match {
+                /* if "f" is defined in the outer class, "this.f" isn't a valid reference of the field
              * from inside the inner class. Note that it's not sufficient to just use "f", because
              * this makes shadowing of this variable impossible */
-            case (None, GlobalFieldInfo(_)) => body.assign(JExpr._this().ref(name), assignExpr)
-            case (Some(_), GlobalFieldInfo(_)) => body.assign(contractClass.staticRef("this").ref(name), assignExpr)
-            case (_, StateSpecificFieldInfo(_, _, setFunc)) => body.invoke(setFunc).arg(assignExpr)
+                case (None, GlobalFieldInfo(_)) => body.assign(JExpr._this().ref(name), assignExpr)
+                case (Some(_), GlobalFieldInfo(_)) => body.assign(contractClass.staticRef("this").ref(name), assignExpr)
+                case (_, StateSpecificFieldInfo(_, _, setFunc)) => body.invoke(setFunc).arg(assignExpr)
+            }
         }
     }
 

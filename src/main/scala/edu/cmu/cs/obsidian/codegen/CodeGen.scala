@@ -2418,12 +2418,20 @@ class CodeGen (val target: Target) {
                                newValue: IJExpression,
                                body: JBlock,
                                translationContext: TranslationContext,
-                               localContext: Map[String, JVar]
+                               localContext: Map[String, JVar],
+                               forceFieldAssignment: Boolean
                               ): Unit = {
         localContext.get(name) match {
-            case Some(variable) => body.assign(variable, newValue)
+            case Some(variable) =>
+                if (forceFieldAssignment) {
+                    body.assign(JExpr._this().ref(name), newValue)
+                    body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
+                }
+                else {
+                    body.assign(variable, newValue)
+                }
             case None =>
-                translationContext.assignVariable(name, newValue, body)
+                translationContext.assignVariable(name, newValue, body, forceFieldAssignment)
                 // This is a field, so mark that we're modified.
                 body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
         }
@@ -2481,7 +2489,7 @@ class CodeGen (val target: Target) {
                     case Some(u) =>
                         for ((f, e) <- u) {
                             assignVariable(f.name, translateExpr(e, translationContext, localContext),
-                                body, translationContext, localContext)
+                                body, translationContext, localContext, true)
                         }
                     case None =>
                         // Fields should have been initialized individually, via S1::foo = bar.
@@ -2500,18 +2508,18 @@ class CodeGen (val target: Target) {
                 // Assign according to the state initialization statements, e.g. S1::foo = bar.
                 // Do this after updating the current state because assignVariable may invoke setters.
                 for (fieldName <- translationContext.pendingFieldAssignments) {
-                    translationContext.assignVariable(fieldName, JExpr.ref(stateInitializationVariableName(newStateName, fieldName)), body)
+                    translationContext.assignVariable(fieldName, JExpr.ref(stateInitializationVariableName(newStateName, fieldName)), body, true)
                 }
 
                 translationContext.pendingFieldAssignments = Set.empty
             case Assignment(ReferenceIdentifier(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
-                    body, translationContext, localContext)
+                    body, translationContext, localContext, false)
             /* it's bad that this is a special case */
             case Assignment(Dereference(This(), field), e) => {
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
-                translationContext.assignVariable(field, newValue, body)
+                translationContext.assignVariable(field, newValue, body, false)
                 // This is a field, so mark that we're modified.
                 // (Note: since we can only assign to fields of 'this', we only need
                 // to mark that we assigned here and in assignVariable if it's a field.)
