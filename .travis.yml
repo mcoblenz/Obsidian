@@ -19,9 +19,4 @@ before_install:
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++2.12.4 test
-
-deploy:
-  provider: script
-  script: bash travis_specific/tests.sh
-  on:
-    branch: getGuid
+  - bash travis_specific/tests.sh
