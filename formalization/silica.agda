@@ -536,12 +536,17 @@ splittingRespectsHeap {Γ} {contractType x} {t₁} {t₂} {t₃} spl consis = {!
 splittingRespectsHeap {Γ} {T} {(base Void)} {(base Void)} {(base Void)} voidSplit consis = ⟨ consis , consis ⟩
 splittingRespectsHeap {Γ} {T} {.(base Boolean)} {.(base Boolean)} {.(base Boolean)} booleanSplit consis = ⟨ consis , consis ⟩
 
-splittingRespectsHeap {Γ} {T} {contractType t₁} {contractType t₂} {contractType t₃} (unownedSplit x x₁ x₂ x₃) (symCompat consis) rewrite (eqContractTypes x₂ x) =
+-- t₁ => t₁ / t₃ because t₃ is Unowned.
+splittingRespectsHeap {Γ} {T} {contractType t₁} {contractType t₂} {contractType t₃} (unownedSplit {Γ} {t₁} {t₂} {t₃} x x₁ x₂ x₃) (symCompat consis) rewrite (eqContractTypes x₂ x) | (proj₂ (typesCompatibleWithContractsAreContracts {T} {t₂} consis))  =
   let
-    val TIsContractType = typesCompatibleWithContractsAreContracts consis
-    compatTypes = (compatibleContractsHaveSameNames consis (proj₂ TIsContractType))
+    TIsContractTypeEx = typesCompatibleWithContractsAreContracts {T} consis -- T is a contractType.
+    TContractType = proj₁ TIsContractTypeEx
+    TIsContractType = proj₂ TIsContractTypeEx
+    compatTypes = (compatibleContractsHaveSameNames consis TIsContractType)
+    C = Tc.contractName t₃
+    C' = Tc.contractName TContractType
   in 
-    ⟨ symCompat consis , symCompat {!unownedCompat x₃ ?!} ⟩
+    ⟨ symCompat ( Eq.subst (λ a → contractType t₂ ⟷ a) TIsContractType consis) , symCompat (unownedCompat x₃ (Eq.trans (Eq.sym x₁) compatTypes)) ⟩
 
 -- t1 => t1 / Unowned
 splittingRespectsHeap {Γ} {(contractType (tc C perm))} {contractType (tc C' perm')} {contractType t₂} {contractType t₃} (unownedSplit x x₁ x₂ x₃) (unownedCompat x₄ x₅) =
