@@ -110,7 +110,6 @@ public class SerializationState {
     public void mapReturnedObject(ObsidianSerialized obj, boolean returnedReferenceIsOwned) {
         loadReturnedObjectsMap(stub);
 
-        System.out.println("mapReturnedObject: " + obj.__getGUID() + ". new external ownership status: " + returnedReferenceIsOwned);
         returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
     }
 
@@ -118,27 +117,15 @@ public class SerializationState {
         loadReturnedObjectsMap(stub);
         for (Map.Entry<String, ReturnedReferenceState> item : returnedObjectClassMap.entrySet()) {
             String key = item.getKey();
-            if (key.equals(guid)) {
-                System.out.println("Are equal");
-            } else {
-                System.out.println("Are not equal");
-            }
             ReturnedReferenceState value = item.getValue();
-            System.out.println("Key: " + key + ", Value: " + value);
         }
-        System.out.println("GUID: " + guid);
-        System.out.println("Return from map: " + returnedObjectClassMap.get(guid));
         return returnedObjectClassMap.get(guid);
     }
 
     public void archiveReturnedObjectsMap (ChaincodeStub stub) {
-        System.out.println("archiveReturnedObjectsMap 2");
-
-
         if (returnedObjectClassMap != null) {
             // Archive the number of returned objects.
             stub.putStringState("NumReturnedObjects", Integer.toString(returnedObjectClassMap.size()));
-
 
             int i = 0;
             for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
@@ -181,8 +168,6 @@ public class SerializationState {
 
                     String isOwnedStr = stub.getStringState(isOwnedKey);
                     boolean isOwned = isOwnedStr.equals("true");
-
-                    System.out.println("loaded returned object " + guid + ": " + c + "; is owned: " + isOwnedStr);
 
                     ReturnedReferenceState refState = new ReturnedReferenceState(c, isOwned);
                     returnedObjectClassMap.put(guid, refState);
