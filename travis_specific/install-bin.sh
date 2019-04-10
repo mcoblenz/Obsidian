@@ -6,7 +6,7 @@
 #
 
 # if version not passed in, default to latest released version
-export VERSION=1.4.0
+export VERSION=$(docker run --rm hyperledger/fabric-tools:latest peer version | sed -ne 's/ Version: //p' | head -1)
 # if ca version not passed in, default to latest released version
 export CA_VERSION=$VERSION
 # current version of thirdparty images (couchdb, kafka and zookeeper) released
