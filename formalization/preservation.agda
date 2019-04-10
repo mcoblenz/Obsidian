@@ -1,5 +1,14 @@
-open import silica
-open import heapProperties
+open import Silica
+open import HeapProperties
+import Context
+
+open TypeEnvContext
+
+open import Data.Nat
+open import Relation.Nullary using (¬_; Dec; yes; no)
+open import Data.Empty
+
+
 
 data Preservation : Expr → Set where
   pres : ∀ {e e' : Expr}
