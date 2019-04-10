@@ -20,6 +20,7 @@ open import Data.List.Membership.DecSetoid ≡-decSetoid
 open import Data.List.Any
 open import Data.List.All
 open import Data.Empty
+open import Data.Sum
 
 import Data.AVL.Sets
 module StateSet = Data.AVL.Sets Data.Nat.Properties.<-strictTotalOrder
@@ -574,6 +575,7 @@ splittingRespectsHeap {Γ} {.(contractType _)} {contractType (tc _ (S _))} {cont
 
 
 record RefTypes : Set where
+  constructor rt
   field
     ctxTypes : List Type -- Corresponds to types from Δ
     envTypes : List Type -- Corresponds to types from ρ
@@ -614,12 +616,12 @@ data IsConnected : RefTypes → Set where
                   → IsConnected R
 
   nonEmptyCtxTypes : ∀ {R D T T'}
-                   → RefTypes.ctxTypes R ≡ T ∷ D
+                   → RefTypes.ctxTypes R ≡ (T ∷ D)
                    → All (λ T' → T ⟷ T') D
                    → All (λ T' → T ⟷ T') (RefTypes.envTypes R)
                    → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)
                    → IsConnected (record {ctxTypes = D ; envTypes = RefTypes.envTypes R ; fieldTypes = RefTypes.fieldTypes R})
-                   -----------------------------------------------
+                   ----------------------------------------------
                    → IsConnected R
                        
 
@@ -631,13 +633,13 @@ objTypes (Δ , o' ⦂ T) o with o ≟ o'
 
 envTypesHelper : IndirectRefEnv → TypeEnv → ObjectRef → List Type
 envTypesHelper IndirectRefContext.∅  Δ o = []
-envTypesHelper (IndirectRefContext._,_⦂_ ρ l (objRef o')) Δ o with (compare o' o) | (TypeEnvContext.lookup Δ l)
-...                                             | equal _ | just T =  (T ∷ envTypesHelper ρ Δ o)
+envTypesHelper (IndirectRefContext._,_⦂_ ρ l (objRef o')) Δ o with (o' ≟ o) | (TypeEnvContext.lookup Δ l)
+...                                             | yes _ | just T =  (T ∷ (envTypesHelper ρ Δ o))
 ...                                             | _ | _ = envTypesHelper ρ Δ o
 envTypesHelper (IndirectRefContext._,_⦂_ ρ l v) Δ o = envTypesHelper ρ Δ o
 
 envTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
-envTypes Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) (StaticEnv.locEnv Δ) o
+envTypes Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) (StaticEnv.locEnv Δ) o 
 
 refFieldTypesHelper : ObjectRefEnv → StaticEnv → ObjectRef → List Type
 refFieldTypesHelper ObjectRefContext.∅ Δ o = []
@@ -648,6 +650,26 @@ refFieldTypes Σ Δ o = refFieldTypesHelper (RuntimeEnv.μ Σ) Δ o
 
 refTypes : RuntimeEnv → StaticEnv → ObjectRef → RefTypes
 refTypes Σ Δ o = record {ctxTypes = (objTypes (StaticEnv.objEnv Δ) o) ; envTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
+
+envTypesExtendingEnv : ∀ {Σ Δ} → ∀ {o : ObjectRef} → ∀ {l T}
+                       → let
+                         E = envTypes Σ Δ o
+                         E' = envTypes Σ (Δ ,ₗ l ⦂ T) o
+                         in
+                         (E' ≡ E) ⊎ (E' ≡ T ∷ E)
+envTypesExtendingEnv{Σ} {Δ} {l} {T} {o} with (TypeEnvContext.lookup (StaticEnv.locEnv Δ) l)
+...                                           | just T' = inj₂ {!!}
+...                                           | _ =  inj₁ {!refl!}
+
+refTypesExtendingEnv : ∀ {Σ Δ l T o}
+                       → let
+                         R = refTypes Σ Δ o
+                         R' = refTypes Σ (Δ ,ₗ l ⦂ T) o
+                         in
+                           (R' ≡ R) ⊎ (R' ≡ rt (RefTypes.ctxTypes R) (T ∷ (RefTypes.envTypes R)) (RefTypes.fieldTypes R))
+refTypesExtendingEnv {Σ} {Δ} {l} {T} {o} with (TypeEnvContext.lookup (StaticEnv.locEnv Δ) l)
+...                                           | just T' = inj₂ {!!}
+...                                           | _ =  inj₁ {!refl!}
 
 {-
 compatibleStaticExtensionsOK : ∀ {Σ Δ o l T}
@@ -672,13 +694,17 @@ splitReplacementEnvFieldOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
                              → IsConnectedEnvAndField (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
 splitReplacementEnvFieldOK = {!!}
 
+-- The idea here is that the expression in question is of type T₂, so the reference left in the heap is of type T₃.
 splitReplacementOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
                      → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                      → Γ ⊢ T₁ ⇛ T₂ / T₃
                      → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
-splitReplacementOK (emptyCtxTypes eq envFieldConnected) spl =
+splitReplacementOK {Γ} {Σ} {Δ} {o} {l} {T₁} {T₂} {T₃} rConnected@(emptyCtxTypes {R} eq envFieldConnected) spl =
+  let
+    R' = (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o) -- objTypes (StaticEnv.objEnv (Δ ,ₗ l ⦂ T₃) Context., o ⦂ T₃) o
+  in
   -- The new obj context includes o, so it is no longer empty.
-  nonEmptyCtxTypes
+  nonEmptyCtxTypes {R'}
     {!refl!} 
     [] -- o is the only thing in the object context, so the rest of the list is empty and trivially is connected.
     {!!} -- show that o is connected to all the prior env types
