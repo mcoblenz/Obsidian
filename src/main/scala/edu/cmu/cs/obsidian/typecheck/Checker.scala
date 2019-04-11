@@ -1488,8 +1488,14 @@ private def checkStatement(
                                     np.permission match {
                                         case Owned() =>
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
-                                            val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
-                                            (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                            t match {
+                                                case StateType(_, specificStates, _) =>
+                                                    val typeFalse = StateType(np.contractName, specificStates - state._1, np.isRemote)
+                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                                case _ =>
+                                                    val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
+                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                            }
                                         case Unowned() => (contextPrime, contextPrime)
                                         case Shared() | Inferred() =>
                                             // If it's Inferred(), there's going to be another error later. For now, be optimistic.
