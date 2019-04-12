@@ -425,6 +425,7 @@ module Silica where
 
 
   record RuntimeEnv : Set where
+    constructor re
     field
       μ : ObjectRefEnv
       ρ : IndirectRefEnv

@@ -1,4 +1,5 @@
-{-# OPTIONS --allow-unsolved-metas #-}
+-- {-# OPTIONS --allow-unsolved-metas #-}
+{-# OPTIONS --show-implicit #-}
 
 module HeapProperties where
 
@@ -11,10 +12,12 @@ module HeapProperties where
   import Data.AVL.Sets
   open import Data.List.All
   open import Data.Sum
+  open import Data.Maybe
 
   open import Data.List.Membership.DecSetoid ≡-decSetoid 
   open import Data.List.Relation.Unary.Any
 
+  open import Data.Empty
 
   open TypeEnvContext
 
@@ -91,12 +94,6 @@ module HeapProperties where
                           → Γ ⊢ t₁ ⇛ t₂ / t₃
                           → T ⟷ t₁
                           → (T ⟷ t₂) × (T ⟷ t₃)
-
-  {-
-  splittingRespectsHeap {Γ} {base Void} {t₁} {t₂} {t₃} voidSplit consis = ⟨ consis , consis ⟩
-  splittingRespectsHeap {Γ} {base Boolean} {t₁} {t₂} {t₃} spl consis = {!!}
-  splittingRespectsHeap {Γ} {contractType x} {t₁} {t₂} {t₃} spl consis = {!!}
-  -}
 
   splittingRespectsHeap {Γ} {T} {(base Void)} {(base Void)} {(base Void)} voidSplit consis = ⟨ consis , consis ⟩
   splittingRespectsHeap {Γ} {T} {.(base Boolean)} {.(base Boolean)} {.(base Boolean)} booleanSplit consis = ⟨ consis , consis ⟩
@@ -190,14 +187,17 @@ module HeapProperties where
   objTypes : TypeEnv → ObjectRef → List Type
   objTypes ∅ _ = []
   objTypes (Δ , o' ⦂ T) o with o ≟ o'
-  ...                    | yes eq = T ∷ (objTypes Δ o) 
+  ...                    | yes eq = [ T ]
   ...                    | no nEq = objTypes Δ o
 
   envTypesHelper : IndirectRefEnv → TypeEnv → ObjectRef → List Type
   envTypesHelper IndirectRefContext.∅  Δ o = []
+
+
   envTypesHelper (IndirectRefContext._,_⦂_ ρ l (objRef o')) Δ o with (o' ≟ o) | (TypeEnvContext.lookup Δ l)
   ...                                             | yes _ | just T =  (T ∷ (envTypesHelper ρ Δ o))
   ...                                             | _ | _ = envTypesHelper ρ Δ o
+
   envTypesHelper (IndirectRefContext._,_⦂_ ρ l v) Δ o = envTypesHelper ρ Δ o
 
   envTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
@@ -213,15 +213,92 @@ module HeapProperties where
   refTypes : RuntimeEnv → StaticEnv → ObjectRef → RefTypes
   refTypes Σ Δ o = record {ctxTypes = (objTypes (StaticEnv.objEnv Δ) o) ; envTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
 
+  objTypesExtension : ∀ {Δ o T}
+                      → objTypes (Δ , o ⦂ T) o ≡ [ T ]
+  objTypesExtension {Δ} {o} {T} with o ≟ o
+  ... | yes oEq = refl
+  ... | no oNeq = ⊥-elim (oNeq refl)
+
+-- Need to prove this by induction over ρ!
+  envTypesWithEmptyListGivesEmpty : ∀ {Δ M Φ Ψ o}
+                                    → envTypes (re M IndirectRefContext.∅ Φ Ψ) Δ o ≡ []
+  envTypesWithEmptyListGivesEmpty = refl
+
+  envTypesWithOneItemMismatch : ∀ {M Φ Ψ Δ l o o'}
+                              → ¬ (o ≡ o')
+                              → envTypes (re M (IndirectRefContext.∅ Context., l ⦂ objRef o') Φ Ψ) Δ o ≡ []
+                              
+  envTypesWithOneItemMismatch {M} {Φ} {Ψ} {Δ} {l} {o} {o'} nEq with (o' ≟ o)
+  envTypesWithOneItemMismatch {M} {Φ} {Ψ} {Δ} {l} {o} {o'} nEq | yes p = ⊥-elim (nEq (Eq.sym p))
+  envTypesWithOneItemMismatch {M} {Φ} {Ψ} {Δ} {l} {o} {o'} nEq | no ¬p = refl
+
+
+
+  envTypesExtensionExtendingΔ : ∀ {Σ Δ l T o R}
+                              → envTypes Σ Δ o ≡ R
+                              → (envTypes Σ ((Δ ,ₗ l ⦂ T) ,ₒ o ⦂ T) o ≡ R) ⊎  (envTypes Σ ((Δ ,ₗ l ⦂ T) ,ₒ o ⦂ T) o ≡ T ∷ R)
+  envTypesExtensionExtendingΔ {re _ IndirectRefContext.∅ _ _} {Δ} {l} {T} {o} {R} eq = inj₁ eq
+
+{-
+  envTypesExtensionExtendingΔ {re Μ (Ρ Context., l' ⦂ (objRef o')) Φ Ψ} {Δ} {l} {T} {o} {R} eq with l ≟ l'
+  ... | yes lEq =
+                let
+                  rest = envTypesExtensionExtendingΔ {re Μ Ρ Φ Ψ} {Δ} {l} {T} {o} {!!}
+                in 
+                  inj₂ {!!}
+  ... | no lNeq = envTypesExtensionExtendingΔ eq
+  envTypesExtensionExtendingΔ {re Μ (Ρ Context., l' ⦂ _) Φ Ψ} {Δ} {l} {T} {o} {R} eq = envTypesExtensionExtendingΔ {re Μ (Ρ Context., l' ⦂ _) Φ Ψ} eq 
+ -}
+
+
+  consListEq : ∀ {A : Set}
+               → ∀ {R R' : List A }
+               → ∀ {T : A}
+               → R ≡ R'
+               → _≡_ {_} {List A} (T ∷ R) (T ∷ R')
+  consListEq {A} {[]} {[]} {T₁} refl = refl
+  consListEq {A} {[]} {x ∷ R'} {T₁} ()
+  consListEq {A} {x ∷ R} {x' ∷ R'} {T} refl = refl
+
+
+  envTypesExtendingρ : ∀ {Μ Ρ Φ Ψ Δ l o o'} {R : List Type}
+                                    → envTypes (re Μ Ρ Φ Ψ) Δ o ≡ R
+                                    → (envTypes (re Μ (Ρ Context., l ⦂ (objRef o')) Φ Ψ) Δ o ≡ R) ⊎
+                                                 (∃[ T ] (envTypes  (re Μ (Ρ Context., l ⦂ (objRef o')) Φ Ψ) Δ o ≡ T ∷ R))
+  envTypesExtendingρ {M} {Ρ} {Φ} {Ψ} {Δ} {l} {o} {o'} {R} eqR with (o' ≟ o) 
+  ... | no oNeq = inj₁ eqR
+  ... | yes oEq with (TypeEnvContext.lookup (StaticEnv.locEnv Δ) l)
+  envTypesExtendingρ {M} {Ρ} {Φ} {Ψ} {Δ} {l} {o} {o'} {R} eqR  | yes oEq | just T =
+    let
+      substFun : List Type → Set
+      substFun a = _≡_ {_} {List Type} (T ∷ a) (T ∷ R)
+      substResult = Eq.subst substFun (Eq.sym eqR) refl
+    in
+      inj₂ ⟨ T , substResult ⟩
+  envTypesExtendingρ {M} {Ρ} {Φ} {Ψ} {Δ} {l} {o} {o'} {R} eqR | yes oEq | nothing = inj₁ eqR
+ 
+
+  -- If we extend the location environment
+  {-
   envTypesExtendingEnv : ∀ {Σ Δ} → ∀ {o : ObjectRef} → ∀ {l} → ∀ {T : Type}
                          → let
                            E = envTypes Σ Δ o
                            E' = envTypes Σ (Δ ,ₗ l ⦂ T) o
                            in
                            (E' ≡ E) ⊎ (E' ≡ T ∷ E)
-  envTypesExtendingEnv{Σ} {Δ} {l} {T} {o} with (TypeEnvContext.lookup (StaticEnv.locEnv Δ) l)
-  ...                                           | just T' = inj₂ {!!}
-  ...                                           | _ =  inj₁ {!!}
+  envTypesExtendingEnv {re _ Context.∅ _ _} {Δ} {o} {l} {T} = inj₁ refl
+  envTypesExtendingEnv {re _ (qq Context., o' ⦂ T') _ _} {Δ} {o} {l} {T} with (o' ≟ o) | (TypeEnvContext.lookup (StaticEnv.locEnv Δ) l)
+  ... | yes _ | just T'' = inj₂ {!!}
+  ... | no _ | _ = envTypesExtendingEnv
+  
+
+  refFieldTypesExtendingEnv :  ∀ {Σ Δ} → ∀ {o : ObjectRef} → ∀ {l} → ∀ {T : Type}
+                         → let
+                           F = refFieldTypes Σ Δ o
+                           F' = refFieldTypes Σ (Δ ,ₗ l ⦂ T) o
+                          in
+                            F ≡ F'
+  refFieldTypesExtendingEnv = refl  
 
   refTypesExtendingEnv : ∀ {Σ Δ l T o}
                          → let
@@ -229,9 +306,8 @@ module HeapProperties where
                            R' = refTypes Σ (Δ ,ₗ l ⦂ T) o
                            in
                              (R' ≡ R) ⊎ (R' ≡ rt (RefTypes.ctxTypes R) (T ∷ (RefTypes.envTypes R)) (RefTypes.fieldTypes R))
-  refTypesExtendingEnv {Σ} {Δ} {l} {T} {o} with (TypeEnvContext.lookup (StaticEnv.locEnv Δ) l)
-  ...                                           | just T' = inj₂ {!!}
-  ...                                           | _ =  inj₁ {!refl!}
+  refTypesExtendingEnv {Σ} {Δ} {l} {T} {o}  = {!envTypesExtendingEnv!}
+-}
 
   {-
   compatibleStaticExtensionsOK : ∀ {Σ Δ o l T}
@@ -256,6 +332,7 @@ module HeapProperties where
                                → IsConnectedEnvAndField (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
   splitReplacementEnvFieldOK = {!!}
 
+  -- Previously, all the types aliasing o were connected. Now, we've extended the context due to a split, and we need to show we still have connectivity.
   -- The idea here is that the expression in question is of type T₂, so the reference left in the heap is of type T₃.
   splitReplacementOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
                        → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
@@ -263,12 +340,23 @@ module HeapProperties where
                        → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
   splitReplacementOK {Γ} {Σ} {Δ} {o} {l} {T₁} {T₂} {T₃} rConnected@(emptyCtxTypes {R} eq envFieldConnected) spl =
     let
-      R' = (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o) -- objTypes (StaticEnv.objEnv (Δ ,ₗ l ⦂ T₃) Context., o ⦂ T₃) o
+      Δ' = ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃)
+      R' = (refTypes Σ Δ' o) 
+      ot = objTypes (StaticEnv.objEnv Δ) o
+      otIsEmpty : ot ≡ []
+      otIsEmpty = eq
+      ot' = objTypes (StaticEnv.objEnv Δ') o
+      otRelationship = ot' ≡ [ T₃ ]
+      otRelationship = refl {_} {_} {_}
+
+
+      
     in
     -- The new obj context includes o, so it is no longer empty.
-    nonEmptyCtxTypes {R'} {_} {_}
+     
+    nonEmptyCtxTypes {R = R'} {D = []} {T = T₃} -- T
     
-      {!refl!} 
+      (objTypesExtension {_} {_} {_}) -- 
       [] -- o is the only thing in the object context, so the rest of the list is empty and trivially is connected.
       {!!} -- show that o is connected to all the prior env types
       {!
