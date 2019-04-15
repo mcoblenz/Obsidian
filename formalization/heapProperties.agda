@@ -11,6 +11,7 @@ module HeapProperties where
 
   import Data.AVL.Sets
   open import Data.List.All
+  import Data.List.Properties
   open import Data.Sum
   open import Data.Maybe
 
@@ -136,7 +137,7 @@ module HeapProperties where
   record RefTypes : Set where
     constructor rt
     field
-      ctxTypes : List Type -- Corresponds to types from Δ
+      ctxTypes : List Type -- Corresponds to types from the o's in Δ.
       envTypes : List Type -- Corresponds to types from ρ
       fieldTypes : List Type -- Corresponds to types from fields inside μ
 
@@ -185,11 +186,11 @@ module HeapProperties where
 
 
 
-  objTypes : TypeEnv → ObjectRef → List Type
-  objTypes ∅ _ = []
-  objTypes (Δ , o' ⦂ T) o with o ≟ o'
+  ctxTypes : TypeEnv → ObjectRef → List Type
+  ctxTypes ∅ _ = []
+  ctxTypes (Δ , o' ⦂ T) o with o ≟ o'
   ...                    | yes eq = [ T ]
-  ...                    | no nEq = objTypes Δ o
+  ...                    | no nEq = ctxTypes Δ o
 
   envTypesHelper : IndirectRefEnv → TypeEnv → ObjectRef → List Type
   envTypesHelper IndirectRefContext.∅  Δ o = []
@@ -212,11 +213,11 @@ module HeapProperties where
   refFieldTypes Σ Δ o = refFieldTypesHelper (RuntimeEnv.μ Σ) Δ o
 
   refTypes : RuntimeEnv → StaticEnv → ObjectRef → RefTypes
-  refTypes Σ Δ o = record {ctxTypes = (objTypes (StaticEnv.objEnv Δ) o) ; envTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
+  refTypes Σ Δ o = record {ctxTypes = (ctxTypes (StaticEnv.objEnv Δ) o) ; envTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
 
-  objTypesExtension : ∀ {Δ o T}
-                      → objTypes (Δ , o ⦂ T) o ≡ [ T ]
-  objTypesExtension {Δ} {o} {T} with o ≟ o
+  ctxTypesExtension : ∀ {Δ o T}
+                      → ctxTypes (Δ , o ⦂ T) o ≡ [ T ]
+  ctxTypesExtension {Δ} {o} {T} with o ≟ o
   ... | yes oEq = refl
   ... | no oNeq = ⊥-elim (oNeq refl)
 
@@ -288,15 +289,16 @@ module HeapProperties where
                                            → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                                            → Γ ⊢ T₁ ⇛ T₂ / T₃
                                            → All (_⟷_ T₃) (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
-  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl with (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
-  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {.(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl | [] =
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl =
     let
       origEnvTypes = envTypes Σ (Δ ,ₗ l ⦂ T₁) o
-    in
-      {![]!}
-  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {.(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl | x ∷ qq =
-    let
-      origEnvTypes = envTypes Σ (Δ ,ₗ l ⦂ T₁) o
+      -- The only possible thing that can be in the new envTypes is T₃ because it was previously empty and we extended Δ with o ⦂ T₃.
+      newEnvTypes = (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
+      foo = ctxTypesExtension {StaticEnv.locEnv (Δ ,ₗ l ⦂ T₃)} {o} {T₃}
+      newEnvTypesIsJustT₃ : newEnvTypes ≡ [ T₃ ]
+      newEnvTypesIsJustT₃ = {!foo!}
+      -- It suffices to prove that T₃ is connected to T₃.
+      T₃CompatibleWithT₃ = proj₂ (splittingRespectsHeap spl {!!})
     in
       {!!}
 
@@ -365,10 +367,10 @@ module HeapProperties where
     let
       Δ' = ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃)
       R' = (refTypes Σ Δ' o) 
-      ot = objTypes (StaticEnv.objEnv Δ) o
+      ot = ctxTypes (StaticEnv.objEnv Δ) o
       otIsEmpty : ot ≡ []
       otIsEmpty = eq
-      ot' = objTypes (StaticEnv.objEnv Δ') o
+      ot' = ctxTypes (StaticEnv.objEnv Δ') o
 --      otRelationship = ot' ≡ [ T₃ ]
 --      otRelationship = refl {_} {_} {_}
     in
@@ -376,7 +378,7 @@ module HeapProperties where
      
     nonEmptyCtxTypes {R = R'} {D = []} {T = T₃} -- T
     
-      (objTypesExtension {StaticEnv.objEnv Δ} {o} {T₃}) -- R ≡ (T ∷ D)
+      (ctxTypesExtension {StaticEnv.objEnv Δ} {o} {T₃}) -- R ≡ (T ∷ D)
       [] -- o is the only thing in the object context, so the rest of the list is empty and trivially is connected.
       (
         -- Need to show o is connected to everything in (envTypes  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
