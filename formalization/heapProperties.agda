@@ -184,6 +184,7 @@ module HeapProperties where
                      → IsConnected R
 
 
+
   objTypes : TypeEnv → ObjectRef → List Type
   objTypes ∅ _ = []
   objTypes (Δ , o' ⦂ T) o with o ≟ o'
@@ -234,16 +235,20 @@ module HeapProperties where
 
 
 
+  -- What happens when you extend Δ depends on what's in ρ. If l is in ρ, then we add T; otherwise we don't.
+  {-
   envTypesExtensionExtendingΔ : ∀ {Σ Δ l T o R}
-                              → envTypes Σ Δ o ≡ R
-                              → (envTypes Σ ((Δ ,ₗ l ⦂ T) ,ₒ o ⦂ T) o ≡ R) ⊎  (envTypes Σ ((Δ ,ₗ l ⦂ T) ,ₒ o ⦂ T) o ≡ T ∷ R)
+                              → envTypes Σ (Δ ,ₗ l ⦂ T₁) o ≡ R
+                              → envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o ⊆ T₃ ∷ T
+                              → (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o ≡ R) -- case 1: l does not occur in ρ
+                                ⊎  (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o ≡ T ∷ R) -- case 2: l occurs in ρ. Want [T₃/T₁] R.
   envTypesExtensionExtendingΔ {re _ IndirectRefContext.∅ _ _} {Δ} {l} {T} {o} {R} eq = inj₁ eq
-
-{-
   envTypesExtensionExtendingΔ {re Μ (Ρ Context., l' ⦂ (objRef o')) Φ Ψ} {Δ} {l} {T} {o} {R} eq with l ≟ l'
   ... | yes lEq =
+                -- I'm doing recursion on Δ, but envTypes operates by recursion on ρ. In this case, ρ ≡ Ρ , l' ⦂ (objRef o').
                 let
-                  rest = envTypesExtensionExtendingΔ {re Μ Ρ Φ Ψ} {Δ} {l} {T} {o} {!!}
+                  
+                  rest = envTypesExtensionExtendingΔ {re Μ Ρ Φ Ψ} {Δ} {l} {T} {o} {_} {!!}
                 in 
                   inj₂ {!!}
   ... | no lNeq = envTypesExtensionExtendingΔ eq
@@ -271,13 +276,31 @@ module HeapProperties where
   envTypesExtendingρ {M} {Ρ} {Φ} {Ψ} {Δ} {l} {o} {o'} {R} eqR  | yes oEq | just T =
     let
       substFun : List Type → Set
-      substFun a = _≡_ {_} {List Type} (T ∷ a) (T ∷ R)
+--      substFun a = _≡_ {_} {List Type} (T ∷ a) (T ∷ R) -- Is specifying {List Type} no longer necessary? why??
+      substFun a = (T ∷ a) ≡ (T ∷ R)
       substResult = Eq.subst substFun (Eq.sym eqR) refl
     in
       inj₂ ⟨ T , substResult ⟩
   envTypesExtendingρ {M} {Ρ} {Φ} {Ψ} {Δ} {l} {o} {o'} {R} eqR | yes oEq | nothing = inj₁ eqR
- 
 
+-- I know that proving this suffices.
+  envTypesExtensionMaintainsConnectivity : ∀ {Σ Δ Γ T₁ T₂ T₃ l o}
+                                           → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                                           → Γ ⊢ T₁ ⇛ T₂ / T₃
+                                           → All (_⟷_ T₃) (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl with (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {.(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl | [] =
+    let
+      origEnvTypes = envTypes Σ (Δ ,ₗ l ⦂ T₁) o
+    in
+      {![]!}
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {.(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl | x ∷ qq =
+    let
+      origEnvTypes = envTypes Σ (Δ ,ₗ l ⦂ T₁) o
+    in
+      {!!}
+
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (nonEmptyCtxTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} {D = D} {T = T} x x₁ x₂ x₃ connected) spl = {!!}
   -- If we extend the location environment
   {-
   envTypesExtendingEnv : ∀ {Σ Δ} → ∀ {o : ObjectRef} → ∀ {l} → ∀ {T : Type}
@@ -346,19 +369,21 @@ module HeapProperties where
       otIsEmpty : ot ≡ []
       otIsEmpty = eq
       ot' = objTypes (StaticEnv.objEnv Δ') o
-      otRelationship = ot' ≡ [ T₃ ]
-      otRelationship = refl {_} {_} {_}
-
-
-      
+--      otRelationship = ot' ≡ [ T₃ ]
+--      otRelationship = refl {_} {_} {_}
     in
     -- The new obj context includes o, so it is no longer empty.
      
     nonEmptyCtxTypes {R = R'} {D = []} {T = T₃} -- T
     
-      (objTypesExtension {_} {_} {_}) -- 
+      (objTypesExtension {StaticEnv.objEnv Δ} {o} {T₃}) -- R ≡ (T ∷ D)
       [] -- o is the only thing in the object context, so the rest of the list is empty and trivially is connected.
-      {!!} -- show that o is connected to all the prior env types
+      (
+        -- Need to show o is connected to everything in (envTypes  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
+        -- But I know rConnnected: IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+        --   and specifically IsConnectedEnvAndField (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+      envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} rConnected spl
+      ) -- show that o is connected to all the prior and new env types
       {!
         -- show that o is connected to all prior field types.
         -- Plan: all prior field types were compatible with T₁, so they must still be compatible with both T₁ and T₃.
