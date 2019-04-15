@@ -1,4 +1,4 @@
--- {-# OPTIONS --allow-unsolved-metas #-}
+{-# OPTIONS --allow-unsolved-metas #-}
 {-# OPTIONS --show-implicit #-}
 
 module HeapProperties where
@@ -137,9 +137,12 @@ module HeapProperties where
   record RefTypes : Set where
     constructor rt
     field
-      ctxTypes : List Type -- Corresponds to types from the o's in Δ.
-      envTypes : List Type -- Corresponds to types from ρ
+      oTypes : List Type -- Corresponds to types from the o's in Δ.
+      lTypes : List Type -- Corresponds to types from ρ
       fieldTypes : List Type -- Corresponds to types from fields inside μ
+
+  allRefTypes : RefTypes → List Type
+  allRefTypes (rt o l f) = o ++ l ++ f
 
   data IsConnectedTypeList : List Type → Set where
     emptyTypeList : ∀ {D}
@@ -155,13 +158,13 @@ module HeapProperties where
 
   data IsConnectedEnvAndField : RefTypes → Set where
     emptyEnvTypes : ∀ {R}
-                    → RefTypes.envTypes R ≡ []
+                    → RefTypes.lTypes R ≡ []
                     → IsConnectedTypeList (RefTypes.fieldTypes R)
                     ----------------------------------------------
                     → IsConnectedEnvAndField R
 
     consEnvTypes : ∀ {R D T}
-                   → RefTypes.envTypes R ≡ T ∷ D
+                   → RefTypes.lTypes R ≡ T ∷ D
                    → All (λ T' → T ⟷ T') D
                    → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)
                    → IsConnectedTypeList (RefTypes.fieldTypes R)
@@ -169,22 +172,20 @@ module HeapProperties where
                    → IsConnectedEnvAndField R
 
   data IsConnected : RefTypes → Set where              
-    emptyCtxTypes : ∀ {R}
-                    → RefTypes.ctxTypes R ≡ []
+    emptyOTypes : ∀ {R}
+                    → RefTypes.oTypes R ≡ []
                     → IsConnectedEnvAndField R
                     ----------------------------
                     → IsConnected R
 
-    nonEmptyCtxTypes : ∀ {R D T}
-                     → RefTypes.ctxTypes R ≡ (T ∷ D)
+    nonEmptyOTypes : ∀ {R D T}
+                     → RefTypes.oTypes R ≡ (T ∷ D)
                      → All (λ T' → T ⟷ T') D
-                     → All (λ T' → T ⟷ T') (RefTypes.envTypes R)
+                     → All (λ T' → T ⟷ T') (RefTypes.lTypes R)
                      → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)
-                     → IsConnected (record {ctxTypes = D ; envTypes = RefTypes.envTypes R ; fieldTypes = RefTypes.fieldTypes R})
+                     → IsConnected (record {oTypes = D ; lTypes = RefTypes.lTypes R ; fieldTypes = RefTypes.fieldTypes R})
                      ----------------------------------------------
                      → IsConnected R
-
-
 
   ctxTypes : TypeEnv → ObjectRef → List Type
   ctxTypes ∅ _ = []
@@ -213,13 +214,16 @@ module HeapProperties where
   refFieldTypes Σ Δ o = refFieldTypesHelper (RuntimeEnv.μ Σ) Δ o
 
   refTypes : RuntimeEnv → StaticEnv → ObjectRef → RefTypes
-  refTypes Σ Δ o = record {ctxTypes = (ctxTypes (StaticEnv.objEnv Δ) o) ; envTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
+  refTypes Σ Δ o = record {oTypes = (ctxTypes (StaticEnv.objEnv Δ) o) ; lTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
 
   ctxTypesExtension : ∀ {Δ o T}
                       → ctxTypes (Δ , o ⦂ T) o ≡ [ T ]
   ctxTypesExtension {Δ} {o} {T} with o ≟ o
   ... | yes oEq = refl
   ... | no oNeq = ⊥-elim (oNeq refl)
+
+-- XXX  locExtension : ∀ {Δ l T}
+--                 → ctxTypes (StaticEnv.ctxTypes Δ
 
 -- Need to prove this by induction over ρ!
   envTypesWithEmptyListGivesEmpty : ∀ {Δ M Φ Ψ o}
@@ -284,25 +288,24 @@ module HeapProperties where
       inj₂ ⟨ T , substResult ⟩
   envTypesExtendingρ {M} {Ρ} {Φ} {Ψ} {Δ} {l} {o} {o'} {R} eqR | yes oEq | nothing = inj₁ eqR
 
+
 -- I know that proving this suffices.
   envTypesExtensionMaintainsConnectivity : ∀ {Σ Δ Γ T₁ T₂ T₃ l o}
                                            → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                                            → Γ ⊢ T₁ ⇛ T₂ / T₃
                                            → All (_⟷_ T₃) (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
-  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyCtxTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} ctxTypesEmpty envFieldConnected) spl =
-    let
-      origEnvTypes = envTypes Σ (Δ ,ₗ l ⦂ T₁) o
-      -- The only possible thing that can be in the new envTypes is T₃ because it was previously empty and we extended Δ with o ⦂ T₃.
-      newEnvTypes = (envTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
-      foo = ctxTypesExtension {StaticEnv.locEnv (Δ ,ₗ l ⦂ T₃)} {o} {T₃}
-      newEnvTypesIsJustT₃ : newEnvTypes ≡ [ T₃ ]
-      newEnvTypesIsJustT₃ = {!foo!}
-      -- It suffices to prove that T₃ is connected to T₃.
-      T₃CompatibleWithT₃ = proj₂ (splittingRespectsHeap spl {!!})
-    in
-      {!!}
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o}
+    (emptyOTypes
+      {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)}
+      oTypesEmpty
+      (emptyEnvTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} lTypesEmpty fieldTypesConnected)
+    )
+    spl =
+      -- empty O types, empty env types, and field types are connected. The new o types will be just [o : T₃].
+        {!nonEmptyOTypes ? ? ? ? ? !}?
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (emptyOTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} oTypesEmpty (consEnvTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} {D = D} {T = T} x x₁ x₂ x₃)) spl = {!!}
 
-  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (nonEmptyCtxTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} {D = D} {T = T} x x₁ x₂ x₃ connected) spl = {!!}
+  envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} (nonEmptyOTypes {R = .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o)} {D = D} {T = T} x x₁ x₂ x₃ connected) spl = {!!}
   -- If we extend the location environment
   {-
   envTypesExtendingEnv : ∀ {Σ Δ} → ∀ {o : ObjectRef} → ∀ {l} → ∀ {T : Type}
@@ -339,9 +342,9 @@ module HeapProperties where
                                  → IsConnected (refTypes Σ Δ o)
                                  → (∀ T' → ∀ l' → (StaticEnv.locEnv Δ) ∋ l' ⦂ T' → T' ⟷ T)
                                  → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T) o)
-  compatibleStaticExtensionsOK (emptyCtxTypes eq (emptyEnvTypes eq' conn)) compat = {!!}
-  compatibleStaticExtensionsOK (emptyCtxTypes eq (consEnvTypes x x₁ x₂ x₃)) compat = {!!}
-  compatibleStaticExtensionsOK (nonEmptyCtxTypes x x₁ x₂ x₃ conn) compat = {!!}
+  compatibleStaticExtensionsOK (emptyOTypes eq (emptyEnvTypes eq' conn)) compat = {!!}
+  compatibleStaticExtensionsOK (emptyOTypes eq (consEnvTypes x x₁ x₂ x₃)) compat = {!!}
+  compatibleStaticExtensionsOK (nonEmptyOTypes x x₁ x₂ x₃ conn) compat = {!!}
 
   compatibleDynamicExtensionsOK : ∀ {Σ Δ o o' T}
                                   → IsConnected (refTypes Σ Δ o)
@@ -363,7 +366,8 @@ module HeapProperties where
                        → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                        → Γ ⊢ T₁ ⇛ T₂ / T₃
                        → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
-  splitReplacementOK {Γ} {Σ} {Δ} {o} {l} {T₁} {T₂} {T₃} rConnected@(emptyCtxTypes {R} eq envFieldConnected) spl =
+  splitReplacementOK {Γ} {Σ} {Δ} {o} {l} {T₁} {T₂} {T₃} rConnected@(emptyOTypes {R} eq envFieldConnected) spl =
+    -- In this case, there are no O types yet, but adding o ⦂ T₃ will add one.
     let
       Δ' = ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃)
       R' = (refTypes Σ Δ' o) 
@@ -373,10 +377,12 @@ module HeapProperties where
       ot' = ctxTypes (StaticEnv.objEnv Δ') o
 --      otRelationship = ot' ≡ [ T₃ ]
 --      otRelationship = refl {_} {_} {_}
+      -- ctxTypes was empty before, and we're extending l and o but not x, so it is still empty.
+      -- XXX
     in
-    -- The new obj context includes o, so it is no longer empty.
+      -- The new obj context includes o, so it is no longer empty.
      
-    nonEmptyCtxTypes {R = R'} {D = []} {T = T₃} -- T
+    nonEmptyOTypes {R = R'} {D = []} {T = T₃} -- T
     
       (ctxTypesExtension {StaticEnv.objEnv Δ} {o} {T₃}) -- R ≡ (T ∷ D)
       [] -- o is the only thing in the object context, so the rest of the list is empty and trivially is connected.
@@ -384,7 +390,8 @@ module HeapProperties where
         -- Need to show o is connected to everything in (envTypes  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o)
         -- But I know rConnnected: IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
         --   and specifically IsConnectedEnvAndField (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
-      envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} rConnected spl
+        
+        envTypesExtensionMaintainsConnectivity {Σ} {Δ} {Γ} {T₁} {T₂} {T₃} {l} {o} rConnected spl
       ) -- show that o is connected to all the prior and new env types
       {!
         -- show that o is connected to all prior field types.
@@ -392,7 +399,16 @@ module HeapProperties where
 
   !} 
       {!emptyCtxTypes refl envFieldConnected!} -- show that the rest of the context is all connected
-  splitReplacementOK (nonEmptyCtxTypes eq withinContext withEnv withField restConnected) spl = nonEmptyCtxTypes {!!} withinContext {!!} withField {!!}
+  splitReplacementOK (nonEmptyOTypes eq withinContext withEnv withField restConnected) spl = nonEmptyOTypes {!!} withinContext {!!} withField {!!}
+
+
+{-
+  splitReplacementOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
+                       → IsAllConnected (allRefTypes (refTypes Σ (Δ ,ₗ l ⦂ T₁) o))
+                       → Γ ⊢ T₁ ⇛ T₂ / T₃
+                       → IsAllConnected (allRefTypes (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃) o))
+  splitReplacementOK {Γ} {Σ} {Δ} {o} {l} {T₁} {T₂} {T₃} connected spl = {!!}
+-}
 
   data ReferenceConsistency : RuntimeEnv → StaticEnv → ObjectRef → Set where
     referencesConsistent : ∀ {Σ : RuntimeEnv}
