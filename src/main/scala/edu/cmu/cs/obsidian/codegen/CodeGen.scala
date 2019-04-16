@@ -83,8 +83,8 @@ class CodeGen (val target: Target) {
                                         protobufOuterClassNames: mutable.HashMap[String, String]): Unit = {
         protobufOuterClassNames += (contractNameResolutionMap(contract) -> (packageName + "." + protobufOuterClassName))
 
-        for (d <- contract.declarations if d.isInstanceOf[Contract]) {
-            val innerContract = d.asInstanceOf[Contract]
+        for (d <- contract.declarations if d.isInstanceOf[ObsidianContractImpl]) {
+            val innerContract = d.asInstanceOf[ObsidianContractImpl]
             populateProtobufOuterClassNames(innerContract, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
         }
     }
@@ -104,21 +104,32 @@ class CodeGen (val target: Target) {
 
         assert(program.imports.isEmpty, "Imports should be empty after processing.")
 
+        /* again match on c to check if it is a ObsidianContract or a javaFFIContract
+         */
         for (c <- program.contracts) {
-            populateProtobufOuterClassNames(c, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+            c match{
+                case c: ObsidianContractImpl => populateProtobufOuterClassNames(c, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+                case c: javaFFIContractImpl => ()
+            }
         }
 
+        /* match on c to check which type of contract it is */
         for (c <- program.contracts) {
             // TODO : generate code for interfaces (issue #117)
-            if (!c.isInterface) {
-                val newClass: JDefinedClass = programPackage._class(c.name)
-                val translationContext = makeTranslationContext(c, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
-                translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
+            c match {
+                case c: ObsidianContractImpl =>
+                    (if(!c.isInterface) {
+                        val newClass: JDefinedClass = programPackage._class(c.name)
+                        val translationContext = makeTranslationContext(c, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
+                        translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
 
-                if (c.isImport) {
-                    translateStubContract(c, programPackage, translationContext)
-                }
+                        if (c.isImport) {
+                            translateStubContract(c, programPackage, translationContext)
+                        }
+                })
+                case c: javaFFIContractImpl => ()
             }
+
         }
         model
     }
@@ -1034,7 +1045,7 @@ class CodeGen (val target: Target) {
         }
     }
 
-    private def translateInnerContract(aContract: Contract,
+    private def translateInnerContract(aContract: ObsidianContractImpl,
                                        parent: JDefinedClass,
                                        translationContext: TranslationContext
                                       ): Unit = {
@@ -1446,8 +1457,8 @@ class CodeGen (val target: Target) {
 
         val subcontracts = contract.declarations.filter(d => d.isInstanceOf[Contract])
 
-        for (c <- contract.declarations if c.isInstanceOf[Contract]) {
-            val innerContract: Contract = c.asInstanceOf[Contract]
+        for (c <- contract.declarations if c.isInstanceOf[ObsidianContractImpl]) {
+            val innerContract: ObsidianContractImpl = c.asInstanceOf[ObsidianContractImpl]
             val javaInnerClasses = inClass.classes().asScala
             val javaInnerClassOption = javaInnerClasses.find((c: AbstractJClass) => (c.name().equals(innerContract.name)))
 
@@ -1920,8 +1931,11 @@ class CodeGen (val target: Target) {
                     aContract: Contract): Unit = {
         declaration match {
             /* the main contract has special generated code, so many functions are different */
-            case (c: Constructor) =>
-                translateConstructor(c, newClass, translationContext, aContract)
+            case (c: Constructor) => aContract match{
+              case obsContract: ObsidianContractImpl => translateConstructor(c, newClass, translationContext, obsContract)
+              case javaContract: javaFFIContractImpl => ()
+            }
+
             case (f: Field) =>
                 translateFieldDecl(f, newClass)
             case (t: Transaction) =>
@@ -1929,12 +1943,19 @@ class CodeGen (val target: Target) {
                 if (aContract.isMain) {
                     mainTransactions.add(t)
                 }
-            case (s@State(_, _, _)) =>
-                translateStateDecl(s, aContract, newClass, translationContext)
-            case (c@Contract(_, _, _,_, _, _)) => translateInnerContract(c, newClass, translationContext)
+            case (s@State(_, _, _)) => aContract match {
+              case obsContract: ObsidianContractImpl => translateStateDecl(s, obsContract, newClass, translationContext)
+              case javaContract: javaFFIContractImpl => ()
+            }
+
+            case (c@ObsidianContractImpl(_, _, _,_, _, _)) => translateInnerContract(c, newClass, translationContext)
+
+            case (c@javaFFIContractImpl(_,_,_,_)) => ()
+
             case t: TypeDecl =>
                 assert(false, "TODO")
                 ()
+
         }
     }
 
@@ -2116,7 +2137,7 @@ class CodeGen (val target: Target) {
 
     private def translateStateDecl(
                     state: State,
-                    contract: Contract,
+                    contract: ObsidianContractImpl,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext): Unit = {
         val stateClass = translationContext.states(state.name).innerClass
@@ -2368,7 +2389,8 @@ class CodeGen (val target: Target) {
         val reentrancyTest = if (tx.isPrivate) JExpr.FALSE else isInsideInvocationFlag()
         val jIf = jTry.body()._if(reentrancyTest)
         val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
-        exception.arg(translationContext.contract.sourcePath)
+        //
+        exception.arg(translationContext.contract.asInstanceOf[ObsidianContractImpl].sourcePath)
         exception.arg(tx.loc.line)
         jIf._then()._throw(exception)
 
@@ -2471,7 +2493,7 @@ class CodeGen (val target: Target) {
 
                     val ifStateLocked = body._if(stateLockCheck)
                     val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.StateLockException"))
-                    exception.arg(translationContext.contract.sourcePath)
+                    exception.arg(translationContext.contract.asInstanceOf[ObsidianContractImpl].sourcePath)
                     exception.arg(statement.loc.line)
                     ifStateLocked._then()._throw(exception)
                 }
@@ -2559,7 +2581,7 @@ class CodeGen (val target: Target) {
                     case Some (expr) => translateExpr(expr, translationContext, localContext)
                 }
                 val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
-                exception.arg(translationContext.contract.sourcePath)
+                exception.arg(translationContext.contract.asInstanceOf[ObsidianContractImpl].sourcePath)
                 exception.arg(statement.loc.line)
                 exception.arg(translatedExpr)
                 body._throw(exception)

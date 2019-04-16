@@ -270,6 +270,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     //-------------------------------------------------------------------------
     /* Subtyping definitions */
 
+    /* method to check if contract is actually implementing an interface */
+    private def contractIsSubtype(c1: String, c2: String): Boolean = {
+        val c1Table = globalTable.contractLookup(c1)
+        val c2Table = globalTable.contractLookup(c2)
+
+        (c1Table.contract, c2Table.contract) match {
+            case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) => (obs1 == obs2)
+            case (jvcon1: javaFFIContractImpl, jvcon2: javaFFIContractImpl) => (jvcon1 == jvcon2)
+            case (obs: ObsidianContractImpl, jvcon: javaFFIContractImpl) => false
+            case (jvcon: javaFFIContractImpl, obs:ObsidianContractImpl) => (obs.name == jvcon.interface)
+        }
+    }
+
+
     /* true iff [t1 <: t2] */
     private def isSubtype(t1: ObsidianType, t2: ObsidianType): Option[Error] = {
         (t1, t2) match {
@@ -281,9 +295,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 val mainSubtype: Boolean = (np1, np2) match {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
-                        c1 == c2 && isSubpermission(c1p, c2p)
+                        contractIsSubtype(c1.contractName, c2.contractName) && isSubpermission(c1p, c2p)
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
-                        c1 == c2 && ss1.subsetOf(ss2)
+                        contractIsSubtype(c1, c2) && ss1.subsetOf(ss2)
                     case (StateType(c, ss1, _), ContractReferenceType(c2, c2p, _)) =>
                         c2 == ContractType(c)
                     case _ => false
@@ -2042,7 +2056,7 @@ private def checkStatement(
         constr.copy(body = newBody)
     }
 
-    private def checkConstructors(constructors: Seq[Constructor], contract: Contract, table: ContractTable): Unit = {
+    private def checkConstructors(constructors: Seq[Constructor], contract: ObsidianContractImpl, table: ContractTable): Unit = {
         if (constructors.isEmpty && table.stateLookup.nonEmpty) {
             logError(contract, NoConstructorError(contract.name))
         }
@@ -2083,23 +2097,35 @@ private def checkStatement(
     }
 
     private def checkContract(contract: Contract): Contract = {
-        currentContractSourcePath = contract.sourcePath
 
-        val table = globalTable.contractLookup(contract.name)
-        val newDecls = contract.declarations.map(checkDeclaration(table))
+        contract match {
+            case obsContract : ObsidianContractImpl =>
+                val table = globalTable.contractLookup(obsContract.name)
+                val newDecls = obsContract.declarations.map(checkDeclaration(table))
 
-        checkConstructors(table.constructors, contract, table)
+                checkConstructors(table.constructors, obsContract, table)
 
-        contract.copy(declarations = newDecls)
+                obsContract.copy(declarations = newDecls)
+            case ffiContract : javaFFIContractImpl => ffiContract
+        }
     }
+
+    //private def checkFFIContract(contract : javaFFIContractImpl): Unit = {
+
+    //}
+
 
 
     // Returns a new program (in a symbol table) with additional type information, paired with errors from the program.
     def checkProgram(): (Seq[ErrorRecord], SymbolTable) = {
         checkForMainContract(globalTable.ast)
 
-        val newContracts = globalTable.ast.contracts.map(checkContract)
+        var checkDiffContract = (x: Contract) => x match {
+            case obsContract : ObsidianContractImpl => checkContract(obsContract)
+            case ffiContract : javaFFIContractImpl => ffiContract
+        }
 
+        val newContracts = globalTable.ast.contracts.map(checkDiffContract)
 
         (errors, new SymbolTable(new Program(globalTable.ast.imports, newContracts)))
     }
