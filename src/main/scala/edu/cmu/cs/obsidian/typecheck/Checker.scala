@@ -1446,15 +1446,42 @@ private def checkStatement(
                 (mergeContext(s, contextIfFalse, contextIfTrue), IfThenElse(eCond, checkedTrueStatements, checkedFalseStatements).setLoc(s))
 
             case IfInState(e, state, body1, body2) =>
+
                 val (t, contextPrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
+
+                val contractName = t match {
+                    case np: NonPrimitiveType =>
+                        np.contractName
+                    case p: PrimitiveType =>
+                        if (!t.isBottom) {
+                          logError(e, StateCheckOnPrimitiveError())
+                        }
+                        // There was previously some kind of error. Don't propagate it.
+                        return (contextPrime, s)
+                    case _ =>
+                        if (!t.isBottom) {
+                            logError(e, SwitchError(t))
+                        }
+                        // There was previously some kind of error. Don't propagate it.
+                        return (contextPrime, s)
+                }
+
+                val contractTable = context.contractTable.lookupContract(contractName) match {
+                    case Some(table) => table
+                    case None =>
+                        logError(e, SwitchError(t))
+                        return (contextPrime, s)
+                }
+
+                val allStates = contractTable.possibleStates
 
                 var resetOwnership: Option[(String, NonPrimitiveType)] = None
 
-                val contextForCheckingTrueBranch =
+                val (contextForCheckingTrueBranch, contextForCheckingFalseBranch) =
                     t match {
                         case p: PrimitiveType =>
                             logError(s, StateCheckOnPrimitiveError())
-                            contextPrime
+                            (contextPrime, contextPrime)
                         case np: NonPrimitiveType =>
                             val ident = e match {
                                 // If e is a variable, we might be able to put it in the context with the appropriate state.
@@ -1468,33 +1495,41 @@ private def checkStatement(
                                     np.permission match {
                                         case Owned() =>
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
-                                            contextPrime.updated(x, newType).updatedMakingVariableVal(x)
-                                        case Unowned() => contextPrime
+                                            t match {
+                                                case StateType(_, specificStates, _) =>
+                                                    val typeFalse = StateType(np.contractName, specificStates - state._1, np.isRemote)
+                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                                case _ =>
+                                                    val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
+                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                            }
+                                        case Unowned() => (contextPrime, contextPrime)
                                         case Shared() | Inferred() =>
                                             // If it's Inferred(), there's going to be another error later. For now, be optimistic.
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
+                                            val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
                                             resetOwnership = Some((x, np))
-                                            contextPrime.updated(x, newType).updatedMakingVariableVal(x)
+                                            (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                     }
-                                case None => contextPrime
+                                case None => (contextPrime, contextPrime)
                             }
-                        case BottomType() => contextPrime
+                        case BottomType() => (contextPrime, contextPrime)
                     }
 
                 val (trueContext, checkedTrueStatements) = checkStatementSequence(decl, contextForCheckingTrueBranch, body1)
+                val (falseContext, checkedFalseStatements) = checkStatementSequence(decl, contextForCheckingFalseBranch, body2)
 
-                val resetTrueContext = resetOwnership match {
-                    case None => trueContext
-                    case Some((x, oldType)) => trueContext.updated(x, oldType)
+                val (resetTrueContext, resetFalseContext) = resetOwnership match {
+                    case None => (trueContext, falseContext)
+                    case Some((x, oldType)) => (trueContext.updated(x, oldType), falseContext.updated(x, oldType))
                 }
 
                 val contextIfTrue = pruneContext(s,
                     resetTrueContext,
                     contextForCheckingTrueBranch)
 
-                val (falseContext, checkedFalseStatements) = checkStatementSequence(decl, contextPrime, body2)
                 val contextIfFalse = pruneContext(s,
-                    falseContext,
+                    resetFalseContext,
                     contextPrime)
 
                 val mergedContext = mergeContext(s, contextIfFalse, contextIfTrue)

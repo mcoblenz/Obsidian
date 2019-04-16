@@ -51,13 +51,13 @@ main contract InState {
              s.turnOff();
         }
 
-        // TODO: Make the type checker smart enough for this assertion to pass.
-        // [s @ Off];
+        [s @ Off];
 
         if (s in Off) {
              s.turnOn();
         }
 
+        // ERROR: s is On now, we know this specifically
         [s @ Owned];
     }
 }
