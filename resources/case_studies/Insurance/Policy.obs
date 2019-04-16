@@ -1,15 +1,29 @@
 contract Policy {
-    state Offered {
-        int cost;
-        int expirationTime;
-    }
-
+    state Offered;
     state Active;
     state Expired;
     state Claimed;
 
-    Policy@Offered(int c, int expiration) {
-        ->Offered(cost = c, expirationTime = expiration);
+    int cost;
+    int expirationTime;
+    int longitude;
+    int latitude;
+    int radius;
+    int moistureContent;
+
+    Policy@Offered(int c,
+                   int expiration,
+                   int longitude,
+                   int latitude,
+                   int radius,
+                   int moistureContent)
+    {
+        ->Offered(cost = c,
+                  expirationTime = expiration,
+                  longitude = longitude,
+                  latitude = latitude,
+                  radius = radius,
+                  moistureContent = moistureContent);
     }
 
     transaction activate(Policy@Offered >> Active this) {
@@ -35,5 +49,13 @@ contract Policy {
     // TODO: Equality on Policies
     transaction equals(Policy@Unowned this, Policy@Unowned p) returns bool {
         return true;
+    }
+
+    transaction isClaimableWithWeather(Policy@Unowned this, WeatherRecord@Unowned weather) returns bool {
+        int longitudeDist = weather.getLongitude() - longitude;
+        int latitudeDist = weather.getLatitude() - latitude;
+        int dist = sqrt(longitudeDist * longitudeDist + latitudeDist * latitudeDist);
+
+        return (dist < radius) and (weather.getMoisture() < moistureContent);
     }
 }

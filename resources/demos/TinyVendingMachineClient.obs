@@ -11,14 +11,14 @@ main contract TinyVendingMachineClient {
         }
     }
 
-    transaction restock(TinyVendingMachine@Shared machine) {
+    private transaction restock(remote TinyVendingMachine@Shared machine) {
         if (machine in Empty) {
             Candy candy = new Candy();
             machine.restock(candy);
         }
     }
 
-    transaction eat(Candy @ Owned >> Unowned c) {
+    private transaction eat(remote Candy @ Owned >> Unowned c) {
         disown c;
     }
 }

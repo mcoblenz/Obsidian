@@ -33,7 +33,7 @@ public class ChaincodeClientConnectionManager {
         cmdArgs.add(receiverUUID);
 
         for (String arg : args) {
-            cmdArgs.add("\"" + arg + "\"");
+            cmdArgs.add(arg);
         }
 
 
