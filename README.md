@@ -20,7 +20,7 @@ Then, push the modified .jar to the Git master branch, and it will be available 
 ###### Fabric deployment
 To use the chaincode on Fabric, some pre-requisites have to be met. First of all, you should have Docker installed on your machine. Then:
 1. In a terminal, go to the root of the Obsidian project folder.
-2. Run the following command: `curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.0`
+2. Run the following command: `curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s`
 
 This installs all the platform-specific binaries you need to run a Fabric network and places them in the `bin` sub-directory of the Obsidian project.
 It also downloands all the required Docker images and places them in your local Docker registry, tagged as `latest`.
