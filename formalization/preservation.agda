@@ -94,8 +94,9 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
       let
         origRefConsistency = refConsistencyFunc o oInμ
         origConnected = referencesConsistentImpliesConnectivity {Σ} {Δ} origRefConsistency
+        -- (splitReplacementOK {Γ} {Σ} {Δ₀} {o} {_} {_} {_} {_} origConnected spl
       in 
-        referencesConsistent (splitReplacementOK origConnected spl)
+        referencesConsistent {_} {_} {_} {!!}
 
 
 preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
