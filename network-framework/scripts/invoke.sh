@@ -25,6 +25,15 @@ verifyResult() {
   fi
 }
 
+verifyResult() {
+  if [ $1 -ne 0 ]; then
+    echo "!!!!!!!!!!!!!!! "$2" !!!!!!!!!!!!!!!!"
+    echo "========= ERROR !!! FAILED to execute End-2-End Scenario ==========="
+    echo
+    exit 1
+  fi
+}
+
 
 parseParameters() {
   # If there is no argument left, no function name is specified
@@ -90,8 +99,12 @@ or lack of function name"
 if [ $isQuiet -eq 1 ]; then
   peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
   res=$?
-  verifyResult $res "Invoke execution on $PEERS failed "
-  cat log.txt | sed -nr 's/^.*?payload:\"(.*)\".*$/\1/p'
+  if [ $res -ne 0 ]; then
+    cat log.txt | sed -nr 's/^.*?message:\"(.*)\".*$/\1/p'
+    exit 1
+  else
+    cat log.txt | sed -nr 's/^.*?payload:\"(.*)\".*$/\1/p'
+  fi
 else
   set -x
   peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
