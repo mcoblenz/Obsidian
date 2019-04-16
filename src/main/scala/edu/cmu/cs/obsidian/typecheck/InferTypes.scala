@@ -11,7 +11,10 @@ class InferTypes(val symbolTable: SymbolTable) {
     }
 
     private def inferTypesInContract(c: Contract): Contract = {
-        c.copy(declarations = c.declarations map inferTypesInDeclaration).setLoc(c)
+        c match {
+            case obs: ObsidianContractImpl => obs.copy(declarations = c.declarations map inferTypesInDeclaration).setLoc(c)
+            case ffi: JavaFFIContractImpl => ffi
+        }
     }
 
     private def inferTypesInDeclaration(d: Declaration): Declaration = {

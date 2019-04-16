@@ -26,7 +26,6 @@ libraryDependencies += "org.hyperledger.fabric-chaincode-java" % "fabric-chainco
 libraryDependencies += "com.helger" % "jcodemodel" % "3.0.3"
 libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2"
 
-
 /* settings for assembly */
 
 // don't get confused about multiple META-INF/MANIFEST.MF

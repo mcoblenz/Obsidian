@@ -79,13 +79,13 @@ case class Dereference(e: Expression, f: String) extends Expression {
 }
 
 case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
-case class Invocation(recipient: Expression, name: String, args: Seq[Expression]) extends Expression {
+case class Invocation(recipient: Expression, name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     override def toString: String = {
         val argString = args.mkString(",")
         s"$recipient.$name($argString)"
     }
 }
-case class Construction(name: String, args: Seq[Expression]) extends Expression
+case class Construction(name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression
 case class Disown(e: Expression) extends Expression
 case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression
 
@@ -172,18 +172,32 @@ case class IsImport() extends ContractModifier
 
 case class Import(name: String) extends AST
 
-case class Contract(modifiers: Set[ContractModifier],
-                    name: String,
-                    declarations: Seq[Declaration],
-                    transitions: Option[Transitions],
-                    isInterface: Boolean,
-                    sourcePath: String) extends Declaration {
-    val tag: DeclarationTag = ContractDeclTag
-
+/* Layer */
+sealed abstract class Contract(name: String, val sourcePath: String) extends Declaration {
+    def declarations: Seq[Declaration]
+    def modifiers: Set[ContractModifier] = Set.empty
     val isAsset = modifiers.contains(IsAsset())
     val isMain = modifiers.contains(IsMain())
     val isImport = modifiers.contains(IsImport())
 }
+
+case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
+                    name: String, override val declarations: Seq[Declaration],
+                    transitions: Option[Transitions],
+                    isInterface: Boolean,
+                    sp: String) extends Contract (name, sp) {
+    val tag: DeclarationTag = ContractDeclTag
+}
+
+/* FFI contract for Java */
+case class JavaFFIContractImpl(name: String,
+                               interface: String,
+                               javaPath: Seq[Identifier],
+                               sp: String,
+                               override val declarations: Seq[Declaration] = Seq.empty) extends Contract(name, sp){
+    val tag: DeclarationTag = ContractDeclTag
+}
+
 
 /* Program */
 case class Program(imports: Seq[Import], contracts: Seq[Contract]) extends AST
