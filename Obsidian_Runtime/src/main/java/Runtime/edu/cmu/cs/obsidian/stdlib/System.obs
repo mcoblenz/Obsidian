@@ -7,7 +7,4 @@ interface System {
      // integers.
      //static transaction print(int s);
      //static transaction println(int s);
-
-     static transaction print(string s);
-     static transaction printLn(string s);
 }

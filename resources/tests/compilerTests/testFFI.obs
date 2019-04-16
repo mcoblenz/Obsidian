@@ -1,0 +1,10 @@
+import "Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian/stdlib/IO.obs"
+
+contract IOImpl implements IO with java : edu.cmu.cs.obsidian.stdlib.IO ;
+
+
+main contract Test {
+    transaction Hello() {
+        new IOImpl().print("hello");
+    }
+}

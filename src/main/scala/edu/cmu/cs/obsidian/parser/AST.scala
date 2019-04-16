@@ -172,18 +172,31 @@ case class IsImport() extends ContractModifier
 
 case class Import(name: String) extends AST
 
-case class Contract(modifiers: Set[ContractModifier],
-                    name: String,
-                    declarations: Seq[Declaration],
-                    transitions: Option[Transitions],
-                    isInterface: Boolean,
-                    sourcePath: String) extends Declaration {
-    val tag: DeclarationTag = ContractDeclTag
-
+/* Layer */
+sealed abstract class Contract(name: String) extends Declaration {
+    def declarations: Seq[Declaration]
+    def modifiers: Set[ContractModifier] = Set.empty
     val isAsset = modifiers.contains(IsAsset())
     val isMain = modifiers.contains(IsMain())
     val isImport = modifiers.contains(IsImport())
 }
+
+case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
+                    name: String, override val declarations: Seq[Declaration],
+                    transitions: Option[Transitions],
+                    isInterface: Boolean,
+                    sourcePath: String) extends Contract (name) {
+    val tag: DeclarationTag = ContractDeclTag
+}
+
+/* FFI contract for Java */
+case class javaFFIContractImpl(name: String,
+                               interface: String,
+                               javaPath: Seq[Identifier],
+                               override val declarations: Seq[Declaration] = Seq.empty) extends Contract(name){
+    val tag: DeclarationTag = ContractDeclTag
+}
+
 
 /* Program */
 case class Program(imports: Seq[Import], contracts: Seq[Contract]) extends AST

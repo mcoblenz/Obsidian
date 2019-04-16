@@ -123,8 +123,12 @@ object Main {
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
+    /* match on c to get either javaFFIcontract or ObdisianFFIContract */
     def findMainContract(ast: Program): Option[Contract] = {
-        ast.contracts.find((c: Contract) => c.modifiers.contains(IsMain()))
+        ast.contracts.find((c: Contract) => c match {
+            case c: ObsidianContractImpl => c.modifiers.contains(IsMain())
+            case c: javaFFIContractImpl => false
+        })
     }
 
     def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {

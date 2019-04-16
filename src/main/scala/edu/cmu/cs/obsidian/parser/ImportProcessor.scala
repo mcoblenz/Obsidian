@@ -64,11 +64,15 @@ object ImportProcessor {
 
     // filter out IsMain modifier to ensure only one main contract in Client
     // add IsImport tag
+
+    /*check this */
     def filterTags(contracts: Seq[Contract]): Seq[Contract] = {
-        contracts.map(c => {
-            val newMods = c.modifiers - IsMain() + IsImport()
-            val newC = Contract(newMods, c.name, c.declarations, c.transitions, c.isInterface, c.sourcePath)
-            newC
+        contracts.map(c => c match {
+            case c: ObsidianContractImpl =>
+                     val newMods = c.modifiers - IsMain() + IsImport()
+                     val newC = ObsidianContractImpl(newMods, c.name, c.declarations, c.transitions, c.isInterface, c.sourcePath)
+                     newC
+            case c: javaFFIContractImpl => c
         })
     }
 }

@@ -34,53 +34,59 @@ class IdentityAstTransformer {
     }
 
     def transformContract(table: SymbolTable, cTable: ContractTable): (Contract, Seq[ErrorRecord]) = {
-        currentContractSourcePath = cTable.contract.sourcePath
+        cTable.contract match {
+            case obsContract: ObsidianContractImpl =>
+                currentContractSourcePath = obsContract.sourcePath
 
-        var newDecls: Seq[Declaration] = Nil
-        var errors = List.empty[ErrorRecord]
-        for (d <- cTable.contract.declarations) {
-            val newDecl: Declaration = d.tag match {
-                case TransactionDeclTag =>
-                    val (newTransaction, newErrors) = transformTransaction(table, cTable, d.asInstanceOf[Transaction])
-                    errors = errors ++ newErrors
-                    newTransaction
-                case ConstructorDeclTag =>
-                    val (newConstructor, newErrors) = transformConstructor(table, cTable, d.asInstanceOf[Constructor])
-                    errors = errors ++ newErrors
-                    newConstructor
-                case FieldDeclTag =>
-                    val (newField, newErrors) = transformField(table, cTable, d.asInstanceOf[Field])
-                    errors = errors ++ newErrors
-                    newField
-                case StateDeclTag =>
-                    val stateTable = cTable.state(d.asInstanceOf[State].name).get
-                    val (newState, newErrors) = transformState(table, stateTable)
-                    errors = errors ++ newErrors
-                    newState
-                case ContractDeclTag =>
-                    val contractTable = cTable.childContract(d.asInstanceOf[Contract].name).get
-                    val (newContract, newErrors) = transformContract(table, contractTable)
-                    errors = errors ++ newErrors
-                    newContract
-                case TypeDeclTag => null
-            }
-            newDecls = newDecl +: newDecls
+                var newDecls: Seq[Declaration] = Nil
+                var errors = List.empty[ErrorRecord]
+                for (d <- cTable.contract.declarations) {
+                    val newDecl: Declaration = d.tag match {
+                        case TransactionDeclTag =>
+                            val (newTransaction, newErrors) = transformTransaction(table, cTable, d.asInstanceOf[Transaction])
+                            errors = errors ++ newErrors
+                            newTransaction
+                        case ConstructorDeclTag =>
+                            val (newConstructor, newErrors) = transformConstructor(table, cTable, d.asInstanceOf[Constructor])
+                            errors = errors ++ newErrors
+                            newConstructor
+                        case FieldDeclTag =>
+                            val (newField, newErrors) = transformField(table, cTable, d.asInstanceOf[Field])
+                            errors = errors ++ newErrors
+                            newField
+                        case StateDeclTag =>
+                            val stateTable = cTable.state(d.asInstanceOf[State].name).get
+                            val (newState, newErrors) = transformState(table, stateTable)
+                            errors = errors ++ newErrors
+                            newState
+                        case ContractDeclTag =>
+                            val contractTable = cTable.childContract(d.asInstanceOf[Contract].name).get
+                            val (newContract, newErrors) = transformContract(table, contractTable)
+                            errors = errors ++ newErrors
+                            newContract
+                        case TypeDeclTag => null
+                    }
+                    newDecls = newDecl +: newDecls
+                }
+
+                newDecls = newDecls.reverse
+
+                val oldContract = obsContract
+                val newContract =
+                    ObsidianContractImpl(
+                        oldContract.modifiers,
+                        oldContract.name,
+                        newDecls,
+                        oldContract.transitions,
+                        oldContract.isInterface,
+                        oldContract.sourcePath
+                    ).setLoc(obsContract)
+
+                (newContract, errors.reverse)
+
+            case ffiContract: javaFFIContractImpl =>
+                (ffiContract, Nil)
         }
-
-        newDecls = newDecls.reverse
-
-        val oldContract = cTable.contract
-        val newContract =
-            Contract(
-                oldContract.modifiers,
-                oldContract.name,
-                newDecls,
-                oldContract.transitions,
-                oldContract.isInterface,
-                oldContract.sourcePath
-            ).setLoc(cTable.contract)
-
-        (newContract, errors.reverse)
     }
 
     def transformState(table: SymbolTable, sTable: StateTable): (State, Seq[ErrorRecord]) = {

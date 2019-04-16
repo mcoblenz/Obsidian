@@ -1,0 +1,5 @@
+
+interface IO {
+    transaction print(string s);
+    transaction println(string s);
+}

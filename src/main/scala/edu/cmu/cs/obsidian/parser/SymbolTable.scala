@@ -150,7 +150,16 @@ class ContractTable(
     }
 
     def lookupField(name: String): Option[Field] = fieldLookup.get(name)
-    def lookupTransaction(name: String): Option[Transaction] = txLookup.get(name)
+
+    def lookupTransaction(name: String): Option[Transaction] = contract match {
+        case obsContract: ObsidianContractImpl => txLookup.get(name)
+        case javaContract: javaFFIContractImpl =>
+            val interfaceContractTable = lookupContract(javaContract.interface)
+            interfaceContractTable match {
+                case None => None
+                case Some(t) => t.lookupTransaction(name)
+            }
+    }
 
     def state(name: String): Option[StateTable] = stateLookup.get(name)
     def possibleStates: Set[String] = stateLookup.values.map(_.name).toSet

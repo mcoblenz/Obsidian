@@ -14,7 +14,10 @@ object StateFieldTransformer {
 
     def transformContract(contract: Contract): Contract = {
         val transformedDeclarations = contract.declarations.flatMap((d: Declaration) => transformDeclaration(d))
-        contract.copy(declarations = transformedDeclarations).setLoc(contract)
+        contract match {
+            case obsContract: ObsidianContractImpl => obsContract.copy(declarations = transformedDeclarations).setLoc(contract)
+            case ffiContract: javaFFIContractImpl => ffiContract
+        }
     }
 
 
