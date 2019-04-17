@@ -219,6 +219,51 @@ module HeapProperties where
   ... | yes oEq = refl
   ... | no oNeq = ⊥-elim (oNeq refl)
 
+  ctxTypesExtensionNeq : ∀ {Δ o o' T}
+                         → o' ≢ o
+                         → ctxTypes (Δ , o ⦂ T) o' ≡ ctxTypes Δ o'
+  ctxTypesExtensionNeq {Δ} {o} {o'} {T} oNeq with o' ≟ o
+  ... | yes p = ⊥-elim (oNeq p)
+  ... | no ¬p = refl
+
+  cong₃ : ∀ {a b c d} {A : Set a} {B : Set b} {C : Set c} {D : Set d}
+        (f : A → B → C → D) {x y u v w t} → x ≡ y → u ≡ v → w ≡ t → f x u w ≡ f y v t
+  cong₃ f refl refl refl = refl
+
+
+  irrelevantRefTypesExtensionO : ∀ {Σ Δ o o' T}
+                                → o' ≢ o
+                                → refTypes Σ (Δ ,ₒ o ⦂ T) o' ≡ refTypes Σ Δ o'
+  irrelevantRefTypesExtensionO {Σ} {Δ} {o} {o'} {T} oNeq = 
+    let
+      ctxTypesEq : ctxTypes (StaticEnv.objEnv (Δ ,ₒ o ⦂ T)) o' ≡ ctxTypes (StaticEnv.objEnv Δ) o'
+      ctxTypesEq = ctxTypesExtensionNeq oNeq
+
+      envTypesEq : envTypes Σ (Δ ,ₒ o ⦂ T) o' ≡ envTypes Σ Δ o'
+      envTypesEq = refl
+
+      refFieldTypesEq = refFieldTypes Σ (Δ ,ₒ o ⦂ T) o' ≡ refFieldTypes Σ Δ o'
+      refFieldTypesEq = refl
+    in
+      cong₃ (λ a → λ b → λ c → rt a b c) ctxTypesEq envTypesEq refFieldTypesEq
+    
+  irrelevantRefTypesExtensionL :  ∀ {Σ Δ l T o'}
+                                  → refTypes Σ (Δ ,ₗ l ⦂ T) o' ≡ refTypes Σ Δ o'
+  irrelevantRefTypesExtensionL {Σ} {Δ} {l} {T} {o'} = 
+   let
+      ctxTypesEq : ctxTypes (StaticEnv.objEnv (Δ ,ₗ l ⦂ T)) o' ≡ ctxTypes (StaticEnv.objEnv Δ) o'
+      ctxTypesEq = refl
+
+      envTypesEq : envTypes Σ (Δ ,ₗ l ⦂ T) o' ≡ envTypes Σ Δ o'
+      envTypesEq = {!!}
+
+      refFieldTypesEq = refFieldTypes Σ (Δ ,ₗ l ⦂ T) o' ≡ refFieldTypes Σ Δ o'
+      refFieldTypesEq = refl
+    in
+      cong₃ (λ a → λ b → λ c → rt a b c) ctxTypesEq envTypesEq refFieldTypesEq      
+
+
+
   lExtensionCompatibility : ∀ {Σ Δ l T₁ o R}
                             → R ≡ refTypes Σ (Δ ,ₗ l ⦂ T₁) o
                             → IsConnected R
@@ -381,11 +426,31 @@ module HeapProperties where
       TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) a) TsForOsIsRight T₁ConnectedToLTypes
 
       envAndFieldConnected : IsConnectedEnvAndField R'
-      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {l} {!!} spl -- envFieldConnected spl
+      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {l} (Eq.subst (λ a → IsConnectedEnvAndField (refTypes Σ (Δ ,ₗ l ⦂ T₁) a)) osEq envFieldConnected) spl
 
+      connectedO = isConnected R' TsForOsConnected TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected
     in
-      isConnected R' ? ? ? ? ? -- {!isConnected R' TsForOsConnected TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected!} 
-  ... | no osNeq = {!!}
+     Eq.subst (λ a → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) a)) (Eq.sym osEq) connectedO
+  ... | no osNeq = 
+        let
+          R = refTypes Σ (Δ ,ₗ l ⦂ T₁) o'
+          R' = refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o'
+
+          ΔRefTypesEq1 : refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o' ≡ refTypes Σ (Δ ,ₗ l ⦂ T₃) o'
+          ΔRefTypesEq1 = irrelevantRefTypesExtensionO {Σ} {Δ ,ₗ l ⦂ T₃} osNeq
+
+          ΔRefTypesEq2 : refTypes Σ (Δ ,ₗ l ⦂ T₃) o' ≡ refTypes Σ Δ o'
+          ΔRefTypesEq2 = irrelevantRefTypesExtensionL {Σ} {Δ} {l} {T₃}
+
+          ΔRefTypesEq3 : refTypes Σ Δ o' ≡ refTypes Σ (Δ ,ₗ l ⦂ T₁) o' 
+          ΔRefTypesEq3 = Eq.sym (irrelevantRefTypesExtensionL {Σ} {Δ} {l} {T₁})
+
+          R'EqR : R' ≡ R
+          R'EqR = Eq.trans (Eq.trans ΔRefTypesEq1 ΔRefTypesEq2) ΔRefTypesEq3
+
+          foo = Eq.subst (λ a → IsConnected a) (Eq.sym R'EqR) rConnected
+        in
+          foo
 
 
 -- ================================ OVERALL HEAP CONSISTENCY ===========================
