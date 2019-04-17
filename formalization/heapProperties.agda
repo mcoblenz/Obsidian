@@ -254,6 +254,7 @@ module HeapProperties where
       ctxTypesEq : ctxTypes (StaticEnv.objEnv (Δ ,ₗ l ⦂ T)) o' ≡ ctxTypes (StaticEnv.objEnv Δ) o'
       ctxTypesEq = refl
 
+      -- If l : o' is in Σ.ρ, then this change will cause envTypes to have T instead of whatever it had before.
       envTypesEq : envTypes Σ (Δ ,ₗ l ⦂ T) o' ≡ envTypes Σ Δ o'
       envTypesEq = {!!}
 
@@ -263,12 +264,18 @@ module HeapProperties where
       cong₃ (λ a → λ b → λ c → rt a b c) ctxTypesEq envTypesEq refFieldTypesEq      
 
 
-
-  lExtensionCompatibility : ∀ {Σ Δ l T₁ o R}
-                            → R ≡ refTypes Σ (Δ ,ₗ l ⦂ T₁) o
-                            → IsConnected R
-                            → All (λ T → T₁ ⟷ T) (RefTypes.oTypes R)
-  lExtensionCompatibility {Σ} {Δ} {l} {T₁} {o} {R} eq (isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) = {!!}   
+  lExtensionCompatibility : ∀ {Γ Σ Δ l T₁ T₂ T₃ o}
+                            → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                            → Γ ⊢ T₁ ⇛ T₂ / T₃
+                            → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o)
+  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} (isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl = 
+      isConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o) oConnected oAndFieldsConnected {!!} {!!}
+      where
+        R' = refTypes Σ (Δ ,ₗ l ⦂ T₃) o
+        oAndLsConnected' : IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o) → All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) (RefTypes.oTypes R')
+--        oAndLsConnected' (isConnected R oConnected oAndFieldsConnected [] envFieldConnected) = {! !}
+--        oAndLsConnected' (isConnected R oConnected oAndFieldsConnected (h ∷ t) envFieldConnected) = {! !}
+        oAndLsConnected' = ?
 
 
   -- What happens when you extend Δ depends on what's in ρ. If l is in ρ, then we add T; otherwise we don't.
@@ -439,18 +446,11 @@ module HeapProperties where
           ΔRefTypesEq1 : refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o' ≡ refTypes Σ (Δ ,ₗ l ⦂ T₃) o'
           ΔRefTypesEq1 = irrelevantRefTypesExtensionO {Σ} {Δ ,ₗ l ⦂ T₃} osNeq
 
-          ΔRefTypesEq2 : refTypes Σ (Δ ,ₗ l ⦂ T₃) o' ≡ refTypes Σ Δ o'
-          ΔRefTypesEq2 = irrelevantRefTypesExtensionL {Σ} {Δ} {l} {T₃}
-
-          ΔRefTypesEq3 : refTypes Σ Δ o' ≡ refTypes Σ (Δ ,ₗ l ⦂ T₁) o' 
-          ΔRefTypesEq3 = Eq.sym (irrelevantRefTypesExtensionL {Σ} {Δ} {l} {T₁})
-
-          R'EqR : R' ≡ R
-          R'EqR = Eq.trans (Eq.trans ΔRefTypesEq1 ΔRefTypesEq2) ΔRefTypesEq3
-
-          foo = Eq.subst (λ a → IsConnected a) (Eq.sym R'EqR) rConnected
+          -- Now it suffices to show IsConnected (refTypes (Δ ,ₗ l ⦂ T₃) o').
+          foo : IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o')
+          foo = lExtensionCompatibility {Γ} rConnected spl
         in
-          foo
+          Eq.subst (λ a → IsConnected a) (Eq.sym ΔRefTypesEq1) foo
 
 
 -- ================================ OVERALL HEAP CONSISTENCY ===========================
