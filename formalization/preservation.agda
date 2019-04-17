@@ -19,7 +19,7 @@ data Preservation : Expr → Set where
        → Σ & Δ ok        
        -- TODO: hdref(e)
        → Σ , e ⟶ Σ' , e'
-       → ∀ Δ'
+       → (Δ' : StaticEnv)
        → (Δ' ⊢ e' ⦂ T' ⊣ Δ''') 
        → (Σ' & Δ' ok)  -- 
        → (Δ''' <* Δ'')
@@ -58,13 +58,13 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
   let
     e'TypingJudgment = objTy {Γ} {Δ = Δ''} o spl
    
-    consis' = ok Δ' voidLookup' boolLookup' objLookup' refConsistency'
+    consis' = ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
   in
     pres {Δ = Δ} {Δ'' = Δ''} ty consis st Δ' e'TypingJudgment consis' {!!}
   where
     splT = splitType spl
-    Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT)
-    Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₁ splT)
+    Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT) -- This is the result of checking e.
+    Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₁ splT) -- This is the typing context in which we need to typecheck e'.
     --Δ = Δ₀ ,ₗ l ⦂ (SplitType.t₁ splT)
     -- Show that if you look up l in the new context, you get the same type as before.
     voidLookup' : (∀ (l' : IndirectRef)
@@ -89,14 +89,18 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
     objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
     objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
+    
+
     -- Show that all location-based aliases from the previous environment are compatible with the new alias.
-    refConsistency' = λ o → λ oInμ →
+    -- Note that Σ is unchanged, so we use Σ instead of defining a separate Σ'.
+    refConsistency' : (o' : ObjectRef) → o' ObjectRefContext.∈dom (RuntimeEnv.μ Σ) → ReferenceConsistency Σ Δ' o'
+    refConsistency' o' o'Inμ =
       let
-        origRefConsistency = refConsistencyFunc o oInμ
-        origConnected = referencesConsistentImpliesConnectivity {Σ} {Δ} origRefConsistency
-        -- (splitReplacementOK {Γ} {Σ} {Δ₀} {o} {_} {_} {_} {_} origConnected spl
+        origRefConsistency = refConsistencyFunc o' o'Inμ
+        origConnected = referencesConsistentImpliesConnectivity {Σ} {Δ} origRefConsistency -- inversion
+        newConnected = splitReplacementOK {Γ} {Σ} {Δ₀} {o} {o'} {l} {SplitType.t₁ splT} {SplitType.t₂ splT} {SplitType.t₃ splT} origConnected spl
       in 
-        referencesConsistent {_} {_} {_} {!!}
+        referencesConsistent {_} {_} {o'} newConnected
 
 
 preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
