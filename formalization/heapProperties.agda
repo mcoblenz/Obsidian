@@ -336,7 +336,7 @@ module HeapProperties where
 
       P a =  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes a)) (RefTypes.oTypes a)
     in
-      ? -- Eq.subst P refFieldsEq oConnectedToFieldTypes    
+      {!!} -- Eq.subst P refFieldsEq oConnectedToFieldTypes    
 
   splitReplacementEnvFieldsOK : ∀ {Σ Δ o l T₁ T₃ R R'}
                                 → R ≡ refTypes Σ (Δ ,ₗ l ⦂ T₁) o
@@ -347,14 +347,18 @@ module HeapProperties where
 
   -- Previously, all the types aliasing o were connected. Now, we've extended the context due to a split, and we need to show we still have connectivity.
   -- The idea here is that the expression in question is of type T₂, so the reference left in the heap is of type T₃.
-
-  splitReplacementOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
-                       → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+  -- o corresponds to the object that was affected by the split, whereas o' is the reference we are interested in analyzing aliases to.
+  splitReplacementOK : ∀ {Γ Σ Δ o o' l}
+                       → {T₁ T₂ T₃ : Type}
+                       → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o')
                        → Γ ⊢ T₁ ⇛ T₂ / T₃
-                       → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o)
-  splitReplacementOK {Γ} {Σ} {Δ} {o} {l} {T₁} {T₂} {T₃} rConnected@(isConnected R oTypesConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected) spl =
+                       → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o')
+  splitReplacementOK {Γ} {Σ} {Δ} {o} {o'} {l} {T₁} {T₂} {T₃} rConnected@(isConnected R oTypesConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected) spl with (o' ≟ o)
+  ... | yes osEq =
     -- In this case, there are no O types yet, but adding o ⦂ T₁ will add one.
     let
+      foo = spl
+    
       Δ' = ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁)
       R' = (refTypes Σ Δ' o) 
       ot = ctxTypes (StaticEnv.objEnv Δ) o
@@ -368,18 +372,20 @@ module HeapProperties where
       TsForOsConnected = (Eq.subst (λ a → IsConnectedTypeList a) TsForOsIsRight (singleElementListsAreConnected T₁))
 
       TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R')) (RefTypes.oTypes R')
-      TsForOsConnectedToFieldTypes = splitReplacementRefFieldsOK {Σ} {Δ} {o} {l} {R = R} {R' = R'} refl refl oConnectedToFieldTypes
-      
+      TsForOsConnectedToFieldTypes = splitReplacementRefFieldsOK {Σ} {Δ} {o} {l} {R = R} {R' = R'} (Eq.cong (λ a → (refTypes Σ (Δ ,ₗ l ⦂ T₁) a)) osEq) refl oConnectedToFieldTypes
+
       T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) TsForOs
-      T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {l} refl refl oConnectedToLTypes
+      T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {l} {R = R} {R' = R'} (Eq.cong (λ a → (refTypes Σ (Δ ,ₗ l ⦂ T₁) a)) osEq) refl oConnectedToLTypes
 
       TsForOsConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) (RefTypes.oTypes R')
       TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) a) TsForOsIsRight T₁ConnectedToLTypes
 
       envAndFieldConnected : IsConnectedEnvAndField R'
-      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {l} envFieldConnected spl
+      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {l} {!!} spl -- envFieldConnected spl
+
     in
-      isConnected R' TsForOsConnected TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected 
+      isConnected R' ? ? ? ? ? -- {!isConnected R' TsForOsConnected TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected!} 
+  ... | no osNeq = {!!}
 
 
 -- ================================ OVERALL HEAP CONSISTENCY ===========================
