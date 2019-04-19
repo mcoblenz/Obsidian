@@ -16,7 +16,7 @@ for ((i = 0; i < 4; i++)); do
     sleep 2
     if [[ ${res} -ne testVals[i] ]] ; then
         echo
-        echo "The old value of IntContainer is ${testVals[i]}, but it returns $res"
+        echo "The old value in the IntContainer is ${testVals[i]}, but the returned value is $res"
         exit 1
     fi
     echo "      pass"
