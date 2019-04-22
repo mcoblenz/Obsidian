@@ -187,6 +187,15 @@ module HeapProperties where
 
   envTypesHelper (IndirectRefContext._,_⦂_ ρ l v) Δ o = envTypesHelper ρ Δ o
 
+{-
+  envTypeHelperOverΔ : IndirectRefEnv → TypeEnv → ObjectRef → List Type
+  envTypeHelperOverΔ ρ Context.∅ o = []
+  envTypeHelperOverΔ ρ (Δ , l ⦂ T) o
+= {!
+  -- If l : o' in ρ AND we haven't seen l before, emit T. 
+!}
+-}
+
   envTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
   envTypes Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) (StaticEnv.locEnv Δ) o 
 
@@ -263,19 +272,71 @@ module HeapProperties where
     in
       cong₃ (λ a → λ b → λ c → rt a b c) ctxTypesEq envTypesEq refFieldTypesEq      
 
+  -- Proof is by induction in ρ.
+  
+  TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃}
+                                → (T : Type)
+                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                                → Γ ⊢ T₁ ⇛ T₂ / T₃
+                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₃) o)
+  TCompatibleWithAllNewEnvTypes {Γ} {re μ (ρ Context., l' ⦂ objRef o') φ ψ} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl with (o' ≟ o) | (TypeEnvContext.lookup (StaticEnv.locEnv Δ) l')
+  TCompatibleWithAllNewEnvTypes {Γ} {Σ@(re μ (ρ Context., l' ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl | yes p | just x = 
+                                let
+                                  
+                                  R = (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                                  RConcat = T₁ ∷  (envTypes (re μ ρ φ ψ) (Δ ,ₗ l ⦂ T₁) o)
+                                  REqRConcat : R ≡ RConcat
+                                  REqRConcat = {!!}
+                                  thisCompat = {!!}
+                                  restCompat = TCompatibleWithAllNewEnvTypes {Γ} {re μ ρ φ ψ} {Δ} {l} {o} {T₁} {T₂} {T₃} T {!TCompatWithR!} spl
+                                in
+                                  {!thisCompat ∷ ?!}
 
+
+  TCompatibleWithAllNewEnvTypes {Γ} {Σ@(re μ (ρ Context., l' ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl | _ | _ = TCompatibleWithAllNewEnvTypes T TCompatWithR spl
+  TCompatibleWithAllNewEnvTypes {Γ} {re μ (ρ Context., l' ⦂ v) φ ψ} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl = {!!}
+{-
+    let
+      R = (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+      R' = 
+      foo = TCompatibleWithAllNewEnvTypes  {re μ ρ φ ψ} T TCompatWithR
+    in
+      ?
+-}
+  TCompatibleWithAllNewEnvTypes {Γ} {re μ Context.∅ φ ψ} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl = []
+
+
+
+--- TRY #2
+{-
+TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃}
+                                → (T : Type)
+                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                                → Γ ⊢ T₁ ⇛ T₂ / T₃
+                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₃) o)
+  TCompatibleWithAllNewEnvTypes {Γ} {Σ} {Δ} {l} {o} {T₁} {T₂} {T₃} T [] spl = []                    
+-}
   lExtensionCompatibility : ∀ {Γ Σ Δ l T₁ T₂ T₃ o}
                             → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                             → Γ ⊢ T₁ ⇛ T₂ / T₃
                             → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o)
-  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} (isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl = 
-      isConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o) oConnected oAndFieldsConnected {!!} {!!}
+  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl = 
+      isConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o) oConnected oAndFieldsConnected (oAndLsConnected' rConnected) {!!}
       where
         R' = refTypes Σ (Δ ,ₗ l ⦂ T₃) o
         oAndLsConnected' : IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o) → All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) (RefTypes.oTypes R')
---        oAndLsConnected' (isConnected R oConnected oAndFieldsConnected [] envFieldConnected) = {! !}
---        oAndLsConnected' (isConnected R oConnected oAndFieldsConnected (h ∷ t) envFieldConnected) = {! !}
-        oAndLsConnected' = ?
+        oAndLsConnected' (isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) with (RefTypes.oTypes R')
+        oAndLsConnected' (isConnected .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o) oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) | [] = []
+        oAndLsConnected' (isConnected .(refTypes Σ (Δ ,ₗ l ⦂ T₁) o) oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) | T ∷ rest = 
+          let
+            -- T is a type of something that is in oTypes R'.
+            TCompatWithR = Data.List.Relation.Unary.All.head oAndLsConnected          
+            TOK = TCompatibleWithAllNewEnvTypes {Γ} {Σ} {Δ} {l} {o} T TCompatWithR spl
+            restOK = {!!}
+          in
+            TOK ∷ restOK
+
+
 
 
   -- What happens when you extend Δ depends on what's in ρ. If l is in ρ, then we add T; otherwise we don't.
@@ -447,10 +508,10 @@ module HeapProperties where
           ΔRefTypesEq1 = irrelevantRefTypesExtensionO {Σ} {Δ ,ₗ l ⦂ T₃} osNeq
 
           -- Now it suffices to show IsConnected (refTypes (Δ ,ₗ l ⦂ T₃) o').
-          foo : IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o')
-          foo = lExtensionCompatibility {Γ} rConnected spl
+          connectivity : IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o')
+          connectivity = lExtensionCompatibility {Γ} {Σ} {_} {_} {_} {_} {_} {_} rConnected spl
         in
-          Eq.subst (λ a → IsConnected a) (Eq.sym ΔRefTypesEq1) foo
+          Eq.subst (λ a → IsConnected a) (Eq.sym ΔRefTypesEq1) connectivity
 
 
 -- ================================ OVERALL HEAP CONSISTENCY ===========================
