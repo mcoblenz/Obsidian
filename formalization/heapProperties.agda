@@ -273,7 +273,7 @@ module HeapProperties where
       cong₃ (λ a → λ b → λ c → rt a b c) ctxTypesEq envTypesEq refFieldTypesEq      
 
   -- Proof is by induction in ρ.
-  
+  {-
   TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃}
                                 → (T : Type)
                                 → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
@@ -295,6 +295,33 @@ module HeapProperties where
 
   TCompatibleWithAllNewEnvTypes {Γ} {Σ@(re μ (ρ Context., l' ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl | _ | _ = TCompatibleWithAllNewEnvTypes T TCompatWithR spl
   TCompatibleWithAllNewEnvTypes {Γ} {re μ (ρ Context., l' ⦂ v) φ ψ} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl = {!!}
+-}
+
+  EnvSubst :  ∀ {Γ Σ Δ l o T₁ T₂ T₃}
+              → (envTypes Σ (Δ ,ₗ l ⦂ T₁) o) with some T₁'s replaced with T₃'s ≡ (envTypes Σ (Δ ,ₗ l ⦂ T₃) o)
+              -- why? because for each l : o in ρ, we'll emit a T₁ in the first case and a T₃ in the second case.
+              -- There may be OTHER 
+
+  TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃}
+                                → (T : Type)
+                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                                → Γ ⊢ T₁ ⇛ T₂ / T₃
+                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₃) o)
+  TCompatibleWithAllNewEnvTypes {Γ} {Σ@(re μ ρ φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl with (envTypes Σ (Δ ,ₗ l ⦂ T₁) o) | Eq.inspect (envTypes Σ (Δ ,ₗ l ⦂ T₁)) o
+  ... | [] | (Eq.[_] eqProof) =
+        let
+           R' = envTypes Σ (Δ ,ₗ l ⦂ T₃) o
+        in
+          {!!}
+  ... | (T' ∷ rest) | Eq.[_] eqProof = 
+        let
+          firstCompat : T ⟷ T'
+          firstCompat = {!!}
+          restCompat = {!TCompatibleWithAllNewEnvTypes T rest spl!}
+          concat = All._∷_ firstCompat restCompat
+        in
+         {!Eq.subst (λ a →  All (λ T' → T ⟷ T') a) (Eq.sym eqProof) concat!} 
+  
 {-
     let
       R = (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
