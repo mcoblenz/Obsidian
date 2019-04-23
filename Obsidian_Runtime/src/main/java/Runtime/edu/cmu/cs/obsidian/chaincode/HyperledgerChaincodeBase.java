@@ -198,10 +198,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
              * in the client will give a compile-time error. */
             revertState();
             return newErrorResponse("No such transaction: " + function);
-        } catch (ObsidianRevertException | StateLockException e) {
-            revertState();
-            return newErrorResponse(e.getMessage());
-        } catch (Throwable e) {
+        } catch (ObsidianRevertException | StateLockException | Throwable e) {
             System.err.println("Caught exception dispatching invocation: " + e);
 
             e.printStackTrace();
