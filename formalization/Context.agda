@@ -47,6 +47,17 @@ module Context (A : Set) where
           -------------
           → x ∈dom Γ
 
+  data _∌dom_ : ℕ → ctx → Set where
+    notInEmpty : ∀ {x}
+               ----------
+               → x ∌dom ∅
+
+    notInNonempty : ∀ {x x' Γ T}
+                    → x ≢ x'
+                    → x ∌dom Γ
+                    --------------------
+                    → x ∌dom (Γ , x' ⦂ T)
+               
 
 -- Removing elements from a context
   _#_ : ctx → ℕ → ctx

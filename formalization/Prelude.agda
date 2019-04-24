@@ -1,7 +1,14 @@
 module Prelude where
   open import Agda.Primitive using (Level; lzero; lsuc) renaming (_⊔_ to lmax)
-  open import Data.Nat
-  import Relation.Binary.PropositionalEquality as Eq
+  open import Relation.Binary.PropositionalEquality as Eq
+
+  open import Data.List
+  open import Data.Nat.Properties
+
+  open import Data.List.Membership.DecSetoid ≡-decSetoid 
+
+  open import Data.List.Relation.Unary.Any
+
 
 
   -- empty type
@@ -19,6 +26,18 @@ module Prelude where
   data _+̇_ (A B : Set) : Set where
     Inl : A → A +̇ B
     Inr : B → A +̇ B
+
+ -- Basic properties of lists
+  emptyListIsEmpty : ∀ {x}
+                     → x ∉ []
+  emptyListIsEmpty ()
+
+
+  listNoncontainment : ∀ {x x' L}
+                       → x ∉ x' ∷ L
+                       → x ≢ x'
+
+  listNoncontainment {x} {.x} {L} xNotIncluded refl = xNotIncluded (here refl)
 
 {-
 -- equality of naturals is decidable. we represent this as computing a
