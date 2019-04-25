@@ -57,7 +57,14 @@ module Context (A : Set) where
                     → x ∌dom Γ
                     --------------------
                     → x ∌dom (Γ , x' ⦂ T)
-               
+
+  ∌domPreservation : ∀ {x x' Γ T T'}
+                     → x ∌dom (Γ , x' ⦂ T)
+                     ---------------------
+                     → x ∌dom (Γ , x' ⦂ T')
+  ∌domPreservation {x} {x'} {Γ} {T} {T'} (notInNonempty xNeqX' xNotInDom) = notInNonempty xNeqX' xNotInDom
+
+                     
 
 -- Removing elements from a context
   _#_ : ctx → ℕ → ctx
