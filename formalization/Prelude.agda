@@ -40,6 +40,19 @@ module Prelude where
   listNoncontainment {x} {x'} {L} xNotInL x'InL = λ xEqx' → xNotInL (Eq.subst (λ a → a ∈ L) (Eq.sym xEqx') x'InL)
 
 
+  listConcatNoncontainment : ∀ {x x' L}
+                             → x ≢ x'
+                             → x ∉ L
+                             → x ∉ (x' ∷ L)
+  listConcatNoncontainment {x} {x'} {L} xNeqx' xNotInL (here xEqx') = xNeqx' xEqx'
+  listConcatNoncontainment {x} {x'} {L} xNeqx' xNotInL (there xInConcat) = xNotInL xInConcat
+  
+-- Basic properties of equality
+  ≢-sym : ∀ {a} {A : Set a} → {x x' : A}
+          → x ≢ x'
+          → x' ≢ x
+  ≢-sym xNeqx' = λ x'Eqx → xNeqx' (Eq.sym x'Eqx)
+
 {-
 -- equality of naturals is decidable. we represent this as computing a
   -- choice of units, with inl <> meaning that the naturals are indeed the
