@@ -498,28 +498,6 @@ module HeapProperties where
   consListEq {A} {x ∷ R} {x' ∷ R'} {T} refl = refl
 
 
-  envTypesExtendingObjs : ∀ {Σ Δ o l T}
-                          → envTypes Σ (Δ ,ₒ l ⦂ T) o ≡ envTypes Σ Δ o
-  envTypesExtendingObjs = refl
-  
-
-  envTypesReplacingl1 : ∀ {Σ Δ T₁ T₃ R l}
-                        → {o : ObjectRef}
-                        → envTypes Σ Δ o ≡ R
-                        → envTypes Σ (Δ ,ₗ l ⦂ T₁) o ≡ R
-                        → envTypes Σ (Δ ,ₗ l ⦂ T₃) o ≡ R -- because l ⦂ o didn't occur in Σ
-  envTypesReplacingl1 = {!!}             
-
-
-  envTypesReplacingl2 : ∀ {Σ Δ T₁ T₃ R l}
-                        → {o : ObjectRef}
-                        → envTypes Σ Δ o ≡ R
-                        → envTypes Σ (Δ ,ₗ l ⦂ T₁) o ≡ T₁ ∷ R
-                        → envTypes Σ (Δ ,ₗ l ⦂ T₃) o ≡ T₃ ∷ R -- because l ⦂ o DID occur in Σ
-  envTypesReplacingl2 = {!!}   
-
-
-
   splitReplacementEnvFieldOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
                                → IsConnectedEnvAndField (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                                → Γ ⊢ T₁ ⇛ T₂ / T₃
