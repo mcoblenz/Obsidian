@@ -135,41 +135,10 @@ module HeapProperties where
 
 
 -- ============= DEFINITIONS OF HEAP CONSISTENCY ===============
-  record RefTypes : Set where
-    constructor rt
-    field
-      oTypes : List Type -- Corresponds to types from the o's in Δ.
-      lTypes : List Type -- Corresponds to types from ρ
-      fieldTypes : List Type -- Corresponds to types from fields inside μ
 
-  data IsConnectedTypeList : List Type → Set where
-    emptyTypeList : ∀ {D}
-                    → D ≡ []
-                    ----------
-                    → IsConnectedTypeList D
+ 
 
-    consTypeList : ∀ {T D}
-                   → All (λ T' → (T ⟷ T')) D
-                   → IsConnectedTypeList D
-                   ------------------------
-                   → IsConnectedTypeList (T ∷ D)
-
-  data IsConnectedEnvAndField : RefTypes → Set where
-    envTypesConnected : (R : RefTypes)
-                        → IsConnectedTypeList (RefTypes.lTypes R)
-                        → IsConnectedTypeList (RefTypes.fieldTypes R)
-                        → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)) (RefTypes.lTypes R) -- all of the l types are connected to all of the field types
-                        ----------------------------------------------
-                        → IsConnectedEnvAndField R
-
-  data IsConnected : RefTypes → Set where              
-    isConnected : (R : RefTypes)
-                  → IsConnectedTypeList (RefTypes.oTypes R)
-                  → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)) (RefTypes.oTypes R) -- all of the o types are connected to all of the field types
-                  → All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R)) (RefTypes.oTypes R) -- all of the o types are connected to all of the l types
-                  → IsConnectedEnvAndField R
-                  ----------------------------------------------
-                  → IsConnected R
+ 
                   
   ctxTypes : TypeEnv → ObjectRef → List Type
   ctxTypes ∅ _ = []
@@ -187,8 +156,8 @@ module HeapProperties where
 
   envTypesHelper (IndirectRefContext._,_⦂_ ρ l v) Δ o = envTypesHelper ρ Δ o
 
-  envTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
-  envTypes Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) (StaticEnv.locEnv Δ) o
+  makeEnvTypesList : RuntimeEnv → StaticEnv → ObjectRef → List Type
+  makeEnvTypesList Σ Δ o = envTypesHelper (RuntimeEnv.ρ Σ) (StaticEnv.locEnv Δ) o
 
  
   -- The List IndirectRef is a list of locations that have already been used in previous calls (and are forbidden to be used again).
@@ -218,6 +187,45 @@ module HeapProperties where
     envTypesEmpty : ∀ {μ φ ψ Δ o forbiddenRefs}
                     → EnvTypes  (re μ Context.∅ φ ψ) Δ o forbiddenRefs []
 
+  record RefTypes (Σ : RuntimeEnv) (Δ : StaticEnv) (o : ObjectRef) : Set where
+    field
+      oTypes : List Type -- Corresponds to types from the o's in Δ.
+      envTypesList : List Type
+      envTypes : EnvTypes Σ Δ o [] envTypesList
+      fieldTypes : List Type -- Corresponds to types from fields inside μ
+
+  data IsConnectedTypeList : List Type → Set where
+    emptyTypeList : ∀ {D}
+                    → D ≡ []
+                    ----------
+                    → IsConnectedTypeList D
+
+    consTypeList : ∀ {T D}
+                   → All (λ T' → (T ⟷ T')) D
+                   → IsConnectedTypeList D
+                   ------------------------
+                   → IsConnectedTypeList (T ∷ D)
+
+  data IsConnectedEnvAndField  (Σ : RuntimeEnv) (Δ : StaticEnv) (o : ObjectRef) : RefTypes Σ Δ o → Set where
+    envTypesConnected : (R : RefTypes Σ Δ o)
+                        → IsConnectedTypeList (RefTypes.envTypesList R)
+                        → IsConnectedTypeList (RefTypes.fieldTypes R)
+                        → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)) (RefTypes.envTypesList R) -- all of the l types are connected to all of the field types
+                        ----------------------------------------------
+                        → IsConnectedEnvAndField Σ Δ o R
+
+  data IsConnected (Σ : RuntimeEnv) (Δ : StaticEnv) (o : ObjectRef) : RefTypes Σ Δ o → Set where              
+    isConnected : (R : RefTypes Σ Δ o)
+                  → IsConnectedTypeList (RefTypes.oTypes R)
+                  → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)) (RefTypes.oTypes R) -- all of the o types are connected to all of the field types
+                  → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList R)) (RefTypes.oTypes R) -- all of the o types are connected to all of the l types
+                  → IsConnectedEnvAndField Σ Δ o R
+                  ----------------------------------------------
+                  → IsConnected Σ Δ o R
+
+
+
+
   refFieldTypesHelper : ObjectRefEnv → StaticEnv → ObjectRef → List Type
   refFieldTypesHelper ObjectRefContext.∅ Δ o = []
   refFieldTypesHelper (ObjectRefContext._,_⦂_ μ o' obj) Δ o = refFieldTypesHelper μ Δ o  -- TODO; this is bogus!
@@ -225,8 +233,8 @@ module HeapProperties where
   refFieldTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
   refFieldTypes Σ Δ o = refFieldTypesHelper (RuntimeEnv.μ Σ) Δ o
 
-  refTypes : RuntimeEnv → StaticEnv → ObjectRef → RefTypes
-  refTypes Σ Δ o = record {oTypes = (ctxTypes (StaticEnv.objEnv Δ) o) ; lTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
+--  refTypes : RuntimeEnv → StaticEnv → ObjectRef → RefTypes
+--  refTypes Σ Δ o = record {oTypes = (ctxTypes (StaticEnv.objEnv Δ) o) ; lTypes = (envTypes Σ Δ o) ; fieldTypes = (refFieldTypes Σ Δ o)}
 
 
   -- =================== LEMMAS RELATED TO HEAP CONSISTENCY =================
@@ -272,10 +280,10 @@ module HeapProperties where
     envTypesEmpty
 
   -- Inversion for isConnected
-  isConnectedImpliesOsConnected : ∀ {R}
-                                  → IsConnected R
+  isConnectedImpliesOsConnected : ∀ {Σ Δ o R}
+                                  → IsConnected Σ Δ o R
                                   → IsConnectedTypeList (RefTypes.oTypes R)
-  isConnectedImpliesOsConnected {R} (isConnected R cl _ _ _ ) = cl
+  isConnectedImpliesOsConnected {Σ} {Δ} {o} {R} (isConnected R cl _ _ _ ) = cl
 
   singleElementListsAreConnected : (T : Type)
                                  → IsConnectedTypeList [ T ]
@@ -300,10 +308,11 @@ module HeapProperties where
   cong₃ f refl refl refl = refl
 
 
-  irrelevantRefTypesExtensionO : ∀ {Σ Δ o o' T}
+  irrelevantRefTypesExtensionO : ∀ {Σ Δ o o' T RT}
                                 → o' ≢ o
-                                → refTypes Σ (Δ ,ₒ o ⦂ T) o' ≡ refTypes Σ Δ o'
-  irrelevantRefTypesExtensionO {Σ} {Δ} {o} {o'} {T} oNeq = 
+                                → (RT : RefTypes Σ (Δ ,ₒ o ⦂ T) o')
+                                → RefTypes Σ Δ o'
+  irrelevantRefTypesExtensionO {Σ} {Δ} {o} {o'} {T} oNeq rtPrev = ? {-
     let
       ctxTypesEq : ctxTypes (StaticEnv.objEnv (Δ ,ₒ o ⦂ T)) o' ≡ ctxTypes (StaticEnv.objEnv Δ) o'
       ctxTypesEq = ctxTypesExtensionNeq oNeq
@@ -315,7 +324,7 @@ module HeapProperties where
       refFieldTypesEq = refl
     in
       cong₃ (λ a → λ b → λ c → rt a b c) ctxTypesEq envTypesEq refFieldTypesEq
-
+-}
 
   EnvTypesChangeForΔReplacement : ∀ {Σ Δ l T T' TCompat o R forbiddenRefs } -- TCompat is something that everything in R is compatible with.
                                   → EnvTypes Σ (Δ ,ₗ l ⦂ T) o forbiddenRefs R
@@ -456,22 +465,14 @@ module HeapProperties where
     (envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T₁)} {o = .o}) origCompat spl =
       ⟨ [] , ⟨ envTypesEmpty , [] ⟩ ⟩
 
-  -- TODO: replace this with the above.
-  TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃}
-                                → (T : Type)
-                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₁) o)
-                                → Γ ⊢ T₁ ⇛ T₂ / T₃
-                                → All (λ T' → T ⟷ T') (envTypes Σ (Δ ,ₗ l ⦂ T₃) o)
-  TCompatibleWithAllNewEnvTypes {Γ} {Σ@(re μ ρ φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} T TCompatWithR spl = {!!}
-
-
---- TRY #2
 
   lExtensionCompatibility : ∀ {Γ Σ Δ l T₁ T₂ T₃ o}
-                            → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                            → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                            → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o RT
                             → Γ ⊢ T₁ ⇛ T₂ / T₃
-                            → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o)
-  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl = 
+                            → (RT' : RefTypes  Σ (Δ ,ₗ l ⦂ T₃) o)
+                            → IsConnected Σ (Δ ,ₗ l ⦂ T₃) o RT'
+  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rt rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl rt' = ? {-
       isConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o) oConnected oAndFieldsConnected (oAndLsConnected' rConnected) {!!}
       where
         R' = refTypes Σ (Δ ,ₗ l ⦂ T₃) o
@@ -486,6 +487,7 @@ module HeapProperties where
             restOK = {!!}
           in
             TOK ∷ restOK
+-}
 
 
   consListEq : ∀ {A : Set}
@@ -499,9 +501,11 @@ module HeapProperties where
 
 
   splitReplacementEnvFieldOK : ∀ {Γ Σ Δ o l T₁ T₂ T₃}
-                               → IsConnectedEnvAndField (refTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                               → (RT : RefTypes  Σ (Δ ,ₗ l ⦂ T₁) o)
+                               → IsConnectedEnvAndField Σ (Δ ,ₗ l ⦂ T₁) o RT
                                → Γ ⊢ T₁ ⇛ T₂ / T₃
-                               → IsConnectedEnvAndField (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o)
+                               → (RT' : RefTypes  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o)
+                               → IsConnectedEnvAndField  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o RT'
   splitReplacementEnvFieldOK = {!!}
 
   fieldTypesExtensionEq2 :  ∀ {Σ Δ o l T₁ T₃}
@@ -513,17 +517,17 @@ module HeapProperties where
   fieldTypesExtensionEq {Σ} {se varEnv locEnv Context.∅} {o} {l} {T₁} {T₃} = {!!}
   fieldTypesExtensionEq {Σ} {se varEnv locEnv (objEnv Context., x ⦂ x₁)} {o} {l} {T₁} {T₃} = {!!}
 
-  splitReplacementRefFieldsOK : ∀ {Σ Δ o l T₁ T₃ R R'}
-                                → R ≡ refTypes Σ (Δ ,ₗ l ⦂ T₁) o
-                                → R' ≡ refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R)) (RefTypes.oTypes R)
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R')) (RefTypes.oTypes R')
-  splitReplacementRefFieldsOK {Σ} {Δ} {o} {l} {T₁} {T₃} {R} {R'} refl refl oConnectedToFieldTypes = 
+  splitReplacementRefFieldsOK : ∀ {Σ Δ o l T₁ T₃}
+                                → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                                → (RT' : RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o)
+                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes RT)) (RefTypes.oTypes RT)
+                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes RT')) (RefTypes.oTypes RT')
+  splitReplacementRefFieldsOK {Σ} {Δ} {o} {l} {T₁} {T₃} RT RT' oConnectedToFieldTypes = 
     let
       -- I know that everything in fieldTypes R was previously compatible with whatever garbage was in oTypes R.
       -- Now I need to show that the same stuff, whatever it is, is compatible with [ T₁ ].
       -- Anything compatible with T₁ is compatible with T₂ and T₃, but that doesn't help...
-      refFieldsEq : RefTypes.fieldTypes R ≡ RefTypes.fieldTypes R'
+      refFieldsEq : RefTypes.fieldTypes RT ≡ RefTypes.fieldTypes RT'
       refFieldsEq = fieldTypesExtensionEq
 
       P a =  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes a)) (RefTypes.oTypes a)
@@ -531,66 +535,74 @@ module HeapProperties where
       {!!} -- Eq.subst P refFieldsEq oConnectedToFieldTypes    
 
   splitReplacementEnvFieldsOK : ∀ {Σ Δ o l T₁ T₃ R R'}
-                                → R ≡ refTypes Σ (Δ ,ₗ l ⦂ T₁) o
-                                → R' ≡ refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R)) (RefTypes.oTypes R)
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) [ T₁ ]
-  splitReplacementEnvFieldsOK refl refl oConnectedToLTypes = {!!}   
+                                → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o)
+                                → (RT' : RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o)
+                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT)) (RefTypes.oTypes RT)
+                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) [ T₁ ]
+  splitReplacementEnvFieldsOK rt rt' oConnectedToLTypes = {!!}   
 
   -- Previously, all the types aliasing o were connected. Now, we've extended the context due to a split, and we need to show we still have connectivity.
   -- The idea here is that the expression in question is of type T₂, so the reference left in the heap is of type T₃.
   -- o corresponds to the object that was affected by the split, whereas o' is the reference we are interested in analyzing aliases to.
   splitReplacementOK : ∀ {Γ Σ Δ o o' l}
                        → {T₁ T₂ T₃ : Type}
-                       → IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₁) o')
+                       → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
+                       → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o' RT
                        → Γ ⊢ T₁ ⇛ T₂ / T₃
-                       → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o')
-  splitReplacementOK {Γ} {Σ} {Δ} {o} {o'} {l} {T₁} {T₂} {T₃} rConnected@(isConnected R oTypesConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected) spl with (o' ≟ o)
+                       → (RT' : RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o')
+                       → IsConnected Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o' RT'
+  splitReplacementOK {Γ} {Σ} {Δ} {o} {o'} {l} {T₁} {T₂} {T₃}
+    RT
+    rConnected@(isConnected R oTypesConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected)
+    spl
+    RT'
+    with (o' ≟ o)
   ... | yes osEq =
     -- In this case, there are no O types yet, but adding o ⦂ T₁ will add one.
     let
       foo = spl
     
       Δ' = ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁)
-      R' = (refTypes Σ Δ' o) 
+
       ot = ctxTypes (StaticEnv.objEnv Δ) o
       ot' = ctxTypes (StaticEnv.objEnv Δ') o
       oldOsConnected = isConnectedImpliesOsConnected rConnected
       TsForOs = [ T₁ ]
-      TsForOsIsRight : TsForOs ≡ (RefTypes.oTypes R')
-      TsForOsIsRight = Eq.sym (ctxTypesExtension {StaticEnv.objEnv Δ} {o} {T₁})
+      TsForOsIsRight : TsForOs ≡ (RefTypes.oTypes RT')
+      TsForOsIsRight = ? --  Eq.sym (ctxTypesExtension {StaticEnv.objEnv Δ} {o} {T₁})
 
       TsForOsConnected : IsConnectedTypeList (ctxTypes ((StaticEnv.objEnv Δ) , o ⦂ T₁) o)
-      TsForOsConnected = (Eq.subst (λ a → IsConnectedTypeList a) TsForOsIsRight (singleElementListsAreConnected T₁))
+      TsForOsConnected = (Eq.subst (λ a → IsConnectedTypeList a) ? {-TsForOsIsRight-} (singleElementListsAreConnected T₁))
 
-      TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes R')) (RefTypes.oTypes R')
-      TsForOsConnectedToFieldTypes = splitReplacementRefFieldsOK {Σ} {Δ} {o} {l} {R = R} {R' = R'} (Eq.cong (λ a → (refTypes Σ (Δ ,ₗ l ⦂ T₁) a)) osEq) refl oConnectedToFieldTypes
+      TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypes RT')) (RefTypes.oTypes RT')
+      TsForOsConnectedToFieldTypes = splitReplacementRefFieldsOK {Σ} {Δ} {o} {l} ? ? ? -- (Eq.cong (λ a → ? {-(refTypes Σ (Δ ,ₗ l ⦂ T₁) a) -} ) osEq) refl oConnectedToFieldTypes
 
-      T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) TsForOs
-      T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {l} {R = R} {R' = R'} (Eq.cong (λ a → (refTypes Σ (Δ ,ₗ l ⦂ T₁) a)) osEq) refl oConnectedToLTypes
+      T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) TsForOs
+      T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {l} ? ? ? -- (Eq.cong (λ a → ? {- (refTypes Σ (Δ ,ₗ l ⦂ T₁) a) -} ) osEq) refl oConnectedToLTypes
 
-      TsForOsConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) (RefTypes.oTypes R')
-      TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.lTypes R')) a) TsForOsIsRight T₁ConnectedToLTypes
+      TsForOsConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) (RefTypes.oTypes RT')
+      TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) a) TsForOsIsRight T₁ConnectedToLTypes
 
-      envAndFieldConnected : IsConnectedEnvAndField R'
-      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {l} (Eq.subst (λ a → IsConnectedEnvAndField (refTypes Σ (Δ ,ₗ l ⦂ T₁) a)) osEq envFieldConnected) spl
+      envAndFieldConnected : IsConnectedEnvAndField Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o (Eq.subst (λ a → RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) a) osEq RT')
+      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {l} ? ? ? ? --  (Eq.subst (λ a → IsConnectedEnvAndField ? {- (refTypes Σ (Δ ,ₗ l ⦂ T₁) a) -}) osEq envFieldConnected) spl
 
-      connectedO = isConnected R' TsForOsConnected TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected
+      connectedO = isConnected RT' TsForOsConnected TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected
     in
-     Eq.subst (λ a → IsConnected (refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) a)) (Eq.sym osEq) connectedO
+     Eq.subst (λ a → IsConnected ? {-(refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) a) -} ) (Eq.sym osEq) connectedO
   ... | no osNeq = 
         let
-          R = refTypes Σ (Δ ,ₗ l ⦂ T₁) o'
-          R' = refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o'
-
+          foo = osNeq -- REMOVE
+        {-
           ΔRefTypesEq1 : refTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o' ≡ refTypes Σ (Δ ,ₗ l ⦂ T₃) o'
           ΔRefTypesEq1 = irrelevantRefTypesExtensionO {Σ} {Δ ,ₗ l ⦂ T₃} osNeq
 
           -- Now it suffices to show IsConnected (refTypes (Δ ,ₗ l ⦂ T₃) o').
           connectivity : IsConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o')
           connectivity = lExtensionCompatibility {Γ} {Σ} {_} {_} {_} {_} {_} {_} rConnected spl
+        -}
         in
-          Eq.subst (λ a → IsConnected a) (Eq.sym ΔRefTypesEq1) connectivity
+          ?
+          -- Eq.subst (λ a → IsConnected a) (Eq.sym ΔRefTypesEq1) connectivity
 
 
 -- ================================ OVERALL HEAP CONSISTENCY ===========================
@@ -599,7 +611,8 @@ module HeapProperties where
     referencesConsistent : ∀ {Σ : RuntimeEnv}
                          → ∀ {Δ : StaticEnv}
                          → ∀ {o : ObjectRef}
-                         → IsConnected (refTypes Σ Δ o)
+                         → ∀ {RT : RefTypes Σ Δ o}
+                         → IsConnected RT
                            -- TODO: add subtype constraint: C <: (refTypes Σ Δ o)
                          ---------------------------
                          → ReferenceConsistency Σ Δ o
@@ -607,9 +620,9 @@ module HeapProperties where
   -- Inversion for reference consistency: connectivity
   referencesConsistentImpliesConnectivity : ∀ {Σ Δ o}
                                             → ReferenceConsistency Σ Δ o
-                                            → IsConnected (refTypes Σ Δ o)
+                                            → ∃[ RT ] (IsConnected RT)
 
-  referencesConsistentImpliesConnectivity (referencesConsistent ic) = ic
+  referencesConsistentImpliesConnectivity (referencesConsistent ic) = ? -- ic
 
   ------------ Global Consistency -----------
   -- I'm going to need the fact that if an expression typechecks, and I find a location in it, then the location can be looked
