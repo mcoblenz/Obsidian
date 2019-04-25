@@ -247,25 +247,28 @@ module HeapProperties where
   envTypesForbiddenRefsObserved : ∀ {l ls T T' Σ R}
                                   → (Δ : StaticEnv)
                                   → (o : ObjectRef)
-                                  → EnvTypes Σ (Δ ,ₗ l ⦂ T) o (l ∷ ls) R
-                                  → EnvTypes Σ (Δ ,ₗ l ⦂ T') o (l ∷ ls) R
+                                  → l ∈ ls
+                                  → EnvTypes Σ (Δ ,ₗ l ⦂ T) o ls R
+                                  → EnvTypes Σ (Δ ,ₗ l ⦂ T') o ls R
 
       -- We previously found l₁ ⦂ o at the END of ρ, and found l₁ : T in (Δ ,ₗ l ⦂ T). By "l₁NotInForbiddenRefs" we may derive l ≢ l₁.
       -- ρ , l₁ : objRef o
       -- WTS: when we look up l₁ in  (Δ ,ₗ l ⦂ T'), we'll still get objRef o.
-  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {.(T₁ ∷ R)} Δ o
-    envTypes@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = (l ∷ ls)} .(Δ ,ₗ l ⦂ T) .o origEnvTypes l₁HasTypeT₁WithL l₁NotInForbiddenRefs) =
+  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {.(T₁ ∷ R)} Δ o lInLs
+    envTypes@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = ls} .(Δ ,ₗ l ⦂ T) .o origEnvTypes l₁HasTypeT₁WithL l₁NotInForbiddenRefs) =
        let
          l₁NeqL : l₁ ≢ l
-         l₁NeqL = listNoncontainment l₁NotInForbiddenRefs
+         l₁NeqL = listNoncontainment l₁NotInForbiddenRefs lInLs
 
          l₁HasSameTypeInNewContext = irrelevantExtensionsOK {y = l} {t' = T'} (irrelevantReductionsOK l₁HasTypeT₁WithL l₁NeqL) l₁NeqL
-      in
-         envTypesConcatMatchFound {R = R} (Δ ,ₗ l ⦂ T') o {!!} l₁HasSameTypeInNewContext l₁NotInForbiddenRefs
 
-  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {R} Δ o (envTypesConcatMatchNotFound {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .(l ∷ ls)} .(Δ ,ₗ l ⦂ T) .o origEnvTypes x) = {!!}
-  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {R} Δ o (envTypesConcatMismatch {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .(l ∷ ls)} .(Δ ,ₗ l ⦂ T) .o o' x origEnvTypes) = {!!}
-  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ IndirectRefContext.∅ φ ψ)} {.[]} Δ o (envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T)} {o = .o} {forbiddenRefs = .(l ∷ ls)}) = {!!}
+         recursiveCall = envTypesForbiddenRefsObserved {l = l} {T = T} {T' = T'} Δ o (there lInLs) origEnvTypes
+      in
+         envTypesConcatMatchFound {R = R} (Δ ,ₗ l ⦂ T') o recursiveCall l₁HasSameTypeInNewContext l₁NotInForbiddenRefs
+
+  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {R} Δ o lInLs (envTypesConcatMatchNotFound {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .ls} .(Δ ,ₗ l ⦂ T) .o origEnvTypes x) = {!!}
+  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {R} Δ o lInLs (envTypesConcatMismatch {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .ls} .(Δ ,ₗ l ⦂ T) .o o' x origEnvTypes) = {!!}
+  envTypesForbiddenRefsObserved {l} {ls} {T} {T'} {.(re μ IndirectRefContext.∅ φ ψ)} {.[]} Δ o lInLs (envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T)} {o = .o} {forbiddenRefs = .ls}) = {!!}
 
   -- Inversion for isConnected
   isConnectedImpliesOsConnected : ∀ {R}
@@ -415,7 +418,7 @@ module HeapProperties where
         origEnvTypesWithL : EnvTypes (re μ ρ φ ψ) (Δ ,ₗ l₁ ⦂ T₁) o (l₁ ∷ []) R
         origEnvTypesWithL = Eq.subst (λ a → EnvTypes (re μ ρ φ ψ) (Δ ,ₗ a ⦂ T₁) o (l₁ ∷ []) R) (Eq.sym eq) origEnvTypes
 
-        forbiddenOK = envTypesForbiddenRefsObserved {T' = T₃} Δ o origEnvTypesWithL
+        forbiddenOK = envTypesForbiddenRefsObserved {T' = T₃} Δ o (here refl) origEnvTypesWithL
         forbiddenOKInL₁ : EnvTypes (re μ ρ φ ψ) (Δ ,ₗ l ⦂ T₃) o (l₁ ∷ []) R
         forbiddenOKInL₁ = Eq.subst (λ a →  EnvTypes (re μ ρ φ ψ) (Δ ,ₗ a ⦂ T₃) o (l₁ ∷ []) R) eq forbiddenOK
 

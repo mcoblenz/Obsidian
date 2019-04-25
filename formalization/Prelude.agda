@@ -34,10 +34,11 @@ module Prelude where
 
 
   listNoncontainment : ∀ {x x' L}
-                       → x ∉ x' ∷ L
-                       → x ≢ x'
+                        → x ∉ L
+                        → x' ∈ L
+                        → x ≢ x'
+  listNoncontainment {x} {x'} {L} xNotInL x'InL = λ xEqx' → xNotInL (Eq.subst (λ a → a ∈ L) (Eq.sym xEqx') x'InL)
 
-  listNoncontainment {x} {.x} {L} xNotIncluded refl = xNotIncluded (here refl)
 
 {-
 -- equality of naturals is decidable. we represent this as computing a
