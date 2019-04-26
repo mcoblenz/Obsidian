@@ -83,7 +83,7 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
     
     objLookup' : (∀ (l' : IndirectRef) → ∀ (T : Tc)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
-                  → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just (objRef o))))
+                  → ∃[ o ] ((IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just (objRef o)) × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)))))
     objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
     objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
     objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z

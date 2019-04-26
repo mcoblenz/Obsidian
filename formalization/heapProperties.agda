@@ -270,7 +270,11 @@ module HeapProperties where
          → (∀ (l : IndirectRef)
            → ∀ (T : Tc)
            → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)         -- If a location is in Δ and has contract reference type...
+<<<<<<< HEAD
            → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o) × o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)) -- then location can be looked up in Σ...
+=======
+           → ∃[ o ] ((IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o)) × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))) -- then location can be looked up in Σ...
+>>>>>>> Progress from today.
            )
          → (∀ o → o ObjectRefContext.∈dom (RuntimeEnv.μ Σ) → ReferenceConsistency Σ Δ o)
          -- TODO: add remaining antecedents
@@ -295,7 +299,11 @@ module HeapProperties where
               → ∀ {T : Tc}
               → Σ & Δ ok
               → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)
+<<<<<<< HEAD
               → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o) × o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))
+=======
+              → ∃[ o ] ((IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o)) × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)))
+>>>>>>> Progress from today.
 
   locLookup (ok Δ _ _ lContainment rc) lInDelta@(Z {Δ'} {x} {contractType a}) = lContainment x a lInDelta
   locLookup (ok Δ _ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {contractType a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
@@ -579,7 +587,15 @@ module HeapProperties where
                             → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o RT
                             → Γ ⊢ T₁ ⇛ T₂ / T₃
                             → ∃[ RT' ] (IsConnected Σ (Δ ,ₗ l ⦂ T₃) o RT')
-  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rt rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl = {!!} {-
+  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rt rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl = ⟨
+                                                                                                                                                                    record
+                                                                                                                                                                    { oTypesList = {!!}
+                                                                                                                                                                    ; oTypes = {!!}
+                                                                                                                                                                    ; envTypesList = {!!}
+                                                                                                                                                                    ; envTypes = {!!}
+                                                                                                                                                                    ; fieldTypesList = {!!}
+                                                                                                                                                                    }
+                                                                                                                                                                    , {!!} ⟩ {-
       isConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o) oConnected oAndFieldsConnected (oAndLsConnected' rConnected) {!!}
       where
         R' = refTypes Σ (Δ ,ₗ l ⦂ T₃) o
@@ -625,11 +641,19 @@ module HeapProperties where
   fieldTypesListExtensionEq {Σ} {se varEnv locEnv Context.∅} {o} {l} {T₁} {T₃} = {!!}
   fieldTypesListExtensionEq {Σ} {se varEnv locEnv (objEnv Context., x ⦂ x₁)} {o} {l} {T₁} {T₃} = {!!}
 
+<<<<<<< HEAD
   locationsInΔAreCompatibleWithFieldTypes : ∀ {Σ Δ l T o}
                                           → (globalConsistency : Σ & Δ ok)
                                           → (StaticEnv.locEnv Δ) ∋ l ⦂ contractType T
 --                                          → All (λ T' → T ⟷ T') (refConsistency globalConsistency) (proj₁ (locLookup globalConsistency lInΔ))
   locationsInΔAreCompatibleWithFieldTypes {Σ} {Δ} {l} {T} {o} globalConsistency = {!!} --  lInΔ = {!!}       
+=======
+  locationsInΔAreCompatibleWithFieldTypes : ∀ {Σ Δ l T}
+                                          → (globalConsistency : Σ & Δ ok)
+                                          → (StaticEnv.locEnv Δ) ∋ l ⦂ contractType T
+--                                          → All (λ T' → T ⟷ T') (refConsistency globalConsistency) (proj₁ (locLookup globalConsistency lInΔ))
+  locationsInΔAreCompatibleWithFieldTypes {Σ} {Δ} {l} {T} globalConsistency = {!!} --  lInΔ = {!!}       
+>>>>>>> Progress from today.
 
   splitReplacementRefFieldsOK : ∀ {Σ Δ o o' l T₁ T₃}
                                 → o' ≡ o

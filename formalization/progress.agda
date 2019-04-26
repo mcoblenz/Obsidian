@@ -40,6 +40,7 @@ data Progress : Expr → Set where
          → Value e
          ---------
          → Progress e
+         
 progress : ∀ {e T Δ Δ'}
            → ∀ (Σ : RuntimeEnv)
            → Closed e
