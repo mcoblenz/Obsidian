@@ -98,9 +98,9 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
       let
         origRefConsistency = refConsistencyFunc o' o'Inμ
         origConnected = referencesConsistentImpliesConnectivity {Σ} {Δ} origRefConsistency -- inversion
-        newConnected = splitReplacementOK {Γ} {Σ} {Δ₀} {o} {o'} {l} {SplitType.t₁ splT} {SplitType.t₂ splT} {SplitType.t₃ splT} origConnected spl
+        newConnected = splitReplacementOK {Γ} {Σ} {Δ₀} {o} {o'} {l} {SplitType.t₁ splT} {SplitType.t₂ splT} {SplitType.t₃ splT} (proj₁ origConnected) (proj₂ origConnected) spl
       in 
-        referencesConsistent {_} {_} {o'} newConnected
+        referencesConsistent {_} {_} {o'} (proj₂ newConnected)
 
 
 preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}

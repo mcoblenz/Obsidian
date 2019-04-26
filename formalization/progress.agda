@@ -69,7 +69,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (unownedSplit _ _ _ _)) =
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
     lInDelta = proj₂ locationExistsInContext
     heapLookupResult = locLookup consis lInDelta
-    heapLookupFound = proj₂ heapLookupResult
+    heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
     step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
@@ -78,7 +78,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (shared-shared-shared _)) 
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
     lInDelta = proj₂ locationExistsInContext
     heapLookupResult = locLookup consis lInDelta
-    heapLookupFound = proj₂ heapLookupResult
+    heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
     step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
@@ -87,7 +87,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (owned-shared _)) =
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
     lInDelta = proj₂ locationExistsInContext
     heapLookupResult = locLookup consis lInDelta
-    heapLookupFound = proj₂ heapLookupResult
+    heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
     step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
@@ -96,7 +96,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (states-shared _)) =
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
     lInDelta = proj₂ locationExistsInContext
     heapLookupResult = locLookup consis lInDelta
-    heapLookupFound = proj₂ heapLookupResult
+    heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
     step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)

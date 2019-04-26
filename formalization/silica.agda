@@ -57,7 +57,6 @@ module Silica where
     base : Tbase -> Type
     contractType : Tc -> Type
 
-
   isShared : Type → Bool
   isShared (contractType (record {contractName = _ ; perm = Shared})) = true
   isShared _ = false
