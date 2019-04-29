@@ -441,7 +441,7 @@ module Silica where
       → ∀ {l : IndirectRef}
       → ∀ {v : Expr}
       → Δ ⊢ (simpleExpr (loc l)) ⦂ T ⊣ Δ'
-      → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
+      → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ v
       -----------------------------------------------------------
       → (Σ , (simpleExpr (loc l)) ⟶ Σ , v)
 

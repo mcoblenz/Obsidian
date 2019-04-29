@@ -215,6 +215,21 @@ module HeapProperties where
                         ----------------------------------------------
                         → IsConnectedEnvAndField Σ Δ o R
 
+  envFieldInversion1 : ∀ {Σ Δ o R}
+                       → IsConnectedEnvAndField Σ Δ o R
+                       → IsConnectedTypeList (RefTypes.envTypesList R)
+  envFieldInversion1 (envTypesConnected R env f envField) = env      
+
+  envFieldInversion2 :  ∀ {Σ Δ o R}
+                        → IsConnectedEnvAndField Σ Δ o R
+                        → IsConnectedTypeList (RefTypes.fieldTypesList R)
+  envFieldInversion2 (envTypesConnected R env f envField) = f
+
+  envFieldInversion3 :  ∀ {Σ Δ o R}
+                        → IsConnectedEnvAndField Σ Δ o R
+                        → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList R)) (RefTypes.envTypesList R)
+  envFieldInversion3 (envTypesConnected R env f envField) = envField
+
   data IsConnected (Σ : RuntimeEnv) (Δ : StaticEnv) (o : ObjectRef) : RefTypes Σ Δ o → Set where              
     isConnected : (R : RefTypes Σ Δ o)
                   → IsConnectedTypeList (RefTypes.oTypesList R)
@@ -264,16 +279,12 @@ module HeapProperties where
   data _&_ok : RuntimeEnv → StaticEnv → Set where
     ok : ∀ {Σ : RuntimeEnv}
          → ∀ (Δ : StaticEnv)
-         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Void → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just voidExpr)))
-         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean → ∃[ b ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (boolExpr b))))
+         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Void → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ voidExpr)))
+         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ boolExpr b)))
          → (∀ (l : IndirectRef)
            → ∀ (T : Tc)
            → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)         -- If a location is in Δ and has contract reference type...
-<<<<<<< HEAD
-           → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o) × o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)) -- then location can be looked up in Σ...
-=======
-           → ∃[ o ] ((IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o)) × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))) -- then location can be looked up in Σ...
->>>>>>> Progress from today.
+           → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))) -- then location can be looked up in Σ...
            )
          → (∀ o → o ObjectRefContext.∈dom (RuntimeEnv.μ Σ) → ReferenceConsistency Σ Δ o)
          -- TODO: add remaining antecedents
@@ -298,11 +309,7 @@ module HeapProperties where
               → ∀ {T : Tc}
               → Σ & Δ ok
               → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)
-<<<<<<< HEAD
-              → ∃[ o ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o) × o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))
-=======
-              → ∃[ o ] ((IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (objRef o)) × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)))
->>>>>>> Progress from today.
+              → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)))
 
   locLookup (ok Δ _ _ lContainment rc) lInDelta@(Z {Δ'} {x} {contractType a}) = lContainment x a lInDelta
   locLookup (ok Δ _ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {contractType a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
@@ -312,7 +319,7 @@ module HeapProperties where
               → ∀ {l : IndirectRef}
               → Σ & Δ ok
               → (StaticEnv.locEnv Δ) ∋ l ⦂ base Void
-              → IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just voidExpr
+              → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ voidExpr)
   voidLookup (ok Δ voidContainment _ _ _) voidType@(Z {Δ'} {l} {a}) = voidContainment l voidType
   voidLookup (ok Δ voidContainment _ _ _) voidType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = voidContainment l voidType
 
@@ -321,12 +328,56 @@ module HeapProperties where
               → ∀ {l : IndirectRef}
               → Σ & Δ ok
               → (StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean
-              → ∃[ b ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just (boolExpr b))
+              → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ boolExpr b)
   boolLookup (ok Δ _ boolContainment _ _) boolType@(Z {Δ'} {l} {a}) = boolContainment l boolType
   boolLookup (ok Δ _ boolContainment _ _) boolType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = boolContainment l boolType 
 
 
   -- =================== LEMMAS RELATED TO HEAP CONSISTENCY =================
+
+  -- If a location is in ρ, then there is a corresponding item in envTypesList.
+  findLocationInEnvTypes : ∀ {Σ Δ l o t₁}
+                           → (RT : RefTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o)
+                           →  All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
+                           → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
+                           → All (_⟷_ (contractType t₁)) (RefTypes.fieldTypesList RT)
+  findLocationInEnvTypes {Σ} {Δ} {l} {o} {t₁} RT envTypesCompatibleWithFieldTypes lInρ with (RefTypes.envTypes RT)
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {o} {t₁}
+    record { oTypesList = oTypesList ; oTypes = oTypes ; envTypesList = .(T ∷ R) ; envTypes = envTypes ; fieldTypesList = fieldTypesList }
+      (TCompat ∷ rest) lInρ |
+      envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ origEnvTypes lTInΔ lNotForbidden with l ≟ l₁
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {o} {t₁}
+    record { oTypesList = oTypesList ;
+             oTypes = oTypes ;
+             envTypesList = .(T ∷ R) ;
+             envTypes = envTypes ;
+             fieldTypesList = fieldTypesList }
+      (TCompat ∷ rest)
+      lInρ |
+      envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]}
+        .(Δ ,ₗ l ⦂ contractType t₁)
+        o₁
+        origEnvTypes
+        lTInΔ
+        lNotForbidden |
+          yes lEql₁ =
+        let
+          tEq : T ≡ contractType t₁
+          tEq = {!refl!}
+        in
+          {!!}
+  ...                                         | no lNeql₁ = {!!}
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {o} {t₁} RT
+    envTypesCompatibleWithFieldTypes lInρ |
+      envTypesConcatMatchNotFound {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ qq x =
+        {!!}
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {t₁} RT
+    envTypesCompatibleWithFieldTypes lInρ |
+      envTypesConcatMismatch {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ o' x qq =
+        {!!}    
+
+
+
   -- Changes in Δ that pertain to forbidden locations are irrelevant.
   envTypesForbiddenRefsObserved : ∀ {l forbiddenRefs T T' Σ R}
                                   → (Δ : StaticEnv)
@@ -636,19 +687,11 @@ module HeapProperties where
   fieldTypesListExtensionEq {Σ} {se varEnv locEnv Context.∅} {o} {l} {T₁} {T₃} = {!!}
   fieldTypesListExtensionEq {Σ} {se varEnv locEnv (objEnv Context., x ⦂ x₁)} {o} {l} {T₁} {T₃} = {!!}
 
-<<<<<<< HEAD
-  locationsInΔAreCompatibleWithFieldTypes : ∀ {Σ Δ l T o}
-                                          → (globalConsistency : Σ & Δ ok)
-                                          → (StaticEnv.locEnv Δ) ∋ l ⦂ contractType T
---                                          → All (λ T' → T ⟷ T') (refConsistency globalConsistency) (proj₁ (locLookup globalConsistency lInΔ))
-  locationsInΔAreCompatibleWithFieldTypes {Σ} {Δ} {l} {T} {o} globalConsistency = {!!} --  lInΔ = {!!}       
-=======
   locationsInΔAreCompatibleWithFieldTypes : ∀ {Σ Δ l T}
                                           → (globalConsistency : Σ & Δ ok)
                                           → (StaticEnv.locEnv Δ) ∋ l ⦂ contractType T
 --                                          → All (λ T' → T ⟷ T') (refConsistency globalConsistency) (proj₁ (locLookup globalConsistency lInΔ))
   locationsInΔAreCompatibleWithFieldTypes {Σ} {Δ} {l} {T} globalConsistency = {!!} --  lInΔ = {!!}       
->>>>>>> Progress from today.
 
              
 
@@ -684,8 +727,9 @@ module HeapProperties where
   splitReplacementOK : ∀ {Γ Σ Δ o o' l}
                        → {t₁ : Tc}
                        → {T₁ T₂ T₃ : Type}
-                       → T₁ ≡ (contractType t₁)
-                       → Σ & (Δ ,ₗ l ⦂ T₁) ok
+                       → (T₁EqctT₁ : T₁ ≡ (contractType t₁))
+                       → (globalConsistency : (Σ & (Δ ,ₗ l ⦂ T₁) ok))
+                       → o ≡ proj₁ (locLookup {T = t₁} globalConsistency (Eq.subst (λ a → StaticEnv.locEnv (Δ ,ₗ l ⦂ T₁) ∋ l ⦂ a) T₁EqctT₁ (TypeEnvContext.Z {StaticEnv.locEnv Δ} {l} {T₁}) ))
                        → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
                        → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o' RT
                        → Γ ⊢ T₁ ⇛ T₂ / T₃
@@ -693,6 +737,7 @@ module HeapProperties where
   splitReplacementOK {Γ} {Σ} {Δ} {o} {o'} {l} {t₁} {T₁} {T₂} {T₃}
     refl
     origConsis@(ok _ _ _ objLookup refConsistencyFunc)
+    refl
     RT
     rConnected@(isConnected _ oTypesListConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected)
     spl
@@ -733,18 +778,25 @@ module HeapProperties where
       -- Need to find the proof that T₁ is compatible with all the field types and use it directly. It has to be in there somewhere.
       -- Specifically, it has to be in envFieldConnected because T₁ has to have been in the old env types.
       lLookupResult = objLookup l t₁ Z
-      oForL = proj₁ lLookupResult
+      oForL = proj₁ lLookupResult -- If we look up l, we better get specifically o! But we don't know that yet. :(
       lInρ = proj₁ (proj₂ lLookupResult)
-      T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)
-      T₁CompatWithAllFieldTypes = {!
-        -- This is going to be one of the items in envFieldConnected. But how do we find it?
-        -- envFieldConnected is organized according to ρ.
-        ?
+      envFieldCrossConnect : All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
+      envFieldCrossConnect = envFieldInversion3 envFieldConnected
+      -- One of the items in envFieldCrossConnect is proof that T₁ is connected to everything in fieldTypesList! But which one?
 
-          
-          
-          
-!} -- TODO: Look inside envFieldConnected. Find l : o in ρ with o ≡ o', and then observe l : T₁ in (Δ ,ₗ l ⦂ T₁).
+--      T₁InEnvTypes : T₁ ∈ (RefTypes.envTypesList RT)
+--      T₁InEnvTypes = ?
+        -- This is going to be one of the items in envFieldCrossConnect. But how do we find it?
+        -- oConnectedToFieldTypes is organized according to ρ.
+        -- We don't know where in ρ l is, but lInρ is proof that it's in there.
+      lInρWitho' : RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o'
+      lInρWitho' = {!!}
+      T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)
+      
+      T₁CompatWithAllFieldTypes = 
+        findLocationInEnvTypes RT envFieldCrossConnect (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ) -- lInρ
+                 
+ -- TODO: Look inside envFieldConnected. Find l : o in ρ with o ≡ o', and then observe l : T₁ in (Δ ,ₗ l ⦂ T₁).
       
       TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToFieldTypes = T₁CompatWithAllFieldTypes ∷ []

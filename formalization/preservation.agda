@@ -69,21 +69,21 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
     -- Show that if you look up l in the new context, you get the same type as before.
     voidLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Void
-                  → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just voidExpr)))
+                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidExpr)))
     voidLookup' l' l'InΔ' with l' Data.Nat.≟ l
     voidLookup' l' (Context.S l'NeqL l'VoidType) | yes eq = ⊥-elim (l'NeqL eq)
     voidLookup' l' l'InΔ' | no nEq = voidLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
     boolLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Boolean
-                  → ∃[ b ] (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just (boolExpr b))))
+                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolExpr b)))
     boolLookup' l' l'InΔ' with l' Data.Nat.≟ l
     boolLookup' l' (Context.S l'NeqL l'BoolType) | yes eq = ⊥-elim (l'NeqL eq)
     boolLookup' l' l'InΔ' | no nEq = boolLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
     
-    objLookup' : (∀ (l' : IndirectRef) → ∀ (T : Tc)
+    objLookup' : (l' : IndirectRef) → (T : Tc)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
-                  → ∃[ o ] ((IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l' ≡ just (objRef o)) × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)))))
+                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
     objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
     objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
     objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
