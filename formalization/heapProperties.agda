@@ -245,8 +245,7 @@ module HeapProperties where
     referencesConsistent : ∀ {Σ : RuntimeEnv}
                          → ∀ {Δ : StaticEnv}
                          → ∀ {o : ObjectRef}
-                         → ∀ {RT : RefTypes Σ Δ o}
-                         → IsConnected Σ Δ o RT
+                         → ∃[ RT ] (IsConnected Σ Δ o RT)
                            -- TODO: add subtype constraint: C <: (refTypes Σ Δ o)
                          ---------------------------
                          → ReferenceConsistency Σ Δ o
@@ -587,15 +586,11 @@ module HeapProperties where
                             → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o RT
                             → Γ ⊢ T₁ ⇛ T₂ / T₃
                             → ∃[ RT' ] (IsConnected Σ (Δ ,ₗ l ⦂ T₃) o RT')
-  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rt rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl = ⟨
-                                                                                                                                                                    record
-                                                                                                                                                                    { oTypesList = {!!}
-                                                                                                                                                                    ; oTypes = {!!}
-                                                                                                                                                                    ; envTypesList = {!!}
-                                                                                                                                                                    ; envTypes = {!!}
-                                                                                                                                                                    ; fieldTypesList = {!!}
-                                                                                                                                                                    }
-                                                                                                                                                                    , {!!} ⟩ {-
+  lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rt rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl =
+    ⟨
+      record { oTypesList = {!!} ; oTypes = {!!}; envTypesList = {!!} ; envTypes = {!!}  ; fieldTypesList = RefTypes.fieldTypesList rt }
+      , {!!}
+    ⟩ {-
       isConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o) oConnected oAndFieldsConnected (oAndLsConnected' rConnected) {!!}
       where
         R' = refTypes Σ (Δ ,ₗ l ⦂ T₃) o
@@ -655,24 +650,24 @@ module HeapProperties where
   locationsInΔAreCompatibleWithFieldTypes {Σ} {Δ} {l} {T} globalConsistency = {!!} --  lInΔ = {!!}       
 >>>>>>> Progress from today.
 
+             
+
   splitReplacementRefFieldsOK : ∀ {Σ Δ o o' l T₁ T₃}
                                 → o' ≡ o
                                 → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
                                 → (RT' : RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o')
                                 → (refFieldsEq : RefTypes.fieldTypesList RT ≡ RefTypes.fieldTypesList RT')
                                 → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT)) (RefTypes.oTypesList RT)
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.oTypesList RT')
+          --                      → T₁ ∈ (RefTypes.oTypesList RT)
+                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) [ T₁ ]
   splitReplacementRefFieldsOK {Σ} {Δ} {o} {o'} {l} {T₁} {T₃} o'Eqo RT RT' refFieldsEq oConnectedToFieldTypes =
-    -- Things I know:
-    -- 1.  (RefTypes.oTypesList RT') ≡ [ T₁ ]
-    -- 2. Everything in the old field types was compatible with the garbage in (RefTypes.oTypesList RT), but I don't know what was there.
-
-    -- NEED TO KNOW: T₁ was previously compatible with everything in (RefTypes.fieldTypesList RT'), so it still is.
+      -- T₁ was previously compatible with everything in (RefTypes.fieldTypesList RT'), so it still is.
+      -- 
     -- In Σ (Δ ,ₗ l ⦂ T₁),  l was well-typed because we were able to look it up in Δ. But ρ(l) = o, and we should have Δ(o) = T₁ by some kind of consistency. But that kind of consistency doesn't seem to be included!
 
-    {!Eq.subst P refFieldsEq oConnectedToFieldTypes!}  --     
-    where
-      P = λ a → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList {_} {_} {_} a)) (RefTypes.oTypesList a)
+    {!!}  --     
+
+
   
   splitReplacementEnvFieldsOK : ∀ {Σ Δ o o' l T₁ T₃}
                                 → o' ≡ o
@@ -687,12 +682,17 @@ module HeapProperties where
   -- The idea here is that the expression in question is of type T₂, so the reference left in the heap is of type T₃.
   -- o corresponds to the bject that was affected by the split, whereas o' is the reference we are interested in analyzing aliases to.
   splitReplacementOK : ∀ {Γ Σ Δ o o' l}
+                       → {t₁ : Tc}
                        → {T₁ T₂ T₃ : Type}
+                       → T₁ ≡ (contractType t₁)
+                       → Σ & (Δ ,ₗ l ⦂ T₁) ok
                        → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
                        → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o' RT
                        → Γ ⊢ T₁ ⇛ T₂ / T₃
                        → ∃[ RT' ] (IsConnected Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o' RT')
-  splitReplacementOK {Γ} {Σ} {Δ} {o} {o'} {l} {T₁} {T₂} {T₃}
+  splitReplacementOK {Γ} {Σ} {Δ} {o} {o'} {l} {t₁} {T₁} {T₂} {T₃}
+    refl
+    origConsis@(ok _ _ _ objLookup refConsistencyFunc)
     RT
     rConnected@(isConnected _ oTypesListConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected)
     spl
@@ -727,8 +727,28 @@ module HeapProperties where
       TsForOsConnected : IsConnectedTypeList (RefTypes.oTypesList RT')
       TsForOsConnected = (Eq.subst (λ a → IsConnectedTypeList a) TsForOsIsRight (singleElementListsAreConnected T₁))
 
+      fieldTypesUnchanged :  _≡_ {_} {List Type} (RefTypes.fieldTypesList RT)  (RefTypes.fieldTypesList RT')
+      fieldTypesUnchanged = refl
+
+      -- Need to find the proof that T₁ is compatible with all the field types and use it directly. It has to be in there somewhere.
+      -- Specifically, it has to be in envFieldConnected because T₁ has to have been in the old env types.
+      lLookupResult = objLookup l t₁ Z
+      oForL = proj₁ lLookupResult
+      lInρ = proj₁ (proj₂ lLookupResult)
+      T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)
+      T₁CompatWithAllFieldTypes = {!
+        -- This is going to be one of the items in envFieldConnected. But how do we find it?
+        -- envFieldConnected is organized according to ρ.
+        ?
+
+          
+          
+          
+!} -- TODO: Look inside envFieldConnected. Find l : o in ρ with o ≡ o', and then observe l : T₁ in (Δ ,ₗ l ⦂ T₁).
+      
       TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.oTypesList RT')
-      TsForOsConnectedToFieldTypes = splitReplacementRefFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' refl oConnectedToFieldTypes
+      TsForOsConnectedToFieldTypes = T₁CompatWithAllFieldTypes ∷ []
+      --splitReplacementRefFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' fieldTypesUnchanged oConnectedToFieldTypes
 
       T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) TsForOs
       T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' oConnectedToLTypes
