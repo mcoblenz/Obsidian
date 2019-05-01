@@ -124,3 +124,11 @@ module Context (A : Set) where
   lookupWeakening {Γ} {x} {x'} {t} {t'} Γcontainment with x ≟ x'
   ...                                                 | yes refl = ⟨ t' , Z {Γ = Γ} {x = x'} {a = t'} ⟩
   ...                                                 | no neq =  ⟨ t , S neq Γcontainment ⟩
+
+  ∌dom-≢ : {Γ : ctx}
+           → ∀ {x x' t}
+           → x ∌dom (Γ , x' ⦂ t)
+           → x ≢ x'
+
+  ∌dom-≢ {Γ} {x} {x'} {t} (notInNonempty xNeqx' xNotInΓ') xEqx' = xNeqx' xEqx'
+           

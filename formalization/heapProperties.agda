@@ -335,18 +335,80 @@ module HeapProperties where
 
   -- =================== LEMMAS RELATED TO HEAP CONSISTENCY =================
 
+  --foo : ℕ → ℕ → ℕ
+  --foo = (n m : ℕ) with n ≟ m
+
+
   -- If a location is in ρ, then there is a corresponding item in envTypesList.
+  findLocationInEnvTypes : ∀ {Σ Δ l o t₁ forbiddenRefs}
+                           → (fieldTypesList : List Type)
+                           → (envTypesList : List Type)
+                           → EnvTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o forbiddenRefs envTypesList
+                           → All (λ T → All (_⟷_ T) fieldTypesList) envTypesList
+                           → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
+--→ All (_⟷_ (contractType t₁)) fieldTypes
+                           → contractType t₁ ∈ₜ envTypesList
+-- The argument will have the form: look, I found contractType t₁ in envTypes, so it must be compatible with everything in fieldTypes already.
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} fieldTypesList .(T ∷ R)
+    (envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o envTypes l₁HasTypeT l₁NotForbidden)
+    (TCompatWithFieldTypes ∷ RCompatWithFieldTypes) lInρ with l ≟ l₁
+  ... | yes lEql₁ =
+    -- We must have contractType t₁ ≡ T because we looked up l in (Δ ,ₗ l ⦂ contractType t₁).
+    let
+      lInΔ' : ((StaticEnv.locEnv Δ) , l ⦂ contractType t₁) ∋ l ⦂ contractType t₁
+      lInΔ' = Z
+      TEqContractTypet₁ : T ≡ contractType t₁
+      TEqContractTypet₁ = contextLookupUnique l₁HasTypeT (Eq.subst (λ a → (StaticEnv.locEnv Δ) TypeEnvContext., l ⦂ contractType t₁ ∋ a ⦂ contractType t₁) lEql₁ lInΔ')
+    in
+      here (Eq.sym TEqContractTypet₁)
+  ... | no lNeql₁ =
+      -- envTypesList is T ∷ R, but T is not the one we were interested in. l ⦂ o is in ρ, but not at the end.
+      -- Eventually we'll look up l in  (Δ ,ₗ l ⦂ contractType t₁) and find contractType t₁.
+    let
+      lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
+    in
+      there (findLocationInEnvTypes {re μ ρ φ ψ} {Δ} {l} {o} {t₁} fieldTypesList R envTypes RCompatWithFieldTypes lInRestOfρ)
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} fieldTypesList envTypesList
+    (envTypesConcatMatchNotFound {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o envTypes lNotInΔ')
+    envTypesCompatibleWithFieldTypes lInρ =
+      let
+        lNeql₁ = ≢-sym (∌dom-≢ lNotInΔ')
+        lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
+      in
+      findLocationInEnvTypes fieldTypesList envTypesList envTypes envTypesCompatibleWithFieldTypes lInRestOfρ 
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {t₁} fieldTypesList envTypesList
+    (envTypesConcatMismatch {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o o' oNeqo' envTypes)
+    envTypesCompatibleWithFieldTypes lInρ =
+      let
+        lInRestOfρ = {!!}
+      in
+        {!findLocationInEnvTypes fieldTypesList envTypesList envTypes envTypesCompatibleWithFieldTypes lInRestOfρ!}
+
+  prevCompatibilityImpliesFieldTypesCompatibility : ∀ {Σ Δ l o t₁}
+                                                    → (RT : RefTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o)
+                                                    →  All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
+                                                    → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
+                                                    → All (_⟷_ (contractType t₁)) (RefTypes.fieldTypesList RT)
+  prevCompatibilityImpliesFieldTypesCompatibility {Σ} {Δ} {l} {o} {t₁} RT envTypesCompatibleWithFieldTypes lInρ = 
+    let
+      t₁InEnvTypes = findLocationInEnvTypes (RefTypes.fieldTypesList RT) (RefTypes.envTypesList RT) (RefTypes.envTypes RT) envTypesCompatibleWithFieldTypes lInρ
+    in
+      Data.List.Relation.Unary.All.lookup envTypesCompatibleWithFieldTypes t₁InEnvTypes             
+
+
+{-              
   findLocationInEnvTypes : ∀ {Σ Δ l o t₁}
                            → (RT : RefTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o)
                            →  All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
                            → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
                            → All (_⟷_ (contractType t₁)) (RefTypes.fieldTypesList RT)
+           
   findLocationInEnvTypes {Σ} {Δ} {l} {o} {t₁} RT envTypesCompatibleWithFieldTypes lInρ with (RefTypes.envTypes RT)
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {o} {t₁}
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁}
     record { oTypesList = oTypesList ; oTypes = oTypes ; envTypesList = .(T ∷ R) ; envTypes = envTypes ; fieldTypesList = fieldTypesList }
       (TCompat ∷ rest) lInρ |
-      envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ origEnvTypes lTInΔ lNotForbidden with l ≟ l₁
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {o} {t₁}
+      envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o origEnvTypes lTInΔ lNotForbidden with l ≟ l₁
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁}
     record { oTypesList = oTypesList ;
              oTypes = oTypes ;
              envTypesList = .(T ∷ R) ;
@@ -361,12 +423,25 @@ module HeapProperties where
         lTInΔ
         lNotForbidden |
           yes lEql₁ =
+          -- We found l₁ : o at the end of ρ when looking for o.
+          -- Then we looked up l₁ in Δ, l ⦂ contractType t₁ and got T. If T is contractType t₁, we're done. Otherwise, we need to recurse with the rest.
+          -- What's the argument for why we can make the recursive call? Ugh.
+
+          -- Why do I say that l : o should be in ρ? It's the last arg of this function!
         let
           tEq : T ≡ contractType t₁
-          tEq = {!refl!}
+          tEq = {!!}
         in
           {!!}
-  ...                                         | no lNeql₁ = {!!}
+  ... | no lNeql₁ = 
+    let 
+    -- We found something in Δ ,ₗ l ⦂ contradctType t₁ when we looked up l₁, but that was the same as whatever we would have gotten in Δ. Make a recursive call.
+    
+      lTInOrigΔ : (StaticEnv.locEnv Δ) ∋ l₁ ⦂ T
+      lTInOrigΔ = irrelevantReductionsOK lTInΔ (≢-sym lNeql₁)
+    in
+      {!findLocationInEnvTypes !}
+
   findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {o} {t₁} RT
     envTypesCompatibleWithFieldTypes lInρ |
       envTypesConcatMatchNotFound {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ qq x =
@@ -375,7 +450,7 @@ module HeapProperties where
     envTypesCompatibleWithFieldTypes lInρ |
       envTypesConcatMismatch {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ o' x qq =
         {!!}    
-
+-}
 
 
   -- Changes in Δ that pertain to forbidden locations are irrelevant.
@@ -793,8 +868,8 @@ module HeapProperties where
       lInρWitho' = {!!}
       T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)
       
-      T₁CompatWithAllFieldTypes = 
-        findLocationInEnvTypes RT envFieldCrossConnect (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ) -- lInρ
+      T₁CompatWithAllFieldTypes =
+        prevCompatibilityImpliesFieldTypesCompatibility RT envFieldCrossConnect (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ) -- lInρ
                  
  -- TODO: Look inside envFieldConnected. Find l : o in ρ with o ≡ o', and then observe l : T₁ in (Δ ,ₗ l ⦂ T₁).
       
