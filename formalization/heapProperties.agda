@@ -335,10 +335,6 @@ module HeapProperties where
 
   -- =================== LEMMAS RELATED TO HEAP CONSISTENCY =================
 
-  --foo : ℕ → ℕ → ℕ
-  --foo = (n m : ℕ) with n ≟ m
-
-
   -- If a location is in ρ, then there is a corresponding item in envTypesList.
   findLocationInEnvTypes : ∀ {Σ Δ l o t₁ forbiddenRefs}
                            → (fieldTypesList : List Type)
@@ -346,7 +342,6 @@ module HeapProperties where
                            → EnvTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o forbiddenRefs envTypesList
                            → All (λ T → All (_⟷_ T) fieldTypesList) envTypesList
                            → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
---→ All (_⟷_ (contractType t₁)) fieldTypes
                            → contractType t₁ ∈ₜ envTypesList
 -- The argument will have the form: look, I found contractType t₁ in envTypes, so it must be compatible with everything in fieldTypes already.
   findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} fieldTypesList .(T ∷ R)
@@ -462,10 +457,6 @@ module HeapProperties where
   ... | yes p = ⊥-elim (oNeq p)
   ... | no ¬p = refl
 
-  cong₃ : ∀ {a b c d} {A : Set a} {B : Set b} {C : Set c} {D : Set d}
-        (f : A → B → C → D) {x y u v w t} → x ≡ y → u ≡ v → w ≡ t → f x u w ≡ f y v t
-  cong₃ f refl refl refl = refl
-
 
   irrelevantRefTypesExtensionO : ∀ {Σ Δ o o' T}
                                 → o' ≢ o
@@ -537,13 +528,13 @@ module HeapProperties where
     origCompat TCompatCompatibility | no lNotInForbiddenRefs =
       ⟨ [] , ⟨ envTypesEmpty , [] ⟩ ⟩
 
-  TCompatibleWithAllNewEnvTypes' : ∀ {Γ Σ Δ l o T₁ T₂ T₃ Ts}
+  TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃ Ts}
                                    → (T : Type)
                                    → EnvTypes Σ (Δ ,ₗ l ⦂ T₁) o [] Ts
                                    → All (λ T' → T ⟷ T') Ts
                                    → Γ ⊢ T₁ ⇛ T₂ / T₃
                                    → ∃[ Ts' ] ((EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o [] Ts') × All (λ T' → T ⟷ T') Ts')
-  TCompatibleWithAllNewEnvTypes' {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} T
+  TCompatibleWithAllNewEnvTypes {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} T
     origMatch@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₄} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes lookupResult lNotForbidden)
     (TCompat ∷ RCompat)
     spl with l₁ ≟ l
@@ -604,23 +595,23 @@ module HeapProperties where
       in
         ⟨ Ts' , ⟨ envTypesTs' , Ts'Compat ⟩ ⟩
 
-  TCompatibleWithAllNewEnvTypes' {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} T
+  TCompatibleWithAllNewEnvTypes {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} T
     (envTypesConcatMatchNotFound {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes l₁NotInΔ') origCompat spl =
     let
-      compatibilityWithOrigρ = TCompatibleWithAllNewEnvTypes' T origEnvTypes origCompat spl
+      compatibilityWithOrigρ = TCompatibleWithAllNewEnvTypes T origEnvTypes origCompat spl
       envTypes = envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T₃) o (proj₁ (proj₂ compatibilityWithOrigρ)) (∌domPreservation l₁NotInΔ' )
     in
       ⟨ proj₁ compatibilityWithOrigρ , ⟨ envTypes , proj₂ (proj₂ compatibilityWithOrigρ) ⟩ ⟩
       
-  TCompatibleWithAllNewEnvTypes' {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} T
+  TCompatibleWithAllNewEnvTypes {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} T
     (envTypesConcatMismatch {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o o' oNeqo' origEnvTypes) origCompat spl =
       let
-        compatibilityWithOrigρ = TCompatibleWithAllNewEnvTypes' T origEnvTypes origCompat spl
+        compatibilityWithOrigρ = TCompatibleWithAllNewEnvTypes T origEnvTypes origCompat spl
         envTypes = envTypesConcatMismatch (Δ ,ₗ l ⦂ T₃) o o' oNeqo' (proj₁ (proj₂ compatibilityWithOrigρ))
       in
         ⟨ proj₁ compatibilityWithOrigρ , ⟨ envTypes , proj₂ (proj₂ compatibilityWithOrigρ) ⟩ ⟩
       
-  TCompatibleWithAllNewEnvTypes' {Γ} {.(re μ IndirectRefContext.∅ φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.[]} T
+  TCompatibleWithAllNewEnvTypes {Γ} {.(re μ IndirectRefContext.∅ φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.[]} T
     (envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T₁)} {o = .o}) origCompat spl =
       ⟨ [] , ⟨ envTypesEmpty , [] ⟩ ⟩
 
@@ -708,16 +699,6 @@ module HeapProperties where
                                → IsConnectedEnvAndField  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o' RT'
   splitReplacementEnvFieldOK = {!!}
 
-  fieldTypesListExtensionEq2 :  ∀ {Σ Δ o l T₁ T₃}
-                            →  refFieldTypes Σ (Δ ,ₗ l ⦂ T₁) o ≡ refFieldTypes Σ (Δ ,ₗ l ⦂ T₃) o
-  fieldTypesListExtensionEq2 = {!!}     
-
-  fieldTypesListExtensionEq :  ∀ {Σ Δ o l T₁ T₃}
-                           →  refFieldTypes Σ (Δ ,ₗ l ⦂ T₁) o ≡ refFieldTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o
-  fieldTypesListExtensionEq {Σ} {se varEnv locEnv Context.∅} {o} {l} {T₁} {T₃} = {!!}
-  fieldTypesListExtensionEq {Σ} {se varEnv locEnv (objEnv Context., x ⦂ x₁)} {o} {l} {T₁} {T₃} = {!!}
-
-
   splitReplacementEnvFieldsOK : ∀ {Σ Δ o o' l T₁ T₃}
                                 → o' ≡ o
                                 → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
@@ -778,9 +759,6 @@ module HeapProperties where
       TsForOsConnected : IsConnectedTypeList (RefTypes.oTypesList RT')
       TsForOsConnected = (Eq.subst (λ a → IsConnectedTypeList a) TsForOsIsRight (singleElementListsAreConnected T₁))
 
-      fieldTypesUnchanged :  _≡_ {_} {List Type} (RefTypes.fieldTypesList RT)  (RefTypes.fieldTypesList RT')
-      fieldTypesUnchanged = refl
-
       -- Need to find the proof that T₁ is compatible with all the field types and use it directly. It has to be in there somewhere.
       -- Specifically, it has to be in envFieldConnected because T₁ has to have been in the old env types.
       lLookupResult = objLookup l t₁ Z
@@ -797,14 +775,15 @@ module HeapProperties where
       TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToFieldTypes = T₁CompatWithAllFieldTypes ∷ []
 
-      T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) TsForOs
-      T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' oConnectedToLTypes
+      -- T₁ was previously in the env types, so it must already be compatible with everything in there.
+      T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) [ T₁ ]
+      T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' oConnectedToLTypes -- XXX
 
       TsForOsConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) a) TsForOsIsRight T₁ConnectedToLTypes
 
       envAndFieldConnected : IsConnectedEnvAndField Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o' RT'
-      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {o'} {l} osEq RT envFieldConnected spl RT'
+      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {o'} {l} osEq RT envFieldConnected spl RT' -- XXX
     in
      ⟨ RT' , isConnected RT' TsForOsConnected  TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected ⟩
   ... | no osNeq =

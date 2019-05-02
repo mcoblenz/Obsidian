@@ -53,6 +53,11 @@ module Prelude where
           → x' ≢ x
   ≢-sym xNeqx' = λ x'Eqx → xNeqx' (Eq.sym x'Eqx)
 
+-- Congruence
+  cong₃ : ∀ {a b c d} {A : Set a} {B : Set b} {C : Set c} {D : Set d}
+        (f : A → B → C → D) {x y u v w t} → x ≡ y → u ≡ v → w ≡ t → f x u w ≡ f y v t
+  cong₃ f refl refl refl = refl
+
 {-
 -- equality of naturals is decidable. we represent this as computing a
   -- choice of units, with inl <> meaning that the naturals are indeed the
