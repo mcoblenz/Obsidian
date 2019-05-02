@@ -476,66 +476,15 @@ module HeapProperties where
       cong₃ (λ a → λ b → λ c → rt a b c) ctxTypesEq envTypesEq refFieldTypesEq
 -}
 
-  EnvTypesChangeForΔReplacement : ∀ {Σ Δ l T T' TCompat o R forbiddenRefs } -- TCompat is something that everything in R is compatible with.
-                                  → EnvTypes Σ (Δ ,ₗ l ⦂ T) o forbiddenRefs R
-                                  → All (λ T' → TCompat ⟷ T') R
-                                  → (TCompat ⟷ T → (TCompat ⟷ T')) -- If TCompat was compatible with T, then TCompat is compatible with T'.
-                                  → ∃[ R' ] (EnvTypes Σ (Δ ,ₗ l ⦂ T') o forbiddenRefs R' ×  All (λ T' → TCompat ⟷ T') R')
-                                  
-  EnvTypesChangeForΔReplacement {Σ} {Δ} {l} {T} {T'} {TCompat} {o} {R} {forbiddenRefs} origEnvTypes origCompat TCompatCompatibility with (l ∈? forbiddenRefs)
-  ... | yes lInForbiddenRefs = ⟨ R , ⟨ envTypesForbiddenRefsObserved Δ o lInForbiddenRefs origEnvTypes , origCompat ⟩ ⟩
 
--- Two cases for envTypesConcatMatchFound: either l₁ is the last thing in Δ, in which case we're going to find T', or it's not, in which case we recurse with the rest of the list.
-  EnvTypesChangeForΔReplacement {.(re μ (ρ IndirectRefContext., l ⦂ objRef o) φ ψ)} {Δ} {l} {T} {T'} {TCompat} {o} {.(T ∷ R)} {forbiddenRefs}
-    (envTypesConcatMatchFound {R = R} {l = l} {T = .T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T) o origEnvTypes (Context.Z {Γ = .(StaticEnv.locEnv Δ)} {x = .l} {a = .T}) x₁) (TCompatCompatWithT ∷ TCompatWithR) TCompatCompatibility | no lNotInForbiddenRefs = 
-    let
-      R' = T' ∷ R
-      envTypesR' = envTypesConcatMatchFound (Δ ,ₗ l ⦂ T') o (envTypesForbiddenRefsObserved Δ o (here refl) origEnvTypes) Z x₁
-      TCompatWithT' : TCompat ⟷ T'
-      TCompatWithT' = TCompatCompatibility TCompatCompatWithT
-    in
-      ⟨ R' , ⟨ envTypesR' , TCompatWithT' ∷ TCompatWithR ⟩ ⟩
-  EnvTypesChangeForΔReplacement {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {T} {T'} {TCompat} {o} {.(T₁ ∷ R)} {forbiddenRefs}
-    envTypes@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T) o origEnvTypes (Context.S {Γ = .(StaticEnv.locEnv Δ)} {x = .l₁} {y = .l} {a = .T₁} {b = .T} l₁Neql l₁HasTypeT₁) l₁NotInForbiddenRefs) (T₁Compat ∷ RCompat) TCompatCompatibility | no lNotInForbiddenRefs =
-      let
-        rest = EnvTypesChangeForΔReplacement {Σ = re μ ρ φ ψ} {Δ} {l} {T} {T'} {TCompat} {o} {R} origEnvTypes RCompat TCompatCompatibility
-        R' = T₁ ∷ (proj₁ rest)
-        envTypesR' = envTypesConcatMatchFound (Δ ,ₗ l ⦂ T') o (proj₁ (proj₂ rest)) (S l₁Neql l₁HasTypeT₁) l₁NotInForbiddenRefs
-        restCompatibleWithTCompat = proj₂ (proj₂ rest)
-      in
-        ⟨ R' , ⟨ envTypesR' , T₁Compat ∷ restCompatibleWithTCompat ⟩ ⟩
--- Other cases for EnvTypes...
-  EnvTypesChangeForΔReplacement {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {T} {T'} {TCompat} {o} {R} {forbiddenRefs}
-    (envTypesConcatMatchNotFound {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T) o origEnvTypes l₁NotInDomΔ')
-    origCompat TCompatCompatibility | no lNotInForbiddenRefs =
-      let
-        origEnvTypesChange = EnvTypesChangeForΔReplacement origEnvTypes origCompat TCompatCompatibility
-        envTypesR = envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T') o (proj₁ (proj₂ origEnvTypesChange)) (∌domPreservation l₁NotInDomΔ')
-      in
-        ⟨ proj₁ origEnvTypesChange , ⟨ envTypesR , proj₂ (proj₂ origEnvTypesChange) ⟩ ⟩
-  
-  EnvTypesChangeForΔReplacement {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {T} {T'} {TCompat} {o} {R} {forbiddenRefs}
-    (envTypesConcatMismatch {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T)
-    o o' oNeqO' origEnvTypes) origCompat TCompatCompatibility | no lNotInForbiddenRefs =
-      let
-        origEnvTypesChange = EnvTypesChangeForΔReplacement origEnvTypes origCompat TCompatCompatibility
-        envTypesR = envTypesConcatMismatch (Δ ,ₗ l ⦂ T') o o' oNeqO' (proj₁ (proj₂ origEnvTypesChange))
-      in
-        ⟨ proj₁ origEnvTypesChange , ⟨ envTypesR , proj₂ (proj₂ origEnvTypesChange) ⟩ ⟩
-  
-  EnvTypesChangeForΔReplacement {.(re μ IndirectRefContext.∅ φ ψ)} {Δ} {l} {T} {T'} {TCompat} {o} {.[]} {forbiddenRefs}
-    (envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T)} {o = .o} {forbiddenRefs = .forbiddenRefs})
-    origCompat TCompatCompatibility | no lNotInForbiddenRefs =
-      ⟨ [] , ⟨ envTypesEmpty , [] ⟩ ⟩
-
-  TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃ Ts}
+  TCompatibleWithAllNewEnvTypes : ∀ {Γ Σ Δ l o T₁ T₂ T₃ Ts forbiddenRefs}
                                    → (T : Type)
-                                   → EnvTypes Σ (Δ ,ₗ l ⦂ T₁) o [] Ts
+                                   → EnvTypes Σ (Δ ,ₗ l ⦂ T₁) o forbiddenRefs Ts
                                    → All (λ T' → T ⟷ T') Ts
                                    → Γ ⊢ T₁ ⇛ T₂ / T₃
-                                   → ∃[ Ts' ] ((EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o [] Ts') × All (λ T' → T ⟷ T') Ts')
-  TCompatibleWithAllNewEnvTypes {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} T
-    origMatch@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₄} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes lookupResult lNotForbidden)
+                                   → ∃[ Ts' ] ((EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o forbiddenRefs Ts') × All (λ T' → T ⟷ T') Ts')
+  TCompatibleWithAllNewEnvTypes {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} {forbiddenRefs} T
+    origMatch@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₄} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes lookupResult l₁NotForbidden)
     (TCompat ∷ RCompat)
     spl with l₁ ≟ l
   ... | yes eq
@@ -552,17 +501,17 @@ module HeapProperties where
         T₄EqT₁ : T₄ ≡ T₁
         T₄EqT₁ = contextLookupUnique lookupResultWithl Z
 
-        origEnvTypesWithL : EnvTypes (re μ ρ φ ψ) (Δ ,ₗ l₁ ⦂ T₁) o (l₁ ∷ []) R
-        origEnvTypesWithL = Eq.subst (λ a → EnvTypes (re μ ρ φ ψ) (Δ ,ₗ a ⦂ T₁) o (l₁ ∷ []) R) (Eq.sym eq) origEnvTypes
+        origEnvTypesWithL : EnvTypes (re μ ρ φ ψ) (Δ ,ₗ l₁ ⦂ T₁) o (l₁ ∷ forbiddenRefs) R
+        origEnvTypesWithL = Eq.subst (λ a → EnvTypes (re μ ρ φ ψ) (Δ ,ₗ a ⦂ T₁) o (l₁ ∷ forbiddenRefs) R) (Eq.sym eq) origEnvTypes
 
         forbiddenOK = envTypesForbiddenRefsObserved {T' = T₃} Δ o (here refl) origEnvTypesWithL
-        forbiddenOKInL₁ : EnvTypes (re μ ρ φ ψ) (Δ ,ₗ l ⦂ T₃) o (l₁ ∷ []) R
-        forbiddenOKInL₁ = Eq.subst (λ a →  EnvTypes (re μ ρ φ ψ) (Δ ,ₗ a ⦂ T₃) o (l₁ ∷ []) R) eq forbiddenOK
+        forbiddenOKInL₁ : EnvTypes (re μ ρ φ ψ) (Δ ,ₗ l ⦂ T₃) o (l₁ ∷ forbiddenRefs) R
+        forbiddenOKInL₁ = Eq.subst (λ a →  EnvTypes (re μ ρ φ ψ) (Δ ,ₗ a ⦂ T₃) o (l₁ ∷ forbiddenRefs) R) eq forbiddenOK
 
         -- We already know that the first match in ρ for o is l, so the new Ts' has to be right.
-        envTypesTs' : EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o [] Ts'
+        envTypesTs' : EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o forbiddenRefs Ts'
         envTypesTs' = envTypesConcatMatchFound {l = l₁} (Δ ,ₗ l ⦂ T₃) o forbiddenOKInL₁
-          (Eq.subst (λ a →  StaticEnv.locEnv Δ , a ⦂ T₃ ∋ l₁ ⦂ T₃) eq Z) emptyListIsEmpty
+          (Eq.subst (λ a →  StaticEnv.locEnv Δ , a ⦂ T₃ ∋ l₁ ⦂ T₃) eq Z) l₁NotForbidden
 
         TCompatWithT₁ : T ⟷ T₁
         TCompatWithT₁ = Eq.subst (λ a → T ⟷ a) T₄EqT₁ TCompat
@@ -578,14 +527,15 @@ module HeapProperties where
         -- Because we're in envTypeConcatMatchFound, l₁ ⦂ o was at the end of the context, and we found l₁ ⦂ T₄ in Δ , l ⦂ T₁.
         -- But l ≢ l₁, so we will be able to find l₁ ⦂ T₄ in Δ and use the same rule.
         -- However, there may be l's in ρ, which may result in a different R than before! Some T₁'s may be replaced with T₃'s.
-        R'WithProof = EnvTypesChangeForΔReplacement {T' = T₃} {TCompat = T} origEnvTypes RCompat (λ compat → proj₂ (splittingRespectsHeap spl compat))
+        --R'WithProof = EnvTypesChangeForΔReplacement {T' = T₃} {TCompat = T} origEnvTypes RCompat (λ compat → proj₂ (splittingRespectsHeap spl compat))
+        R'WithProof = TCompatibleWithAllNewEnvTypes T origEnvTypes RCompat spl
         R' = proj₁ R'WithProof
         Ts' = T₄ ∷ R'
         
         l₁InΔ : ((StaticEnv.locEnv Δ) , l ⦂ T₃) ∋ l₁ ⦂ T₄
         l₁InΔ = irrelevantExtensionsOK {t = T₄} {t' = T₃} (irrelevantReductionsOK lookupResult nEq) nEq
 
-        envTypesTs' = envTypesConcatMatchFound (Δ ,ₗ l ⦂ T₃) o (proj₁ (proj₂ R'WithProof)) l₁InΔ emptyListIsEmpty
+        envTypesTs' = envTypesConcatMatchFound (Δ ,ₗ l ⦂ T₃) o (proj₁ (proj₂ R'WithProof)) l₁InΔ l₁NotForbidden
 
         R'Compat : All (λ T' → T ⟷ T') R'
         R'Compat = proj₂ (proj₂ R'WithProof)
