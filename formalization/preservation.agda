@@ -64,7 +64,7 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
   where
     splT = splitType spl
     Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT) -- This is the result of checking e.
-    Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₁ splT) -- This is the typing context in which we need to typecheck e'.
+    Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₂ splT) -- This is the typing context in which we need to typecheck e'.
     --Δ = Δ₀ ,ₗ l ⦂ (SplitType.t₁ splT)
     -- Show that if you look up l in the new context, you get the same type as before.
     voidLookup' : (∀ (l' : IndirectRef)
@@ -98,7 +98,7 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₃ = contractT
       let
         origRefConsistency = refConsistencyFunc o' o'Inμ
         origConnected = referencesConsistentImpliesConnectivity {Σ} {Δ} origRefConsistency -- inversion
-        newConnected = splitReplacementOK {Γ} {Σ} {Δ₀} {o} {o'} {l} {t₁} {SplitType.t₁ splT} {SplitType.t₂ splT} {SplitType.t₃ splT} refl consis (proj₁ origConnected) (proj₂ origConnected) spl
+        newConnected = splitReplacementOK {Γ} {Σ} {Δ₀} {o} {o'} {l} {t₁} {SplitType.t₁ splT} {SplitType.t₂ splT} {SplitType.t₃ splT} refl refl consis {!!} (proj₁ origConnected) (proj₂ origConnected) spl
       in 
         referencesConsistent {_} {_} {o'} newConnected
 
