@@ -380,9 +380,12 @@ module HeapProperties where
     (envTypesConcatMismatch {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o o' oNeqo' envTypes)
     envTypesCompatibleWithFieldTypes lInρ =
       let
-        lInRestOfρ = {!!}
+        -- from o ≢ o' I need to prove that objRef o ≢ objRef o'
+        -- so I assume objRef o ≡ objRef o' and derive o ≡ o', which is a contradiction.
+        oExprNeqo'Expr = λ objRefsEq → (objRefInjective oNeqo') (Eq.sym objRefsEq)
+        lInRestOfρ = IndirectRefContext.irrelevantReductionsInValuesOK lInρ oExprNeqo'Expr 
       in
-        {!findLocationInEnvTypes fieldTypesList envTypesList envTypes envTypesCompatibleWithFieldTypes lInRestOfρ!}
+        findLocationInEnvTypes fieldTypesList envTypesList envTypes envTypesCompatibleWithFieldTypes lInRestOfρ
 
   prevCompatibilityImpliesFieldTypesCompatibility : ∀ {Σ Δ l o t₁}
                                                     → (RT : RefTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o)
@@ -395,65 +398,6 @@ module HeapProperties where
     in
       Data.List.Relation.Unary.All.lookup envTypesCompatibleWithFieldTypes t₁InEnvTypes             
 
-
-{-              
-  findLocationInEnvTypes : ∀ {Σ Δ l o t₁}
-                           → (RT : RefTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o)
-                           →  All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
-                           → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
-                           → All (_⟷_ (contractType t₁)) (RefTypes.fieldTypesList RT)
-           
-  findLocationInEnvTypes {Σ} {Δ} {l} {o} {t₁} RT envTypesCompatibleWithFieldTypes lInρ with (RefTypes.envTypes RT)
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁}
-    record { oTypesList = oTypesList ; oTypes = oTypes ; envTypesList = .(T ∷ R) ; envTypes = envTypes ; fieldTypesList = fieldTypesList }
-      (TCompat ∷ rest) lInρ |
-      envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o origEnvTypes lTInΔ lNotForbidden with l ≟ l₁
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁}
-    record { oTypesList = oTypesList ;
-             oTypes = oTypes ;
-             envTypesList = .(T ∷ R) ;
-             envTypes = envTypes ;
-             fieldTypesList = fieldTypesList }
-      (TCompat ∷ rest)
-      lInρ |
-      envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]}
-        .(Δ ,ₗ l ⦂ contractType t₁)
-        o₁
-        origEnvTypes
-        lTInΔ
-        lNotForbidden |
-          yes lEql₁ =
-          -- We found l₁ : o at the end of ρ when looking for o.
-          -- Then we looked up l₁ in Δ, l ⦂ contractType t₁ and got T. If T is contractType t₁, we're done. Otherwise, we need to recurse with the rest.
-          -- What's the argument for why we can make the recursive call? Ugh.
-
-          -- Why do I say that l : o should be in ρ? It's the last arg of this function!
-        let
-          tEq : T ≡ contractType t₁
-          tEq = {!!}
-        in
-          {!!}
-  ... | no lNeql₁ = 
-    let 
-    -- We found something in Δ ,ₗ l ⦂ contradctType t₁ when we looked up l₁, but that was the same as whatever we would have gotten in Δ. Make a recursive call.
-    
-      lTInOrigΔ : (StaticEnv.locEnv Δ) ∋ l₁ ⦂ T
-      lTInOrigΔ = irrelevantReductionsOK lTInΔ (≢-sym lNeql₁)
-    in
-      {!findLocationInEnvTypes !}
-
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {o} {t₁} RT
-    envTypesCompatibleWithFieldTypes lInρ |
-      envTypesConcatMatchNotFound {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ qq x =
-        {!!}
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {t₁} RT
-    envTypesCompatibleWithFieldTypes lInρ |
-      envTypesConcatMismatch {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ contractType t₁) o₁ o' x qq =
-        {!!}    
--}
-
-
-  -- Changes in Δ that pertain to forbidden locations are irrelevant.
   envTypesForbiddenRefsObserved : ∀ {l forbiddenRefs T T' Σ R}
                                   → (Δ : StaticEnv)
                                   → (o : ObjectRef)
@@ -707,16 +651,27 @@ module HeapProperties where
       envTypesEmpty
 
 
+-- TODO: lExtensionEnvTypes
+
+
   lExtensionCompatibility : ∀ {Γ Σ Δ l T₁ T₂ T₃ o}
                             → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                             → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o RT
                             → Γ ⊢ T₁ ⇛ T₂ / T₃
                             → ∃[ RT' ] (IsConnected Σ (Δ ,ₗ l ⦂ T₃) o RT')
   lExtensionCompatibility {Γ} {Σ} {Δ} {l} {T₁} {T₂} {T₃} {o} rt rConnected@(isConnected R oConnected oAndFieldsConnected oAndLsConnected envFieldConnected) spl =
-    ⟨
-      record { oTypesList = {!!} ; oTypes = {!!}; envTypesList = {!!} ; envTypes = {!!}  ; fieldTypesList = RefTypes.fieldTypesList rt }
-      , {!!}
-    ⟩ {-
+    let
+      envTypes = {!envTypeCompatibility rt rConnected spl!}
+    in
+      ⟨
+        record { oTypesList = RefTypes.oTypesList rt ;
+                 oTypes = RefTypes.oTypes rt ;
+                 envTypesList = {!proj₁ envTypes!} ;
+                 envTypes = proj₂ envTypes ;
+                 fieldTypesList = RefTypes.fieldTypesList rt
+               }
+        , {!!}
+      ⟩ {-
       isConnected (refTypes Σ (Δ ,ₗ l ⦂ T₃) o) oConnected oAndFieldsConnected (oAndLsConnected' rConnected) {!!}
       where
         R' = refTypes Σ (Δ ,ₗ l ⦂ T₃) o
@@ -762,31 +717,7 @@ module HeapProperties where
   fieldTypesListExtensionEq {Σ} {se varEnv locEnv Context.∅} {o} {l} {T₁} {T₃} = {!!}
   fieldTypesListExtensionEq {Σ} {se varEnv locEnv (objEnv Context., x ⦂ x₁)} {o} {l} {T₁} {T₃} = {!!}
 
-  locationsInΔAreCompatibleWithFieldTypes : ∀ {Σ Δ l T}
-                                          → (globalConsistency : Σ & Δ ok)
-                                          → (StaticEnv.locEnv Δ) ∋ l ⦂ contractType T
---                                          → All (λ T' → T ⟷ T') (refConsistency globalConsistency) (proj₁ (locLookup globalConsistency lInΔ))
-  locationsInΔAreCompatibleWithFieldTypes {Σ} {Δ} {l} {T} globalConsistency = {!!} --  lInΔ = {!!}       
 
-             
-
-  splitReplacementRefFieldsOK : ∀ {Σ Δ o o' l T₁ T₃}
-                                → o' ≡ o
-                                → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
-                                → (RT' : RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o')
-                                → (refFieldsEq : RefTypes.fieldTypesList RT ≡ RefTypes.fieldTypesList RT')
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT)) (RefTypes.oTypesList RT)
-          --                      → T₁ ∈ (RefTypes.oTypesList RT)
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) [ T₁ ]
-  splitReplacementRefFieldsOK {Σ} {Δ} {o} {o'} {l} {T₁} {T₃} o'Eqo RT RT' refFieldsEq oConnectedToFieldTypes =
-      -- T₁ was previously compatible with everything in (RefTypes.fieldTypesList RT'), so it still is.
-      -- 
-    -- In Σ (Δ ,ₗ l ⦂ T₁),  l was well-typed because we were able to look it up in Δ. But ρ(l) = o, and we should have Δ(o) = T₁ by some kind of consistency. But that kind of consistency doesn't seem to be included!
-
-    {!!}  --     
-
-
-  
   splitReplacementEnvFieldsOK : ∀ {Σ Δ o o' l T₁ T₃}
                                 → o' ≡ o
                                 → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
@@ -836,13 +767,13 @@ module HeapProperties where
 
       RT' : RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o'
       RT' = record {oTypesList = TsForOs ;
-        oTypes = Eq.sym (RT'o'TypesEq) ;
-        envTypesList = RefTypes.envTypesList (proj₁ lExtensionCompatible) ;
-        envTypes = oExtensionIrrelevantToEnvTypes lExtensionEnvTypes ;
-        fieldTypesList = RefTypes.fieldTypesList (proj₁ lExtensionCompatible)}
+                   oTypes = Eq.sym (RT'o'TypesEq) ;
+                   envTypesList = RefTypes.envTypesList (proj₁ lExtensionCompatible) ;
+                   envTypes = oExtensionIrrelevantToEnvTypes lExtensionEnvTypes ;
+                   fieldTypesList = RefTypes.fieldTypesList (proj₁ lExtensionCompatible)}
 
       TsForOsIsRight : TsForOs ≡ (RefTypes.oTypesList RT')
-      TsForOsIsRight =  Eq.trans RT'o'TypesEq (RefTypes.oTypes RT') -- 
+      TsForOsIsRight =  Eq.trans RT'o'TypesEq (RefTypes.oTypes RT')
 
       TsForOsConnected : IsConnectedTypeList (RefTypes.oTypesList RT')
       TsForOsConnected = (Eq.subst (λ a → IsConnectedTypeList a) TsForOsIsRight (singleElementListsAreConnected T₁))
@@ -859,23 +790,12 @@ module HeapProperties where
       envFieldCrossConnect = envFieldInversion3 envFieldConnected
       -- One of the items in envFieldCrossConnect is proof that T₁ is connected to everything in fieldTypesList! But which one?
 
---      T₁InEnvTypes : T₁ ∈ (RefTypes.envTypesList RT)
---      T₁InEnvTypes = ?
-        -- This is going to be one of the items in envFieldCrossConnect. But how do we find it?
-        -- oConnectedToFieldTypes is organized according to ρ.
-        -- We don't know where in ρ l is, but lInρ is proof that it's in there.
-      lInρWitho' : RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o'
-      lInρWitho' = {!!}
-      T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)
-      
+      T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)      
       T₁CompatWithAllFieldTypes =
-        prevCompatibilityImpliesFieldTypesCompatibility RT envFieldCrossConnect (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ) -- lInρ
+        prevCompatibilityImpliesFieldTypesCompatibility RT envFieldCrossConnect (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
                  
- -- TODO: Look inside envFieldConnected. Find l : o in ρ with o ≡ o', and then observe l : T₁ in (Δ ,ₗ l ⦂ T₁).
-      
       TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToFieldTypes = T₁CompatWithAllFieldTypes ∷ []
-      --splitReplacementRefFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' fieldTypesUnchanged oConnectedToFieldTypes
 
       T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) TsForOs
       T₁ConnectedToLTypes = splitReplacementEnvFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' oConnectedToLTypes

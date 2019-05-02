@@ -9,7 +9,7 @@ module Context (A : Set) where
   open import Data.Product using (_×_; proj₁; proj₂; ∃-syntax) renaming (_,_ to ⟨_,_⟩)
   open import Relation.Nullary.Decidable
   open import Relation.Nullary using (Dec; yes; no)
-  import Data.Empty
+  open import Data.Empty
 
 
   infixl 5  _,_⦂_
@@ -97,6 +97,14 @@ module Context (A : Set) where
       Data.Empty.⊥-elim bot
       
   irrelevantReductionsOK {Γ} {x} {y} {t} {t'} (S x₁ qq) neq = qq                 
+
+  irrelevantReductionsInValuesOK :  ∀ {Γ : ctx}
+                                 → ∀ {x y t t'}
+                                 → Γ , x ⦂ t ∋ y ⦂ t'
+                                 → t ≢ t'
+                                 → Γ ∋ y ⦂ t'
+  irrelevantReductionsInValuesOK {Γ} {x} {.x} {t} {.t} Z tNeqt' = ⊥-elim (tNeqt' refl)
+  irrelevantReductionsInValuesOK {Γ} {x} {y} {t} {t'} (S yNeqx yt'InΓ') tNeqt' = yt'InΓ'
 
   contextLookupUnique : ∀ {Γ : ctx}
                         → ∀ {x t t'}

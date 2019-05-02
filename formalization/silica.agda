@@ -193,7 +193,10 @@ module Silica where
     assertₗ : IndirectRef → σ → Expr
     -- TODO: add the rest of the expressions
 
-
+  objRefInjective : ∀ {o o'}
+                      → o ≢ o'
+                      → objRef o ≢ objRef o'
+  objRefInjective {o} {.o} oNeqo' refl = oNeqo' refl
 
   record PublicTransaction : Set where
     constructor publicTransaction
