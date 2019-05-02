@@ -336,41 +336,41 @@ module HeapProperties where
   -- =================== LEMMAS RELATED TO HEAP CONSISTENCY =================
 
   -- If a location is in ρ, then there is a corresponding item in envTypesList.
-  findLocationInEnvTypes : ∀ {Σ Δ l o t₁ forbiddenRefs}
+  findLocationInEnvTypes : ∀ {Σ Δ l o T forbiddenRefs}
                            → (envTypesList : List Type)
-                           → EnvTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o forbiddenRefs envTypesList
+                           → EnvTypes Σ (Δ ,ₗ l ⦂ T) o forbiddenRefs envTypesList
                            → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
-                           → contractType t₁ ∈ₜ envTypesList
--- The argument will have the form: look, I found contractType t₁ in envTypes, so it must be compatible with everything in fieldTypes already.
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} .(T ∷ R)
-    (envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o envTypes l₁HasTypeT l₁NotForbidden)
+                           → T ∈ₜ envTypesList
+-- The argument will have the form: look, I found T in envTypes, so it must be compatible with everything in fieldTypes already.
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T} .(T' ∷ R)
+    (envTypesConcatMatchFound {R = R} {l = l₁} {T = T'} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ T) o envTypes l₁HasTypeT l₁NotForbidden)
     lInρ with l ≟ l₁
   ... | yes lEql₁ =
-    -- We must have contractType t₁ ≡ T because we looked up l in (Δ ,ₗ l ⦂ contractType t₁).
+    -- We must have T' ≡ T because we looked up l in (Δ ,ₗ l ⦂ T).
     let
-      lInΔ' : ((StaticEnv.locEnv Δ) , l ⦂ contractType t₁) ∋ l ⦂ contractType t₁
+      lInΔ' : ((StaticEnv.locEnv Δ) , l ⦂ T) ∋ l ⦂ T
       lInΔ' = Z
-      TEqContractTypet₁ : T ≡ contractType t₁
-      TEqContractTypet₁ = contextLookupUnique l₁HasTypeT (Eq.subst (λ a → (StaticEnv.locEnv Δ) TypeEnvContext., l ⦂ contractType t₁ ∋ a ⦂ contractType t₁) lEql₁ lInΔ')
+      TEqContractTypet₁ : T' ≡ T
+      TEqContractTypet₁ = contextLookupUnique l₁HasTypeT (Eq.subst (λ a → (StaticEnv.locEnv Δ) TypeEnvContext., l ⦂ T ∋ a ⦂ T) lEql₁ lInΔ')
     in
       here (Eq.sym TEqContractTypet₁)
   ... | no lNeql₁ =
       -- envTypesList is T ∷ R, but T is not the one we were interested in. l ⦂ o is in ρ, but not at the end.
-      -- Eventually we'll look up l in  (Δ ,ₗ l ⦂ contractType t₁) and find contractType t₁.
+      -- Eventually we'll look up l in  (Δ ,ₗ l ⦂ T) and find T.
     let
       lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
     in
-      there (findLocationInEnvTypes {re μ ρ φ ψ} {Δ} {l} {o} {t₁} R envTypes lInRestOfρ)
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} envTypesList
-    (envTypesConcatMatchNotFound {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o envTypes lNotInΔ')
+      there (findLocationInEnvTypes {re μ ρ φ ψ} {Δ} {l} {o} {T} R envTypes lInRestOfρ)
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T} envTypesList
+    (envTypesConcatMatchNotFound {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ T) o envTypes lNotInΔ')
     lInρ =
       let
         lNeql₁ = ≢-sym (∌dom-≢ lNotInΔ')
         lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
       in
       findLocationInEnvTypes envTypesList envTypes lInRestOfρ 
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {t₁} envTypesList
-    (envTypesConcatMismatch {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o o' oNeqo' envTypes)
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T} envTypesList
+    (envTypesConcatMismatch {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ T) o o' oNeqo' envTypes)
     lInρ =
       let
         -- from o ≢ o' I need to prove that objRef o ≢ objRef o'
@@ -380,11 +380,11 @@ module HeapProperties where
       in
         findLocationInEnvTypes envTypesList envTypes  lInRestOfρ
 
-  prevCompatibilityImpliesFieldTypesCompatibility : ∀ {Σ Δ l o t₁}
-                                                    → (RT : RefTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o)
+  prevCompatibilityImpliesFieldTypesCompatibility : ∀ {Σ Δ l o T}
+                                                    → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T) o)
                                                     →  All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
                                                     → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
-                                                    → All (_⟷_ (contractType t₁)) (RefTypes.fieldTypesList RT)
+                                                    → All (_⟷_ (T)) (RefTypes.fieldTypesList RT)
   prevCompatibilityImpliesFieldTypesCompatibility {Σ} {Δ} {l} {o} {t₁} RT envTypesCompatibleWithFieldTypes lInρ = 
     let
       t₁InEnvTypes = findLocationInEnvTypes (RefTypes.envTypesList RT) (RefTypes.envTypes RT) lInρ
