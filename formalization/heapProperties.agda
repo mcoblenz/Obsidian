@@ -380,16 +380,18 @@ module HeapProperties where
       in
         findLocationInEnvTypes envTypesList envTypes  lInRestOfρ
 
-  prevCompatibilityImpliesFieldTypesCompatibility : ∀ {Σ Δ l o T}
-                                                    → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T) o)
-                                                    →  All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
-                                                    → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
-                                                    → All (_⟷_ (T)) (RefTypes.fieldTypesList RT)
-  prevCompatibilityImpliesFieldTypesCompatibility {Σ} {Δ} {l} {o} {t₁} RT envTypesCompatibleWithFieldTypes lInρ = 
+  -- If a list of types was all compatible with the env types for (Δ ,ₗ l ⦂ T), then everything in that list is compatible with T.
+  prevCompatibilityImpliesCompatibility : ∀ {Σ Δ l o T}
+                                          → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T) o)
+                                          → (TL : List Type)
+                                          → All (λ T → All (_⟷_ T) TL) (RefTypes.envTypesList RT)
+                                          → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
+                                          → All (_⟷_ (T)) TL
+  prevCompatibilityImpliesCompatibility {Σ} {Δ} {l} {o} {t₁} RT TL envTypesCompatibleWithTypes lInρ = 
     let
       t₁InEnvTypes = findLocationInEnvTypes (RefTypes.envTypesList RT) (RefTypes.envTypes RT) lInρ
     in
-      Data.List.Relation.Unary.All.lookup envTypesCompatibleWithFieldTypes t₁InEnvTypes             
+      Data.List.Relation.Unary.All.lookup envTypesCompatibleWithTypes t₁InEnvTypes             
 
   envTypesForbiddenRefsObserved : ∀ {l forbiddenRefs T T' Σ R}
                                   → (Δ : StaticEnv)
@@ -493,9 +495,6 @@ module HeapProperties where
         lookupResultWithl : (StaticEnv.locEnv Δ , l ⦂ T₁) ∋ l ⦂ T₄
         lookupResultWithl = Eq.subst (λ a → StaticEnv.locEnv Δ , l ⦂ T₁ ∋ a ⦂ T₄) eq lookupResult
 
-        T₄EqT₁ : T₄ ≡ T₁
-        T₄EqT₁ = contextLookupUnique lookupResultWithl Z
-
         origEnvTypesWithL : EnvTypes (re μ ρ φ ψ) (Δ ,ₗ l₁ ⦂ T₁) o (l₁ ∷ forbiddenRefs) R
         origEnvTypesWithL = Eq.subst (λ a → EnvTypes (re μ ρ φ ψ) (Δ ,ₗ a ⦂ T₁) o (l₁ ∷ forbiddenRefs) R) (Eq.sym eq) origEnvTypes
 
@@ -509,6 +508,8 @@ module HeapProperties where
           (Eq.subst (λ a →  StaticEnv.locEnv Δ , a ⦂ T₃ ∋ l₁ ⦂ T₃) eq Z) l₁NotForbidden
 
 {-
+        T₄EqT₁ : T₄ ≡ T₁
+        T₄EqT₁ = contextLookupUnique lookupResultWithl Z
         TCompatWithT₁ : T ⟷ T₁
         TCompatWithT₁ = Eq.subst (λ a → T ⟷ a) T₄EqT₁ TCompat
         TCompatWithT₃ : T ⟷ T₃
@@ -564,6 +565,47 @@ module HeapProperties where
     (envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T₁)} {o = .o})  spl =
       ⟨ [] , envTypesEmpty ⟩
 
+
+  newEnvTypesCompatibleWithT₁ : ∀ {Σ Δ l T₁ T₃ o o'}
+                                → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
+                                → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o' RT
+                                → (RT' : RefTypes  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o')
+                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) [ T₁ ]
+  newEnvTypesCompatibleWithT₁ {Σ} {Δ} {l} {T₁} {T₃} {o} {o'} RT RTConnected RT' with (RefTypes.envTypes RT)
+  newEnvTypesCompatibleWithT₁ {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {T₁} {T₃} {o} {.o₁}
+    record { oTypesList = oTypesList ; oTypes = oTypes ; envTypesList = .(T ∷ R) ; envTypes = envTypes ; fieldTypesList = fieldTypesList }
+    RTConnected
+    RT' |
+      envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ T₁) o₁ qq x x₁  with l₁ ≟ l 
+  ... | yes eq = ?
+  ... | no nEq = ?
+
+{-
+        {!let
+          TEqT₁ : T ≡ T₁
+          TEqT₁ = ?
+          TCompatWithT
+        in
+          ?!}
+-}
+  newEnvTypesCompatibleWithT₁ {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o₁) φ ψ)} {Δ} {l} {T₁} {T₃} {o} {.o₁}
+    RT
+    RTConnected
+    RT' |
+      envTypesConcatMatchNotFound {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ T₁) o₁ qq x =
+      {!!}
+  newEnvTypesCompatibleWithT₁ {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {T₁} {T₃} {o} {.o₁}
+    RT
+    RTConnected
+    RT' |
+      envTypesConcatMismatch {R = .(RefTypes.envTypesList RT)} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .[]} .(Δ ,ₗ l ⦂ T₁) o₁ o' x qq =
+      {!!}
+  newEnvTypesCompatibleWithT₁ {.(re μ IndirectRefContext.∅ φ ψ)} {Δ} {l} {T₁} {T₃} {o} {o'}
+    record { oTypesList = oTypesList ; oTypes = oTypes ; envTypesList = .[] ; envTypes = envTypes ; fieldTypesList = fieldTypesList }
+    RTConnected
+    RT' |
+      envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T₁)} {o = .o'} {forbiddenRefs = .[]} =
+        {!!}
 
   oExtensionIrrelevantToEnvTypes :  ∀ {Σ Δ R o o' forbiddenRefs T}
                                     → EnvTypes Σ Δ o' forbiddenRefs R
@@ -717,17 +759,17 @@ module HeapProperties where
 
       T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)      
       T₁CompatWithAllFieldTypes =
-        prevCompatibilityImpliesFieldTypesCompatibility RT oldEnvFieldsCompatible (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
+        prevCompatibilityImpliesCompatibility RT (RefTypes.fieldTypesList RT) oldEnvFieldsCompatible (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
                  
       TsForOsConnectedToFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToFieldTypes = T₁CompatWithAllFieldTypes ∷ []
 
       -- T₁ was previously in the env types, so it must already be compatible with everything in there.
-      T₁InOldEnvTypes = findLocationInEnvTypes (RefTypes.envTypesList RT) (RefTypes.envTypes RT) (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
-      
+--      T₁InOldEnvTypes = findLocationInEnvTypes (RefTypes.envTypesList RT) (RefTypes.envTypes RT) (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
+--      foo = prevCompatibilityImpliesCompatibility RT (RefTypes.envTypesList RT) {!!} (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
 
       T₁ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) [ T₁ ]
-      T₁ConnectedToLTypes = {!!} -- splitReplacementEnvFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' oConnectedToLTypes -- XXX
+      T₁ConnectedToLTypes =  newEnvTypesCompatibleWithT₁ RT rConnected RT' -- splitReplacementEnvFieldsOK {Σ} {Δ} {o} {o'} {l} osEq RT RT' oConnectedToLTypes -- XXX
 
       TsForOsConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) a) TsForOsIsRight T₁ConnectedToLTypes
