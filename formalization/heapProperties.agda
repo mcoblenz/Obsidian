@@ -337,16 +337,14 @@ module HeapProperties where
 
   -- If a location is in ρ, then there is a corresponding item in envTypesList.
   findLocationInEnvTypes : ∀ {Σ Δ l o t₁ forbiddenRefs}
-                           → (fieldTypesList : List Type)
                            → (envTypesList : List Type)
                            → EnvTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o forbiddenRefs envTypesList
-                           → All (λ T → All (_⟷_ T) fieldTypesList) envTypesList
                            → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
                            → contractType t₁ ∈ₜ envTypesList
 -- The argument will have the form: look, I found contractType t₁ in envTypes, so it must be compatible with everything in fieldTypes already.
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} fieldTypesList .(T ∷ R)
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} .(T ∷ R)
     (envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o envTypes l₁HasTypeT l₁NotForbidden)
-    (TCompatWithFieldTypes ∷ RCompatWithFieldTypes) lInρ with l ≟ l₁
+    lInρ with l ≟ l₁
   ... | yes lEql₁ =
     -- We must have contractType t₁ ≡ T because we looked up l in (Δ ,ₗ l ⦂ contractType t₁).
     let
@@ -362,25 +360,25 @@ module HeapProperties where
     let
       lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
     in
-      there (findLocationInEnvTypes {re μ ρ φ ψ} {Δ} {l} {o} {t₁} fieldTypesList R envTypes RCompatWithFieldTypes lInRestOfρ)
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} fieldTypesList envTypesList
+      there (findLocationInEnvTypes {re μ ρ φ ψ} {Δ} {l} {o} {t₁} R envTypes lInRestOfρ)
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {t₁} envTypesList
     (envTypesConcatMatchNotFound {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o envTypes lNotInΔ')
-    envTypesCompatibleWithFieldTypes lInρ =
+    lInρ =
       let
         lNeql₁ = ≢-sym (∌dom-≢ lNotInΔ')
         lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
       in
-      findLocationInEnvTypes fieldTypesList envTypesList envTypes envTypesCompatibleWithFieldTypes lInRestOfρ 
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {t₁} fieldTypesList envTypesList
+      findLocationInEnvTypes envTypesList envTypes lInRestOfρ 
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {t₁} envTypesList
     (envTypesConcatMismatch {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ contractType t₁) o o' oNeqo' envTypes)
-    envTypesCompatibleWithFieldTypes lInρ =
+    lInρ =
       let
         -- from o ≢ o' I need to prove that objRef o ≢ objRef o'
         -- so I assume objRef o ≡ objRef o' and derive o ≡ o', which is a contradiction.
         oExprNeqo'Expr = λ objRefsEq → (objRefInjective oNeqo') (Eq.sym objRefsEq)
         lInRestOfρ = IndirectRefContext.irrelevantReductionsInValuesOK lInρ oExprNeqo'Expr 
       in
-        findLocationInEnvTypes fieldTypesList envTypesList envTypes envTypesCompatibleWithFieldTypes lInRestOfρ
+        findLocationInEnvTypes envTypesList envTypes  lInRestOfρ
 
   prevCompatibilityImpliesFieldTypesCompatibility : ∀ {Σ Δ l o t₁}
                                                     → (RT : RefTypes Σ (Δ ,ₗ l ⦂ contractType t₁) o)
@@ -389,7 +387,7 @@ module HeapProperties where
                                                     → All (_⟷_ (contractType t₁)) (RefTypes.fieldTypesList RT)
   prevCompatibilityImpliesFieldTypesCompatibility {Σ} {Δ} {l} {o} {t₁} RT envTypesCompatibleWithFieldTypes lInρ = 
     let
-      t₁InEnvTypes = findLocationInEnvTypes (RefTypes.fieldTypesList RT) (RefTypes.envTypesList RT) (RefTypes.envTypes RT) envTypesCompatibleWithFieldTypes lInρ
+      t₁InEnvTypes = findLocationInEnvTypes (RefTypes.envTypesList RT) (RefTypes.envTypes RT) lInρ
     in
       Data.List.Relation.Unary.All.lookup envTypesCompatibleWithFieldTypes t₁InEnvTypes             
 
