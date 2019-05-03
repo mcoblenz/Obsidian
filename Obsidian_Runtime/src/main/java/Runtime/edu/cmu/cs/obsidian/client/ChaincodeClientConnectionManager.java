@@ -46,11 +46,17 @@ public class ChaincodeClientConnectionManager {
         Process process = pb.start();
 
         String output = IOUtils.toString(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8);
+
         try {
             process.waitFor();
         }
         catch (InterruptedException e) {
             System.err.println("Process interrupted: e");
+        }
+
+        int exitValue = process.exitValue();
+        if (exitValue != 0) {
+            throw new ChaincodeClientTransactionFailedException(output);
         }
 
         return output.getBytes();
