@@ -137,37 +137,6 @@ object Main {
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
-    /* returns the exit code of the javac process */
-    def invokeJavac(
-            printJavacOutput: Boolean,
-            mainName: String,
-            sourceDir: Path,
-            compileTo: Path): Int  = {
-
-        val sourcePath = sourceDir.toString
-        //val compilerDir =
-        val classPath =
-            s"Obsidian_Runtime/Runtime/:$sourcePath:lib/protobuf-java-3.7.0.jar:lib/json-20160810.jar"
-
-        val srcFile = sourceDir.resolve(s"edu/cmu/cs/obsidian/generated_code/$mainName.java")
-        val compileCmd: Array[String] = Array("javac", "-d", compileTo.toString,
-                                                       "-classpath", classPath,
-                                                        srcFile.toString)
-
-        val proc: java.lang.Process = Runtime.getRuntime().exec(compileCmd)
-        val compilerOutput = proc.getErrorStream()
-        val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
-        val result = if (untilEOF.hasNext()) {
-            untilEOF.next()
-        } else {
-            ""
-        }
-        print(result)
-
-        proc.waitFor()
-        proc.exitValue()
-    }
-
     /* returns the exit code of the jar process */
     def makeJar(
             printJavacOutput: Boolean,
