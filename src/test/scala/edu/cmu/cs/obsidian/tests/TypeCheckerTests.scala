@@ -660,9 +660,12 @@ class TypeCheckerTests extends JUnitSuite {
                 ContractReferenceType(ContractType("LightSwitch"), Unowned(), false),
                 StateType("LightSwitch", "Off", false)), 37) ::
             (StateCheckOnPrimitiveError(), 45) ::
+              (StateCheckRedundant(), 56) ::
               (StaticAssertFailed(
                 ReferenceIdentifier("s"), Seq("Owned"),
-                StateType("LightSwitch", "On", false)), 61) ::
+                StateType("LightSwitch", "On", false)), 62) ::
+              (StateCheckRedundant(), 67) ::
               Nil)
+
     }
 }

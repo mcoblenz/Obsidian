@@ -1497,15 +1497,24 @@ private def checkStatement(
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
                                             t match {
                                                 case StateType(_, specificStates, _) =>
+                                                    if (specificStates.size == 1 && specificStates.contains(state._1)) {
+                                                        logError(e, StateCheckRedundant())
+                                                    }
                                                     val typeFalse = StateType(np.contractName, specificStates - state._1, np.isRemote)
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                                 case _ =>
+                                                    if (allStates.size == 1 && allStates.contains(state._1)) {
+                                                        logError(e, StateCheckRedundant())
+                                                    }
                                                     val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                             }
                                         case Unowned() => (contextPrime, contextPrime)
                                         case Shared() | Inferred() =>
                                             // If it's Inferred(), there's going to be another error later. For now, be optimistic.
+                                            if (allStates.size == 1 && allStates.contains(state._1)) {
+                                                logError(e, StateCheckRedundant())
+                                            }
                                             val newType = StateType(np.contractName, Set(state._1), np.isRemote)
                                             val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
                                             resetOwnership = Some((x, np))
