@@ -535,18 +535,9 @@ module HeapProperties where
         T₁CompatWithRestOfEnvTypes = Eq.subst (λ a → All (λ T' → a ⟷ T') R) T₄EqT₁ T₄CompatWithRestOfEnvTypes
         
         T₂CompatWithRestOfEnvTypes : All (λ T' → T₂ ⟷ T') R
-        T₂CompatWithRestOfEnvTypes = t₁CompatibilityImpliest₂Compatibility T₁CompatWithRestOfEnvTypes spl -- Eq.subst (λ a → T ⟷ a) T₄EqT₁
+        T₂CompatWithRestOfEnvTypes = t₁CompatibilityImpliest₂Compatibility T₁CompatWithRestOfEnvTypes spl
 
         T₂CompatWithT₃ = splitCompatibility spl
-{-
-        TCompatWithT₁ : T ⟷ T₁
-        TCompatWithT₁ = Eq.subst (λ a → T ⟷ a) T₄EqT₁ ? -- TCompat
-        TCompatWithT₃ : T ⟷ T₃
-        TCompatWithT₃ = proj₂ (splittingRespectsHeap spl TCompatWithT₁)
-
-        Ts'Compat :  All (λ T' → T ⟷ T') Ts'
-        Ts'Compat = TCompatWithT₃ ∷ restConnected
--}
       in
         ⟨ Ts' , ⟨ envTypesTs' , T₂CompatWithT₃ ∷ T₂CompatWithRestOfEnvTypes ⟩ ⟩
   ... | no nEq =
@@ -554,7 +545,6 @@ module HeapProperties where
         -- Because we're in envTypeConcatMatchFound, l₁ ⦂ o was at the end of the context, and we found l₁ ⦂ T₄ in Δ , l ⦂ T₁.
         -- But l ≢ l₁, so we will be able to find l₁ ⦂ T₄ in Δ and use the same rule.
         -- However, there may be l's in ρ, which may result in a different R than before! Some T₁'s may be replaced with T₃'s.
-        T₁InRest = {!-- TODO !} 
         R'WithProof = envTypesForSplit origEnvTypes RConnected restConnected spl
         R' = proj₁ R'WithProof
         Ts' = T₄ ∷ R'
@@ -565,8 +555,14 @@ module HeapProperties where
         envTypesTs' = envTypesConcatMatchFound (Δ ,ₗ l ⦂ T₃) o (proj₁ (proj₂ R'WithProof)) l₁InΔ l₁NotForbidden
 
         -- Previously, we knew that T₄ was compatible with everything in R.
-        -- Now, T₁ is T₄
-        T₂CompatWithT₄ = {!!}
+        -- Specificially, we have T₁Connected : T₁ ⟷ T₄.
+        -- Everything that was compatible with T₁ has to be compatible with T₂.
+        T₄CompatWithT₁ : T₄ ⟷ T₁
+        T₄CompatWithT₁ = symCompat T₁Connected
+        T₄CompatWithT₂ : T₄ ⟷ T₂
+        T₄CompatWithT₂ = proj₁ (splittingRespectsHeap spl T₄CompatWithT₁)
+
+        T₂CompatWithT₄ = symCompat T₄CompatWithT₂
         T₂CompatWithR'  = proj₂ (proj₂ R'WithProof)
         Ts'Compat = T₂CompatWithT₄ ∷ T₂CompatWithR' 
       in
