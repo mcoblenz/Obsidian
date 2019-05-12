@@ -1,0 +1,35 @@
+main contract Choice {
+
+    state Hidden {
+      string hashed;
+    }
+
+    state Revealed {
+      string choice;
+    }
+
+    Choice@Hidden(string hashedChoice) {
+      -> Hidden(hashed = hashedChoice);
+    }
+
+    transaction reveal(Choice@Hidden >> (Hidden | Revealed) this, string handChoice) returns bool {
+      string HashedClaim = hash(handChoice);
+      if (hashed == HashedClaim) {
+    	->Revealed(choice = handChoice);
+    	return true;
+      }
+      return false;
+    }
+
+    transaction getHash(Choice@Hidden this) returns string {
+      return hashed;
+    }
+
+    transaction getHandChoice(Choice@Revealed this) returns string {
+      return choice;
+    }
+
+    transaction hash(Choice this, string str) returns string {
+      return str;
+    }
+}

@@ -1,0 +1,9 @@
+import "resources/case_studies/RockPaperScissor/RockPaperScissors.obs"
+
+main contract rpsA {
+    transaction main(remote rps@Shared rps, string form) {
+        if(RPS in begin) {
+          RPS.APlay(form)
+        }
+    }
+}

@@ -1,0 +1,7 @@
+import "resources/case_studies/RockPaperScissor/RockPaperScissors.obs"
+
+main contract rpsA {
+    transaction main(remote rps@Shared RPS, string form) {
+        int oldX = container.BPlay(3);
+    }
+}

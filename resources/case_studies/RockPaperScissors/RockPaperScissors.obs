@@ -1,0 +1,48 @@
+import "resources/case_studies/RockPaperScissors/Choice.obs"
+
+main contract RockPaperScissors {
+
+    state Begin;
+    state AHasPlayed;
+    state BHasPlayed;
+    state End;
+
+    Choice@Hidden aChoiceHidden available in AHasPlayed, BHasPlayed;
+    Choice@Revealed aChoiceRevealed available in End;
+
+
+    string bChoice available in BHasPlayed, End;
+
+    RockPaperScissors() {
+      ->Begin;
+    }
+
+    transaction APlay(RockPaperScissors@Begin >> AHasPlayed this, string encryptedChoice) {
+        ->AHasPlayed(aChoiceHidden = new Choice(encryptedChoice));
+    }
+
+    transaction BPlay(RockPaperScissors@AHasPlayed >> BHasPlayed this, string choice) {
+      ->BHasPlayed(bChoice = choice);
+    }
+
+    transaction AReveal(RockPaperScissors@BHasPlayed >> (BHasPlayed | End) this, string strChoice) returns bool {
+      string hash = aChoiceHidden.getHash();
+      bool resultMatched = aChoiceHidden.reveal(strChoice);
+      Choice toBeRevealed = new Choice(hash);
+      if(resultMatched) {
+        toBeRevealed.reveal(strChoice);
+        if(toBeRevealed in Revealed) {
+          -> End(aChoiceRevealed = toBeRevealed);
+        }
+      }
+      return resultMatched;
+    }
+
+    transaction getBChoice(RockPaperScissors@End this) returns string {
+      return bChoice;
+    }
+
+    transaction getAChoice(RockPaperScissors@End this) returns string {
+      return aChoiceRevealed.getHandChoice();
+    }
+}
