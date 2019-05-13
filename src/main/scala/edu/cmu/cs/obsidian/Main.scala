@@ -113,13 +113,13 @@ object Main {
         return mainContractOption.get.name
     }
 
-    def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
+    def translateServerASTToJava (ast: Program, protobufOuterClassName: String, Table: SymbolTable): JCodeModel = {
         // Server must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val codeGen = new CodeGen(Server(mainContractOption.get))
+        val codeGen = new CodeGen(Server(mainContractOption.get), Table)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
@@ -131,13 +131,13 @@ object Main {
         })
     }
 
-    def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
+    def translateClientASTToJava (ast: Program, protobufOuterClassName: String, Table: SymbolTable): JCodeModel = {
         // Client programs must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val codeGen = new CodeGen(Client(mainContractOption.get))
+        val codeGen = new CodeGen(Client(mainContractOption.get), Table)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
@@ -362,8 +362,8 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(checkedTable.ast, protobufOuterClassName)
-            else translateServerASTToJava(checkedTable.ast, protobufOuterClassName)
+            val javaModel = if (options.buildClient) translateClientASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
+            else translateServerASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
             javaModel.build(srcDir.toFile)
 
             val mainName = findMainContractName(checkedTable.ast)

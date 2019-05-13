@@ -5,7 +5,7 @@ echo "publish result: $PUBLISH"
 
 if [[ $PUBLISH =~ .*SUCCESS.* ]]
    then
-       scp -r ../docs/repository mcoblenz@linux.gp.cs.cmu.edu:~/www/
+       scp -r ../docs/repository gauria@unix.andrew.cmu.edu:~/www/
        rm -rf ~/.gradle/caches/
        exit 0
     else

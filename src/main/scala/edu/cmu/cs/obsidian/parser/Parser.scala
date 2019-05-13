@@ -352,7 +352,7 @@ object Parser extends Parsers {
             dots.foldLeft(e)(
                 (e: Expression, inv: DotExpr) => inv match {
                     case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
-                    case Right((funcName, args)) => Invocation(e, funcName._1, args).setLoc(funcName)
+                    case Right((funcName, args)) => Invocation(e, funcName._1, args, false).setLoc(funcName)
                 }
             )
         }
