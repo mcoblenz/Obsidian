@@ -54,10 +54,18 @@ main contract InState {
         [s @ Off];
 
         if (s in Off) {
+             // redundant if in state error since s is marked as Off line 54
              s.turnOn();
         }
 
         // ERROR: s is On now, we know this specifically
         [s @ Owned];
+    }
+
+    transaction t5(LightSwitch@Off >> On s) {
+        s.turnOn();
+        if (s in On) {
+            // error here since we know it will be on, redundant code
+        }
     }
 }

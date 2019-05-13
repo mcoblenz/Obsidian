@@ -317,6 +317,10 @@ case class StateCheckOnPrimitiveError() extends Error {
     val msg: String = s"Can't check the state of a primitive-type expression."
 }
 
+case class StateCheckRedundant() extends Error {
+    val msg: String = s"State check will always pass/fail. Remove redundant code."
+}
+
 case class InvalidValAssignmentError() extends Error {
     val msg: String = s"Can't reassign to variables that are formal parameters or which are used in a dynamic state check."
 }
