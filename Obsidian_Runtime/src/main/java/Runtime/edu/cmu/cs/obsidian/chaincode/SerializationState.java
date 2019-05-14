@@ -153,7 +153,11 @@ public class SerializationState {
 
             try {
                 String numAsString =  stub.getStringState("NumReturnedObjects");
-                int numReturnedObjects = Integer.parseInt(numAsString);
+                int numReturnedObjects = 0;
+
+                if (numAsString != null && numAsString.length() > 0) {
+                    numReturnedObjects = Integer.parseInt(numAsString);
+                }
 
                 for (int i = 0; i < numReturnedObjects; i++) {
                     String indexAsString = Integer.toString(i);
