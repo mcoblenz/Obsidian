@@ -681,8 +681,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, args)
                  (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv))
 
-             case Construction(name, args: Seq[Expression]) =>
+             case Construction(name, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(name)
+                 val isFFIInv = tableLookup match {
+                     case None => false
+                     case Some(x) => x.contract match {
+                         case obsContract: ObsidianContractImpl => false
+                         case javaContract: javaFFIContractImpl => true
+                     }
+                 }
+
                  if (tableLookup.isEmpty) {
                      logError(e, ContractUndefinedError(name))
                      return (BottomType(), context, e)
@@ -702,7 +710,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case Some((newExprSequence, cntxt, constr)) => (newExprSequence, constr.asInstanceOf[Constructor].resultType, cntxt)
                  }
 
-                 (simpleType, contextPrime, Construction(name, exprList))
+                 (simpleType, contextPrime, Construction(name, exprList, isFFIInv))
 
              case Disown(e) =>
                  // The expression "disown e" evaluates to an unowned value but also side-effects the context

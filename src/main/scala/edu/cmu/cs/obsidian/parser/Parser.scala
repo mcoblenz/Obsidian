@@ -382,7 +382,7 @@ object Parser extends Parsers {
 
         val parseNew = {
             NewT() ~! parseId ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
-                case _new ~ name ~ _ ~ args ~ _ => Construction(name._1, args).setLoc(_new)
+                case _new ~ name ~ _ ~ args ~ _ => Construction(name._1, args, false).setLoc(_new)
             }
         }
 

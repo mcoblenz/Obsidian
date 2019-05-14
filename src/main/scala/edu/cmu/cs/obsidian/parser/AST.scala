@@ -79,13 +79,13 @@ case class Dereference(e: Expression, f: String) extends Expression {
 }
 
 case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
-case class Invocation(recipient: Expression, name: String, args: Seq[Expression], isFFIInvocation : Boolean) extends Expression {
+case class Invocation(recipient: Expression, name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     override def toString: String = {
         val argString = args.mkString(",")
         s"$recipient.$name($argString)"
     }
 }
-case class Construction(name: String, args: Seq[Expression]) extends Expression
+case class Construction(name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression
 case class Disown(e: Expression) extends Expression
 case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression
 

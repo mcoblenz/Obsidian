@@ -20,7 +20,7 @@ trait Target {
 case class Client(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
 case class Server(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
 
-class CodeGen (val target: Target, Table: SymbolTable) {
+class CodeGen (val target: Target, table: SymbolTable) {
 
     private val model: JCodeModel = new JCodeModel()
 
@@ -251,7 +251,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
             case _ =>
-                val targetClass = resolveType(typ, Table).asInstanceOf[AbstractJClass]
+                val targetClass = resolveType(typ, table).asInstanceOf[AbstractJClass]
                 val constructorInvocation = JExpr._new(targetClass)
                 constructorInvocation.arg(JExpr.ref("connectionManager"))
 
@@ -277,7 +277,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 val stringType = model.ref("java.lang.String")
                 val intAsString = JExpr._new(stringType).arg(marshalledExpr)
                 intAsString.arg(charset)
-                val intType = resolveType(initialTyp, Table)
+                val intType = resolveType(initialTyp, table)
                 val decl = body.decl(intType, "unmarshalledInt" + paramIndex, JExpr._new(intType).arg(intAsString))
                 val test = body._if(decl.eq(JExpr._null()))
                 val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
@@ -312,7 +312,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 val enumGetter = "getEitherCase"
                 val guidEnumName = protobufClassName + "OrGUID" + "." + "EitherCase" + "." + "GUID"
 
-                val unarchivedObjDecl = body.decl(resolveType(initialTyp, Table), "unarchivedObj" + paramIndex)
+                val unarchivedObjDecl = body.decl(resolveType(initialTyp, table), "unarchivedObj" + paramIndex)
                 // If we have a GUID…
                 val hasGUID = archive.invoke(enumGetter).invoke("equals").arg(JExpr.direct(guidEnumName))
 
@@ -323,10 +323,10 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 val loadInvocation = JExpr.ref(serializationParamName).invoke("loadContractWithGUID").arg(stub).arg(guid)
                 loadInvocation.arg(np.isOwned)
                 loadInvocation.arg(finalTyp.isOwned)
-                cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(initialTyp, Table), loadInvocation))
+                cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(initialTyp, table), loadInvocation))
 
                 // If we have an object…
-                val targetClass = resolveType(initialTyp, Table).asInstanceOf[AbstractJClass]
+                val targetClass = resolveType(initialTyp, table).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
 
                 cond._else().assign(unarchivedObjDecl, classInstance)
@@ -363,7 +363,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
         }
 
         val javaRetType = obsidianRetType match {
-            case Some(retType) => resolveType(retType, Table)
+            case Some(retType) => resolveType(retType, table)
             case None => model.VOID
         }
 
@@ -374,7 +374,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
         var argExpressions: List[IJExpression] = Nil
         /* add args */
         for (arg <- transaction.args) {
-            argExpressions = argExpressions :+ meth.param(resolveType(arg.typIn, Table), arg.varName)
+            argExpressions = argExpressions :+ meth.param(resolveType(arg.typIn, table), arg.varName)
         }
         /* add SerializationState as argument */
         argExpressions = argExpressions :+ meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
@@ -448,7 +448,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
      * (i.e. defined in some states but not in the entire contract) of type X */
     def makeFieldInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
                      (name: String, declSeq: Seq[(State, Field)]): FieldInfo = {
-        val fieldType = resolveType(declSeq.head._2.typ, Table)
+        val fieldType = resolveType(declSeq.head._2.typ, table)
 
         /* setup get method */
         val getMeth = newClass.method(JMod.PRIVATE, fieldType, fieldGetMethodName(name))
@@ -485,7 +485,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
         val txExampleName = transactionGetMethodName(txExample.name, Some(stExample.name))
 
         val (hasReturn, retType) = txExample.retType match {
-            case Some(typ) => (true, resolveType(typ, Table))
+            case Some(typ) => (true, resolveType(typ, table))
             case None => (false, model.VOID)
         }
                              
@@ -494,7 +494,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
 
 
       /* add the appropriate args to the method and collect them in a list */
-        val jArgs = txExample.args.map( (arg: VariableDeclWithSpec) => meth.param(resolveType(arg.typIn, Table), arg.varName) )
+        val jArgs = txExample.args.map( (arg: VariableDeclWithSpec) => meth.param(resolveType(arg.typIn, table), arg.varName) )
 
         val body = meth.body()
 
@@ -1265,7 +1265,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 var runArgNumber = 0
                 for (txArg <- tx.args) {
                     val runArg = runArgs.component(JExpr.lit(runArgNumber))
-                    val javaArgType = resolveType(txArg.typIn, Table)
+                    val javaArgType = resolveType(txArg.typIn, table)
                     val errorBlock = new JBlock()
 
                     val transactionArgExpr = unmarshallExprExpectingFullObjects(translationContext, enoughArgs, runArg, txArg.typIn, txArg.typOut, errorBlock, runArgNumber)
@@ -1286,7 +1286,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 if (tx.retType.isDefined) {
                     txInvoke = JExpr.invoke(txMethName)
 
-                    val returnObj = enoughArgs.decl(resolveType(tx.retType.get, Table), "returnObj", txInvoke)
+                    val returnObj = enoughArgs.decl(resolveType(tx.retType.get, table), "returnObj", txInvoke)
 
                     // Record the UUID of this object (if it is one).
                     tx.retType.get match {
@@ -1438,7 +1438,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
 
             // The main transaction expects to be passed a stub of a particular type. Construct it.
             val stubType: ObsidianType = mainTransaction.args(0).typIn
-            val stubJavaType = resolveType(stubType, Table)
+            val stubJavaType = resolveType(stubType, table)
             val newStubExpr = JExpr._new(stubJavaType)
             newStubExpr.arg(JExpr.ref("connectionManager"))
             val generateUUID = stubType match {
@@ -1536,7 +1536,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                     body: JBlock,
                     translationContext: TranslationContext,
                     inContract: Contract): Unit = {
-        val javaFieldType = resolveType(field.typ, Table)
+        val javaFieldType = resolveType(field.typ, table)
 
         def handleNonPrimitive(name: String, n: ObsidianType): Unit = {
             val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
@@ -1728,7 +1728,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                     inContract: Contract): Unit = {
         // generate: FieldArchive fieldArchive = field.archive();
         val javaFieldName: String = field.name
-        val javaFieldType: AbstractJType = resolveType(field.typ, Table)
+        val javaFieldType: AbstractJType = resolveType(field.typ, table)
 
         def handleNonPrimitive(name: String, n: ObsidianType): Unit = {
             // foo = new Foo(); foo.initFromArchive(archive.getFoo());
@@ -1972,13 +1972,13 @@ class CodeGen (val target: Target, Table: SymbolTable) {
     }
 
 
-    private def resolveType(typ: ObsidianType, Table: SymbolTable): AbstractJType = {
+    private def resolveType(typ: ObsidianType, table: SymbolTable): AbstractJType = {
         typ match {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
             case n: NonPrimitiveType => {
-                val contractTableOpt = Table.contractLookup.get(n.contractName)
+                val contractTableOpt = table.contractLookup.get(n.contractName)
                 contractTableOpt match {
                     case None => if (n.isRemote) model.ref(classNameForStub(n.contractName)) else model.ref(n.contractName)
                     case Some(x) => x.contract match {
@@ -2078,10 +2078,10 @@ class CodeGen (val target: Target, Table: SymbolTable) {
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
         val initializer = fieldInitializerForType(decl.typ)
         if (initializer.isDefined) {
-            newClass.field(JMod.PUBLIC, resolveType(decl.typ, Table), decl.name, initializer.get)
+            newClass.field(JMod.PUBLIC, resolveType(decl.typ, table), decl.name, initializer.get)
         }
         else {
-            newClass.field(JMod.PUBLIC, resolveType(decl.typ, Table), decl.name)
+            newClass.field(JMod.PUBLIC, resolveType(decl.typ, table), decl.name)
         }
     }
 
@@ -2152,10 +2152,10 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, isFFIInvocation)
             case Invocation(recipient, name, args, isFFIInvocation) =>
                 addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext, isFFIInvocation)
-            case Construction(name, args) =>
+            case Construction(name, args, isFFIInvocation) =>
                 val contractRefType = ContractReferenceType(ContractType(name), Owned(), false)
-                val resolvedType = resolveType(contractRefType, Table)
-                addArgs(JExpr._new(resolvedType), args, translationContext, localContext, false)
+                val resolvedType = resolveType(contractRefType, table)
+                addArgs(JExpr._new(resolvedType), args, translationContext, localContext, isFFIInvocation)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
             case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
@@ -2212,13 +2212,14 @@ class CodeGen (val target: Target, Table: SymbolTable) {
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn, Table), arg.varName))
+            (arg.varName, meth.param(resolveType(arg.typIn, table), arg.varName))
         )
 
         // We need to pass in a stub as well since we might need
         // to deserialize some objects in here (for example, if we call a method on a parameter
         // that returns a property of one of its child objects which isn't yet loaded)
         meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
@@ -2229,6 +2230,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
         assignNewGUID(newClass, aContract, meth)
 
         /* When an object is newly created, we always mark it as modified (and loaded). */
+        meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
 
@@ -2259,7 +2261,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
 
         /* add args to method and collect them in a list */
         for (arg <- c.args) {
-            constructor.param(resolveType(arg.typIn, Table), arg.varName)
+            constructor.param(resolveType(arg.typIn, table), arg.varName)
             invocation.arg(JExpr.ref(arg.varName))
         }
 
@@ -2338,7 +2340,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                 var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
                 for (st <- states) {
-                    val className = resolveType(typ, Table).name()
+                    val className = resolveType(typ, table).name()
                     val enumClassName = stateEnumNameForClassName(className)
                     val enumClass = model.ref(packageName + "." + className + "." + enumClassName)
                     val enumConstant = JExpr.enumConstantRef(enumClass, st)
@@ -2362,7 +2364,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                     translationContext: TranslationContext): JMethod = {
         // Put all transactions at the top level, for now.
         val javaRetType = tx.retType match {
-            case Some(typ) => resolveType(typ, Table)
+            case Some(typ) => resolveType(typ, table)
             case None => model.VOID
         }
 
@@ -2398,7 +2400,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
 
         /* add args to method and collect them in a list */
         val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn, Table), arg.varName))
+            (arg.varName, meth.param(resolveType(arg.typIn, table), arg.varName))
         )
 
         val argsWithVars = jArgs.zip (tx.args)
@@ -2502,9 +2504,9 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                     case BoolType() => JExpr.lit(false)
                     case _ => JExpr._null()
                 }
-                nextContext = localContext.updated(name, body.decl(resolveType(typ, Table), name, initializer))
+                nextContext = localContext.updated(name, body.decl(resolveType(typ, table), name, initializer))
             case VariableDeclWithInit(typ, name, e) =>
-                nextContext = localContext.updated(name, body.decl(resolveType(typ, Table), name, translateExpr(e, translationContext, localContext)))
+                nextContext = localContext.updated(name, body.decl(resolveType(typ, table), name, translateExpr(e, translationContext, localContext)))
             case Return() => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newStateName, updates, permission) =>
@@ -2593,7 +2595,7 @@ class CodeGen (val target: Target, Table: SymbolTable) {
                         declSeq.find((p: (State, Field)) => p._1 == state).get._2
                 }
 
-                val tempVarType = resolveType(field.typ, Table)
+                val tempVarType = resolveType(field.typ, table)
 
                 val tempVar = body.decl(tempVarType,
                     stateInitializationVariableName(stateName._1, fieldName._1),
