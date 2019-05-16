@@ -8,8 +8,6 @@ module HeapProperties where
   import Relation.Binary.PropositionalEquality as Eq
   import Context
 
-
-  import Data.AVL.Sets
   open import Data.List.Relation.Unary.All
   import Relation.Unary
   import Data.List.Properties
@@ -504,6 +502,17 @@ module HeapProperties where
       (symCompat TCompat') ∷ t₁CompatibilityImpliest₂Compatibility restCompat spl
 
 
+  t₁CompatibilityImpliest₃Compatibility : ∀ {Γ TL T₁ T₂ T₃}
+                                          → All (λ T' → T₁ ⟷ T') TL
+                                          →  Γ ⊢ T₁ ⇛ T₂ / T₃
+                                          → All (λ T' → T₃ ⟷ T') TL
+  t₁CompatibilityImpliest₃Compatibility {Γ} {.[]} {T₁} {T₂} {T₃} [] spl = []
+  t₁CompatibilityImpliest₃Compatibility {Γ} {.(x ∷ xs)} {T₁} {T₂} {T₃} (_∷_ {x = x} {xs = xs} TCompat restCompat) spl =
+    let
+      TCompat' = proj₂ (splittingRespectsHeap spl (symCompat TCompat))
+    in
+      (symCompat TCompat') ∷ t₁CompatibilityImpliest₃Compatibility restCompat spl
+
   connectedTypeListsAreConnected : ∀ {T Ts}
                                     → IsConnectedTypeList Ts
                                     → (TIncluded : T ∈ₜ Ts)
@@ -516,6 +525,16 @@ module HeapProperties where
   connectedTypeListsAreConnected {T} {.(x ∷ xs)} (consTypeList {T = .x} {D = .xs} x₁ restConnected) (there {x = x} {xs = xs} TInTs) (there {x = .x} {xs = .xs} T'InTs) TNeqT' =
     connectedTypeListsAreConnected restConnected TInTs T'InTs λ prfsEqual → TNeqT' (Eq.cong there prfsEqual)
 
+{-
+  record EnvTypesForSplitResult (Σ : RuntimeEnv) (Δ : StaticEnv) (T₂ : Type) (T₃ : Type) (l : IndirectRef) (o : ObjectRef) : Set where
+    field
+      Ts' : List Type
+      T₂Compat : (All (λ T' → T₂ ⟷ T') Ts')
+      et : (EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o forbiddenRefs Ts')
+      connected : (IsConnectedTypeList Ts')
+      externalCompat : (λ T' → All (λ T'' → T' ⟷ T'') Ts → All (λ T'' → T' ⟷ T'') Ts')
+-}
+
   -- Trying to assume that T₁ is compatible with all the Ts is too strong, since T₁ may be in the Ts.
   -- What do I actually need here I need to show that T₂ is compatible with all the new types.
   -- So 
@@ -525,7 +544,10 @@ module HeapProperties where
                                    → All (λ T' → (T' ≢ T₁) → T₁ ⟷ T') Ts
                                    → IsConnectedTypeList Ts
                                    → Γ ⊢ T₁ ⇛ T₂ / T₃
-                                   → ∃[ Ts' ] (EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o forbiddenRefs Ts' × All (λ T' → T₂ ⟷ T') Ts')
+                                   → ∃[ Ts' ] ((EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o forbiddenRefs Ts') ×
+                                              (All (λ T' → T₂ ⟷ T') Ts') ×
+                                              (IsConnectedTypeList Ts') ×
+                                              (∀ T' → All (λ T'' → T' ⟷ T'') Ts → All (λ T'' → T' ⟷ T'') Ts'))
   envTypesForSplit {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} {forbiddenRefs}
     origMatch@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₄} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes lookupResult l₁NotForbidden)
     lInρ
@@ -536,9 +558,11 @@ module HeapProperties where
     = 
       -- The last step in the proof of EnvTypes (ρ , l₁ ⦂ o) (Δ ,ₗ l ⦂ T₃) o T₁∷R is that we looked up l₁ and prepended the result to the rest of the Ts. 
       -- If l₁ ≡ l, then Ts' is T₃ ∷ R. Otherwise, we found l₁ ⦂ T₄ in Δ and Ts' is T₄ ∷ (recurse with the rest).
-      let
+        ⟨ Ts' , ⟨ envTypesTs' , ⟨ T₂CompatWithT₃ ∷ T₂CompatWithRestOfEnvTypes ,  ⟨ (consTypeList T₃CompatWithRestOfEnvTypes restConnected) , externalCompat ⟩ ⟩ ⟩ ⟩
+      where
         Ts'' = R
         Ts' = T₃ ∷ Ts''
+
         -- WTS: (EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o Ts') × All (λ T' → T ⟷ T') Ts')
         lookupResultWithl : (StaticEnv.locEnv Δ , l ⦂ T₁) ∋ l ⦂ T₄
         lookupResultWithl = Eq.subst (λ a → StaticEnv.locEnv Δ , l ⦂ T₁ ∋ a ⦂ T₄) eq lookupResult
@@ -566,8 +590,19 @@ module HeapProperties where
         T₂CompatWithRestOfEnvTypes = t₁CompatibilityImpliest₂Compatibility T₁CompatWithRestOfEnvTypes spl
 
         T₂CompatWithT₃ = splitCompatibility spl
-      in
-        ⟨ Ts' , ⟨ envTypesTs' , T₂CompatWithT₃ ∷ T₂CompatWithRestOfEnvTypes ⟩ ⟩
+
+        -- Need to prove everything in R is connected to T₃, given that everything in R is connected to T₄ (≡ T₁).
+        -- Follows from splittingRespectsHeap.
+        T₃CompatWithRestOfEnvTypes : All (λ T' → T₃ ⟷ T') R
+        T₃CompatWithRestOfEnvTypes = t₁CompatibilityImpliest₃Compatibility T₁CompatWithRestOfEnvTypes spl
+        
+        externalCompat : (T' : Type) →  All (λ T'' → T' ⟷ T'') (T₄ ∷ R) → All (λ T'' → T' ⟷ T'') Ts'
+        externalCompat T' (_∷_ {x = x} {xs = xs} px T'CompatWithTs) =
+          let
+            T'CompatT₁ = Eq.subst (λ a →  T' ⟷ a) T₄EqT₁ px
+            T'CompatT₃ = proj₂ (splittingRespectsHeap spl T'CompatT₁)
+          in
+            T'CompatT₃ ∷ T'CompatWithTs
   envTypesForSplit {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} {forbiddenRefs}
     origMatch@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₄} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes lookupResult l₁NotForbidden)
     lInρ
@@ -575,7 +610,7 @@ module HeapProperties where
     allConnected@(consTypeList firstConnected restConnected)
     spl | no nEq with T₄ ≟t T₁
   ... | yes T₄EqT₁ =
-        ⟨ Ts' , ⟨ envTypesTs' , Ts'Compat ⟩ ⟩
+        ⟨ Ts' , ⟨ envTypesTs' , ⟨ Ts'Compat , ⟨ consTypeList T₄CompatWithR' (proj₁ (proj₂ (proj₂ (proj₂ R'WithProof)))) , externCompatibility' ⟩ ⟩ ⟩ ⟩
       where
        -- Because we're in envTypeConcatMatchFound, l₁ ⦂ o was at the end of the context, and we found l₁ ⦂ T₄ in Δ , l ⦂ T₁.
         -- But l ≢ l₁, so we will be able to find l₁ ⦂ T₄ in Δ and use the same rule.
@@ -609,15 +644,26 @@ module HeapProperties where
         T₂CompatWithT₁ = symCompat (proj₁ (splittingRespectsHeap spl T₁CompatWithT₁))
         T₂CompatWithT₄ = Eq.subst (λ a → T₂ ⟷ a) (Eq.sym T₄EqT₁) T₂CompatWithT₁
 
-        T₂CompatWithR'  = proj₂ (proj₂ R'WithProof)
+        T₂CompatWithR' = proj₁ (proj₂ (proj₂ R'WithProof))
         Ts'Compat = T₂CompatWithT₄ ∷ T₂CompatWithR'
 
+        externCompatibility = proj₂ (proj₂ (proj₂ (proj₂ R'WithProof)))
+        T₄CompatWithR' : All (λ T' → T₄ ⟷ T') R'
+        T₄CompatWithR' = externCompatibility T₄ firstConnected
+
+        externCompatibility' : (T' : Type) →  All (λ T'' → T' ⟷ T'') (T₄ ∷ R) → All (λ T'' → T' ⟷ T'') Ts'
+        externCompatibility' T' (_∷_ {x = x} {xs = xs} px T'CompatWithTs) =
+          px ∷ externCompatibility T' T'CompatWithTs
+
   ... | no T₄NeqT₁ =
-      let
+        ⟨ Ts' , ⟨ envTypesTs' , ⟨ Ts'Compat ,  ⟨ consTypeList T₄CompatWithR' (proj₁ (proj₂ (proj₂ (proj₂ R'WithProof)))) , externCompatibility' ⟩ ⟩ ⟩ ⟩
+      where
         -- Because we're in envTypeConcatMatchFound, l₁ ⦂ o was at the end of the context, and we found l₁ ⦂ T₄ in Δ , l ⦂ T₁.
         -- But l ≢ l₁, so we will be able to find l₁ ⦂ T₄ in Δ and use the same rule.
         -- However, there may be l's in ρ, which may result in a different R than before! Some T₁'s may be replaced with T₃'s.
-       
+        lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ (≢-sym nEq)
+        R'WithProof = envTypesForSplit origEnvTypes lInRestOfρ RConnected restConnected spl
+        
         R' = proj₁ R'WithProof
         Ts' = T₄ ∷ R'
         
@@ -629,23 +675,23 @@ module HeapProperties where
         -- Previously, we knew that T₄ was compatible with everything in R.
         -- Specificially, we have T₁Connected : (T₄ ≢ T₁) → T₁ ⟷ T₄.
         -- Everything that was compatible with T₁ has to be compatible with T₂.
-        --T₄CompatWithT₁ : T₄ ⟷ T₁
-        --T₄CompatWithT₁ = symCompat (T₁Connected {!!}) -- 
+        T₄CompatWithT₁ :  T₄ ⟷ T₁
+        T₄CompatWithT₁ = symCompat (T₁Connected T₄NeqT₁)
         T₄CompatWithT₂ : T₄ ⟷ T₂
         T₄CompatWithT₂ = proj₁ (splittingRespectsHeap spl T₄CompatWithT₁)
 
         T₂CompatWithT₄ = symCompat T₄CompatWithT₂
-        T₂CompatWithR'  = proj₂ (proj₂ R'WithProof)
-        Ts'Compat = T₂CompatWithT₄ ∷ T₂CompatWithR' 
-      in
-        ⟨ Ts' , ⟨ envTypesTs' , Ts'Compat ⟩ ⟩
-      where
-        lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ (≢-sym nEq)
-        R'WithProof = envTypesForSplit origEnvTypes lInRestOfρ RConnected restConnected spl
-       
-        T₄CompatWithT₁ :  T₄ ⟷ T₁
-        T₄CompatWithT₁ = symCompat (T₁Connected T₄NeqT₁)
+        T₂CompatWithR'  = proj₁ (proj₂ (proj₂ R'WithProof))
+        Ts'Compat = T₂CompatWithT₄ ∷ T₂CompatWithR'
 
+        externCompatibility = proj₂ (proj₂ (proj₂ (proj₂ R'WithProof)))
+        T₄CompatWithR' : All (λ T' → T₄ ⟷ T') R'
+        T₄CompatWithR' = externCompatibility T₄ firstConnected
+
+        externCompatibility' : (T' : Type) →  All (λ T'' → T' ⟷ T'') (T₄ ∷ R) → All (λ T'' → T' ⟷ T'') Ts'
+        externCompatibility' T' (_∷_ {x = x} {xs = xs} px T'CompatWithTs) =
+          px ∷ externCompatibility T' T'CompatWithTs
+    
   envTypesForSplit {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} {T}
     (envTypesConcatMatchNotFound {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes l₁NotInΔ') lInρ T₁Connected origCompat spl =
     let
@@ -669,7 +715,7 @@ module HeapProperties where
       
   envTypesForSplit {Γ} {.(re μ IndirectRefContext.∅ φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.[]} {T}
     (envTypesEmpty {μ = μ} {φ = φ} {ψ = ψ} {Δ = .(Δ ,ₗ l ⦂ T₁)} {o = .o}) T₁InTs T₁Connected origCompat spl =
-      ⟨ [] , ⟨ envTypesEmpty , [] ⟩ ⟩
+      ⟨ [] , ⟨ envTypesEmpty , ⟨ [] , ⟨ emptyTypeList refl , (λ T' → λ a → []) ⟩ ⟩ ⟩ ⟩
 
 
 {-
@@ -740,9 +786,6 @@ module HeapProperties where
       envTypesEmpty
 
 
--- TODO: lExtensionEnvTypes
-
-
   lExtensionCompatibility : ∀ {Γ Σ Δ l T₁ T₂ T₃ o}
                             → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o)
                             → IsConnected Σ (Δ ,ₗ l ⦂ T₁) o RT
@@ -788,26 +831,6 @@ module HeapProperties where
   consListEq {A} {x ∷ R} {x' ∷ R'} {T} refl = refl
 
 
-  splitReplacementEnvFieldOK : ∀ {Γ Σ Δ o o' l T₁ T₂ T₃}
-                               → o' ≡ o
-                               → (RT : RefTypes  Σ (Δ ,ₗ l ⦂ T₁) o')
-                               → IsConnectedEnvAndField Σ (Δ ,ₗ l ⦂ T₁) o' RT
-                               → Γ ⊢ T₁ ⇛ T₂ / T₃
-                               → (RT' : RefTypes  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂) o')
-                               → IsConnectedEnvAndField  Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂) o' RT'
-  splitReplacementEnvFieldOK = {!!}
-
-  splitReplacementEnvFieldsOK : ∀ {Σ Δ o o' l T₁ T₃}
-                                → o' ≡ o
-                                → (RT : RefTypes Σ (Δ ,ₗ l ⦂ T₁) o')
-                                → (RT' : RefTypes Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₁) o')
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT)) (RefTypes.oTypesList RT)
-                                → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) [ T₁ ]
-  splitReplacementEnvFieldsOK o'Eqo rt rt' oConnectedToLTypes = {!!}   
-
- 
-      
-
   -- Previously, all the types aliasing o were connected. Now, we've extended the context due to a split, and we need to show we still have connectivity.
   -- The idea here is that the expression in question is of type T₂, so the reference left in the heap is of type T₃.
   -- o corresponds to the bject that was affected by the split, whereas o' is the reference we are interested in analyzing aliases to.
@@ -828,12 +851,13 @@ module HeapProperties where
     origConsis@(ok _ _ _ objLookup refConsistencyFunc)
     refl
     RT
-    rConnected@(isConnected _ oTypesListConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected@(envTypesConnected _ etc _ _))
+    rConnected@(isConnected _ oTypesListConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected@(envTypesConnected _ etc fieldTypesConnected fieldEnvTypesConnected))
     spl
     with (o' ≟ o)
   ... | yes osEq =
     -- In this case, there are no O types yet, but adding o ⦂ T₂ will add one.
-    let
+      ⟨ RT' , isConnected RT' TsForOsConnected  TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected ⟩
+    where
       Δ' = ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂)
 
       TsForOs = [ T₂ ] -- Since o ≡ o', when we look up o' in the new context, we'll get T₂.
@@ -852,7 +876,6 @@ module HeapProperties where
       -- Can I show that T₂ is compatible with all of the old env types? Because that's really what I need.
       lInρForFindLocation = (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
       TInEnvTypes = findLocationInEnvTypes (RefTypes.envTypesList RT) (RefTypes.envTypes RT) etc lInρForFindLocation
-      foo = proj₂ TInEnvTypes
       newEnvTypes = envTypesForSplit (RefTypes.envTypes RT) lInρForFindLocation (proj₂ TInEnvTypes) etc spl
 
       RT' : RefTypes Σ Δ' o'
@@ -874,8 +897,6 @@ module HeapProperties where
       oldEnvFieldsCompatible : All (λ T → All (_⟷_ T) (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)
       oldEnvFieldsCompatible = envFieldInversion3 envFieldConnected
       -- One of the items in oldEnvFieldsCompatible is proof that T₁ is connected to everything in fieldTypesList! But which one?
-
-
       
       T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)      
       T₁CompatWithAllFieldTypes =
@@ -887,15 +908,23 @@ module HeapProperties where
       TsForOsConnectedToFieldTypes = T₂CompatWithAllFieldTypes ∷ []
 
       T₂ConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) [ T₂ ]
-      T₂ConnectedToLTypes =  proj₂ (proj₂ newEnvTypes) ∷ []
+      T₂ConnectedToLTypes =  proj₁ (proj₂ (proj₂ newEnvTypes)) ∷ []
 
       TsForOsConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) a) TsForOsIsRight T₂ConnectedToLTypes
 
+      externalCompat =  proj₂ (proj₂ (proj₂ (proj₂ newEnvTypes)))
+      -- TODO: use fieldEnvTypesConnected
+      convertCompatibility : (All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)) → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.envTypesList RT')
+      convertCompatibility [] = {![]!}
+      convertCompatibility (_∷_ {x = x} {xs = xs} origFieldTypesEnvTypesCompat origFieldTypesEnvTypesCompat₁) = {!!}
+
+      envTypesCompatibleWithFieldTypes : All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.envTypesList RT')
+      envTypesCompatibleWithFieldTypes = {!!}
+
       envAndFieldConnected : IsConnectedEnvAndField Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂) o' RT'
-      envAndFieldConnected = splitReplacementEnvFieldOK {Γ} {Σ} {Δ} {o} {o'} {l} osEq RT envFieldConnected spl RT' -- XXX
-    in
-     ⟨ RT' , isConnected RT' TsForOsConnected  TsForOsConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected ⟩
+      envAndFieldConnected = envTypesConnected RT' ( proj₁ (proj₂ (proj₂ (proj₂ newEnvTypes)))) fieldTypesConnected envTypesCompatibleWithFieldTypes
+       
   ... | no osNeq =
         --  The change in Δ has no impact on looking up o', since o' ≢ o.
         let
