@@ -8,19 +8,9 @@ module Prelude where
   open import Data.List.Membership.DecSetoid ≡-decSetoid 
 
   open import Data.List.Relation.Unary.Any
+  open import Data.Empty
 
 
-
-  -- empty type
-  data ⊥ : Set where
-
-  -- from false, derive whatever
-  abort : ∀ {C : Set} → ⊥ → C
-  abort ()
-
-  -- unit
-  data ⊤ : Set where
-    <> : ⊤
 
   -- sums
   data _+̇_ (A B : Set) : Set where
@@ -46,6 +36,14 @@ module Prelude where
                              → x ∉ (x' ∷ L)
   listConcatNoncontainment {x} {x'} {L} xNeqx' xNotInL (here xEqx') = xNeqx' xEqx'
   listConcatNoncontainment {x} {x'} {L} xNeqx' xNotInL (there xInConcat) = xNotInL xInConcat
+
+  listConcatContainment : ∀ {x x' t}
+                          → x ∈ (x' ∷ t)
+                          → x' ≢ x
+                          → x ∈ t
+
+  listConcatContainment {x} {x'} {t} (here px) x'Neqx = ⊥-elim (x'Neqx (Eq.sym px))
+  listConcatContainment {x} {x'} {t} (there xInCons) x'Neqx = xInCons
   
 -- Basic properties of equality
   ≢-sym : ∀ {a} {A : Set a} → {x x' : A}
