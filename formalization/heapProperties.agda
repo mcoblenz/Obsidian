@@ -131,6 +131,11 @@ module HeapProperties where
   splittingRespectsHeap {Γ} {.(contractType (tc _ _))} {contractType (tc _ (S _))} {contractType (tc _ Shared)} {contractType (tc _ Shared)} (states-shared x) (unownedCompat x₁ x₂) =  ⟨ unownedCompat x₁ x₂ , unownedCompat x₁ x₂ ⟩
   splittingRespectsHeap {Γ} {.(contractType _)} {contractType (tc _ (S _))} {contractType (tc _ Shared)} {contractType (tc _ Shared)} (states-shared x) (sharedCompat x₂ () x₄)
 
+  splitSymmetric : ∀ {T T'}
+                   → T ⟷ T'
+                   → T' ⟷ T
+  splitSymmetric {T} {T'} compat = symCompat compat    
+
 
 -- ============= DEFINITIONS OF HEAP CONSISTENCY ===============
 
@@ -913,14 +918,27 @@ module HeapProperties where
       TsForOsConnectedToLTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) (RefTypes.oTypesList RT')
       TsForOsConnectedToLTypes =  Eq.subst (λ a →  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) a) TsForOsIsRight T₂ConnectedToLTypes
 
+      externalCompat : ∀ T' → All (λ T'' → T' ⟷ T'') (RefTypes.envTypesList RT) → All (λ T'' → T' ⟷ T'') (RefTypes.envTypesList RT')
       externalCompat =  proj₂ (proj₂ (proj₂ (proj₂ newEnvTypes)))
-      -- TODO: use fieldEnvTypesConnected
-      convertCompatibility : (All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT)) (RefTypes.envTypesList RT)) → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.envTypesList RT')
-      convertCompatibility [] = {![]!}
-      convertCompatibility (_∷_ {x = x} {xs = xs} origFieldTypesEnvTypesCompat origFieldTypesEnvTypesCompat₁) = {!!}
+
+      insideOutEnvTypesFieldTypesCompat : All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT)) (RefTypes.fieldTypesList RT)
+      insideOutEnvTypesFieldTypesCompat = allInsideOut splitSymmetric fieldEnvTypesConnected -- turn prev. inside out
+
+      iterateExternalCompat : (L : List Type)
+                              → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT)) L
+                              → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) L
+      iterateExternalCompat [] allCompat = []
+      iterateExternalCompat (T ∷ rest) (_∷_ {x = .T} {xs = .rest} TCompat restCompat) =
+        (externalCompat T TCompat) ∷ (iterateExternalCompat rest restCompat)
+
+      newEnvTypesCompatWithFieldTypes :  All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) (RefTypes.fieldTypesList RT)
+      newEnvTypesCompatWithFieldTypes = iterateExternalCompat  (RefTypes.fieldTypesList RT) insideOutEnvTypesFieldTypesCompat
+
+      newEnvTypesCompatWithNewFieldTypes : All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList RT')) (RefTypes.fieldTypesList RT')
+      newEnvTypesCompatWithNewFieldTypes = newEnvTypesCompatWithFieldTypes -- b/c old field types ≡ new field types
 
       envTypesCompatibleWithFieldTypes : All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.envTypesList RT')
-      envTypesCompatibleWithFieldTypes = {!!}
+      envTypesCompatibleWithFieldTypes = {! allInsideOut splitSymmetric newEnvTypesCompatWithNewFieldTypes !} -- turn prev. inside out
 
       envAndFieldConnected : IsConnectedEnvAndField Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂) o' RT'
       envAndFieldConnected = envTypesConnected RT' ( proj₁ (proj₂ (proj₂ (proj₂ newEnvTypes)))) fieldTypesConnected envTypesCompatibleWithFieldTypes
