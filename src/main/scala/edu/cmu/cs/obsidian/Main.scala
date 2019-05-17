@@ -299,8 +299,7 @@ object Main {
             val set = new HashSet[String]
             for (contract <- fieldsLiftedAst.contracts) {
                 if (set.contains(contract.name)) {
-                    println("Error:\nDuplicate contract: " + contract.name)
-                    return false
+                    println("Warning: Duplicate contract " + contract.name + " will be ignored")
                 }
                 set.add(contract.name)
             }
