@@ -3,8 +3,7 @@ package edu.cmu.cs.obsidian
 import java.io.File
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
-import java.io.PrintWriter
-import scala.io.Source
+import scala.collection.mutable.HashSet
 
 import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
@@ -296,6 +295,15 @@ object Main {
 
             val (importsProcessedAst, importErrors) = ImportProcessor.processImports(filename, ast)
             val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
+
+            val set = new HashSet[String]
+            for (contract <- fieldsLiftedAst.contracts) {
+                if (set.contains(contract.name)) {
+                    println("Error:\nDuplicate contract: " + contract.name)
+                    return false
+                }
+                set.add(contract.name)
+            }
 
             val table = new SymbolTable(fieldsLiftedAst)
             val (transformedTable: SymbolTable, transformErrors) = StateNameValidator.transformProgram(table)
