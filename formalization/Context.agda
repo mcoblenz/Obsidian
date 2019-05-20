@@ -9,7 +9,7 @@ module Context (A : Set) where
   open import Data.Product using (_×_; proj₁; proj₂; ∃-syntax) renaming (_,_ to ⟨_,_⟩)
   open import Relation.Nullary.Decidable
   open import Relation.Nullary using (Dec; yes; no)
-  import Data.Empty
+  open import Data.Empty
 
 
   infixl 5  _,_⦂_
@@ -47,6 +47,24 @@ module Context (A : Set) where
           -------------
           → x ∈dom Γ
 
+  data _∌dom_ : ℕ → ctx → Set where
+    notInEmpty : ∀ {x}
+               ----------
+               → x ∌dom ∅
+
+    notInNonempty : ∀ {x x' Γ T}
+                    → x ≢ x'
+                    → x ∌dom Γ
+                    --------------------
+                    → x ∌dom (Γ , x' ⦂ T)
+
+  ∌domPreservation : ∀ {x x' Γ T T'}
+                     → x ∌dom (Γ , x' ⦂ T)
+                     ---------------------
+                     → x ∌dom (Γ , x' ⦂ T')
+  ∌domPreservation {x} {x'} {Γ} {T} {T'} (notInNonempty xNeqX' xNotInDom) = notInNonempty xNeqX' xNotInDom
+
+                     
 
 -- Removing elements from a context
   _#_ : ctx → ℕ → ctx
@@ -80,6 +98,14 @@ module Context (A : Set) where
       
   irrelevantReductionsOK {Γ} {x} {y} {t} {t'} (S x₁ qq) neq = qq                 
 
+  irrelevantReductionsInValuesOK :  ∀ {Γ : ctx}
+                                 → ∀ {x y t t'}
+                                 → Γ , x ⦂ t ∋ y ⦂ t'
+                                 → t ≢ t'
+                                 → Γ ∋ y ⦂ t'
+  irrelevantReductionsInValuesOK {Γ} {x} {.x} {t} {.t} Z tNeqt' = ⊥-elim (tNeqt' refl)
+  irrelevantReductionsInValuesOK {Γ} {x} {y} {t} {t'} (S yNeqx yt'InΓ') tNeqt' = yt'InΓ'
+
   contextLookupUnique : ∀ {Γ : ctx}
                         → ∀ {x t t'}
                         → Γ ∋ x ⦂ t
@@ -106,3 +132,11 @@ module Context (A : Set) where
   lookupWeakening {Γ} {x} {x'} {t} {t'} Γcontainment with x ≟ x'
   ...                                                 | yes refl = ⟨ t' , Z {Γ = Γ} {x = x'} {a = t'} ⟩
   ...                                                 | no neq =  ⟨ t , S neq Γcontainment ⟩
+
+  ∌dom-≢ : {Γ : ctx}
+           → ∀ {x x' t}
+           → x ∌dom (Γ , x' ⦂ t)
+           → x ≢ x'
+
+  ∌dom-≢ {Γ} {x} {x'} {t} (notInNonempty xNeqx' xNotInΓ') xEqx' = xNeqx' xEqx'
+           

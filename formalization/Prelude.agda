@@ -1,24 +1,94 @@
 module Prelude where
   open import Agda.Primitive using (Level; lzero; lsuc) renaming (_⊔_ to lmax)
-  open import Data.Nat
-  import Relation.Binary.PropositionalEquality as Eq
+  open import Relation.Binary.PropositionalEquality as Eq
 
+  open import Data.List
+  open import Data.Nat.Properties
 
-  -- empty type
-  data ⊥ : Set where
+  open import Data.List.Membership.DecSetoid ≡-decSetoid 
 
-  -- from false, derive whatever
-  abort : ∀ {C : Set} → ⊥ → C
-  abort ()
+  open import Data.List.Relation.Unary.Any
+  open import Data.Empty
 
-  -- unit
-  data ⊤ : Set where
-    <> : ⊤
+  open import Data.List.Relation.Unary.All
+
 
   -- sums
   data _+̇_ (A B : Set) : Set where
     Inl : A → A +̇ B
     Inr : B → A +̇ B
+
+ -- Basic properties of lists
+  emptyListIsEmpty : ∀ {x}
+                     → x ∉ []
+  emptyListIsEmpty ()
+
+
+  listNoncontainment : ∀ {x x' L}
+                        → x ∉ L
+                        → x' ∈ L
+                        → x ≢ x'
+  listNoncontainment {x} {x'} {L} xNotInL x'InL = λ xEqx' → xNotInL (Eq.subst (λ a → a ∈ L) (Eq.sym xEqx') x'InL)
+
+
+  listConcatNoncontainment : ∀ {x x' L}
+                             → x ≢ x'
+                             → x ∉ L
+                             → x ∉ (x' ∷ L)
+  listConcatNoncontainment {x} {x'} {L} xNeqx' xNotInL (here xEqx') = xNeqx' xEqx'
+  listConcatNoncontainment {x} {x'} {L} xNeqx' xNotInL (there xInConcat) = xNotInL xInConcat
+
+  listConcatContainment : ∀ {x x' t}
+                          → x ∈ (x' ∷ t)
+                          → x' ≢ x
+                          → x ∈ t
+
+  listConcatContainment {x} {x'} {t} (here px) x'Neqx = ⊥-elim (x'Neqx (Eq.sym px))
+  listConcatContainment {x} {x'} {t} (there xInCons) x'Neqx = xInCons
+  
+-- Basic properties of equality
+  ≢-sym : ∀ {a} {A : Set a} → {x x' : A}
+          → x ≢ x'
+          → x' ≢ x
+  ≢-sym xNeqx' = λ x'Eqx → xNeqx' (Eq.sym x'Eqx)
+
+-- Congruence
+  cong₃ : ∀ {a b c d} {A : Set a} {B : Set b} {C : Set c} {D : Set d}
+        (f : A → B → C → D) {x y u v w t} → x ≡ y → u ≡ v → w ≡ t → f x u w ≡ f y v t
+  cong₃ f refl refl refl = refl
+
+-- All
+  allInsideOut : {A : Set}
+                 → {L L' : List A}
+                 → {P : A → A → Set}
+                 → (∀ {T T'} → P T T' → P T' T)
+                 → All (λ T → All (λ T' → P T T') L) L'
+                 → All (λ T → All (λ T' → P T T') L') L
+  allInsideOut {A} {[]} {.[]} sym [] = []
+  allInsideOut {A} {x ∷ L} {.[]} sym [] = [] ∷ allRelatedToEmpty
+    where
+      allRelatedToEmpty : {A : Set}
+                          → {L : List A}
+                          → {P : A → A → Set}
+                          → All (λ T → All (P T) []) L
+      allRelatedToEmpty {A} {[]} {P} = []
+      allRelatedToEmpty {A} {x ∷ L} {P} = [] ∷ allRelatedToEmpty
+  allInsideOut {A} {[]} {.(_ ∷ _)} sym (all₁ ∷ all₂) = []
+  allInsideOut {A} {x ∷ L} {(x' ∷ L')} {P} sym (all₁ ∷ all₂) =
+    ((sym (Data.List.Relation.Unary.All.head all₁)) ∷ unwrap L' all₂) ∷
+      allInsideOut sym (Data.List.Relation.Unary.All.tail all₁ ∷  unwrap2 L' all₂)
+    where
+      unwrap : (M : List A)
+               → All (λ T → All (P T) (x ∷ L)) M
+               → All (λ T' → P x T') M
+      unwrap .[] [] = []
+      unwrap (x ∷ r) (h ∷ t) = (sym (Data.List.Relation.Unary.All.head h)) ∷ unwrap r t
+
+      unwrap2 : (M : List A)
+                → All (λ T → All (P T) (x ∷ L)) M
+                → All (λ T → All (P T) L) M
+      unwrap2 [] all = []
+      unwrap2 (x ∷ M) (all₁ ∷ all₂) = (Data.List.Relation.Unary.All.tail all₁) ∷ unwrap2 M all₂
 
 {-
 -- equality of naturals is decidable. we represent this as computing a

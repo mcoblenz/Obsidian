@@ -9,22 +9,25 @@ module Silica where
   open import Data.List public
   open import Data.Nat.Properties public
   open import Relation.Nullary using (¬_; Dec; yes; no) public
-  open import Relation.Binary using (module StrictTotalOrder) public
+  open import Relation.Binary using (module StrictTotalOrder; DecSetoid; IsDecEquivalence) public
   open import Data.Maybe using (just) public
-  import Relation.Binary.PropositionalEquality as Eq 
+  import Relation.Binary.PropositionalEquality as Eq
+  import Relation.Binary.Core
+  import Relation.Binary.HeterogeneousEquality
   open Eq using (_≡_; _≢_; refl; cong; sym) public
   open Eq.≡-Reasoning public
   open import Data.Product using (_×_; proj₁; proj₂; ∃-syntax; ∃) renaming (_,_ to ⟨_,_⟩) public
   import Context
-  open import Data.List.Membership.DecSetoid ≡-decSetoid 
+  open import Data.List.Membership.DecSetoid ≡-decSetoid
+  import Data.List.Membership.DecSetoid
+  import Data.List.Relation.Binary.Subset.Setoid using (_⊆_)
+  import Data.List.Relation.Binary.Equality.DecPropositional using (_≡?_)
   open import Data.List.Relation.Unary.Any
   open import Data.List.All
   open import Data.Empty
-  open import Data.Sum 
+  open import Data.Sum
+  open import Level
 
-  import Data.AVL.Sets
-  module StateSet = Data.AVL.Sets Data.Nat.Properties.<-strictTotalOrder
-  open StateSet 
 
   -------------- Syntax ------------
   Id : Set
@@ -32,10 +35,16 @@ module Silica where
 
   -- State sets
   σ : Set
-  σ = StateSet.⟨Set⟩
+  σ = List ℕ
 
+  -- List of ℕ subset
   _⊆_ : σ → σ → Set
-  s₁ ⊆ s₂ = (x : ℕ) → (x StateSet.∈? s₁) ≡ true → (x StateSet.∈? s₂) ≡ true
+  _⊆_ = Data.List.Relation.Binary.Subset.Setoid._⊆_ (DecSetoid.setoid ≡-decSetoid)
+
+  -- List of ℕ decidable equality
+  _≟l_ : Relation.Binary.Core.Decidable {A = σ} _≡_
+  _≟l_ = Data.List.Relation.Binary.Equality.DecPropositional._≡?_ _≟_
+  
 
   data Perm : Set where
     Owned : Perm
@@ -57,6 +66,85 @@ module Silica where
     base : Tbase -> Type
     contractType : Tc -> Type
 
+  SInjective : (l₁ l₂ : σ)
+               → l₁ ≢ l₂
+               → S l₁ ≢ S l₂
+  SInjective l₁ .l₁ lsEq refl = lsEq refl
+
+  TCInjectiveContractName : ∀ {p₁ p₂}
+                            → (cn₁ cn₂ : Id)
+                            → cn₁ ≢ cn₂
+                            → tc cn₁ p₁ ≢ tc cn₂ p₂
+  TCInjectiveContractName cn₁ cn₂ nEq refl = nEq refl
+
+  TCInjectivePermission : ∀ {cn₁ cn₂}
+                            → (p₁ p₂ : Perm)
+                            → p₁ ≢ p₂
+                            → tc cn₁ p₁ ≢ tc cn₂ p₂
+  TCInjectivePermission cn₁ cn₂ nEq refl = nEq refl     
+
+  contractTypeInjective : ∀ {tc₁ tc₂}
+    → tc₁ ≢ tc₂
+    → contractType tc₁ ≢ contractType tc₂
+
+  contractTypeInjective nEq refl = nEq refl
+
+  -- Decidable equality for permissions
+  infix 4 _≟p_
+  _≟p_ : Relation.Binary.Core.Decidable {A = Perm} _≡_
+  Owned ≟p Owned = yes refl
+  Owned ≟p Unowned =  no (λ ())
+  Owned ≟p Shared =  no (λ ())
+  Owned ≟p S x =  no (λ ())
+  Unowned ≟p Owned =  no (λ ())
+  Unowned ≟p Unowned = yes refl
+  Unowned ≟p Shared =  no (λ ())
+  Unowned ≟p S x =  no (λ ())
+  Shared ≟p Owned =  no (λ ())
+  Shared ≟p Unowned =  no (λ ())
+  Shared ≟p Shared = yes refl
+  Shared ≟p S x =  no (λ ())
+  S x ≟p Owned =  no (λ ())
+  S x ≟p Unowned =  no (λ ())
+  S x ≟p Shared =  no (λ ())
+  S s1 ≟p S s2 with s1 ≟l s2
+  ... | yes eq = yes (Eq.cong S eq)
+  ... | no nEq = no λ sEq → SInjective s1 s2 nEq sEq 
+
+  -- Decidable equality for types
+  infix 4 _≟t_
+  _≟t_ : Relation.Binary.Core.Decidable {A = Type} _≡_
+  base Void ≟t base Void = yes refl
+  base Void ≟t base Boolean = no (λ ())
+  base Boolean ≟t base Void = no (λ ())
+  base Boolean ≟t base Boolean = yes refl
+  base x ≟t contractType x₁ = no (λ ())
+  contractType x ≟t base x₁ = no (λ ())
+  contractType (tc contractName p₁) ≟t contractType (tc contractName₁ p₂) with contractName ≟ contractName₁ | p₁ ≟p p₂
+  ... | yes eqNames | yes eqPerms = yes (Eq.cong₂ (λ a → λ b → contractType (tc a b)) eqNames eqPerms)
+  ... | no nEqNames | _ = no (contractTypeInjective (TCInjectiveContractName contractName contractName₁ nEqNames))
+  ... | _ | no nEqPerms =  no (contractTypeInjective (TCInjectivePermission p₁ p₂ nEqPerms))
+
+  ≟tIsEquivalence : Relation.Binary.IsEquivalence {A = Type} _≡_ -- _≟t_
+  ≟tIsEquivalence = Eq.isEquivalence 
+
+  ≡t-isDecEquivalence : IsDecEquivalence (_≡_ {A = Type})
+  ≡t-isDecEquivalence = record
+    { isEquivalence = ≟tIsEquivalence
+    ; _≟_           = _≟t_
+    }
+
+  ≡t-decSetoid : DecSetoid 0ℓ 0ℓ
+  ≡t-decSetoid = record
+    { Carrier          = Type
+    ; _≈_              = _≡_
+    ; isDecEquivalence = ≡t-isDecEquivalence
+    }
+
+
+  module tDecSetoid = Data.List.Membership.DecSetoid ≡t-decSetoid
+  _∈ₜ_ : Type → List Type → Set
+  _∈ₜ_ = tDecSetoid._∈_
 
   isShared : Type → Bool
   isShared (contractType (record {contractName = _ ; perm = Shared})) = true
@@ -101,11 +189,19 @@ module Silica where
     voidExpr : Expr
     objRef : ObjectRef → Expr
     fieldAccess : Id → Expr  -- All field accesses are to 'this', so the field name suffices.
-    assertₓ : Id → StateSet.⟨Set⟩ → Expr
-    assertₗ : IndirectRef → StateSet.⟨Set⟩ → Expr
+    assertₓ : Id → σ → Expr
+    assertₗ : IndirectRef → σ → Expr
     -- TODO: add the rest of the expressions
 
+  objRefInjective : ∀ {o o'}
+                      → o ≢ o'
+                      → objRef o ≢ objRef o'
+  objRefInjective {o} {.o} oNeqo' refl = oNeqo' refl
 
+  objRefInjectiveContrapositive : ∀ {o o'}
+                                  → objRef o ≡ objRef o'
+                                  → o ≡ o'
+  objRefInjectiveContrapositive {o} {o'} refl = refl                  
 
   record PublicTransaction : Set where
     constructor publicTransaction
@@ -242,9 +338,7 @@ module Silica where
 
   data _<*_ : StaticEnv → StaticEnv → Set where
     * : ∀ {Δ Δ'}
-          → (StaticEnv.varEnv Δ) ≡ (StaticEnv.varEnv Δ')
           → (StaticEnv.locEnv Δ) <ₗ (StaticEnv.locEnv Δ')
-          → (StaticEnv.objEnv Δ) ≡ (StaticEnv.objEnv Δ')
           -----------------------------------------------
           → Δ <* Δ'
 
@@ -256,11 +350,11 @@ module Silica where
   <*-refl : ∀ {Δ : StaticEnv}
             → Δ <* Δ
 
-  <*-refl =
-    let
-      lt = <ₗ-refl
-    in 
-    * refl lt refl
+  <*-refl = * <ₗ-refl
+
+  <*-o-extension : ∀ {Δ o T}
+                   → (Δ ,ₒ o ⦂ T) <* Δ
+  <*-o-extension {Δ} {o} {T} = * <ₗ-refl
 
   -- Splitting --
   record SplitType : Set where
@@ -376,7 +470,7 @@ module Silica where
 
     assertTyₓ : ∀ {Γ : ContractEnv.ctx}
              → ∀ {Δ : StaticEnv}
-             → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
+             → ∀ {s₁ s₂ : σ}
              → ∀ {tc : Tc}
              → ∀ {x : Id}
              → Tc.perm tc ≡ S s₁
@@ -386,7 +480,7 @@ module Silica where
 
     assertTyₗ : ∀ {Γ : ContractEnv.ctx}
              → ∀ {Δ : StaticEnv}
-             → ∀ {s₁ s₂ : StateSet.⟨Set⟩}
+             → ∀ {s₁ s₂ : σ}
              → ∀ {tc : Tc}
              → ∀ {l : IndirectRef}
              → Tc.perm tc ≡ S s₁
@@ -442,21 +536,21 @@ module Silica where
       → ∀ {l : IndirectRef}
       → ∀ {v : Expr}
       → Δ ⊢ (simpleExpr (loc l)) ⦂ T ⊣ Δ'
-      → (IndirectRefContext.lookup (RuntimeEnv.ρ Σ) l ≡ just v)
+      → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ v
       -----------------------------------------------------------
       → (Σ , (simpleExpr (loc l)) ⟶ Σ , v)
 
     SEassertₓ :
       ∀ {Σ : RuntimeEnv}
       → ∀ (x : Id)
-      → ∀ (s : StateSet.⟨Set⟩)
+      → ∀ (s : σ)
       --------------
       → (Σ , assertₓ x s ⟶ Σ , voidExpr)
 
     SEassertₗ :
       ∀ {Σ : RuntimeEnv}
       → ∀ (l : IndirectRef)
-      → ∀ (s : StateSet.⟨Set⟩)
+      → ∀ (s : σ)
       --------------
       → (Σ , assertₗ l s ⟶ Σ , voidExpr)
 
