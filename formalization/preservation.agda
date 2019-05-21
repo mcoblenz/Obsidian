@@ -56,14 +56,14 @@ preservation : ∀ {e e' : Expr}
 
 -- Proof proceeds by induction on the dynamic semantics.
 
-preservation ty@(locTy {Γ} {Δ₀} l voidSplit) consis st@(SElookup {l = l} {v = voidExpr} _ lookupL) =
+preservation ty@(locTy {Γ} {Δ₀} l voidSplit) consis st@(SElookup {l = l} {v = voidVal} _ lookupL) =
   let
     Δ = (Δ₀ ,ₗ l ⦂ base Void)
     Δ' = Δ
     e'TypingJudgment = voidTy {Γ} {Δ = Δ'}
   in 
     pres ty consis st Δ' e'TypingJudgment consis <*-refl
-preservation ty@(locTy {Γ} {Δ₀} l booleanSplit) consis st@(SElookup {l = l} {v = boolExpr b} _ lookupL) = 
+preservation ty@(locTy {Γ} {Δ₀} l booleanSplit) consis st@(SElookup {l = l} {v = boolVal b} _ lookupL) = 
  let
     Δ = (Δ₀ ,ₗ l ⦂ base Boolean)
     Δ' = Δ
@@ -73,7 +73,7 @@ preservation ty@(locTy {Γ} {Δ₀} l booleanSplit) consis st@(SElookup {l = l} 
 -- The code duplication below is very sad, but I haven't figured out a way that doesn't require refactoring the split judgment to be two-level.
 preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(unownedSplit _ _ _ _))
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
-                       st@(SElookup {Σ} {l = l} {v = objRef o} _ lookupL) = 
+                       st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
   let
     spl' = splitIdempotent spl
     e'TypingJudgment = objTy {Γ} {Δ = Δ''} {T₁ = contractType t₂} {T₂ = contractType t₂} {T₃ = contractType t₃} o spl'
@@ -89,29 +89,29 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
     -- Show that if you look up l in the new context, you get the same type as before.
     voidLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Void
-                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidExpr)))
+                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidVal)))
     voidLookup' l' l'InΔ' with l' Data.Nat.≟ l
     voidLookup' l' (Context.S l'NeqL l'VoidType) | yes eq = ⊥-elim (l'NeqL eq)
     voidLookup' l' l'InΔ' | no nEq = voidLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
     boolLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Boolean
-                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolExpr b)))
+                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolVal b)))
     boolLookup' l' l'InΔ' with l' Data.Nat.≟ l
     boolLookup' l' (Context.S l'NeqL l'BoolType) | yes eq = ⊥-elim (l'NeqL eq)
     boolLookup' l' l'InΔ' | no nEq = boolLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
     
     objLookup' : (l' : IndirectRef) → (T : Tc)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
-                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
+                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objVal o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
     objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
     objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
     objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
     objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
-    lookupUnique : objRef o ≡ objRef ( proj₁ (objLookup l t₁ Z))
+    lookupUnique : objVal o ≡ objVal ( proj₁ (objLookup l t₁ Z))
     lookupUnique = IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} lookupL (proj₁ (proj₂ (objLookup l t₁ Z)))
-    oLookupUnique = objRefInjectiveContrapositive lookupUnique
+    oLookupUnique = objValInjectiveContrapositive lookupUnique
 
     -- Show that all location-based aliases from the previous environment are compatible with the new alias.
     -- Note that Σ is unchanged, so we use Σ instead of defining a separate Σ'.
@@ -127,7 +127,7 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
                        
 preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(shared-shared-shared _))
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
-                       st@(SElookup {Σ} {l = l} {v = objRef o} _ lookupL) = 
+                       st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
    let
     spl' = splitIdempotent spl
     e'TypingJudgment = objTy {Γ} {Δ = Δ''} {T₁ = contractType t₂} {T₂ = contractType t₂} {T₃ = contractType t₃} o spl'
@@ -143,29 +143,29 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
     -- Show that if you look up l in the new context, you get the same type as before.
     voidLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Void
-                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidExpr)))
+                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidVal)))
     voidLookup' l' l'InΔ' with l' Data.Nat.≟ l
     voidLookup' l' (Context.S l'NeqL l'VoidType) | yes eq = ⊥-elim (l'NeqL eq)
     voidLookup' l' l'InΔ' | no nEq = voidLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
     boolLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Boolean
-                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolExpr b)))
+                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolVal b)))
     boolLookup' l' l'InΔ' with l' Data.Nat.≟ l
     boolLookup' l' (Context.S l'NeqL l'BoolType) | yes eq = ⊥-elim (l'NeqL eq)
     boolLookup' l' l'InΔ' | no nEq = boolLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
     
     objLookup' : (l' : IndirectRef) → (T : Tc)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
-                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
+                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objVal o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
     objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
     objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
     objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
     objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
-    lookupUnique : objRef o ≡ objRef ( proj₁ (objLookup l t₁ Z))
+    lookupUnique : objVal o ≡ objVal ( proj₁ (objLookup l t₁ Z))
     lookupUnique = IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} lookupL (proj₁ (proj₂ (objLookup l t₁ Z)))
-    oLookupUnique = objRefInjectiveContrapositive lookupUnique
+    oLookupUnique = objValInjectiveContrapositive lookupUnique
 
     -- Show that all location-based aliases from the previous environment are compatible with the new alias.
     -- Note that Σ is unchanged, so we use Σ instead of defining a separate Σ'.
@@ -180,7 +180,7 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
         referencesConsistent {_} {_} {o'} newConnected
 preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(owned-shared _))
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
-                       st@(SElookup {Σ} {l = l} {v = objRef o} _ lookupL) = 
+                       st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
    let
     spl' = splitIdempotent spl
     e'TypingJudgment = objTy {Γ} {Δ = Δ''} {T₁ = contractType t₂} {T₂ = contractType t₂} {T₃ = contractType t₃} o spl'
@@ -196,29 +196,29 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
     -- Show that if you look up l in the new context, you get the same type as before.
     voidLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Void
-                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidExpr)))
+                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidVal)))
     voidLookup' l' l'InΔ' with l' Data.Nat.≟ l
     voidLookup' l' (Context.S l'NeqL l'VoidType) | yes eq = ⊥-elim (l'NeqL eq)
     voidLookup' l' l'InΔ' | no nEq = voidLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
     boolLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Boolean
-                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolExpr b)))
+                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolVal b)))
     boolLookup' l' l'InΔ' with l' Data.Nat.≟ l
     boolLookup' l' (Context.S l'NeqL l'BoolType) | yes eq = ⊥-elim (l'NeqL eq)
     boolLookup' l' l'InΔ' | no nEq = boolLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
     
     objLookup' : (l' : IndirectRef) → (T : Tc)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
-                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
+                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objVal o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
     objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
     objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
     objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
     objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
-    lookupUnique : objRef o ≡ objRef ( proj₁ (objLookup l t₁ Z))
+    lookupUnique : objVal o ≡ objVal ( proj₁ (objLookup l t₁ Z))
     lookupUnique = IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} lookupL (proj₁ (proj₂ (objLookup l t₁ Z)))
-    oLookupUnique = objRefInjectiveContrapositive lookupUnique
+    oLookupUnique = objValInjectiveContrapositive lookupUnique
 
     -- Show that all location-based aliases from the previous environment are compatible with the new alias.
     -- Note that Σ is unchanged, so we use Σ instead of defining a separate Σ'.
@@ -233,7 +233,7 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
         referencesConsistent {_} {_} {o'} newConnected
 preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(states-shared _))
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
-                       st@(SElookup {Σ} {l = l} {v = objRef o} _ lookupL) = 
+                       st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
    let
     spl' = splitIdempotent spl
     e'TypingJudgment = objTy {Γ} {Δ = Δ''} {T₁ = contractType t₂} {T₂ = contractType t₂} {T₃ = contractType t₃} o spl'
@@ -249,29 +249,29 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
     -- Show that if you look up l in the new context, you get the same type as before.
     voidLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Void
-                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidExpr)))
+                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidVal)))
     voidLookup' l' l'InΔ' with l' Data.Nat.≟ l
     voidLookup' l' (Context.S l'NeqL l'VoidType) | yes eq = ⊥-elim (l'NeqL eq)
     voidLookup' l' l'InΔ' | no nEq = voidLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
     boolLookup' : (∀ (l' : IndirectRef)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Boolean
-                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolExpr b)))
+                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolVal b)))
     boolLookup' l' l'InΔ' with l' Data.Nat.≟ l
     boolLookup' l' (Context.S l'NeqL l'BoolType) | yes eq = ⊥-elim (l'NeqL eq)
     boolLookup' l' l'InΔ' | no nEq = boolLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
     
     objLookup' : (l' : IndirectRef) → (T : Tc)
                   → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
-                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
+                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objVal o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
     objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
     objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
     objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
     objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
-    lookupUnique : objRef o ≡ objRef ( proj₁ (objLookup l t₁ Z))
+    lookupUnique : objVal o ≡ objVal ( proj₁ (objLookup l t₁ Z))
     lookupUnique = IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} lookupL (proj₁ (proj₂ (objLookup l t₁ Z)))
-    oLookupUnique = objRefInjectiveContrapositive lookupUnique
+    oLookupUnique = objValInjectiveContrapositive lookupUnique
 
     -- Show that all location-based aliases from the previous environment are compatible with the new alias.
     -- Note that Σ is unchanged, so we use Σ instead of defining a separate Σ'.

@@ -24,7 +24,7 @@ locationsInExprAreInContext (varTy x spl) varFL ()
 -- l is related to e, so therefore we can point to where l is in Δ.
 locationsInExprAreInContext (locTy {Δ = Δ''} {T₁ = T₁} l spl) (locFL l) (here refl) =  ⟨ T₁ , Z ⟩
 locationsInExprAreInContext (locTy {Δ = Δ''} {T₁} l spl) (locFL l) (there ())
-locationsInExprAreInContext (objTy o spl) objRefFL ()
+locationsInExprAreInContext (objTy o spl) objValFL ()
 locationsInExprAreInContext (boolTy b) boolFL ()
 locationsInExprAreInContext ty voidFL ()
 
@@ -57,14 +57,14 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l voidSplit) =
     lInDelta = proj₂ locationExistsInContext
     heapLookupResult = voidLookup consis lInDelta
   in
-    step Σ Σ (simpleExpr (loc l)) voidExpr (SElookup ty heapLookupResult)
+    step Σ Σ (simpleExpr (loc l)) (valExpr voidVal) (SElookup ty heapLookupResult)
 progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l booleanSplit) = 
   let
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
     lInDelta = proj₂ locationExistsInContext
     heapLookupResult = boolLookup consis lInDelta
   in
-    step Σ Σ (simpleExpr (loc l)) (boolExpr (proj₁ heapLookupResult)) (SElookup ty (proj₂ heapLookupResult))
+    step Σ Σ (simpleExpr (loc l)) (valExpr (boolVal (proj₁ heapLookupResult))) (SElookup ty (proj₂ heapLookupResult))
 progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (unownedSplit _ _ _ _)) = 
   let
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -73,7 +73,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (unownedSplit _ _ _ _)) =
     heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
-    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+    step Σ Σ (simpleExpr (loc l)) (valExpr (objVal o)) (SElookup ty heapLookupFound)
 progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (shared-shared-shared _)) =
   let
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -82,7 +82,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (shared-shared-shared _)) 
     heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
-    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+    step Σ Σ (simpleExpr (loc l)) (valExpr (objVal o)) (SElookup ty heapLookupFound)
 progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (owned-shared _)) =
   let
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -91,7 +91,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (owned-shared _)) =
     heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
-    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+    step Σ Σ (simpleExpr (loc l)) (valExpr (objVal o)) (SElookup ty heapLookupFound)
 progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (states-shared _)) =
   let
     locationExistsInContext = locationsInExprAreInContext ty (locFL l) (here refl)
@@ -100,10 +100,10 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (states-shared _)) =
     heapLookupFound = proj₁ (proj₂ heapLookupResult)
     o = proj₁ heapLookupResult
   in
-    step Σ Σ (simpleExpr (loc l)) (objRef o) (SElookup ty heapLookupFound)
+    step Σ Σ (simpleExpr (loc l)) (valExpr (objVal o)) (SElookup ty heapLookupFound)
 
 progress Σ cl consis (objTy o split) =  done (objVal o)
 progress Σ cl consis (boolTy b) = done (boolVal b)
 progress Σ cl consis (voidTy) = done (voidVal)
-progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (voidExpr) (SEassertₗ {Σ} l s)
-progress Σ cl consis (assertTyₓ {s₁ = s} {x = x} tcEq subset) = step Σ Σ (assertₓ x s) (voidExpr) (SEassertₓ {Σ} x s)
+progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (valExpr voidVal) (SEassertₗ {Σ} l s)
+progress Σ cl consis (assertTyₓ {s₁ = s} {x = x} tcEq subset) = step Σ Σ (assertₓ x s) (valExpr voidVal) (SEassertₓ {Σ} x s)

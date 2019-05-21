@@ -183,25 +183,35 @@ module Silica where
       contractFields : List SimpleExpr
       stateFields : List SimpleExpr
 
+  data Value : Set where
+    boolVal : (b : Bool)
+              ------------
+              → Value
+
+    voidVal : Value 
+
+    objVal : ∀ (o : ObjectRef)
+             --------------
+             → Value
+
   data Expr : Set where
+    valExpr : Value → Expr
     simpleExpr : SimpleExpr → Expr
-    boolExpr : Bool → Expr
-    voidExpr : Expr
-    objRef : ObjectRef → Expr
     fieldAccess : Id → Expr  -- All field accesses are to 'this', so the field name suffices.
     assertₓ : Id → σ → Expr
     assertₗ : IndirectRef → σ → Expr
     -- TODO: add the rest of the expressions
 
-  objRefInjective : ∀ {o o'}
-                      → o ≢ o'
-                      → objRef o ≢ objRef o'
-  objRefInjective {o} {.o} oNeqo' refl = oNeqo' refl
 
-  objRefInjectiveContrapositive : ∀ {o o'}
-                                  → objRef o ≡ objRef o'
+  objValInjective : ∀ {o o'}
+                      → o ≢ o'
+                      → objVal o ≢ objVal o'
+  objValInjective {o} {.o} oNeqo' refl = oNeqo' refl
+
+  objValInjectiveContrapositive : ∀ {o o'}
+                                  → objVal o ≡ objVal o'
                                   → o ≡ o'
-  objRefInjectiveContrapositive {o} {o'} refl = refl                  
+  objValInjectiveContrapositive {o} {o'} refl = refl                  
 
   record PublicTransaction : Set where
     constructor publicTransaction
@@ -230,29 +240,11 @@ module Silica where
     program : List Contract -> Expr -> Program
 
   --============= Utilities ================
-  data FreeLocations : Expr → List IndirectRef → Set where
-    boolFL : ∀ {b : Bool} → FreeLocations (boolExpr b) []
-    varFL : ∀ {x : Id} → FreeLocations (simpleExpr (var x)) []
-    voidFL : FreeLocations (voidExpr) []
-    objRefFL : ∀ {o : ObjectRef} → FreeLocations (objRef o) []
-    locFL : ∀ (l : IndirectRef) → FreeLocations (simpleExpr (loc l)) [ l ]
-
-
-  freeLocations : Expr → List IndirectRef
-  freeLocations (boolExpr b) = []
-  freeLocations (simpleExpr (var x)) = []
-  freeLocations (voidExpr) = []
-  freeLocations (objRef o) = []
-  freeLocations (simpleExpr (loc l)) = [ l ]
-  freeLocations (fieldAccess x) = []
-  freeLocations (assertₓ x x₁) = []
-  freeLocations (assertₗ l x₁) = [ l ]
-
   data FreeVariables : Expr → List Id → Set where
-    boolFL : ∀ {b : Bool} → FreeVariables (boolExpr b) []
+    boolFL : ∀ {b : Bool} → FreeVariables (valExpr (boolVal b)) []
     varFL : ∀ {x : Id} → FreeVariables (simpleExpr (var x)) [ x ]
-    voidFL : FreeVariables (voidExpr) []
-    objRefFL : ∀ {o : ObjectRef} → FreeVariables (objRef o) []
+    voidFL : FreeVariables (valExpr voidVal) []
+    objValFL : ∀ {o : ObjectRef} → FreeVariables (valExpr (objVal o)) []
     locFL : ∀ (l : IndirectRef) → FreeVariables (simpleExpr (loc l)) []
 
   data Closed : Expr → Set where
@@ -262,10 +254,10 @@ module Silica where
              → Closed e
 
   freeVariables : Expr → List IndirectRef
-  freeVariables (boolExpr b) = []
+  freeVariables (valExpr (boolVal b)) = []
   freeVariables (simpleExpr (var x)) = [ x ]
-  freeVariables (voidExpr) = []
-  freeVariables (objRef o) = []
+  freeVariables (valExpr voidVal) = []
+  freeVariables (valExpr (objVal o)) = []
   freeVariables (simpleExpr (loc l)) = []
   freeVariables (fieldAccess x) = []
   freeVariables (assertₓ x x₁) = [ x ]
@@ -454,18 +446,18 @@ module Silica where
         → ∀ (o : ObjectRef)
         → Γ ⊢ T₁ ⇛ T₂ / T₃
         ------------------------------------
-        → (Δ ,ₒ o ⦂ T₁) ⊢ (objRef o) ⦂ T₂ ⊣ (Δ ,ₒ o ⦂ T₃)
+        → (Δ ,ₒ o ⦂ T₁) ⊢ (valExpr (objVal o)) ⦂ T₂ ⊣ (Δ ,ₒ o ⦂ T₃)
 
     boolTy : ∀ {Γ : ContractEnv.ctx}
            → ∀ {Δ : StaticEnv}
            → ∀ (b : Bool)
            ------------------------------------
-           → Δ ⊢ (boolExpr b) ⦂ (base Boolean) ⊣ Δ
+           → Δ ⊢ (valExpr (boolVal b)) ⦂ (base Boolean) ⊣ Δ
 
     voidTy : ∀ {Γ : ContractEnv.ctx}
            → ∀ {Δ : StaticEnv}
            --------------------
-            → Δ ⊢ voidExpr ⦂ base Void ⊣ Δ
+            → Δ ⊢ (valExpr voidVal) ⦂ base Void ⊣ Δ
 
 
     assertTyₓ : ∀ {Γ : ContractEnv.ctx}
@@ -489,24 +481,13 @@ module Silica where
              → (Δ ,ₗ l ⦂ (contractType tc)) ⊢ assertₗ l s₁ ⦂ base Void ⊣ (Δ ,ₗ l ⦂ (contractType tc))
 
   ------------ DYNAMIC SEMANTICS --------------
-  data Value : Expr → Set where
-    boolVal : ∀ (b : Bool)
-            ------------
-            → Value (boolExpr b)
-
-    voidVal : Value (voidExpr)
-
-    objVal : ∀ (o : ObjectRef)
-             --------------
-             → Value (objRef o)
-
 
   -- μ
   module ObjectRefContext = Context Object
   ObjectRefEnv = ObjectRefContext.ctx
 
   -- ρ
-  module IndirectRefContext = Context Expr -- TODO: require that these are all values
+  module IndirectRefContext = Context Value -- TODO: require that these are all values
   IndirectRefEnv = IndirectRefContext.ctx
 
   -- φ
@@ -534,24 +515,24 @@ module Silica where
       → ∀ {Δ Δ' : StaticEnv}
       → ∀ {T : Type}
       → ∀ {l : IndirectRef}
-      → ∀ {v : Expr}
+      → ∀ {v : Value}
       → Δ ⊢ (simpleExpr (loc l)) ⦂ T ⊣ Δ'
       → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ v
       -----------------------------------------------------------
-      → (Σ , (simpleExpr (loc l)) ⟶ Σ , v)
+      → (Σ , (simpleExpr (loc l)) ⟶ Σ , valExpr v)
 
     SEassertₓ :
       ∀ {Σ : RuntimeEnv}
       → ∀ (x : Id)
       → ∀ (s : σ)
       --------------
-      → (Σ , assertₓ x s ⟶ Σ , voidExpr)
+      → (Σ , assertₓ x s ⟶ Σ , valExpr voidVal)
 
     SEassertₗ :
       ∀ {Σ : RuntimeEnv}
       → ∀ (l : IndirectRef)
       → ∀ (s : σ)
       --------------
-      → (Σ , assertₗ l s ⟶ Σ , voidExpr)
+      → (Σ , assertₗ l s ⟶ Σ , valExpr voidVal)
 
 

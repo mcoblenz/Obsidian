@@ -149,7 +149,7 @@ module HeapProperties where
   envTypesHelper IndirectRefContext.∅  Δ o = []
 
 
-  envTypesHelper (IndirectRefContext._,_⦂_ ρ l (objRef o')) Δ o with (o' ≟ o) | (TypeEnvContext.lookup Δ l)
+  envTypesHelper (IndirectRefContext._,_⦂_ ρ l (objVal o')) Δ o with (o' ≟ o) | (TypeEnvContext.lookup Δ l)
   ...                                             | yes _ | just T =  (T ∷ (envTypesHelper ρ Δ o))
   ...                                             | _ | _ = envTypesHelper ρ Δ o
 
@@ -167,21 +167,21 @@ module HeapProperties where
                                → EnvTypes (re μ ρ φ ψ) Δ o (l ∷ forbiddenRefs) R
                                → (StaticEnv.locEnv Δ) ∋ l ⦂ T
                                → l ∉ forbiddenRefs 
-                               → EnvTypes (re μ (ρ IndirectRefContext., l ⦂ (objRef o)) φ ψ) Δ o forbiddenRefs (T ∷ R)
+                               → EnvTypes (re μ (ρ IndirectRefContext., l ⦂ (objVal o)) φ ψ) Δ o forbiddenRefs (T ∷ R)
 
     envTypesConcatMatchNotFound : ∀ {R l μ ρ φ ψ forbiddenRefs}
                                   → (Δ : StaticEnv)
                                   → (o : ObjectRef)
                                   → EnvTypes (re μ ρ φ ψ) Δ o forbiddenRefs R
                                   → l ∌dom (StaticEnv.locEnv Δ)
-                                  → EnvTypes (re μ (ρ IndirectRefContext., l ⦂ (objRef o)) φ ψ) Δ o forbiddenRefs R
+                                  → EnvTypes (re μ (ρ IndirectRefContext., l ⦂ (objVal o)) φ ψ) Δ o forbiddenRefs R
  
     envTypesConcatMismatch : ∀ {R l μ ρ φ ψ forbiddenRefs}
                              → (Δ : StaticEnv)
                              → (o o' : ObjectRef)
                              → o ≢ o'
                              → EnvTypes (re μ ρ φ ψ) Δ o forbiddenRefs R -- Mismatch in ρ, so keep looking in the rest of ρ
-                             → EnvTypes (re μ (ρ IndirectRefContext., l ⦂ (objRef o')) φ ψ) Δ o forbiddenRefs R
+                             → EnvTypes (re μ (ρ IndirectRefContext., l ⦂ (objVal o')) φ ψ) Δ o forbiddenRefs R
 
     envTypesEmpty : ∀ {μ φ ψ Δ o forbiddenRefs}
                     → EnvTypes  (re μ Context.∅ φ ψ) Δ o forbiddenRefs []
@@ -273,12 +273,12 @@ module HeapProperties where
   data _&_ok : RuntimeEnv → StaticEnv → Set where
     ok : ∀ {Σ : RuntimeEnv}
          → ∀ (Δ : StaticEnv)
-         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Void → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ voidExpr)))
-         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ boolExpr b)))
+         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Void → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ voidVal)))
+         → (∀ (l : IndirectRef) → ((StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ boolVal b)))
          → (∀ (l : IndirectRef)
            → ∀ (T : Tc)
            → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)         -- If a location is in Δ and has contract reference type...
-           → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))) -- then location can be looked up in Σ...
+           → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))) -- then location can be looked up in Σ...
            )
          → (∀ o → o ObjectRefContext.∈dom (RuntimeEnv.μ Σ) → ReferenceConsistency Σ Δ o)
          -- TODO: add remaining antecedents
@@ -303,7 +303,7 @@ module HeapProperties where
               → ∀ {T : Tc}
               → Σ & Δ ok
               → (StaticEnv.locEnv Δ) ∋ l ⦂ (contractType T)
-              → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)))
+              → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ)))
 
   locLookup (ok Δ _ _ lContainment rc) lInDelta@(Z {Δ'} {x} {contractType a}) = lContainment x a lInDelta
   locLookup (ok Δ _ _ lContainment rc) lInDelta@(S {Δ'} {x} {y} {contractType a} {b} nEq xInRestOfDelta) = lContainment x a lInDelta
@@ -313,7 +313,7 @@ module HeapProperties where
               → ∀ {l : IndirectRef}
               → Σ & Δ ok
               → (StaticEnv.locEnv Δ) ∋ l ⦂ base Void
-              → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ voidExpr)
+              → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ voidVal)
   voidLookup (ok Δ voidContainment _ _ _) voidType@(Z {Δ'} {l} {a}) = voidContainment l voidType
   voidLookup (ok Δ voidContainment _ _ _) voidType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = voidContainment l voidType
 
@@ -322,7 +322,7 @@ module HeapProperties where
               → ∀ {l : IndirectRef}
               → Σ & Δ ok
               → (StaticEnv.locEnv Δ) ∋ l ⦂ base Boolean
-              → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ boolExpr b)
+              → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ boolVal b)
   boolLookup (ok Δ _ boolContainment _ _) boolType@(Z {Δ'} {l} {a}) = boolContainment l boolType
   boolLookup (ok Δ _ boolContainment _ _) boolType@(S {Δ'} {l} {y} {a} {b} nEq lInRestOfDelta) = boolContainment l boolType 
 
@@ -334,10 +334,10 @@ module HeapProperties where
                            → (envTypesList : List Type)
                            → EnvTypes Σ (Δ ,ₗ l ⦂ T) o forbiddenRefs envTypesList
                            → IsConnectedTypeList envTypesList
-                           → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
+                           → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o)                          
                            → T ∈ₜ envTypesList × All (λ T' → (T' ≢ T) → T ⟷ T') envTypesList
 -- The argument will have the form: look, I found T in envTypes, so it must be compatible with everything in fieldTypes already.
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T} .(T' ∷ R)
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {Δ} {l} {o} {T} .(T' ∷ R)
     (envTypesConcatMatchFound {R = R} {l = l₁} {T = T'} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ T) o envTypes l₁HasTypeT l₁NotForbidden)
     (consTypeList firstConnected restConnected)
     lInρ with l ≟ l₁
@@ -368,7 +368,7 @@ module HeapProperties where
       TCompatT' = Data.List.Relation.Unary.All.lookup firstConnected TInR
     in
       ⟨ there TInR , (λ TNeqT' → symCompat TCompatT') ∷ proj₂ recurse ⟩ -- firstConnected ⟩
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T} envTypesList
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {Δ} {l} {o} {T} envTypesList
     (envTypesConcatMatchNotFound {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ T) o envTypes lNotInΔ')
     connected
     lInρ =
@@ -377,14 +377,14 @@ module HeapProperties where
         lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
       in
       findLocationInEnvTypes envTypesList envTypes connected lInRestOfρ 
-  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T} envTypesList
+  findLocationInEnvTypes {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o') φ ψ)} {Δ} {l} {o} {T} envTypesList
     (envTypesConcatMismatch {R = .envTypesList} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ T) o o' oNeqo' envTypes)
     connected
     lInρ =
       let
-        -- from o ≢ o' I need to prove that objRef o ≢ objRef o'
-        -- so I assume objRef o ≡ objRef o' and derive o ≡ o', which is a contradiction.
-        oExprNeqo'Expr = λ objRefsEq → (objRefInjective oNeqo') (Eq.sym objRefsEq)
+        -- from o ≢ o' I need to prove that objVal o ≢ objVal o'
+        -- so I assume objVal o ≡ objVal o' and derive o ≡ o', which is a contradiction.
+        oExprNeqo'Expr = λ objValsEq → (objValInjective oNeqo') (Eq.sym objValsEq)
         lInRestOfρ = IndirectRefContext.irrelevantReductionsInValuesOK lInρ oExprNeqo'Expr 
       in
         findLocationInEnvTypes envTypesList envTypes connected lInRestOfρ
@@ -395,7 +395,7 @@ module HeapProperties where
                                           → (TL : List Type)
                                           → All (λ T → All (_⟷_ T) TL) (RefTypes.envTypesList RT)
                                           → IsConnectedTypeList (RefTypes.envTypesList RT)
-                                          → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)                          
+                                          → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o)                          
                                           → All (_⟷_ (T)) TL
   prevCompatibilityImpliesCompatibility {Σ} {Δ} {l} {o} {T} RT TL envTypesCompatibleWithTypes connected lInρ = 
     let
@@ -411,9 +411,9 @@ module HeapProperties where
                                   → EnvTypes Σ (Δ ,ₗ l ⦂ T') o forbiddenRefs R
 
       -- We previously found l₁ ⦂ o at the END of ρ, and found l₁ : T in (Δ ,ₗ l ⦂ T). By "l₁NotInForbiddenRefs" we may derive l ≢ l₁.
-      -- ρ , l₁ : objRef o
-      -- WTS: when we look up l₁ in  (Δ ,ₗ l ⦂ T'), we'll still get objRef o.
-  envTypesForbiddenRefsObserved {l} {forbiddenRefs} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {.(T₁ ∷ R)} Δ o lInLs
+      -- ρ , l₁ : objVal o
+      -- WTS: when we look up l₁ in  (Δ ,ₗ l ⦂ T'), we'll still get objVal o.
+  envTypesForbiddenRefsObserved {l} {forbiddenRefs} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {.(T₁ ∷ R)} Δ o lInLs
     envTypes@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = forbiddenRefs} .(Δ ,ₗ l ⦂ T) .o origEnvTypes l₁HasTypeT₁WithL l₁NotInForbiddenRefs) =
        let
          l₁NeqL : l₁ ≢ l
@@ -425,14 +425,14 @@ module HeapProperties where
       in
          envTypesConcatMatchFound {R = R} (Δ ,ₗ l ⦂ T') o recursiveCall l₁HasSameTypeInNewContext l₁NotInForbiddenRefs
 
-  envTypesForbiddenRefsObserved {l} {forbiddenRefs} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {R} Δ o lInLs
+  envTypesForbiddenRefsObserved {l} {forbiddenRefs} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {R} Δ o lInLs
     (envTypesConcatMatchNotFound {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T) .o origEnvTypes l₁NotInDomΔ') =
       let
         prevEnvTypesObserved = envTypesForbiddenRefsObserved Δ o lInLs origEnvTypes
       in
         envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T') o prevEnvTypesObserved (∌domPreservation l₁NotInDomΔ')
     
-  envTypesForbiddenRefsObserved {l} {forbiddenRefs} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {R} Δ o lInLs
+  envTypesForbiddenRefsObserved {l} {forbiddenRefs} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o') φ ψ)} {R} Δ o lInLs
     (envTypesConcatMismatch {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T) .o o' oNeqO' origEnvTypes) =
       let
         prevEnvTypesObserved = envTypesForbiddenRefsObserved Δ o lInLs origEnvTypes
@@ -518,7 +518,7 @@ module HeapProperties where
   -- So 
   envTypesForSplit : ∀ {Γ Σ Δ l o T₁ T₂ T₃ Ts forbiddenRefs}
                                    → EnvTypes Σ (Δ ,ₗ l ⦂ T₁) o forbiddenRefs Ts
-                                   → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef o)
+                                   → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o)
                                    → All (λ T' → (T' ≢ T₁) → T₁ ⟷ T') Ts
                                    → IsConnectedTypeList Ts
                                    → Γ ⊢ T₁ ⇛ T₂ / T₃
@@ -526,7 +526,7 @@ module HeapProperties where
                                               (All (λ T' → T₂ ⟷ T') Ts') ×
                                               (IsConnectedTypeList Ts') ×
                                               (∀ T' → All (λ T'' → T' ⟷ T'') Ts → All (λ T'' → T' ⟷ T'') Ts'))
-  envTypesForSplit {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} {forbiddenRefs}
+  envTypesForSplit {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} {forbiddenRefs}
     origMatch@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₄} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes lookupResult l₁NotForbidden)
     lInρ
     (T₁Connected ∷ RConnected)
@@ -580,7 +580,7 @@ module HeapProperties where
             T'CompatT₃ = proj₂ (splittingRespectsHeap spl T'CompatT₁)
           in
             T'CompatT₃ ∷ T'CompatWithTs
-  envTypesForSplit {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} {forbiddenRefs}
+  envTypesForSplit {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {.(T₄ ∷ R)} {forbiddenRefs}
     origMatch@(envTypesConcatMatchFound {R = R} {l = l₁} {T = T₄} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes lookupResult l₁NotForbidden)
     lInρ
     (T₁Connected ∷ RConnected)
@@ -669,7 +669,7 @@ module HeapProperties where
         externCompatibility' T' (_∷_ {x = x} {xs = xs} px T'CompatWithTs) =
           px ∷ externCompatibility T' T'CompatWithTs
     
-  envTypesForSplit {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} {T}
+  envTypesForSplit {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} {T}
     (envTypesConcatMatchNotFound {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes l₁NotInΔ') lInρ T₁Connected origCompat spl =
     let
       lNeql₁ = ≢-sym (∌dom-≢ l₁NotInΔ')
@@ -679,10 +679,10 @@ module HeapProperties where
     in
       ⟨ proj₁ compatibilityWithOrigρ , ⟨ envTypes ,  proj₂ (proj₂ compatibilityWithOrigρ) ⟩ ⟩
       
-  envTypesForSplit {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} {T}
+  envTypesForSplit {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o') φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} {T}
     (envTypesConcatMismatch {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o o' oNeqo' origEnvTypes) lInρ T₁Connected origCompat spl =
       let
-        oExprNeqo'Expr = λ objRefsEq → (objRefInjective oNeqo') (Eq.sym objRefsEq)
+        oExprNeqo'Expr = λ objValsEq → (objValInjective oNeqo') (Eq.sym objValsEq)
         lInRestOfρ = IndirectRefContext.irrelevantReductionsInValuesOK lInρ oExprNeqo'Expr 
 
         compatibilityWithOrigρ = envTypesForSplit origEnvTypes lInRestOfρ T₁Connected origCompat spl
@@ -698,19 +698,19 @@ module HeapProperties where
   oExtensionIrrelevantToEnvTypes :  ∀ {Σ Δ R o o' forbiddenRefs T}
                                     → EnvTypes Σ Δ o' forbiddenRefs R
                                     → EnvTypes Σ (Δ ,ₒ o ⦂ T) o' forbiddenRefs R
-  oExtensionIrrelevantToEnvTypes {.(re μ (ρ IndirectRefContext., l ⦂ objRef o₁) φ ψ)} {Δ} {.(T₁ ∷ R)} {o} {.o₁} {forbiddenRefs} {T}
+  oExtensionIrrelevantToEnvTypes {.(re μ (ρ IndirectRefContext., l ⦂ objVal o₁) φ ψ)} {Δ} {.(T₁ ∷ R)} {o} {.o₁} {forbiddenRefs} {T}
     (envTypesConcatMatchFound {R = R} {l = l} {T = T₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} Δ o₁ envTypes x x₁) =
       let
         recurse = oExtensionIrrelevantToEnvTypes envTypes
       in
         envTypesConcatMatchFound (Δ ,ₒ o ⦂ T) o₁ recurse x x₁
-  oExtensionIrrelevantToEnvTypes {.(re μ (ρ IndirectRefContext., l ⦂ objRef o₁) φ ψ)} {Δ} {R} {o} {.o₁} {forbiddenRefs} {T}
+  oExtensionIrrelevantToEnvTypes {.(re μ (ρ IndirectRefContext., l ⦂ objVal o₁) φ ψ)} {Δ} {R} {o} {.o₁} {forbiddenRefs} {T}
     (envTypesConcatMatchNotFound {R = .R} {l = l} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} Δ o₁ envTypes x) =
       let
         recurse = oExtensionIrrelevantToEnvTypes envTypes
       in
         envTypesConcatMatchNotFound (Δ ,ₒ o ⦂ T) o₁ recurse x
-  oExtensionIrrelevantToEnvTypes {.(re μ (ρ IndirectRefContext., l ⦂ objRef o') φ ψ)} {Δ} {R} {o} {.o₁} {forbiddenRefs} {T}
+  oExtensionIrrelevantToEnvTypes {.(re μ (ρ IndirectRefContext., l ⦂ objVal o') φ ψ)} {Δ} {R} {o} {.o₁} {forbiddenRefs} {T}
     (envTypesConcatMismatch {R = .R} {l = l} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} Δ o₁ o' x envTypes) =
        let
         recurse = oExtensionIrrelevantToEnvTypes envTypes
@@ -729,7 +729,7 @@ module HeapProperties where
                                    → ∃[ Ts' ] ((EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o' forbiddenRefs Ts') ×
                                               (IsConnectedTypeList Ts') ×
                                               (∀ T' → All (λ T'' → T' ⟷ T'') Ts → All (λ T'' → T' ⟷ T'') Ts'))
-  envTypesForSplitOMismatch {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {.o'} {T₁} {T₂} {T₃} {.(T ∷ R)} {forbiddenRefs}
+  envTypesForSplitOMismatch {Γ} {Σ@.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o') φ ψ)} {Δ} {l} {.o'} {T₁} {T₂} {T₃} {.(T ∷ R)} {forbiddenRefs}
     (envTypesConcatMatchFound {R = R} {l = l₁} {T = T} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T₁) o' origEnvTypes lookupResult l₁NotForbidden)
     (consTypeList firstConnected restConnected)
     spl with l₁ ≟ l
@@ -824,7 +824,7 @@ module HeapProperties where
         externCompatibility' T' (_∷_ {x = x} {xs = xs} px T'CompatWithTs) =
           px ∷ externCompatibility T' T'CompatWithTs
           
-  envTypesForSplitOMismatch {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {.o'} {T₁} {T₂} {T₃} {Ts} {forbiddenRefs}
+  envTypesForSplitOMismatch {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o') φ ψ)} {Δ} {l} {.o'} {T₁} {T₂} {T₃} {Ts} {forbiddenRefs}
     (envTypesConcatMatchNotFound {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T₁) o' origEnvTypes l₁NotInΔ')
     origCompat
     spl =
@@ -834,7 +834,7 @@ module HeapProperties where
       in
         ⟨ proj₁ compatibilityWithOrigρ , ⟨ envTypes ,  proj₂ (proj₂ compatibilityWithOrigρ) ⟩ ⟩
 
-  envTypesForSplitOMismatch {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objRef o') φ ψ)} {Δ} {l} {o''} {T₁} {T₂} {T₃} {Ts} {forbiddenRefs}
+  envTypesForSplitOMismatch {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o') φ ψ)} {Δ} {l} {o''} {T₁} {T₂} {T₃} {Ts} {forbiddenRefs}
     (envTypesConcatMismatch {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T₁) o'' o' o''Neqo' origEnvTypes)
     origCompat
     spl =
@@ -902,7 +902,7 @@ module HeapProperties where
 
 
       -- Can I show that T₂ is compatible with all of the old env types? Because that's really what I need.
-      lInρForFindLocation = (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
+      lInρForFindLocation = (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal a) (Eq.sym osEq) lInρ)
       TInEnvTypes = findLocationInEnvTypes (RefTypes.envTypesList RT) (RefTypes.envTypes RT) etc lInρForFindLocation
       newEnvTypes = envTypesForSplit (RefTypes.envTypes RT) lInρForFindLocation (proj₂ TInEnvTypes) etc spl
 
@@ -928,7 +928,7 @@ module HeapProperties where
       
       T₁CompatWithAllFieldTypes : All (λ T' → T₁ ⟷ T') (RefTypes.fieldTypesList RT)      
       T₁CompatWithAllFieldTypes =
-        prevCompatibilityImpliesCompatibility RT (RefTypes.fieldTypesList RT) oldEnvFieldsCompatible etc (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objRef a) (Eq.sym osEq) lInρ)
+        prevCompatibilityImpliesCompatibility RT (RefTypes.fieldTypesList RT) oldEnvFieldsCompatible etc (Eq.subst (λ a → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal a) (Eq.sym osEq) lInρ)
 
       T₂CompatWithAllFieldTypes = t₁CompatibilityImpliest₂Compatibility T₁CompatWithAllFieldTypes spl
 
