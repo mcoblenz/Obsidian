@@ -284,9 +284,79 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
                                           refl refl consis oLookupUnique (proj₁ origConnected) (proj₂ origConnected) spl
       in 
         referencesConsistent {_} {_} {o'} newConnected
-preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl)
-                       consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
-                       st@(SElookup {Σ} {l = l} {v = v} _ lookupL) = ?
 
-preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
-preservation ty consis st@(SEassertₗ l s) = pres ty consis st {!!} {!!} {!!} {!!}
+preservation {T = contractType t₂}
+  (locTy {Γ} {Δ₀} {contractType t₁} {.(contractType t₂)} {contractType t₃} l spl)
+  (ok .(Δ₀ ,ₗ l ⦂ contractType t₁) voidLookup boolLookup objLookup refConsistencyFunc)
+  (SElookup {Σ} {l = l} {boolVal b} _ lookupL) =
+    -- The context says the location refers to a contract, but also a boolean value?? Inconsistent.
+      ⊥-elim (lookupNeq lookupUnique)
+    where
+      objLookupResult = objLookup l t₁ Z
+      o = proj₁ objLookupResult
+      lHasObjType = proj₁ (proj₂ objLookupResult)
+      lookupUnique = IndirectRefContext.contextLookupUnique lHasObjType lookupL
+      lookupNeq : (objVal o) ≢ boolVal b
+      lookupNeq ()
+
+preservation {T = contractType t₂}
+  (locTy {Γ} {Δ₀} {contractType t₁} {.(contractType t₂)} {contractType t₃} l spl)
+  (ok .(Δ₀ ,ₗ l ⦂ contractType t₁) voidLookup boolLookup objLookup refConsistencyFunc)
+  (SElookup {Σ} {l = l} {voidVal} _ lookupL) =
+    -- The context says the location refers to a contract, but also a boolean value?? Inconsistent.
+      ⊥-elim (lookupNeq lookupUnique)
+    where
+      objLookupResult = objLookup l t₁ Z
+      o = proj₁ objLookupResult
+      lHasObjType = proj₁ (proj₂ objLookupResult)
+      lookupUnique = IndirectRefContext.contextLookupUnique lHasObjType lookupL
+      lookupNeq : (objVal o) ≢ voidVal
+      lookupNeq ()
+
+preservation
+  (locTy {Γ} {Δ₀} {.(base Void)} l voidSplit)
+  (ok .(Δ₀ ,ₗ l ⦂ base Void) voidLookup boolLookup objLookup refConsistencyFunc)
+  (SElookup {Σ} {Δ} {T = T} {l = l} {boolVal b} lookupLType lookupL) = 
+            ⊥-elim (lookupNeq lookupUnique)
+    where
+      lLookupResult = voidLookup l Z
+      lookupUnique = IndirectRefContext.contextLookupUnique lLookupResult lookupL
+      lookupNeq : voidVal ≢ boolVal b
+      lookupNeq ()
+
+
+preservation
+  (locTy {Γ} {Δ₀} {.(base Void)} l voidSplit)
+  (ok .(Δ₀ ,ₗ l ⦂ base Void) voidLookup boolLookup objLookup refConsistencyFunc)
+  (SElookup {Σ} {Δ} {T = T} {l = l} {objVal o} lookupLType lookupL) = 
+            ⊥-elim (lookupNeq lookupUnique)
+    where
+      lLookupResult = voidLookup l Z
+      lookupUnique = IndirectRefContext.contextLookupUnique lLookupResult lookupL
+      lookupNeq : voidVal ≢ objVal o
+      lookupNeq ()
+
+preservation
+  (locTy {Γ} {Δ₀} {.(base Boolean)} l booleanSplit)
+  (ok .(Δ₀ ,ₗ l ⦂ base Boolean) voidLookup boolLookup objLookup refConsistencyFunc)
+  (SElookup {Σ} {Δ} {T = T} {l = l} {voidVal} lookupLType lookupL) = 
+            ⊥-elim (lookupNeq lookupUnique)
+    where
+      lLookupResult = boolLookup l Z
+      lookupUnique = IndirectRefContext.contextLookupUnique (proj₂ lLookupResult) lookupL
+      lookupNeq : boolVal (proj₁ lLookupResult) ≢ voidVal
+      lookupNeq ()
+      
+preservation
+  (locTy {Γ} {Δ₀} {.(base Boolean)} l booleanSplit)
+  (ok .(Δ₀ ,ₗ l ⦂ base Boolean) voidLookup boolLookup objLookup refConsistencyFunc)
+  (SElookup {Σ} {Δ} {T = T} {l = l} {objVal o} lookupLType lookupL) = 
+            ⊥-elim (lookupNeq lookupUnique)
+    where
+      lLookupResult = boolLookup l Z
+      lookupUnique = IndirectRefContext.contextLookupUnique (proj₂ lLookupResult) lookupL     
+      lookupNeq : boolVal (proj₁ lLookupResult) ≢ objVal o
+      lookupNeq ()
+
+--preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
+--preservation ty consis st@(SEassertₗ l s) = pres ty consis st {!!} {!!} {!!} {!!}
