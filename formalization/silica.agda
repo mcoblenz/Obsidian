@@ -428,7 +428,7 @@ module Silica where
   splitTypeCorrect (owned-shared x) = refl
   splitTypeCorrect (states-shared x) = refl
 
-
+ 
 
   ------------ Type judgments ----------------
   data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
