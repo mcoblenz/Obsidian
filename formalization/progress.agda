@@ -36,10 +36,9 @@ data Progress : Expr → Set where
          -------------
          → Progress e
 
-  done : ∀ {e : Expr}
-         → Value e
+  done : ∀ {e : Value}
          ---------
-         → Progress e
+         → Progress (valExpr e)
          
 progress : ∀ {e T Δ Δ'}
            → ∀ (Σ : RuntimeEnv)
@@ -102,8 +101,8 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (states-shared _)) =
   in
     step Σ Σ (simpleExpr (loc l)) (valExpr (objVal o)) (SElookup ty heapLookupFound)
 
-progress Σ cl consis (objTy o split) =  done (objVal o)
-progress Σ cl consis (boolTy b) = done (boolVal b)
-progress Σ cl consis (voidTy) = done (voidVal)
+progress Σ cl consis (objTy o split) =  done
+progress Σ cl consis (boolTy b) = done
+progress Σ cl consis (voidTy) = done
 progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (valExpr voidVal) (SEassertₗ {Σ} l s)
 progress Σ cl consis (assertTyₓ {s₁ = s} {x = x} tcEq subset) = step Σ Σ (assertₓ x s) (valExpr voidVal) (SEassertₓ {Σ} x s)

@@ -240,6 +240,26 @@ module Silica where
     program : List Contract -> Expr -> Program
 
   --============= Utilities ================
+  data FreeLocations : Expr → List IndirectRef → Set where
+    boolFL : ∀ {b : Bool} → FreeLocations (valExpr (boolVal b)) []
+    varFL : ∀ {x : Id} → FreeLocations (simpleExpr (var x)) []
+    voidFL : FreeLocations (valExpr voidVal) []
+    objValFL : ∀ {o : ObjectRef} → FreeLocations (valExpr (objVal o)) []
+    locFL : ∀ (l : IndirectRef) → FreeLocations (simpleExpr (loc l)) [ l ]
+
+
+  freeLocations : Expr → List IndirectRef
+  freeLocations (valExpr (boolVal b)) = []
+  freeLocations (simpleExpr (var x)) = []
+  freeLocations (valExpr voidVal) = []
+  freeLocations (valExpr (objVal o)) = []
+  freeLocations (simpleExpr (loc l)) = [ l ]
+  freeLocations (fieldAccess x) = []
+  freeLocations (assertₓ x x₁) = []
+  freeLocations (assertₗ l x₁) = [ l ]
+
+
+
   data FreeVariables : Expr → List Id → Set where
     boolFL : ∀ {b : Bool} → FreeVariables (valExpr (boolVal b)) []
     varFL : ∀ {x : Id} → FreeVariables (simpleExpr (var x)) [ x ]

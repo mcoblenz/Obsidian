@@ -45,6 +45,7 @@ splitIdempotent {Γ} {.(contractType (record { contractName = _ ; perm = S _ }))
                     shared-shared-shared refl
 
 preservation : ∀ {e e' : Expr}
+               → {Γ : ContractEnv.ctx}
                → ∀ {T : Type}
                → ∀ {Δ Δ'' : StaticEnv}
                → ∀ {Σ Σ' : RuntimeEnv}
@@ -358,5 +359,7 @@ preservation
       lookupNeq : boolVal (proj₁ lLookupResult) ≢ objVal o
       lookupNeq ()
 
---preservation ty consis st@(SEassertₓ x s) = pres ty consis st {!!} {!!} {!!} {!!}
---preservation ty consis st@(SEassertₗ l s) = pres ty consis st {!!} {!!} {!!} {!!}
+preservation {Γ = Γ} {Δ = Δ} {Δ'' = Δ''} ty@(assertTyₓ _ _) consis st@(SEassertₓ x s) =
+  pres ty consis st Δ (voidTy {Γ = Γ} {Δ = Δ}) consis <*-refl
+preservation {Γ = Γ} {Δ = Δ} {Δ'' = Δ''} ty@(assertTyₗ _ _) consis st@(SEassertₗ x s) =
+  pres ty consis st Δ (voidTy {Γ = Γ} {Δ = Δ}) consis <*-refl
