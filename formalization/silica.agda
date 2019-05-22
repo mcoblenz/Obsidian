@@ -28,6 +28,8 @@ module Silica where
   open import Data.Sum
   open import Level
 
+  import Data.Fin
+
 
   -------------- Syntax ------------
   Id : Set
@@ -157,10 +159,11 @@ module Silica where
                     → t₁ ≡ t₂
   eqContractTypes {t₁} {t₂} refl refl = refl
 
-  data Field : Set where
-
-  data State : Set where
-    state : Id -> List Field -> State
+  record State : Set where
+    field
+      field₁ : Tc
+      field₂ : Tc
+      isAsset : Bool
 
   data Targ : Set where
     arg-trans : Tc -> Perm -> Targ
@@ -200,6 +203,7 @@ module Silica where
     fieldAccess : Id → Expr  -- All field accesses are to 'this', so the field name suffices.
     assertₓ : Id → σ → Expr
     assertₗ : IndirectRef → σ → Expr
+    new : Id → Id → SimpleExpr → SimpleExpr → Expr  -- Contract, state, field values (always two of them).
     -- TODO: add the rest of the expressions
 
 
@@ -232,7 +236,6 @@ module Silica where
       isAsset : Bool
       name : Id
       states : List State
-      fields : List Field
       transactions : List PublicTransaction
 
 
@@ -500,6 +503,20 @@ module Silica where
              --------------------------
              → (Δ ,ₗ l ⦂ (contractType tc)) ⊢ assertₗ l s₁ ⦂ base Void ⊣ (Δ ,ₗ l ⦂ (contractType tc))
 
+    newTy : ∀ {Γ Δ Δ' Δ''}
+            → {states : List State}
+            → {C st : Id}
+            → {x₁ x₂ : SimpleExpr}
+            → {T₁ T₂ Tf₁ Tf₂ : Tc}
+            → ∀ {isCAsset isSAsset transactions}
+            → (stOK : st < (length states))
+            → Δ ⊢ simpleExpr x₁ ⦂ (contractType T₁) ⊣ Δ'
+            → Δ' ⊢ simpleExpr x₂ ⦂ (contractType T₂) ⊣ Δ''
+            → Γ ContractEnv.∋ C ⦂ (contract isCAsset C states transactions)
+            → (Data.List.lookup states (Data.Fin.fromℕ≤ stOK)) ≡ record {field₁ = Tf₁ ; field₂ = Tf₂ ; isAsset = isSAsset}
+            --------------------------
+            → Δ ⊢ new C st x₁ x₂ ⦂ (contractType (tc C (S [ st ]))) ⊣ Δ''
+            
   ------------ DYNAMIC SEMANTICS --------------
 
   -- μ
