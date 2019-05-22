@@ -2,7 +2,8 @@
 
 
 module Context (A : Set) where
-
+  open import Prelude
+  
   open import Data.Nat
   open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym)
   open import Data.Maybe
@@ -10,6 +11,7 @@ module Context (A : Set) where
   open import Relation.Nullary.Decidable
   open import Relation.Nullary using (Dec; yes; no)
   open import Data.Empty
+  import Data.Nat.Properties
 
 
   infixl 5  _,_⦂_
@@ -47,33 +49,17 @@ module Context (A : Set) where
           -------------
           → x ∈dom Γ
 
-  data _∌dom_ : ℕ → ctx → Set where
+  data _∉dom_ : ℕ → ctx → Set where
     notInEmpty : ∀ {x}
                ----------
-               → x ∌dom ∅
+               → x ∉dom ∅
 
     notInNonempty : ∀ {x x' Γ T}
                     → x ≢ x'
-                    → x ∌dom Γ
+                    → x ∉dom Γ
                     --------------------
-                    → x ∌dom (Γ , x' ⦂ T)
+                    → x ∉dom (Γ , x' ⦂ T)
 
-  ∌domPreservation : ∀ {x x' Γ T T'}
-                     → x ∌dom (Γ , x' ⦂ T)
-                     ---------------------
-                     → x ∌dom (Γ , x' ⦂ T')
-  ∌domPreservation {x} {x'} {Γ} {T} {T'} (notInNonempty xNeqX' xNotInDom) = notInNonempty xNeqX' xNotInDom
-
-                     
-
--- Removing elements from a context
-  _#_ : ctx → ℕ → ctx
-  ∅ # x = ∅
-  (Γ , x' ⦂ T) # x with compare x x'
-  ... | equal _  = Γ
-  ... | _ = (Γ # x) , x' ⦂ T
-
-  
   irrelevantExtensionsOK : ∀ {Γ : ctx}
                            → ∀ {x y t t'}
                            → Γ ∋ x ⦂ t
@@ -106,6 +92,83 @@ module Context (A : Set) where
   irrelevantReductionsInValuesOK {Γ} {x} {.x} {t} {.t} Z tNeqt' = ⊥-elim (tNeqt' refl)
   irrelevantReductionsInValuesOK {Γ} {x} {y} {t} {t'} (S yNeqx yt'InΓ') tNeqt' = yt'InΓ'
 
+  ∈domExcludedMiddle : ∀ {Γ x}
+                       → x ∉dom Γ
+                       → Relation.Nullary.¬ (x ∈dom Γ)
+  ∈domExcludedMiddle {.∅} {x} notInEmpty (inDom ())
+  ∈domExcludedMiddle {.(_ , _ ⦂ _)} {x} (notInNonempty xNeqx' xNotInΓ) (inDom n) = 
+    let
+      rest = ∈domExcludedMiddle xNotInΓ
+      xInΓ = irrelevantReductionsOK n xNeqx'
+    in
+      rest (inDom xInΓ)       
+
+  ∉domPreservation : ∀ {x x' Γ T T'}
+                     → x ∉dom (Γ , x' ⦂ T)
+                     ---------------------
+                     → x ∉dom (Γ , x' ⦂ T')
+  ∉domPreservation {x} {x'} {Γ} {T} {T'} (notInNonempty xNeqX' xNotInDom) = notInNonempty xNeqX' xNotInDom
+
+  ∉domGreaterThan : ∀ {Γ x}
+                    → (∀ x' → x' ∈dom Γ → x' < x)
+                    → x ∉dom Γ
+  ∉domGreaterThan {∅} {x} xBigger = notInEmpty
+  ∉domGreaterThan {Γ , x' ⦂ t} {x} xBigger =
+      notInNonempty x≢x' (∉domGreaterThan rest) -- (∉domGreaterThan (λ x'' → λ x''InΓ → xBigger x'' (inDom {!!})))
+    where
+      x'<x = xBigger x' (inDom Z)
+      x≢x' : x ≢ x'
+      x≢x' = ≢-sym (Data.Nat.Properties.<⇒≢ x'<x)
+
+      rest : (x'' : ℕ)
+             → x'' ∈dom Γ
+             → x'' < x
+      rest x'' (inDom x''InΓ) with x' ≟ x''
+      ... | yes x'≡x'' rewrite x'≡x'' = xBigger x'' (inDom Z)
+      ... | no x'≢x'' = xBigger x'' (inDom (S (≢-sym x'≢x'') x''InΓ))
+           
+      
+
+  fresh : (Γ : ctx)
+        → ∃[ x ] (x ∉dom Γ × (∀ x' → x' ∈dom Γ → x' < x))
+  fresh ∅ =
+    ⟨ zero , ⟨ notInEmpty , xBigger ⟩ ⟩
+    where
+      xBigger :  (∀ x' → x' ∈dom ∅ → x' < zero)
+      xBigger x' (inDom ())
+  fresh (Γ , x ⦂ t) =
+    ⟨ x' , ⟨ x'IsFresh , x'Bigger ⟩ ⟩
+    where
+      freshInRest = fresh Γ
+      biggerThanRest = suc (proj₁ freshInRest)
+      x' = biggerThanRest ⊔ (suc x) -- bigger than both everything in Γ and x.
+      freshInRestBigger = proj₂ (proj₂ freshInRest)
+      x'Bigger : (x'' : ℕ) → (x'' ∈dom (Γ , x ⦂ t)) → x'' < x'
+      x'Bigger x'' (inDom x''InΓ') with x ≟ x''
+      ... | yes x≡x'' rewrite x≡x'' = 
+          s≤s (Data.Nat.Properties.n≤m⊔n (proj₁ (fresh Γ)) x'') -- s≤s (Data.Nat.Properties.<⇒≤ x''<oldFresh)      
+      ... | no x≢x'' = 
+        let
+          x''<oldFresh = freshInRestBigger x'' (inDom (irrelevantReductionsOK x''InΓ' (≢-sym x≢x'')) )
+          x''≤oldFresh = (Data.Nat.Properties.<⇒≤ x''<oldFresh)
+        in
+          s≤s ( Data.Nat.Properties.m≤n⇒m≤n⊔o x x''≤oldFresh) --  s≤s (Data.Nat.Properties.<⇒≤ x''<oldFresh)
+      x'IsFresh : x' ∉dom (Γ , x ⦂ t)
+      x'IsFresh = ∉domGreaterThan x'Bigger
+    
+     
+      
+
+-- Removing elements from a context
+  _#_ : ctx → ℕ → ctx
+  ∅ # x = ∅
+  (Γ , x' ⦂ T) # x with compare x x'
+  ... | equal _  = Γ
+  ... | _ = (Γ # x) , x' ⦂ T
+
+  
+  
+
   contextLookupUnique : ∀ {Γ : ctx}
                         → ∀ {x t t'}
                         → Γ ∋ x ⦂ t
@@ -133,10 +196,10 @@ module Context (A : Set) where
   ...                                                 | yes refl = ⟨ t' , Z {Γ = Γ} {x = x'} {a = t'} ⟩
   ...                                                 | no neq =  ⟨ t , S neq Γcontainment ⟩
 
-  ∌dom-≢ : {Γ : ctx}
+  ∉dom-≢ : {Γ : ctx}
            → ∀ {x x' t}
-           → x ∌dom (Γ , x' ⦂ t)
+           → x ∉dom (Γ , x' ⦂ t)
            → x ≢ x'
 
-  ∌dom-≢ {Γ} {x} {x'} {t} (notInNonempty xNeqx' xNotInΓ') xEqx' = xNeqx' xEqx'
+  ∉dom-≢ {Γ} {x} {x'} {t} (notInNonempty xNeqx' xNotInΓ') xEqx' = xNeqx' xEqx'
            

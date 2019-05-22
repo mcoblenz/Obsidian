@@ -1,7 +1,4 @@
 module Silica where
-
-  -- open import Data.AVL.Sets using (⟨Set⟩)
-
   open import Agda.Builtin.Bool public
   open import Data.Bool using (true; false) public
   open import Prelude public
@@ -183,8 +180,8 @@ module Silica where
     field
       contractName : Id
       stateName : Id
-      contractFields : List SimpleExpr
-      stateFields : List SimpleExpr
+      x₁ : SimpleExpr
+      x₂ : SimpleExpr
 
   data Value : Set where
     boolVal : (b : Bool)
@@ -250,16 +247,19 @@ module Silica where
     objValFL : ∀ {o : ObjectRef} → FreeLocations (valExpr (objVal o)) []
     locFL : ∀ (l : IndirectRef) → FreeLocations (simpleExpr (loc l)) [ l ]
 
-
+  freeLocationsOfSimpleExpr : SimpleExpr → List IndirectRef
+  freeLocationsOfSimpleExpr (var x) = []
+  freeLocationsOfSimpleExpr (loc l) = [ l ]
+ 
   freeLocations : Expr → List IndirectRef
   freeLocations (valExpr (boolVal b)) = []
-  freeLocations (simpleExpr (var x)) = []
+  freeLocations (simpleExpr (se)) = freeLocationsOfSimpleExpr se
   freeLocations (valExpr voidVal) = []
   freeLocations (valExpr (objVal o)) = []
-  freeLocations (simpleExpr (loc l)) = [ l ]
   freeLocations (fieldAccess x) = []
   freeLocations (assertₓ x x₁) = []
   freeLocations (assertₗ l x₁) = [ l ]
+  freeLocations (new _ _ f₁ f₂) = (freeLocationsOfSimpleExpr f₁) ++ (freeLocationsOfSimpleExpr f₂)
 
 
 
@@ -276,16 +276,19 @@ module Silica where
              --------------------
              → Closed e
 
+  freeVariablesOfSimpleExpr : SimpleExpr → List IndirectRef
+  freeVariablesOfSimpleExpr (var x) = [ x ]
+  freeVariablesOfSimpleExpr (loc l) = []
+
   freeVariables : Expr → List IndirectRef
   freeVariables (valExpr (boolVal b)) = []
-  freeVariables (simpleExpr (var x)) = [ x ]
+  freeVariables (simpleExpr se) = freeVariablesOfSimpleExpr se
   freeVariables (valExpr voidVal) = []
   freeVariables (valExpr (objVal o)) = []
-  freeVariables (simpleExpr (loc l)) = []
   freeVariables (fieldAccess x) = []
   freeVariables (assertₓ x x₁) = [ x ]
   freeVariables (assertₗ l x₁) =  []
-
+  freeVariables (new _ _ f₁ f₂) = (freeVariablesOfSimpleExpr f₁) ++ (freeVariablesOfSimpleExpr f₂)
 
   --=============== Static Semantics ================
   -- A ContractEnv (written Γ) maps from Ids to contract definitions.
@@ -572,4 +575,10 @@ module Silica where
       --------------
       → (Σ , assertₗ l s ⟶ Σ , valExpr voidVal)
 
-
+    SEnew :
+      ∀ {Σ μ' Σ' C st x₁ x₂ o}
+      → o ObjectRefContext.∉dom (RuntimeEnv.μ Σ)
+      → μ' ≡ (RuntimeEnv.μ Σ) ObjectRefContext., o ⦂ record { contractName = C ; stateName = st ; x₁ = x₁ ; x₂ = x₂ }
+      → Σ' ≡ record Σ {μ = μ'}
+      -------------
+      → (Σ , new C st x₁ x₂ ⟶ Σ' , valExpr (objVal o))

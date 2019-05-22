@@ -1,6 +1,3 @@
-{-# OPTIONS --allow-unsolved-metas #-}
-
-
 open import Silica
 open import HeapProperties
 
@@ -106,3 +103,14 @@ progress Σ cl consis (boolTy b) = done
 progress Σ cl consis (voidTy) = done
 progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (valExpr voidVal) (SEassertₗ {Σ} l s)
 progress Σ cl consis (assertTyₓ {s₁ = s} {x = x} tcEq subset) = step Σ Σ (assertₓ x s) (valExpr voidVal) (SEassertₓ {Σ} x s)
+
+progress Σ cl consis (newTy {Γ} {Δ} {Δ'} {Δ''} {states} {C} {st} {x₁} {x₂} stOK x₁Ty x₂Ty CInΓ refl) = 
+  let
+    oFresh = ObjectRefContext.fresh (RuntimeEnv.μ Σ)
+    o = proj₁ oFresh
+    μ' =  (RuntimeEnv.μ Σ) ObjectRefContext., o ⦂ record { contractName = C ; stateName = st ; x₁ = x₁ ; x₂ = x₂ }
+    Σ' = record Σ {μ = μ'}
+
+  in
+    step Σ Σ' (new C st x₁ x₂)  (valExpr (objVal o)) (SEnew (proj₁ (proj₂ oFresh)) refl refl)
+  

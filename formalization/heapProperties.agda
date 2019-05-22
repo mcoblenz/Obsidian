@@ -173,7 +173,7 @@ module HeapProperties where
                                   → (Δ : StaticEnv)
                                   → (o : ObjectRef)
                                   → EnvTypes (re μ ρ φ ψ) Δ o forbiddenRefs R
-                                  → l ∌dom (StaticEnv.locEnv Δ)
+                                  → l ∉dom (StaticEnv.locEnv Δ)
                                   → EnvTypes (re μ (ρ IndirectRefContext., l ⦂ (objVal o)) φ ψ) Δ o forbiddenRefs R
  
     envTypesConcatMismatch : ∀ {R l μ ρ φ ψ forbiddenRefs}
@@ -373,7 +373,7 @@ module HeapProperties where
     connected
     lInρ =
       let
-        lNeql₁ = ≢-sym (∌dom-≢ lNotInΔ')
+        lNeql₁ = ≢-sym (∉dom-≢ lNotInΔ')
         lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
       in
       findLocationInEnvTypes envTypesList envTypes connected lInRestOfρ 
@@ -430,7 +430,7 @@ module HeapProperties where
       let
         prevEnvTypesObserved = envTypesForbiddenRefsObserved Δ o lInLs origEnvTypes
       in
-        envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T') o prevEnvTypesObserved (∌domPreservation l₁NotInDomΔ')
+        envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T') o prevEnvTypesObserved (∉domPreservation l₁NotInDomΔ')
     
   envTypesForbiddenRefsObserved {l} {forbiddenRefs} {T} {T'} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o') φ ψ)} {R} Δ o lInLs
     (envTypesConcatMismatch {R = .R} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} {forbiddenRefs = .forbiddenRefs} .(Δ ,ₗ l ⦂ T) .o o' oNeqO' origEnvTypes) =
@@ -672,10 +672,10 @@ module HeapProperties where
   envTypesForSplit {Γ} {.(re μ (ρ IndirectRefContext., l₁ ⦂ objVal o) φ ψ)} {Δ} {l} {o} {T₁} {T₂} {T₃} {Ts} {T}
     (envTypesConcatMatchNotFound {R = .Ts} {l = l₁} {μ = μ} {ρ = ρ} {φ = φ} {ψ = ψ} .(Δ ,ₗ l ⦂ T₁) o origEnvTypes l₁NotInΔ') lInρ T₁Connected origCompat spl =
     let
-      lNeql₁ = ≢-sym (∌dom-≢ l₁NotInΔ')
+      lNeql₁ = ≢-sym (∉dom-≢ l₁NotInΔ')
       lInRestOfρ = IndirectRefContext.irrelevantReductionsOK lInρ lNeql₁
       compatibilityWithOrigρ = envTypesForSplit origEnvTypes lInRestOfρ T₁Connected origCompat spl
-      envTypes = envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T₃) o (proj₁ (proj₂ compatibilityWithOrigρ)) (∌domPreservation l₁NotInΔ' )
+      envTypes = envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T₃) o (proj₁ (proj₂ compatibilityWithOrigρ)) (∉domPreservation l₁NotInΔ' )
     in
       ⟨ proj₁ compatibilityWithOrigρ , ⟨ envTypes ,  proj₂ (proj₂ compatibilityWithOrigρ) ⟩ ⟩
       
@@ -830,7 +830,7 @@ module HeapProperties where
     spl =
       let
         compatibilityWithOrigρ = envTypesForSplitOMismatch origEnvTypes origCompat spl
-        envTypes = envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T₃) o' (proj₁ (proj₂ compatibilityWithOrigρ)) (∌domPreservation l₁NotInΔ' )
+        envTypes = envTypesConcatMatchNotFound (Δ ,ₗ l ⦂ T₃) o' (proj₁ (proj₂ compatibilityWithOrigρ)) (∉domPreservation l₁NotInΔ' )
       in
         ⟨ proj₁ compatibilityWithOrigρ , ⟨ envTypes ,  proj₂ (proj₂ compatibilityWithOrigρ) ⟩ ⟩
 
