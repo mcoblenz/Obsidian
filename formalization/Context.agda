@@ -112,10 +112,17 @@ module Context (A : Set) where
   ∈domExtension : ∀ {Γ x x' T}
                   → x ∈dom Γ
                   → x ∈dom (Γ , x' ⦂ T)
-
   ∈domExtension {Γ} {x} {x'} {T} (inDom x₁) with x ≟ x'
   ... | yes x≡x' rewrite x≡x' = inDom Z
   ... | no x≢x' = inDom (S x≢x' x₁)
+
+  ∈domWeakening : ∀ {Γ x x' T}
+                  → x ∈dom (Γ , x' ⦂ T)
+                  → x ≢ x'
+                  → x ∈dom Γ
+
+  ∈domWeakening {Γ} {x} {x'} {T} (inDom Z) x≢x' = ⊥-elim (x≢x' refl)
+  ∈domWeakening {Γ} {x} {x'} {T} (inDom (S x₁ x₂)) x≢x' = inDom x₂
 
   ∉domGreaterThan : ∀ {Γ x}
                     → (∀ x' → x' ∈dom Γ → x' < x)

@@ -450,6 +450,7 @@ module Silica where
 
   ------------ Type judgments ----------------
   data _⊢_⦂_⊣_ : StaticEnv → Expr → Type → StaticEnv → Set where
+  {-
     varTy : ∀ {Γ : ContractEnv.ctx}
         → ∀ {Δ : StaticEnv}
         → ∀ {T₁ T₂ T₃ : Type}
@@ -457,7 +458,7 @@ module Silica where
         → Γ ⊢ T₁ ⇛ T₂ / T₃
         -----------------------------------
         → (Δ ,ₓ x ⦂ T₁) ⊢ (simpleExpr (var x)) ⦂ T₂ ⊣ (Δ ,ₓ x ⦂ T₃)
-
+  -}
     locTy :  ∀ {Γ : ContractEnv.ctx}
         → ∀ {Δ : StaticEnv}
         → ∀ {T₁ T₂ T₃ : Type}
@@ -473,6 +474,7 @@ module Silica where
         → Γ ⊢ T₁ ⇛ T₂ / T₃
         ------------------------------------
         → (Δ ,ₒ o ⦂ T₁) ⊢ (valExpr (objVal o)) ⦂ T₂ ⊣ (Δ ,ₒ o ⦂ T₃)
+
 
     boolTy : ∀ {Γ : ContractEnv.ctx}
            → ∀ {Δ : StaticEnv}

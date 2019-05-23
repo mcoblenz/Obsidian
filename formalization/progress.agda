@@ -17,11 +17,11 @@ locationsInExprAreInContext : ∀ {Δ Δ' e T fl}
                               → ∃[ T' ] ((StaticEnv.locEnv Δ) ∋ l ⦂ T')
 
 -- fl is empty, so l is in fl leads to a contradiction.
-locationsInExprAreInContext (varTy x spl) varFL ()
+--locationsInExprAreInContext (varTy x spl) varFL ()
 -- l is related to e, so therefore we can point to where l is in Δ.
 locationsInExprAreInContext (locTy {Δ = Δ''} {T₁ = T₁} l spl) (locFL l) (here refl) =  ⟨ T₁ , Z ⟩
 locationsInExprAreInContext (locTy {Δ = Δ''} {T₁} l spl) (locFL l) (there ())
-locationsInExprAreInContext (objTy o spl) objValFL ()
+--locationsInExprAreInContext (objTy o spl) objValFL ()
 locationsInExprAreInContext (boolTy b) boolFL ()
 locationsInExprAreInContext ty voidFL ()
 
@@ -45,7 +45,7 @@ progress : ∀ {e T Δ Δ'}
            ---------------
            → Progress e
 
-progress Σ (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
+-- progress Σ (closed (simpleExpr (var x)) ()) consis (varTy x split) -- Contradiction: var x has free variables, but we assumed e was closed.
 -- TODO: Refactor these cases to avoid duplication!
 progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l voidSplit) = 
   let
@@ -98,7 +98,7 @@ progress Σ cl consis@(ok {Σ} _ _ _ _ _) ty@(locTy l (states-shared _)) =
   in
     step Σ Σ (simpleExpr (loc l)) (valExpr (objVal o)) (SElookup ty heapLookupFound)
 
-progress Σ cl consis (objTy o split) =  done
+--progress Σ cl consis (objTy o split) =  done
 progress Σ cl consis (boolTy b) = done
 progress Σ cl consis (voidTy) = done
 progress Σ cl consis (assertTyₗ {s₁ = s} {l = l} tcEq subset) = step Σ Σ (assertₗ l s) (valExpr voidVal) (SEassertₗ {Σ} l s)

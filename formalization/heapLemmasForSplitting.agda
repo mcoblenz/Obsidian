@@ -280,19 +280,9 @@ module HeapLemmasForSplitting where
   connectedTypeListsAreConnected {T} {.(x ∷ xs)} (consTypeList {T = .x} {D = .xs} x₁ restConnected) (there {x = x} {xs = xs} TInTs) (there {x = .x} {xs = .xs} T'InTs) TNeqT' =
     connectedTypeListsAreConnected restConnected TInTs T'InTs λ prfsEqual → TNeqT' (Eq.cong there prfsEqual)
 
-{-
-  record EnvTypesForSplitResult (Σ : RuntimeEnv) (Δ : StaticEnv) (T₂ : Type) (T₃ : Type) (l : IndirectRef) (o : ObjectRef) : Set where
-    field
-      Ts' : List Type
-      T₂Compat : (All (λ T' → T₂ ⟷ T') Ts')
-      et : (EnvTypes Σ (Δ ,ₗ l ⦂ T₃) o forbiddenRefs Ts')
-      connected : (IsConnectedTypeList Ts')
-      externalCompat : (λ T' → All (λ T'' → T' ⟷ T'') Ts → All (λ T'' → T' ⟷ T'') Ts')
--}
 
   -- Trying to assume that T₁ is compatible with all the Ts is too strong, since T₁ may be in the Ts.
   -- What do I actually need here I need to show that T₂ is compatible with all the new types.
-  -- So 
   envTypesForSplit : ∀ {Γ Σ Δ l o T₁ T₂ T₃ Ts forbiddenRefs}
                                    → EnvTypes Σ (Δ ,ₗ l ⦂ T₁) o forbiddenRefs Ts
                                    → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o)
@@ -656,7 +646,8 @@ module HeapLemmasForSplitting where
     origConsis@(ok _ _ _ objLookup refConsistencyFunc)
     refl
     RT
-    rConnected@(isConnected _ oTypesListConnected oConnectedToFieldTypes oConnectedToLTypes envFieldConnected@(envTypesConnected _ etc fieldTypesConnected fieldEnvTypesConnected))
+    rConnected@(isConnected _ oTypesListConnected oConnectedToFieldTypes oConnectedToLTypes
+      envFieldConnected@(envTypesConnected etc fieldTypesConnected fieldEnvTypesConnected))
     spl
     with (o' ≟ o)
   ... | yes osEq =
@@ -733,8 +724,7 @@ module HeapLemmasForSplitting where
       envTypesCompatibleWithFieldTypes : All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.envTypesList RT')
       envTypesCompatibleWithFieldTypes =  allInsideOut splitSymmetric newEnvTypesCompatWithNewFieldTypes  -- turn prev. inside out
 
-      envAndFieldConnected : IsConnectedEnvAndField Σ ((Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂) o' RT'
-      envAndFieldConnected = envTypesConnected RT' ( proj₁ (proj₂ (proj₂ (proj₂ newEnvTypes)))) fieldTypesConnected envTypesCompatibleWithFieldTypes
+      envAndFieldConnected = envTypesConnected ( proj₁ (proj₂ (proj₂ (proj₂ newEnvTypes)))) fieldTypesConnected envTypesCompatibleWithFieldTypes
        
   ... | no osNeq =
         --  The change in Δ has no impact on looking up o', since o' ≢ o.
@@ -770,6 +760,6 @@ module HeapLemmasForSplitting where
           envTypesCompatibleWithFieldTypes : All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList RT')) (RefTypes.envTypesList RT')
           envTypesCompatibleWithFieldTypes =  allInsideOut splitSymmetric newEnvTypesCompatWithNewFieldTypes  -- turn prev. inside out
 
-          envAndFieldConnected =  envTypesConnected RT' ( proj₁ (proj₂ (proj₂ newEnvTypes))) fieldTypesConnected envTypesCompatibleWithFieldTypes
+          envAndFieldConnected =  envTypesConnected ( proj₁ (proj₂ (proj₂ newEnvTypes))) fieldTypesConnected envTypesCompatibleWithFieldTypes
         in
             ⟨ RT' , isConnected RT' oTypesListConnected  oConnectedToFieldTypes TsForOsConnectedToLTypes envAndFieldConnected ⟩

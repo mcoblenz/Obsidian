@@ -118,35 +118,38 @@ module HeapPropertiesDefs where
                    ------------------------
                    → IsConnectedTypeList (T ∷ D)
 
-  data IsConnectedEnvAndField  (Σ : RuntimeEnv) (Δ : StaticEnv) (o : ObjectRef) : RefTypes Σ Δ o → Set where
-    envTypesConnected : (R : RefTypes Σ Δ o)
-                        → IsConnectedTypeList (RefTypes.envTypesList R)
-                        → IsConnectedTypeList (RefTypes.fieldTypesList R)
-                        → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList R)) (RefTypes.envTypesList R) -- all of the l types are connected to all of the field types
+  data IsConnectedEnvAndField : List Type → List Type → Set where
+    envTypesConnected : {envTypesList : List Type}
+                        → {fieldTypesList : List Type}
+                        → IsConnectedTypeList envTypesList
+                        → IsConnectedTypeList fieldTypesList
+                        → All (λ T → All (λ T' → T ⟷ T') fieldTypesList) envTypesList  -- all of the l types are connected to all of the field types
                         ----------------------------------------------
-                        → IsConnectedEnvAndField Σ Δ o R  
+                        → IsConnectedEnvAndField envTypesList fieldTypesList  
 
-  envFieldInversion1 : ∀ {Σ Δ o R}
-                       → IsConnectedEnvAndField Σ Δ o R
-                       → IsConnectedTypeList (RefTypes.envTypesList R)
-  envFieldInversion1 (envTypesConnected R env f envField) = env      
 
-  envFieldInversion2 :  ∀ {Σ Δ o R}
-                        → IsConnectedEnvAndField Σ Δ o R
-                        → IsConnectedTypeList (RefTypes.fieldTypesList R)
-  envFieldInversion2 (envTypesConnected R env f envField) = f
+  envFieldInversion1 : ∀ {envTypesList fieldTypesList}
+                       → IsConnectedEnvAndField  envTypesList fieldTypesList
+                       → IsConnectedTypeList envTypesList
+  envFieldInversion1 (envTypesConnected env _ _) = env      
 
-  envFieldInversion3 :  ∀ {Σ Δ o R}
-                        → IsConnectedEnvAndField Σ Δ o R
-                        → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList R)) (RefTypes.envTypesList R)
-  envFieldInversion3 (envTypesConnected R env f envField) = envField
+  envFieldInversion2 :  ∀ {envTypesList fieldTypesList}
+                        → IsConnectedEnvAndField envTypesList fieldTypesList
+                        → IsConnectedTypeList fieldTypesList
+  envFieldInversion2 (envTypesConnected _ f _) = f
+
+  envFieldInversion3 :  ∀ {envTypesList fieldTypesList}
+                        → IsConnectedEnvAndField envTypesList fieldTypesList
+                        → All (λ T → All (λ T' → T ⟷ T') fieldTypesList) envTypesList
+  envFieldInversion3 (envTypesConnected _ _ envField) = envField
+  
 
   data IsConnected (Σ : RuntimeEnv) (Δ : StaticEnv) (o : ObjectRef) : RefTypes Σ Δ o → Set where              
     isConnected : (R : RefTypes Σ Δ o)
                   → IsConnectedTypeList (RefTypes.oTypesList R)
                   → All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList R)) (RefTypes.oTypesList R) -- all of the o types are connected to all of the field types
                   → All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList R)) (RefTypes.oTypesList R) -- all of the o types are connected to all of the l types
-                  → IsConnectedEnvAndField Σ Δ o R
+                  → IsConnectedEnvAndField (RefTypes.envTypesList R) (RefTypes.fieldTypesList R)
                   ----------------------------------------------
                   → IsConnected Σ Δ o R
 
@@ -160,6 +163,21 @@ module HeapPropertiesDefs where
   refFieldTypes : RuntimeEnv → StaticEnv → ObjectRef → List Type
   refFieldTypes Σ Δ o = refFieldTypesHelper (RuntimeEnv.μ Σ) Δ o
 
+  -- Inversion for IsConnected
+  isConnectedInversion : ∀ {Σ Δ o R}
+                         → IsConnected Σ Δ o R
+                         → (IsConnectedTypeList (RefTypes.oTypesList R) ×
+                                                 All (λ T → All (λ T' → T ⟷ T') (RefTypes.fieldTypesList R)) (RefTypes.oTypesList R) ×
+                                                 All (λ T → All (λ T' → T ⟷ T') (RefTypes.envTypesList R)) (RefTypes.oTypesList R) ×
+                                                 IsConnectedEnvAndField (RefTypes.envTypesList R) (RefTypes.fieldTypesList R))
+
+  isConnectedInversion {Σ} {Δ} {o} {R} (isConnected R x x₁ x₂ x₃) = ⟨ x , ⟨ x₁ , ⟨ x₂ , x₃ ⟩ ⟩ ⟩
+
+{-
+  oTypesIrrelevantForIsConnectedEnvAndField : ∀ {Σ Δ o o' T R R' μ'}
+                                              → IsConnectedEnvAndField Σ Δ o R
+                                              → IsConnectedEnvAndField (re μ' (RuntimeEnv.ρ Σ) (RuntimeEnv.φ Σ) (RuntimeEnv.ψ Σ)) (Δ ,ₒ o' ⦂ T) o R'
+-}
 -- ================================ OVERALL HEAP CONSISTENCY ===========================
 
   data ReferenceConsistency : RuntimeEnv → StaticEnv → ObjectRef → Set where
@@ -240,4 +258,12 @@ module HeapPropertiesDefs where
 
 
  
-
+  ctxTypesIrrelevantExtension : ∀ {Δ x x' T}
+                                → x ≢ x'
+                                → ctxTypes (Δ , x' ⦂ T) x ≡ ctxTypes Δ x
+  ctxTypesIrrelevantExtension {Context.∅} {x} {x'} {T} x≢x' with x ≟ x'
+  ctxTypesIrrelevantExtension {Context.∅} {x} {.x} {T} x≢x' | yes refl = ⊥-elim (x≢x' refl)
+  ... | no _ = refl
+  ctxTypesIrrelevantExtension {Δ Context., x₁ ⦂ x₂} {x} {x'} {T} x≢x' with x ≟ x'
+  ... | yes x≡x' = ⊥-elim (x≢x' x≡x')
+  ... | no _ = refl

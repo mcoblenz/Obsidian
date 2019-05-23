@@ -61,6 +61,29 @@ module HeapLemmasForNew where
           
       ... | no o'≢o =      
         let
-          origRefConsistency = referenceConsistencyFunc o'
+          o'Inμ : o' ObjectRefContext.∈dom RuntimeEnv.μ Σ
+          o'Inμ = ObjectRefContext.∈domWeakening o'Inμ' o'≢o
+          origConnected = referencesConsistentImpliesConnectivity (referenceConsistencyFunc o' o'Inμ)
+          RT = proj₁ origConnected
+          origConnectedComponents = isConnectedInversion (proj₂ origConnected)
+          oTypesEq : ctxTypes (StaticEnv.objEnv Δ Context., o ⦂ T) o' ≡ ctxTypes (StaticEnv.objEnv Δ) o'
+          oTypesEq = ctxTypesIrrelevantExtension o'≢o
+
+          RT' : RefTypes Σ' Δ' o'
+          RT' = record {oTypesList = RefTypes.oTypesList RT ;
+                        oTypes = Eq.subst (λ a → ctxTypes (StaticEnv.objEnv Δ Context., o ⦂ T) o' ≡ a) (RefTypes.oTypes RT) oTypesEq ;
+                        envTypesList = (RefTypes.envTypesList RT) ;
+                        envTypes = {!!} ; --(RefTypes.envTypes RT) ;
+                        fieldTypesList = (RefTypes.fieldTypesList RT)
+                        }
+          newConnected : IsConnected Σ' Δ' o' RT'
+          newConnected = isConnected RT'
+                                     (proj₁ origConnectedComponents)
+                                     (proj₁ (proj₂ origConnectedComponents))
+                                     ( (proj₁ (proj₂ (proj₂ origConnectedComponents))))
+                                     ( (proj₂ (proj₂ (proj₂ origConnectedComponents))))
         in
-          referencesConsistent {!!}
+          referencesConsistent ⟨ RT' , newConnected ⟩
+
+
+  --envTypesAndConnectivity

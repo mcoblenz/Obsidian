@@ -11,7 +11,7 @@ open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Data.Empty
 import Relation.Binary.PropositionalEquality as Eq
 
-
+open import ConsistencyForSimpleExprs
 
 data Preservation : Expr → Set where
   pres : ∀ {e e' : Expr}
@@ -78,56 +78,21 @@ preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractT
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
                        st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
   let
-    spl' = splitIdempotent spl
-    e'TypingJudgment = objTy {Γ} {Δ = Δ''} {T₁ = contractType t₂} {T₂ = contractType t₂} {T₃ = contractType t₃} o spl'
-   
-    consis' = ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
-  in
-    pres {_} {_} {_} {_} {Δ = Δ} {Δ'' = Δ''} {_} {_} {_} ty consis st Δ' e'TypingJudgment consis' <*-o-extension
-  where
-    splT = splitType spl
-    Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT) -- This is the result of checking e.
-    Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₂ splT) -- This is the typing context in which we need to typecheck e'.
-    --Δ = Δ₀ ,ₗ l ⦂ (SplitType.t₁ splT)
-    -- Show that if you look up l in the new context, you get the same type as before.
-    voidLookup' : (∀ (l' : IndirectRef)
-                  → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Void
-                  → (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ voidVal)))
-    voidLookup' l' l'InΔ' with l' Data.Nat.≟ l
-    voidLookup' l' (Context.S l'NeqL l'VoidType) | yes eq = ⊥-elim (l'NeqL eq)
-    voidLookup' l' l'InΔ' | no nEq = voidLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
-
-    boolLookup' : (∀ (l' : IndirectRef)
-                  → ((StaticEnv.locEnv Δ') ∋ l' ⦂ base Boolean
-                  → ∃[ b ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ boolVal b)))
-    boolLookup' l' l'InΔ' with l' Data.Nat.≟ l
-    boolLookup' l' (Context.S l'NeqL l'BoolType) | yes eq = ⊥-elim (l'NeqL eq)
-    boolLookup' l' l'InΔ' | no nEq = boolLookup l' (S nEq (irrelevantReductionsOK l'InΔ' nEq))
+    spl' = splitIdempotent spl   
+    ⟨ Δ' , consis' ⟩ = simpleExprsPreserveConsistency consis ty
+    e'TypingJudgment = objTy {Γ} {Δ'} {T₁ = contractType t₂} {T₂ = contractType t₂} {T₃ = contractType t₃} o spl'
     
-    objLookup' : (l' : IndirectRef) → (T : Tc)
-                  → ((StaticEnv.locEnv Δ') ∋ l' ⦂ (contractType T)
-                  → ∃[ o ] (RuntimeEnv.ρ Σ IndirectRefContext.∋ l' ⦂ objVal o × (o ObjectRefContext.∈dom (RuntimeEnv.μ Σ))))
-    objLookup' l' _ l'InΔ' with l' Data.Nat.≟ l
-    objLookup' l' _ (Context.S l'NeqL l'ObjType) | yes eq = ⊥-elim (l'NeqL eq)
-    objLookup' l' t l'InΔ'@(Z {a = contractType t₃}) | yes eq = objLookup l' t₁ Z
-    objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
-
+    l⦂oInρ : RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o
+    l⦂oInρ = {!!}
     lookupUnique : objVal o ≡ objVal ( proj₁ (objLookup l t₁ Z))
-    lookupUnique = IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} lookupL (proj₁ (proj₂ (objLookup l t₁ Z)))
+    lookupUnique = IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} l⦂oInρ (proj₁ (proj₂ (objLookup l t₁ Z)))
     oLookupUnique = objValInjectiveContrapositive lookupUnique
 
-    -- Show that all location-based aliases from the previous environment are compatible with the new alias.
-    -- Note that Σ is unchanged, so we use Σ instead of defining a separate Σ'.
-    refConsistency' : (o' : ObjectRef) → o' ObjectRefContext.∈dom (RuntimeEnv.μ Σ) → ReferenceConsistency Σ Δ' o'
-    refConsistency' o' o'Inμ =
-      let
-        origRefConsistency = refConsistencyFunc o' o'Inμ
-        origConnected =  referencesConsistentImpliesConnectivity origRefConsistency
-        newConnected = splitReplacementOK {Γ} {Σ} {Δ₀} {o} {o'} {l} {t₁} {t₂} {SplitType.t₁ splT} {SplitType.t₂ splT} {SplitType.t₃ splT}
-                                          refl refl consis oLookupUnique (proj₁ origConnected) (proj₂ origConnected) spl
-      in 
-        referencesConsistent {_} {_} {o'} newConnected
-                       
+--    e'TypingJudgmentForO : 
+
+    -- ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
+  in
+    pres {_} {_} {_} {_} {Δ = Δ} {_} {_} {_} ty consis st Δ' {!!} consis' <*-o-extension  -- e'TypingJudgment                 
 preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(shared-shared-shared _))
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
                        st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
@@ -367,13 +332,14 @@ preservation {Γ = Γ} {Δ = Δ} {Δ'' = Δ''} ty@(assertTyₗ _ _) consis st@(S
   pres ty consis st Δ (voidTy {Γ = Γ} {Δ = Δ}) consis <*-refl
 
 preservation  {Γ = Γ} {Δ = Δ} {Δ'' = Δ''}
-  ty@(newTy {C = C} {st = st} stOK ty₁ ty₂ CInΓ refl)
+  ty@(newTy {Δ = Δ} {Δ' = Δintermed} {Δ'' = Δ''} {C = C} {st = st} stOK ty₁ ty₂ CInΓ refl)
   consis
   step@(SEnew {Σ} {o = o} oFresh refl refl) =
-    pres ty consis step Δ' newTypeJudgment newConsis {!!}
+    pres ty consis step Δ' newTypeJudgment {!!} {!!} -- newConsis {!<*-o-extension!}
     where
       T = contractType (tc C (S [ st ]) )
-      Δ' = Δ ,ₒ o ⦂ T
+      Δ' = Δ'' ,ₒ o ⦂ T
       spl = unownedSplit {Γ} refl refl refl refl
       newTypeJudgment = objTy o spl
       newConsis = heapConsistencyForNew consis refl refl
+
