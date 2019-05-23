@@ -109,6 +109,14 @@ module Context (A : Set) where
                      → x ∉dom (Γ , x' ⦂ T')
   ∉domPreservation {x} {x'} {Γ} {T} {T'} (notInNonempty xNeqX' xNotInDom) = notInNonempty xNeqX' xNotInDom
 
+  ∈domExtension : ∀ {Γ x x' T}
+                  → x ∈dom Γ
+                  → x ∈dom (Γ , x' ⦂ T)
+
+  ∈domExtension {Γ} {x} {x'} {T} (inDom x₁) with x ≟ x'
+  ... | yes x≡x' rewrite x≡x' = inDom Z
+  ... | no x≢x' = inDom (S x≢x' x₁)
+
   ∉domGreaterThan : ∀ {Γ x}
                     → (∀ x' → x' ∈dom Γ → x' < x)
                     → x ∉dom Γ

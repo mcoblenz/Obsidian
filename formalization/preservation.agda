@@ -1,3 +1,5 @@
+{-# OPTIONS --allow-unsolved-metas #-}
+
 open import Silica
 open import HeapProperties
 import Context
@@ -368,10 +370,10 @@ preservation  {Γ = Γ} {Δ = Δ} {Δ'' = Δ''}
   ty@(newTy {C = C} {st = st} stOK ty₁ ty₂ CInΓ refl)
   consis
   step@(SEnew {Σ} {o = o} oFresh refl refl) =
-    pres ty consis step Δ' newTypeJudgment {!!} {!!}
+    pres ty consis step Δ' newTypeJudgment newConsis {!!}
     where
       T = contractType (tc C (S [ st ]) )
       Δ' = Δ ,ₒ o ⦂ T
       spl = unownedSplit {Γ} refl refl refl refl
       newTypeJudgment = objTy o spl
-
+      newConsis = heapConsistencyForNew consis refl refl
