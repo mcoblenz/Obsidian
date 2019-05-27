@@ -1,4 +1,4 @@
-{-# OPTIONS --allow-unsolved-metas #-}
+
 
 open import Silica
 open import HeapProperties
@@ -46,6 +46,15 @@ splitIdempotent {Γ} {.(contractType (record { contractName = _ ; perm = S _ }))
                     (states-shared x) =
                     shared-shared-shared refl
 
+test : ∀ {Γ Σ Δ T₁ T₂ T₃ o}
+       → {l : IndirectRef}
+       → Σ & (Δ ,ₗ l ⦂ T₁) ok
+       → Γ ⊢ T₁ ⇛ T₂ / T₃
+       → (Δ ,ₗ l ⦂ T₁) ⊢ simpleExpr (loc l) ⦂ T₂ ⊣ (Δ ,ₗ l ⦂ T₃)
+       → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o
+       → Σ & ( (Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂) ok
+test = {!!}
+
 preservation : ∀ {e e' : Expr}
                → {Γ : ContractEnv.ctx}
                → ∀ {T : Type}
@@ -76,23 +85,20 @@ preservation ty@(locTy {Γ} {Δ₀} l booleanSplit) consis st@(SElookup {l = l} 
 -- The code duplication below is very sad, but I haven't figured out a way that doesn't require refactoring the split judgment to be two-level.
 preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(unownedSplit _ _ _ _))
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
-                       st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
+                       st@(SElookup {Σ} {Δ = Δ'} {l = l} {v = objVal o} _ lookupL) = 
   let
-    spl' = splitIdempotent spl   
-    ⟨ Δ' , consis' ⟩ = simpleExprsPreserveConsistency consis ty
-    e'TypingJudgment = objTy {Γ} {Δ'} {T₁ = contractType t₂} {T₂ = contractType t₂} {T₃ = contractType t₃} o spl'
-    
-    l⦂oInρ : RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o
-    l⦂oInρ = {!!}
-    lookupUnique : objVal o ≡ objVal ( proj₁ (objLookup l t₁ Z))
-    lookupUnique = IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} l⦂oInρ (proj₁ (proj₂ (objLookup l t₁ Z)))
-    oLookupUnique = objValInjectiveContrapositive lookupUnique
-
---    e'TypingJudgmentForO : 
-
-    -- ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
+    spl' = splitIdempotent spl
+    T₁ = contractType t₁
+    T₂ = contractType t₂
+    T₃ = contractType t₃
+    consis' = test consis spl ty lookupL
+    Δ'' = Δ₀ ,ₗ l ⦂ T₃ -- This is the result of checking e.
+    Δ' = (Δ₀ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂
+    e'TypingJudgment : Δ' ⊢ valExpr (objVal o) ⦂ T₂ ⊣ ((Δ₀ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₃)
+    e'TypingJudgment =  objTy {Γ} {Δ''} {T₁ = T₂} {T₂ = T₂} {T₃ = T₃} o spl' -- -- Yes, I do mean T₁ = T₂ here.
   in
-    pres {_} {_} {_} {_} {Δ = Δ} {_} {_} {_} ty consis st Δ' {!!} consis' <*-o-extension  -- e'TypingJudgment                 
+    pres {_} {valExpr (objVal o)} {_} {T₂} {Δ = Δ} {Δ'' = Δ''} {_} ty consis st Δ' e'TypingJudgment consis' <*-o-extension
+    
 preservation ty@(locTy {Γ} {Δ₀} {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(shared-shared-shared _))
                        consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
                        st@(SElookup {Σ} {l = l} {v = objVal o} _ lookupL) = 
