@@ -14,13 +14,7 @@ module ConsistencyForSimpleExprs where
   open import Data.Empty
   import Relation.Binary.PropositionalEquality as Eq
 
-{-
-  locEvalPreservesConsistency :  ∀ {Σ Δ Δ'' T}
-                                 → {l : IndirectRef}
-                                 → Σ & Δ ok
-                                 → Δ ⊢ simpleExpr (loc l) ⦂ T ⊣ Δ''
-                                 → ∃[ Δ' ] (Σ & Δ' ok)
--}
+
   locEvalPreservesConsistency :  ∀ {Σ Δ T₁ T₂ T₃ o}
        → {l : IndirectRef}
        → Σ & (Δ ,ₗ l ⦂ T₁) ok
@@ -28,14 +22,14 @@ module ConsistencyForSimpleExprs where
        → RuntimeEnv.ρ Σ IndirectRefContext.∋ l ⦂ objVal o
        → Σ & ( (Δ ,ₗ l ⦂ T₃) ,ₒ o ⦂ T₂) ok
 
-  locEvalPreservesConsistency {Σ} 
+  locEvalPreservesConsistency {Σ} {o = o}
     consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
     (locTy {Γ} {Δ₀}  {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(unownedSplit _ _ _ _))
     l⦂oInρ =
       ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
     where
       splT = splitType spl
-      o = proj₁ (objLookup l t₁ Z)
+--      o = proj₁ (objLookup l t₁ Z) -- but I need to show that this o is the input o??
       Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT) -- This is the result of checking e.
       Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₂ splT) -- This is the typing context in which we need to typecheck e'.
  
@@ -64,7 +58,7 @@ module ConsistencyForSimpleExprs where
       objLookup' l' t l'InΔ' | no nEq = objLookup l' t (S nEq (irrelevantReductionsOK l'InΔ' nEq))
 
       lookupUnique : objVal o ≡ objVal ( proj₁ (objLookup l t₁ Z))
-      lookupUnique = ? -- IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} l⦂oInρ (proj₁ (proj₂ (objLookup l t₁ Z)))
+      lookupUnique =  IndirectRefContext.contextLookupUnique {RuntimeEnv.ρ Σ} l⦂oInρ (proj₁ (proj₂ (objLookup l t₁ Z)))
       oLookupUnique = objValInjectiveContrapositive lookupUnique
 
       -- Show that all location-based aliases from the previous environment are compatible with the new alias.
@@ -79,14 +73,13 @@ module ConsistencyForSimpleExprs where
         in 
           referencesConsistent {_} {_} {o'} newConnected
 
-  locEvalPreservesConsistency {Σ} {.(_ ,ₗ l ⦂ _)}
+  locEvalPreservesConsistency {Σ} {o = o}
     consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
     (locTy {Γ} {Δ₀}  {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(shared-shared-shared _))
     l⦂oInρ =
-    ⟨ Δ' , ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency' ⟩
+      ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
     where
       splT = splitType spl
-      o = proj₁ (objLookup l t₁ Z)
       Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT) -- This is the result of checking e.
       Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₂ splT) -- This is the typing context in which we need to typecheck e'.
  
@@ -130,14 +123,13 @@ module ConsistencyForSimpleExprs where
         in 
           referencesConsistent {_} {_} {o'} newConnected
 
-  locEvalPreservesConsistency {Σ} {.(_ ,ₗ l ⦂ _)}
+  locEvalPreservesConsistency {Σ} {o = o}
     consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
     (locTy {Γ} {Δ₀}  {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(owned-shared _))
     l⦂oInρ =
-    ⟨ Δ' , ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency' ⟩
+     ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
     where
       splT = splitType spl
-      o = proj₁ (objLookup l t₁ Z)
       Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT) -- This is the result of checking e.
       Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₂ splT) -- This is the typing context in which we need to typecheck e'.
  
@@ -180,14 +172,13 @@ module ConsistencyForSimpleExprs where
                                             refl refl consis oLookupUnique (proj₁ origConnected) (proj₂ origConnected) spl
         in 
           referencesConsistent {_} {_} {o'} newConnected
-  locEvalPreservesConsistency {Σ} {.(_ ,ₗ l ⦂ _)}
+  locEvalPreservesConsistency {Σ} {o = o}
     consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
     (locTy {Γ} {Δ₀}  {T₁ = contractType t₁} {T₂ = contractType t₂} {T₃ = contractType t₃} l spl@(states-shared _))
     l⦂oInρ =
-    ⟨ Δ' , ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency' ⟩
+      ok {Σ} Δ' voidLookup' boolLookup' objLookup' refConsistency'
     where
       splT = splitType spl
-      o = proj₁ (objLookup l t₁ Z)
       Δ'' = Δ₀ ,ₗ l ⦂ (SplitType.t₃ splT) -- This is the result of checking e.
       Δ' = Δ'' ,ₒ o ⦂ (SplitType.t₂ splT) -- This is the typing context in which we need to typecheck e'.
  
@@ -230,17 +221,27 @@ module ConsistencyForSimpleExprs where
                                             refl refl consis oLookupUnique (proj₁ origConnected) (proj₂ origConnected) spl
         in 
           referencesConsistent {_} {_} {o'} newConnected
-  locEvalPreservesConsistency {Σ} {.(_ ,ₗ l ⦂ _)}
+  locEvalPreservesConsistency {Σ} {o = o}
     consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
     (locTy {Γ} {Δ₀} l voidSplit)
     l⦂oInρ = 
-      ⟨ Δ , consis ⟩
+      ⊥-elim (lookupNeq lookupUnique)
+    where
+      lLookupResult = voidLookup l Z
+      lookupUnique = IndirectRefContext.contextLookupUnique lLookupResult l⦂oInρ
+      lookupNeq : voidVal ≢ objVal o
+      lookupNeq ()
     
-  locEvalPreservesConsistency {Σ} {.(_ ,ₗ l ⦂ _)}
+  locEvalPreservesConsistency {Σ} {o = o}
     consis@(ok Δ voidLookup boolLookup objLookup refConsistencyFunc)
     (locTy {Γ} {Δ₀} l booleanSplit)
-    l⦂oInρ = 
-      ⟨ Δ , consis ⟩
-    
+    l⦂oInρ =
+      ⊥-elim (lookupNeq lookupUnique)
+    where
+      lLookupResult = boolLookup l Z
+      lookupUnique = IndirectRefContext.contextLookupUnique (proj₂ lLookupResult) l⦂oInρ
+      lookupNeq : boolVal (proj₁ lLookupResult) ≢ objVal o
+      lookupNeq ()
+          
 
 

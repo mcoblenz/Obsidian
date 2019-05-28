@@ -51,7 +51,7 @@ module HeapLemmasForNew where
       referenceConsistency' o' o'Inμ' with o' ≟ o
       ... | yes o'≡o = 
         let
-          origRefConsistency = referencesConsistentImpliesConnectivity(referenceConsistencyFunc o' {!!})
+          origRefConsistency = referencesConsistentImpliesConnectivity(referenceConsistencyFunc o' ?)
           RT = proj₁ origRefConsistency
           RT' = {!record {oTypesList = [ T ] ;
                          oTypes = refl ;
