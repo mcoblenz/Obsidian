@@ -30,6 +30,8 @@ services:
     extends:
       file:  base/docker-compose-base.yaml
       service: peer0.org1.example.com
+    environment:
+      - GODEBUG=netdns=go
     networks:
       - byfn
 
@@ -38,6 +40,8 @@ services:
     extends:
       file:  base/docker-compose-base.yaml
       service: peer1.org1.example.com
+    environment:
+      - GODEBUG=netdns=go
     networks:
       - byfn
 
@@ -46,6 +50,8 @@ services:
     extends:
       file:  base/docker-compose-base.yaml
       service: peer0.org2.example.com
+    environment:
+      - GODEBUG=netdns=go
     networks:
       - byfn
 
@@ -54,6 +60,8 @@ services:
     extends:
       file:  base/docker-compose-base.yaml
       service: peer1.org2.example.com
+    environment:
+      - GODEBUG=netdns=go
     networks:
       - byfn
 
