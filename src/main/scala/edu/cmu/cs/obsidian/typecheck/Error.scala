@@ -44,12 +44,22 @@ case class CombineAvailableIns(fieldName: String, states: String, prevLine: Int)
     val msg: String = s"Field '$fieldName' previously declared at line $prevLine. Did you mean '$fieldName available in $states'?"
 }
 
-case class SubtypingError(t1: ObsidianType, t2: ObsidianType) extends Error {
+case class SubtypingError(t1: ObsidianType, t2: ObsidianType, isThis : Boolean) extends Error {
     val msg: String =
         t1 match {
             case np: NonPrimitiveType =>
                 if (np.permission == Inferred()) {
                     s"Found a local variable of unknown permission; ensure that a value was assigned to this variable."
+                }
+                else if (isThis) {
+
+                    t2 match {
+                        case np2: NonPrimitiveType =>
+                            val p1 = np.permission
+                            val p2 = np2.permission
+                            s"'this' is $p1 at the end of the transaction, but the transaction signature requires that it be $p1"
+                        case _ => assert(false); "s\"Found type '$t1', but expected something of type '$t2'"
+                    }
                 }
                 else {
                     s"Found type '$t1', but expected something of type '$t2'"
