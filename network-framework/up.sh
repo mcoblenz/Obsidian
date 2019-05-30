@@ -7,7 +7,7 @@
 
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
-export PATH=${PWD}/../fabric-samples/bin:${PWD}:$PATH
+export PATH=${PWD}/../bin:${PWD}:$PATH
 export FABRIC_CFG_PATH=${PWD}
 export VERBOSE=false
 
@@ -86,7 +86,7 @@ function checkPrereqs() {
 function networkUp() {
   checkPrereqs
   # replace the chaincode directory in the .evn file
-  sed -i .backup "s/^.*CHAINCODE_DIRECTORY=.*$/CHAINCODE_DIRECTORY=$CD/" .env
+  sed -i.backup "s/^.*CHAINCODE_DIRECTORY=.*$/CHAINCODE_DIRECTORY=$CD/" .env
   rm .env.backup
   # generate artifacts if they don't exist
   if [ ! -d "crypto-config" ]; then
