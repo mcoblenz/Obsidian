@@ -228,7 +228,9 @@ class CodeGen (val target: Target) {
                 newInt
             case BoolType() =>
                 val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
-                val _ = ifLengthIncorrect._then()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException")))
+                val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException"))
+                exception.arg("Invalid length of data array for boolean expression.")
+                val _ = ifLengthIncorrect._then()._throw(exception)
                 marshalledExpr.component(JExpr.lit(0)).eq0()
             case StringType() =>
                 val stringClass = model.ref("java.lang.String")
