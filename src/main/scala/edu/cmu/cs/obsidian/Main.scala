@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
 import scala.collection.mutable.HashSet
+import org.apache.commons.io.FileUtils
 
 import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
@@ -201,14 +202,19 @@ object Main {
                     srcPath.toString + " " +
                     path + File.separator
             println("copying: " + copyFabricFolderInvocation)
-            copyFabricFolderInvocation.!
+
+            Files.copy(buildPath, path.resolve("build.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            Files.copy(settingsPath, path.resolve("settings.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            FileUtils.copyDirectory(srcPath.toFile, path.resolve("src").toFile)
+//            copyFabricFolderInvocation.!
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
             val javaTargetLocation = Paths.get(path.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
             val copyAllGeneratedClasses : String =
                 "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
             println("copying: " + copyAllGeneratedClasses)
-            copyAllGeneratedClasses.!
+            FileUtils.copyDirectory(tmpGeneratedCodePath.toFile, javaTargetLocation.toFile)
+//            copyAllGeneratedClasses.!
 
             //place the correct class name in the build.gradle
             val gradlePath = Paths.get(path.toString, "build.gradle")
@@ -221,7 +227,8 @@ object Main {
                 "rm " + gradleBackupPath.toString
 
             replaceClassNameInGradleBuild.!
-            deleteSedBackupFile.!
+            new File(gradleBackupPath.toString).delete()
+//            deleteSedBackupFile.!
             println("Successfully generated Fabric chaincode at " + path)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
@@ -378,9 +385,18 @@ object Main {
                         Paths.get(mainName)
                 }
                 val protobufOutputPath = outputPath.resolve("protos")
+                val temp = new File(protobufOutputPath.toString)
+                if (temp.exists()) {
+                    temp.delete()
+                }
                 Files.createDirectories(protobufOutputPath)
-                val copyProtobufCmd = s"cp $protobufPath $protobufOutputPath"
-                copyProtobufCmd.!
+
+
+//                val copyProtobufCmd = s"cp $protobufPath $protobufOutputPath"
+                val sourceFile = (Paths.get(s"$protobufPath"))
+                val destFile = Paths.get(s"$protobufOutputPath")
+                Files.copy(sourceFile, destFile, StandardCopyOption.REPLACE_EXISTING)
+//                copyProtobufCmd.!
 
             }
 
