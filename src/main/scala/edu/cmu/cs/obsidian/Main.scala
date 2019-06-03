@@ -196,12 +196,6 @@ object Main {
             val buildPath = fabricPath.resolve("build.gradle")
             val settingsPath = fabricPath.resolve("settings.gradle")
             val srcPath = fabricPath.resolve("src")
-            val copyFabricFolderInvocation: String =
-                "cp -R " + buildPath.toString + " " +
-                    settingsPath.toString + " " +
-                    srcPath.toString + " " +
-                    path + File.separator
-            println("copying: " + copyFabricFolderInvocation)
 
             Files.copy(buildPath, path.resolve("build.gradle"), StandardCopyOption.REPLACE_EXISTING)
             Files.copy(settingsPath, path.resolve("settings.gradle"), StandardCopyOption.REPLACE_EXISTING)
@@ -209,9 +203,7 @@ object Main {
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
             val javaTargetLocation = Paths.get(path.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
-            val copyAllGeneratedClasses : String =
-                "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
-            println("copying: " + copyAllGeneratedClasses)
+
             FileUtils.copyDirectory(tmpGeneratedCodePath.toFile, javaTargetLocation.toFile)
 
             //place the correct class name in the build.gradle
@@ -381,13 +373,14 @@ object Main {
                 val protobufOutputPath = outputPath.resolve("protos")
                 val temp = protobufOutputPath.toFile
                 if (temp.exists()) {
-                    temp.delete()
+                    FileUtils.deleteDirectory(temp)
                 }
                 Files.createDirectories(protobufOutputPath)
 
                 val sourceFile = (Paths.get(s"$protobufPath"))
                 val destFile = Paths.get(s"$protobufOutputPath")
-                Files.copy(sourceFile, destFile, StandardCopyOption.REPLACE_EXISTING)
+                val newDest = Paths.get(destFile.toString() + File.separator + sourceFile.getFileName())
+                Files.copy(sourceFile, newDest, StandardCopyOption.REPLACE_EXISTING)
             }
 
             generateFabricCode(mainName, options.outputPath, srcDir)
