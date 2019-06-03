@@ -1,0 +1,107 @@
+contract Player {
+    state ToChoose;
+    state Rock;
+    state Paper;
+    state Scissors;
+
+    Player() {
+        ->ToChoose;
+    }
+
+    transaction choose(Player@Owned >> Unowned this, string choice) returns Player@(Rock | Paper | Scissors) {
+        if (choice == "rock") {
+            ->Rock;
+        } else {
+            if (choice == "paper") {
+                ->Paper;
+            } else {
+                if (choice == "scissors") {
+                    ->Scissors;
+                } else {
+                    revert "choice must be one of: rock, paper, scissors";
+                }
+            }
+        }
+
+        return this;
+    }
+
+    transaction beats(Player@(Rock | Paper | Scissors) this, Player@(Rock | Paper | Scissors) opponent) returns int {
+        if (this in Rock) {
+            if (opponent in Rock) {
+                return 0;
+            } else {
+                if (opponent in Scissors) {
+                    return 1;
+                } else {
+                    return -1;
+                }
+            }
+        } else {
+            if (this in Scissors) {
+                if (opponent in Scissors) {
+                    return 0;
+                } else {
+                    if (opponent in Paper) {
+                        return 1;
+                    } else {
+                        return -1;
+                    }
+                }
+            } else {
+                if (opponent in Paper) {
+                    return 0;
+                } else {
+                    if (opponent in Rock) {
+                        return 1;
+                    } else {
+                        return -1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+main contract RockPaperScissors {
+    state GameStart;
+    state PlayerOneChose;
+    state PlayerTwoChose;
+    state PlayerOneWin;
+    state PlayerTwoWin;
+    state Tie;
+
+    Player@(Rock | Paper | Scissors) playerOne available in PlayerOneChose, PlayerTwoChose;
+    Player@(Rock | Paper | Scissors) playerTwo available in PlayerTwoChose;
+
+    RockPaperScissors() {
+        ->GameStart;
+    }
+
+    transaction playerOneChoose(RockPaperScissors@GameStart >> PlayerOneChose this, string choice) {
+        ->PlayerOneChose(playerOne = new Player().choose(choice));
+    }
+
+    transaction playerTwoChoose(RockPaperScissors@PlayerOneChose >> PlayerTwoChose this, string choice) {
+        ->PlayerTwoChose(playerTwo = new Player().choose(choice));
+    }
+
+    transaction result(RockPaperScissors@PlayerTwoChose >> (PlayerOneWin | PlayerTwoWin | Tie) this) {
+        int res = playerOne.beats(playerTwo);
+
+        if (res == 1) {
+            ->PlayerOneWin;
+        } else {
+            if (res == -1) {
+                ->PlayerTwoWin;
+            } else {
+                ->Tie;
+            }
+        }
+    }
+
+    transaction reset(RockPaperScissors@Owned >> GameStart this) {
+        ->GameStart;
+    }
+}
+

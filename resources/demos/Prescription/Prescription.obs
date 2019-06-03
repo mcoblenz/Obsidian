@@ -1,0 +1,231 @@
+contract AccessControl {
+	transaction loggedInAsDoctor() returns bool {
+		// Assume this is implemented correctly.
+		return false;
+	}
+
+	transaction getCurrentPatientName() returns string {
+		// Assume this correctly returns the name of the currently logged-in patient, or null if there is none.
+		// Also assume all patients have unique names.
+		return "";
+	}
+}
+
+// Prescriptions are immutable by design; pharmacies that want to record information about
+// prescriptions must do so in a separate data structure.
+contract Prescription {
+	string prescriptionText; // specifies the drug, dosage, etc.
+	int refills;
+	string patientName; // Assume that patient names are unique.
+
+	Prescription(string prescriptionText, int refills, string patientName) {
+        // TODO: Put this back, can't be here now because can't call transactions in constructors
+		/* if (not new AccessControl().loggedInAsDoctor()) { */
+            /* revert "Invalid access: Not logged in as doctor!"; */
+		/* } */
+
+		this.prescriptionText = prescriptionText;
+		this.refills = refills;
+		this.patientName = patientName;
+	}
+
+	transaction getRefills(Prescription@Unowned this) returns int {
+		return refills;
+	}
+
+	transaction getPatientName(Prescription@Unowned this) returns string {
+		return patientName;
+	}
+}
+
+contract PharmacyPrescriptionRecord {
+    state Empty;
+
+    state HasFills {
+        int fillsLeft; // Might be nice to have a nonnegative int type
+        Prescription@Owned prescription;
+    }
+
+    PharmacyPrescriptionRecord@Empty() {
+        ->Empty;
+    }
+
+    transaction init(PharmacyPrescriptionRecord@Empty >> Unowned this, Prescription@Owned >> Unowned presc) returns PharmacyPrescriptionRecord@(Empty | HasFills) {
+        if (presc.getRefills() > 0) {
+            ->HasFills(fillsLeft = presc.getRefills(), prescription = presc);
+        } else {
+            ->Empty;
+        }
+
+        return this;
+	}
+
+    transaction getPrescription(PharmacyPrescriptionRecord@HasFills this) returns Prescription@Unowned {
+        return prescription;
+    }
+
+    transaction checkAndUpdateFills(PharmacyPrescriptionRecord@HasFills >> Unowned this) returns PharmacyPrescriptionRecord@(Empty | HasFills) {
+        if (fillsLeft > 1) {
+            fillsLeft = fillsLeft - 1;
+        } else {
+            disown prescription;
+            ->Empty;
+        }
+        return this;
+    }
+}
+
+contract MaybeRecord {
+    state Just {
+        PharmacyPrescriptionRecord@HasFills record;
+    }
+    state Nothing;
+
+    MaybeRecord@Nothing() {
+        ->Nothing;
+    }
+
+    transaction just(MaybeRecord@Nothing >> Unowned this, PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) returns MaybeRecord@Just {
+        ->Just(record = newRecord);
+        return this;
+    }
+
+    transaction getRecord(MaybeRecord@Just >> Nothing this) returns PharmacyPrescriptionRecord@HasFills {
+        PharmacyPrescriptionRecord result = record;
+        ->Nothing;
+        return result;
+    }
+}
+
+contract PharmacyPrescriptionRecordList {
+    state Nil;
+    state Cons {
+        PharmacyPrescriptionRecord@HasFills record;
+        PharmacyPrescriptionRecordList@Shared next;
+    }
+
+    PharmacyPrescriptionRecordList@Nil() {
+        ->Nil;
+    }
+
+    transaction cons(PharmacyPrescriptionRecordList@Shared this,
+                     PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
+                     PharmacyPrescriptionRecordList@Shared tail) returns PharmacyPrescriptionRecordList@Shared {
+        ->Cons(record = newRecord, next = tail);
+        return this;
+    }
+
+    transaction prepend(PharmacyPrescriptionRecordList@Shared this,
+                        PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
+        return new PharmacyPrescriptionRecordList().cons(newRecord, this);
+    }
+
+    transaction prependIfNotEmpty(PharmacyPrescriptionRecordList@Shared this,
+                                  PharmacyPrescriptionRecord@Owned >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
+        if (newRecord in HasFills) {
+            return prepend(newRecord);
+        } else {
+            disown newRecord;
+            return this;
+        }
+    }
+
+    transaction contains(PharmacyPrescriptionRecordList@Shared this, Prescription@Unowned prescription) returns bool {
+        if (this in Cons) {
+            return (record.getPrescription() == prescription) or next.contains(prescription);
+        } else {
+            return false;
+        }
+    }
+
+    transaction remove(PharmacyPrescriptionRecordList@Shared this, Prescription@Unowned prescription) returns MaybeRecord@Owned {
+        if (this in Cons) {
+            if (record.getPrescription() == prescription) {
+                PharmacyPrescriptionRecord oldRecord = record;
+
+                if (next in Nil) {
+                    ->Nil;
+                } else {
+                    PharmacyPrescriptionRecordList newNext = next.getNext();
+                    ->Cons(record = next.getRecord(), next = newNext);
+                }
+
+                return new MaybeRecord().just(oldRecord);
+            } else {
+                return next.remove(prescription);
+            }
+        } else {
+            return new MaybeRecord();
+        }
+    }
+
+    transaction getRecord(PharmacyPrescriptionRecordList@Cons >> Nil this) returns PharmacyPrescriptionRecord@HasFills {
+        PharmacyPrescriptionRecord res = record;
+        ->Nil;
+        return res;
+    }
+
+    transaction getNext(PharmacyPrescriptionRecordList@Cons this) returns PharmacyPrescriptionRecordList@Shared {
+        return next;
+    }
+}
+
+/* A Pharmacy keeps a record of all the prescriptions that patients have submitted as well as how many times each prescription has been filled.
+ * Before filling a prescription, the pharmacy must make sure that there is at least one refill available.
+ */
+main contract Pharmacy {
+    PharmacyPrescriptionRecordList@Shared prescriptions;
+
+	transaction prescriptionIsDeposited(Prescription@Unowned prescription) returns bool {
+        return prescriptions.contains(prescription);
+	}
+
+	transaction getPrescriptionRecord(Prescription@Unowned prescription) returns MaybeRecord@Owned {
+        return prescriptions.remove(prescription);
+	}
+
+	// Must be called before the patient can fill a new prescription.
+	transaction depositPrescription(Prescription@Owned >> Unowned prescription) {
+		if (getPrescriptionRecord(prescription) in Found) {
+            revert "PrescriptionAlreadyDepositedException";
+		}
+
+		prescriptions = prescriptions.prependIfNotEmpty(new PharmacyPrescriptionRecord().init(prescription));
+	}
+
+	transaction fillPrescription(Prescription prescription) {
+		// Can't fill a prescription that wasn't deposited in this pharmacy.
+		MaybeRecord result = getPrescriptionRecord(prescription);
+
+		if (result in Nothing) {
+			revert "PrescriptionNotDepositedException";
+		} else {
+            if (prescription.getPatientName() != new AccessControl().getCurrentPatientName()) {
+                revert "WrongPatientForThisPrescriptionException";
+            }
+
+            PharmacyPrescriptionRecord record = result.getRecord().checkAndUpdateFills();
+            prescriptions = prescriptions.prependIfNotEmpty(record);
+
+            doFill(prescription);
+        }
+	}
+
+	transaction doFill(Prescription prescription) {
+		// This code, which is not shown, notifies the pharmacist to actually fill the prescription.
+	}
+}
+
+contract Patient {
+	string name;
+
+	// Assume that this prescription is for this patient; no separate checking is needed.
+	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) {
+		if (not pharmacy.prescriptionIsDeposited(prescription)) {
+            pharmacy.depositPrescription(prescription);
+		}
+
+		pharmacy.fillPrescription(prescription);
+	}
+}
+
