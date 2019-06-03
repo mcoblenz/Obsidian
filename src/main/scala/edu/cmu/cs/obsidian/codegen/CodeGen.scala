@@ -2314,7 +2314,7 @@ class CodeGen (val target: Target) {
     private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
         typ match {
             case StateType(_, states, _) => {
-                val currentState = invokeGetState(JExpr._this())
+                val currentState = invokeGetState(expr)
 
                 var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
