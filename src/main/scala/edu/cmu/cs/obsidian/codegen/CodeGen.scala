@@ -61,12 +61,12 @@ class CodeGen (val target: Target) {
         JExpr.ref("__isInsideInvocation")
     }
 
-    private def invokeGetState(rec: IJExpression): JInvocation = {
-        JExpr.invoke(rec, getStateMeth).arg(JExpr.ref(serializationParamName))
-    }
-
-    private def invokeGetStateNoLoad(): JInvocation = {
-        JExpr.invoke(getStateMeth)
+    private def invokeGetState(receiver: IJExpression, loadSerialization: Boolean): JInvocation = {
+        if (loadSerialization) {
+            JExpr.invoke(receiver, getStateMeth).arg(JExpr.ref(serializationParamName))
+        } else {
+            JExpr.invoke(receiver, getStateMeth).arg(JExpr._null())
+        }
     }
 
     private def transactionGetMethodName(txName: String, stOption: Option[String]): String = {
@@ -450,7 +450,7 @@ class CodeGen (val target: Target) {
         val getBody = getMeth.body()
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            getBody._if(invokeGetState(JExpr._this()).eq(stateLookup(st.name).enumVal))
+            getBody._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))
                    ._then()
                    ._return(stateLookup(st.name).innerClassField.ref(f.name))
         }
@@ -464,7 +464,7 @@ class CodeGen (val target: Target) {
         val newValue = setMeth.param(fieldType, "newValue")
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            setBody._if(invokeGetState(JExpr._this()).eq(stateLookup(st.name).enumVal))
+            setBody._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))
                 ._then()
                 .assign(stateLookup(st.name).innerClassField.ref(f.name), newValue)
         }
@@ -500,7 +500,7 @@ class CodeGen (val target: Target) {
             jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
 
             // dynamically check the state
-            val stBody = body._if(invokeGetState(JExpr._this()).eq(stateLookup(st.name).enumVal))._then()
+            val stBody = body._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))._then()
 
             if (hasReturn) stBody._return(inv)
             else stBody.add(inv)
@@ -665,57 +665,51 @@ class CodeGen (val target: Target) {
             /* setup the state field and the [getState] method */
             stateEnumField = Some(newClass.field(JMod.PRIVATE, stateEnum, stateField))
 
-            def makeStateMethBody(meth: JMethod, restoreObject: Boolean): Unit = {
-                if (restoreObject) {
-                    meth.body().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
-                }
-
-                if (!isStub) {
-                    meth.body()._return(JExpr.ref(stateField))
-                } else {
-                    meth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
-                    val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("String"))
-                    val newArrayExpr = JExpr._new(objectArrayType)
-                    val argArray = meth.body().decl(objectArrayType, "argArray", newArrayExpr)
-
-                    //connectionManager.doTransaction(transaction.name, args)
-                    val tryBlock = meth.body()._try()
-
-                    val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
-                    doTransactionInvocation.arg(getStateMeth)
-                    doTransactionInvocation.arg(argArray)
-                    doTransactionInvocation.arg(JExpr.invoke("__getGUID"))
-                    doTransactionInvocation.arg(true)
-
-                    // return result
-                    val marshalledResultDecl = tryBlock.body().decl(newClass.owner().ref("byte[]"), "marshalledResult", doTransactionInvocation)
-
-                    val stringClass = model.ref("java.lang.String")
-                    val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                    val enumString = tryBlock.body().decl(stringClass, "enumString", JExpr._new(stringClass).arg(marshalledResultDecl).arg(charset)).invoke("trim")
-
-                    val errorBlock = new JBlock()
-
-                    tryBlock.body()._return(stateEnum.staticInvoke("valueOf").arg(enumString))
-
-                    val ioExceptionCatchBlock = tryBlock._catch(model.directClass("java.io.IOException"))
-                    ioExceptionCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
-
-                    val failedCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException"))
-                    failedCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
-
-                    val bugCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionBugException"))
-                    bugCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
-                }
-            }
-
-            val stateMethNoLoad = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
-            makeStateMethBody(stateMethNoLoad, restoreObject = false)
-
             val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
             stateMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
             stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
-            makeStateMethBody(stateMeth, restoreObject = true)
+
+            stateMeth.body()
+                ._if(JExpr.ref(serializationParamName).neNull())
+                ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
+
+            if (!isStub) {
+                stateMeth.body()._return(JExpr.ref(stateField))
+            } else {
+                stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+                val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("String"))
+                val newArrayExpr = JExpr._new(objectArrayType)
+                val argArray = stateMeth.body().decl(objectArrayType, "argArray", newArrayExpr)
+
+                //connectionManager.doTransaction(transaction.name, args)
+                val tryBlock = stateMeth.body()._try()
+
+                val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
+                doTransactionInvocation.arg(getStateMeth)
+                doTransactionInvocation.arg(argArray)
+                doTransactionInvocation.arg(JExpr.invoke("__getGUID"))
+                doTransactionInvocation.arg(true)
+
+                // return result
+                val marshalledResultDecl = tryBlock.body().decl(newClass.owner().ref("byte[]"), "marshalledResult", doTransactionInvocation)
+
+                val stringClass = model.ref("java.lang.String")
+                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                val enumString = tryBlock.body().decl(stringClass, "enumString", JExpr._new(stringClass).arg(marshalledResultDecl).arg(charset)).invoke("trim")
+
+                val errorBlock = new JBlock()
+
+                tryBlock.body()._return(stateEnum.staticInvoke("valueOf").arg(enumString))
+
+                val ioExceptionCatchBlock = tryBlock._catch(model.directClass("java.io.IOException"))
+                ioExceptionCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+                val failedCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException"))
+                failedCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+                val bugCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionBugException"))
+                bugCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+            }
         }
 
         (stateDeclarations, stateEnumOption, stateEnumField)
@@ -734,7 +728,7 @@ class CodeGen (val target: Target) {
                 case None => meth.body()._return(JExpr.TRUE)
                 case Some(states) =>
                     // Safe to not load here because by the time we get to it, we will have already exited if we have not loaded
-                    val currentState = invokeGetStateNoLoad()
+                    val currentState = invokeGetState(JExpr._this(), false)
                     val availableInStatesArray = JExpr.newArray(model.ref("String"))
                     states.foreach( (state : String) => availableInStatesArray.add(JExpr.lit(state)))
 
@@ -886,7 +880,7 @@ class CodeGen (val target: Target) {
         /* match on the current state */
         for (stFrom <- translationContext.states.values) {
             val thisStateBody = conserveBody._if(
-                    invokeGetStateNoLoad().eq(stFrom.enumVal))
+                    invokeGetState(JExpr._this(), false).eq(stFrom.enumVal))
                 ._then()
             /* match on the target state */
             for (stTo <- translationContext.states.values if stTo != stFrom) {
@@ -909,7 +903,7 @@ class CodeGen (val target: Target) {
         val deleteBody = deleteMeth.body()
         for (st <- translationContext.states.values) {
             deleteBody._if(
-                    invokeGetStateNoLoad().eq(st.enumVal))
+                    invokeGetState(JExpr._this(), false).eq(st.enumVal))
                 ._then()
                 .assign(st.innerClassField, JExpr._null())
         }
@@ -1234,7 +1228,7 @@ class CodeGen (val target: Target) {
                         case Some(stateSet) =>
                             var test: IJExpression = JExpr.TRUE
                             for (stateName <- stateSet) {
-                                val thisTest = invokeGetState(JExpr._this())
+                                val thisTest = invokeGetState(JExpr._this(), true)
                                   .eq(translationContext.getEnum(stateName))
 
                                 test = JOp.cor(test, thisTest)
@@ -1363,7 +1357,7 @@ class CodeGen (val target: Target) {
             exception.arg(0)
             notEnoughArgs._throw(exception)
 
-            enoughArgs.assign(returnBytes, invokeGetState(JExpr._this()).invoke("name").invoke("getBytes"))
+            enoughArgs.assign(returnBytes, invokeGetState(JExpr._this(), true).invoke("name").invoke("getBytes"))
         }
 
         /* Find where to throw a 'no such transaction' error.
@@ -1672,7 +1666,7 @@ class CodeGen (val target: Target) {
 
                 // Safe to not load here because we should always be loaded when we are archiving,
                 // and therefore we will never actually try to use __st
-                val cond = translationContext.getEnum(st.name).eq(invokeGetStateNoLoad())
+                val cond = translationContext.getEnum(st.name).eq(invokeGetState(JExpr._this(), false))
                 val thisStateBody = archiveBody._if(cond)._then()
 
                 val stateField = translationContext.states(st.name).innerClassField
@@ -2314,7 +2308,7 @@ class CodeGen (val target: Target) {
     private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
         typ match {
             case StateType(_, states, _) => {
-                val currentState = invokeGetState(expr)
+                val currentState = invokeGetState(expr, true)
 
                 var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
@@ -2618,7 +2612,7 @@ class CodeGen (val target: Target) {
                     /* somewhat of a bad workaround, but the alternative involves knowing the
                      * type of the expression jEx: in general, this requires an analysis
                      * to link references to declarations */
-                    invokeGetState(jEx).invoke("toString").invoke("equals").arg(JExpr.lit(s))
+                    invokeGetState(jEx, true).invoke("toString").invoke("equals").arg(JExpr.lit(s))
 
                 val jIf = body._if(eqState(h.stateName))
                 translateBody(jIf._then(), h.body, translationContext, localContext)
@@ -2634,7 +2628,7 @@ class CodeGen (val target: Target) {
                 val jEx = translateExpr(e, translationContext, localContext)
 
                 val eqState = (s: String) =>
-                    invokeGetState(jEx).invoke("toString").invoke("equals").arg(JExpr.lit(s))
+                    invokeGetState(jEx, true).invoke("toString").invoke("equals").arg(JExpr.lit(s))
 
                 val jIf = body._if(eqState(state._1))
 
