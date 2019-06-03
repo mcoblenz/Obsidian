@@ -206,7 +206,6 @@ object Main {
             Files.copy(buildPath, path.resolve("build.gradle"), StandardCopyOption.REPLACE_EXISTING)
             Files.copy(settingsPath, path.resolve("settings.gradle"), StandardCopyOption.REPLACE_EXISTING)
             FileUtils.copyDirectory(srcPath.toFile, path.resolve("src").toFile)
-//            copyFabricFolderInvocation.!
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
             val javaTargetLocation = Paths.get(path.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
@@ -214,7 +213,6 @@ object Main {
                 "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
             println("copying: " + copyAllGeneratedClasses)
             FileUtils.copyDirectory(tmpGeneratedCodePath.toFile, javaTargetLocation.toFile)
-//            copyAllGeneratedClasses.!
 
             //place the correct class name in the build.gradle
             val gradlePath = Paths.get(path.toString, "build.gradle")
@@ -223,12 +221,9 @@ object Main {
 
             //sed automatically creates a backup of the original file, has to be deleted
             val gradleBackupPath = Paths.get(path.toString, "build.gradle.backup")
-            val deleteSedBackupFile: String =
-                "rm " + gradleBackupPath.toString
 
             replaceClassNameInGradleBuild.!
             new File(gradleBackupPath.toString).delete()
-//            deleteSedBackupFile.!
             println("Successfully generated Fabric chaincode at " + path)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
@@ -282,7 +277,6 @@ object Main {
                 path
             case None => Paths.get(".")
         }
-
 
         Files.createDirectories(srcDir)
         Files.createDirectories(bytecodeDir)
@@ -385,19 +379,15 @@ object Main {
                         Paths.get(mainName)
                 }
                 val protobufOutputPath = outputPath.resolve("protos")
-                val temp = new File(protobufOutputPath.toString)
+                val temp = protobufOutputPath.toFile
                 if (temp.exists()) {
                     temp.delete()
                 }
                 Files.createDirectories(protobufOutputPath)
 
-
-//                val copyProtobufCmd = s"cp $protobufPath $protobufOutputPath"
                 val sourceFile = (Paths.get(s"$protobufPath"))
                 val destFile = Paths.get(s"$protobufOutputPath")
                 Files.copy(sourceFile, destFile, StandardCopyOption.REPLACE_EXISTING)
-//                copyProtobufCmd.!
-
             }
 
             generateFabricCode(mainName, options.outputPath, srcDir)
