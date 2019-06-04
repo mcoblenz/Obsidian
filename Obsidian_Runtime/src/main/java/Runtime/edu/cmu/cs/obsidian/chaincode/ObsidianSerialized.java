@@ -5,9 +5,9 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 public interface ObsidianSerialized {
     String __getGUID();
-    Set<ObsidianSerialized> __resetModified(Set<ObsidianSerialized> checked);
-    byte[] __archiveBytes();
-    byte[] __wrappedArchiveBytes();
+    Set<ObsidianSerialized> __resetModified(Set<ObsidianSerialized> checked) throws InvalidProtocolBufferException;
+    byte[] __archiveBytes() throws InvalidProtocolBufferException;
+    byte[] __wrappedArchiveBytes() throws InvalidProtocolBufferException;
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
             BadTransactionException, BadArgumentException, NoSuchTransactionException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;

@@ -724,6 +724,7 @@ class CodeGen (val target: Target) {
         for (decl <- aContract.declarations if decl.isInstanceOf[Field]) {
             val field: Field = decl.asInstanceOf[Field]
             val meth = newClass.method(JMod.PUBLIC, model.ref("boolean"), fieldInScopeMethodName(field.name))
+            meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
             field.availableIn match {
                 case None => meth.body()._return(JExpr.TRUE)
                 case Some(states) =>
@@ -796,6 +797,7 @@ class CodeGen (val target: Target) {
           .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
         // __resetModified collects the set of modified fields and resets the set of modified fields.
         val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__resetModified")
+        getModifiedMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         // add a list of things we've already checked so we don't get stuck in loops
         getModifiedMeth.param(setType, "checked");
         val modBody = getModifiedMeth.body()
@@ -875,6 +877,7 @@ class CodeGen (val target: Target) {
          * Invariant for use: [getStateMeth] returns the current state, the new state is passed
          * as an argument. The new state's inner class field must be non-null. */
         val conserveMeth = newClass.method(JMod.PRIVATE, model.VOID, conserveFieldsName)
+        conserveMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
         val nextState = conserveMeth.param(translationContext.stateEnumClass.get, "nextState")
         val conserveBody = conserveMeth.body()
         /* match on the current state */
@@ -900,6 +903,7 @@ class CodeGen (val target: Target) {
          * Invariant for use: [getStateMeth] returns the current state; this will be the state
          * whose inner class field this method nullifies. */
         val deleteMeth = newClass.method(JMod.PRIVATE, model.VOID, deleteOldStateName)
+        deleteMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val deleteBody = deleteMeth.body()
         for (st <- translationContext.states.values) {
             deleteBody._if(
@@ -1606,6 +1610,7 @@ class CodeGen (val target: Target) {
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = stateClass.method(JMod.PUBLIC, archiveType, "archive")
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
@@ -1637,6 +1642,7 @@ class CodeGen (val target: Target) {
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
@@ -1684,6 +1690,8 @@ class CodeGen (val target: Target) {
     // Generates a method, __archiveBytes(), which outputs a string in protobuf format.
     private def generateSerializer(contract: Contract, inClass: JDefinedClass): Unit = {
         val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__archiveBytes")
+        archiveMethod.annotate(classOf[Override])
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
 
         val archiveBody = archiveMethod.body()
 
@@ -1695,6 +1703,8 @@ class CodeGen (val target: Target) {
     // Generates a method, __wrappedArchiveBytes(), which wraps Foo in a FooOrGuid object and outputs as bytes
     private def generateWrapperSerializer(contract: Contract, inClass: JDefinedClass, translationContext: TranslationContext): Unit = {
         val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__wrappedArchiveBytes")
+        archiveMethod.annotate(classOf[Override])
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val contractName = contract.name
 
         val protobufClassName = translationContext.getProtobufClassName(contract)
@@ -1873,6 +1883,7 @@ class CodeGen (val target: Target) {
 
         /* [initFromArchive] setup */
         val fromArchiveMeth = newClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
+        fromArchiveMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archive = fromArchiveMeth.param(archiveType, "archive")
         // Also need the serialization-state b/c the object might
         // already be loaded.
@@ -2183,6 +2194,7 @@ class CodeGen (val target: Target) {
 
         val methodName = "new_" + newClass.name()
         var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
+        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         /* add args to method and collect them in a list */
@@ -2228,6 +2240,7 @@ class CodeGen (val target: Target) {
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
         val constructor = newClass.constructor(JMod.PUBLIC)
+        constructor._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         val invocation = constructor.body().invoke(methodName)
@@ -2357,7 +2370,7 @@ class CodeGen (val target: Target) {
         }
                     /* ensure the object is loaded before trying to do anything.
                      * (even checking the state!) */
-        meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
+        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         target match {
             case Client(mainContract, _) =>
                 if (translationContext.contract != mainContract) {
