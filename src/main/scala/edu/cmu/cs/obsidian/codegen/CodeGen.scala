@@ -61,6 +61,14 @@ class CodeGen (val target: Target) {
         JExpr.ref("__isInsideInvocation")
     }
 
+    private def invokeGetState(receiver: IJExpression, loadSerialization: Boolean): JInvocation = {
+        if (loadSerialization) {
+            JExpr.invoke(receiver, getStateMeth).arg(JExpr.ref(serializationParamName))
+        } else {
+            JExpr.invoke(receiver, getStateMeth).arg(JExpr._null())
+        }
+    }
+
     private def transactionGetMethodName(txName: String, stOption: Option[String]): String = {
         stOption match {
             case Some(stName) => txName + "__" + "state" + stName
@@ -442,7 +450,7 @@ class CodeGen (val target: Target) {
         val getBody = getMeth.body()
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            getBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
+            getBody._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))
                    ._then()
                    ._return(stateLookup(st.name).innerClassField.ref(f.name))
         }
@@ -456,7 +464,7 @@ class CodeGen (val target: Target) {
         val newValue = setMeth.param(fieldType, "newValue")
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            setBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
+            setBody._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))
                 ._then()
                 .assign(stateLookup(st.name).innerClassField.ref(f.name), newValue)
         }
@@ -492,7 +500,7 @@ class CodeGen (val target: Target) {
             jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
 
             // dynamically check the state
-            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))._then()
+            val stBody = body._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))._then()
 
             if (hasReturn) stBody._return(inv)
             else stBody.add(inv)
@@ -656,7 +664,15 @@ class CodeGen (val target: Target) {
 
             /* setup the state field and the [getState] method */
             stateEnumField = Some(newClass.field(JMod.PRIVATE, stateEnum, stateField))
+
             val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
+            stateMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+            stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
+
+            stateMeth.body()
+                ._if(JExpr.ref(serializationParamName).neNull())
+                ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
+
             if (!isStub) {
                 stateMeth.body()._return(JExpr.ref(stateField))
             } else {
@@ -669,7 +685,7 @@ class CodeGen (val target: Target) {
                 val tryBlock = stateMeth.body()._try()
 
                 val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
-                doTransactionInvocation.arg("getState")
+                doTransactionInvocation.arg(getStateMeth)
                 doTransactionInvocation.arg(argArray)
                 doTransactionInvocation.arg(JExpr.invoke("__getGUID"))
                 doTransactionInvocation.arg(true)
@@ -708,10 +724,12 @@ class CodeGen (val target: Target) {
         for (decl <- aContract.declarations if decl.isInstanceOf[Field]) {
             val field: Field = decl.asInstanceOf[Field]
             val meth = newClass.method(JMod.PUBLIC, model.ref("boolean"), fieldInScopeMethodName(field.name))
+            meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
             field.availableIn match {
                 case None => meth.body()._return(JExpr.TRUE)
                 case Some(states) =>
-                    val currentState = JExpr.invoke(getStateMeth)
+                    // Safe to not load here because by the time we get to it, we will have already exited if we have not loaded
+                    val currentState = invokeGetState(JExpr._this(), false)
                     val availableInStatesArray = JExpr.newArray(model.ref("String"))
                     states.foreach( (state : String) => availableInStatesArray.add(JExpr.lit(state)))
 
@@ -779,6 +797,7 @@ class CodeGen (val target: Target) {
           .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
         // __resetModified collects the set of modified fields and resets the set of modified fields.
         val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__resetModified")
+        getModifiedMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         // add a list of things we've already checked so we don't get stuck in loops
         getModifiedMeth.param(setType, "checked");
         val modBody = getModifiedMeth.body()
@@ -858,12 +877,13 @@ class CodeGen (val target: Target) {
          * Invariant for use: [getStateMeth] returns the current state, the new state is passed
          * as an argument. The new state's inner class field must be non-null. */
         val conserveMeth = newClass.method(JMod.PRIVATE, model.VOID, conserveFieldsName)
+        conserveMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
         val nextState = conserveMeth.param(translationContext.stateEnumClass.get, "nextState")
         val conserveBody = conserveMeth.body()
         /* match on the current state */
         for (stFrom <- translationContext.states.values) {
             val thisStateBody = conserveBody._if(
-                    JExpr.invoke(getStateMeth).eq(stFrom.enumVal))
+                    invokeGetState(JExpr._this(), false).eq(stFrom.enumVal))
                 ._then()
             /* match on the target state */
             for (stTo <- translationContext.states.values if stTo != stFrom) {
@@ -882,10 +902,12 @@ class CodeGen (val target: Target) {
         /* method to null out old state
          * Invariant for use: [getStateMeth] returns the current state; this will be the state
          * whose inner class field this method nullifies. */
-        val deleteBody = newClass.method(JMod.PRIVATE, model.VOID, deleteOldStateName).body()
+        val deleteMeth = newClass.method(JMod.PRIVATE, model.VOID, deleteOldStateName)
+        deleteMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
+        val deleteBody = deleteMeth.body()
         for (st <- translationContext.states.values) {
             deleteBody._if(
-                    JExpr.invoke(getStateMeth).eq(st.enumVal))
+                    invokeGetState(JExpr._this(), false).eq(st.enumVal))
                 ._then()
                 .assign(st.innerClassField, JExpr._null())
         }
@@ -1210,7 +1232,7 @@ class CodeGen (val target: Target) {
                         case Some(stateSet) =>
                             var test: IJExpression = JExpr.TRUE
                             for (stateName <- stateSet) {
-                                val thisTest = JExpr.invoke(getStateMeth)
+                                val thisTest = invokeGetState(JExpr._this(), true)
                                   .eq(translationContext.getEnum(stateName))
 
                                 test = JOp.cor(test, thisTest)
@@ -1334,12 +1356,12 @@ class CodeGen (val target: Target) {
             notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
 
             val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
-            exception.arg("getState")
+            exception.arg(getStateMeth)
             exception.arg(runArgs.ref("length"))
             exception.arg(0)
             notEnoughArgs._throw(exception)
 
-            enoughArgs.assign(returnBytes, JExpr.invoke(getStateMeth).invoke("name").invoke("getBytes"))
+            enoughArgs.assign(returnBytes, invokeGetState(JExpr._this(), true).invoke("name").invoke("getBytes"))
         }
 
         /* Find where to throw a 'no such transaction' error.
@@ -1588,6 +1610,7 @@ class CodeGen (val target: Target) {
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = stateClass.method(JMod.PUBLIC, archiveType, "archive")
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
@@ -1619,6 +1642,7 @@ class CodeGen (val target: Target) {
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
@@ -1645,7 +1669,10 @@ class CodeGen (val target: Target) {
         if (translationContext.states.nonEmpty) {
             for (stDecl <- declarations.filter(d => d.isInstanceOf[State])) {
                 val st = stDecl.asInstanceOf[State]
-                val cond = translationContext.getEnum(st.name).eq(JExpr.invoke(getStateMeth))
+
+                // Safe to not load here because we should always be loaded when we are archiving,
+                // and therefore we will never actually try to use __st
+                val cond = translationContext.getEnum(st.name).eq(invokeGetState(JExpr._this(), false))
                 val thisStateBody = archiveBody._if(cond)._then()
 
                 val stateField = translationContext.states(st.name).innerClassField
@@ -1663,6 +1690,8 @@ class CodeGen (val target: Target) {
     // Generates a method, __archiveBytes(), which outputs a string in protobuf format.
     private def generateSerializer(contract: Contract, inClass: JDefinedClass): Unit = {
         val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__archiveBytes")
+        archiveMethod.annotate(classOf[Override])
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
 
         val archiveBody = archiveMethod.body()
 
@@ -1674,6 +1703,8 @@ class CodeGen (val target: Target) {
     // Generates a method, __wrappedArchiveBytes(), which wraps Foo in a FooOrGuid object and outputs as bytes
     private def generateWrapperSerializer(contract: Contract, inClass: JDefinedClass, translationContext: TranslationContext): Unit = {
         val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__wrappedArchiveBytes")
+        archiveMethod.annotate(classOf[Override])
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val contractName = contract.name
 
         val protobufClassName = translationContext.getProtobufClassName(contract)
@@ -1852,6 +1883,7 @@ class CodeGen (val target: Target) {
 
         /* [initFromArchive] setup */
         val fromArchiveMeth = newClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
+        fromArchiveMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archive = fromArchiveMeth.param(archiveType, "archive")
         // Also need the serialization-state b/c the object might
         // already be loaded.
@@ -2162,6 +2194,7 @@ class CodeGen (val target: Target) {
 
         val methodName = "new_" + newClass.name()
         var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
+        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         /* add args to method and collect them in a list */
@@ -2207,6 +2240,7 @@ class CodeGen (val target: Target) {
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
         val constructor = newClass.constructor(JMod.PUBLIC)
+        constructor._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         val invocation = constructor.body().invoke(methodName)
@@ -2287,7 +2321,7 @@ class CodeGen (val target: Target) {
     private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
         typ match {
             case StateType(_, states, _) => {
-                val currentState = expr.invoke(getStateMeth)
+                val currentState = invokeGetState(expr, true)
 
                 var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
@@ -2336,7 +2370,7 @@ class CodeGen (val target: Target) {
         }
                     /* ensure the object is loaded before trying to do anything.
                      * (even checking the state!) */
-        meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
+        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         target match {
             case Client(mainContract, _) =>
                 if (translationContext.contract != mainContract) {
@@ -2507,6 +2541,9 @@ class CodeGen (val target: Target) {
                 /* change the enum to reflect the new state */
                 body.assign(JExpr.ref(stateField), translationContext.getEnum(newStateName))
 
+                /* note that we've been modified so the changes will be saved */
+                body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
+
                 // Assign according to the state initialization statements, e.g. S1::foo = bar.
                 // Do this after updating the current state because assignVariable may invoke setters.
                 for (fieldName <- translationContext.pendingFieldAssignments) {
@@ -2588,7 +2625,8 @@ class CodeGen (val target: Target) {
                     /* somewhat of a bad workaround, but the alternative involves knowing the
                      * type of the expression jEx: in general, this requires an analysis
                      * to link references to declarations */
-                    JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
+                    invokeGetState(jEx, true).invoke("toString").invoke("equals").arg(JExpr.lit(s))
+
                 val jIf = body._if(eqState(h.stateName))
                 translateBody(jIf._then(), h.body, translationContext, localContext)
 
@@ -2603,10 +2641,9 @@ class CodeGen (val target: Target) {
                 val jEx = translateExpr(e, translationContext, localContext)
 
                 val eqState = (s: String) =>
-                    JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
+                    invokeGetState(jEx, true).invoke("toString").invoke("equals").arg(JExpr.lit(s))
 
                 val jIf = body._if(eqState(state._1))
-
 
                 val shouldStateLock = e match {
                     case ReferenceIdentifier(x) => true
@@ -2623,7 +2660,7 @@ class CodeGen (val target: Target) {
                     translateBody(jIf._then(), s1, translationContext, localContext)
                 }
 
-                if (!s2.isEmpty) {
+                if (s2.nonEmpty) {
                     translateBody(jIf._else(), s2, translationContext, localContext)
                 }
 

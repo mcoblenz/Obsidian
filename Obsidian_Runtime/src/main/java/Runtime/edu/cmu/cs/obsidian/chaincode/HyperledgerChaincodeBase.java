@@ -128,6 +128,10 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
                     revertState();
                     return newErrorResponse("Failed to invoke method: a parameter that the client does not own needs to be owned.");
                 }
+                catch (InvalidProtocolBufferException e) {
+                    revertState();
+                    return newErrorResponse(e.getMessage());
+                }
             }
             else {
                 revertState();
@@ -277,7 +281,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
 
     /* Figure out what was modified and write it out to the blockchain.
      * Only called for main transactions. */
-    public void __saveModifiedData(ChaincodeStub stub, ObsidianSerialized target) {
+    public void __saveModifiedData(ChaincodeStub stub, ObsidianSerialized target) throws InvalidProtocolBufferException {
         Set<ObsidianSerialized> dirtyFields = target.__resetModified(new HashSet<ObsidianSerialized>());
         List<ObsidianSerialized> dirtyFieldsSorted = dirtyFields.stream().collect(Collectors.toList());
         Collections.sort(dirtyFieldsSorted, (o1, o2) -> o1.__getGUID().compareTo(o2.__getGUID()));
@@ -294,7 +298,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     }
 
     // Must be overridden in generated class.
-    public abstract Set<ObsidianSerialized> __resetModified(Set<ObsidianSerialized> checked);
+    public abstract Set<ObsidianSerialized> __resetModified(Set<ObsidianSerialized> checked) throws InvalidProtocolBufferException;
     public abstract String __getGUID();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
@@ -303,7 +307,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes, SerializationState __st)
         throws InvalidProtocolBufferException;
-    public abstract byte[] __archiveBytes();
+    public abstract byte[] __archiveBytes() throws InvalidProtocolBufferException;
     public abstract void __restoreObject(SerializationState st)
         throws InvalidProtocolBufferException;
     protected abstract void __unload();
