@@ -219,13 +219,15 @@ main contract Pharmacy {
 contract Patient {
 	string name;
 
-	// Assume that this prescription is for this patient; no separate checking is needed.
-	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) {
-		if (not pharmacy.prescriptionIsDeposited(prescription)) {
-            pharmacy.depositPrescription(prescription);
-		}
+    transaction depositPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) {
+        pharmacy.depositPrescription(prescription);
+    }
 
-		pharmacy.fillPrescription(prescription);
+	// Assume that this prescription is for this patient; no separate checking is needed.
+	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Unowned prescription) {
+		if (pharmacy.prescriptionIsDeposited(prescription)) {
+		    pharmacy.fillPrescription(prescription);
+        }
 	}
 }
 
