@@ -2057,11 +2057,6 @@ private def checkStatement(
             logError(contract, NoConstructorError(contract.name))
         }
 
-        // TODO: enable multiple constructors. by adding appropriate dispatch logic in init. For now, we only support one constructor per contract.
-        if (constructors.length > 1) {
-            logError(contract, MultipleConstructorsError(contract.name))
-        }
-
         val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typIn.topPermissionType))
         val matchingConstructors = constructorsByArgTypes.filter(_._2.size > 1)
 

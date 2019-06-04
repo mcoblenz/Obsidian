@@ -36,6 +36,7 @@ class CodeGen (val target: Target) {
     private final val modifiedFieldName: String = "__modified"
     private final val loadedFieldName: String = "__loaded"
     private final val serializationParamName: String = "__st"
+    private final val constructorReturnsOwnedFieldName: String = "__constructorReturnsOwned"
 
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
@@ -913,6 +914,132 @@ class CodeGen (val target: Target) {
         }
     }
 
+    /* Constructors are mapped to "new_" methods because we need to
+         *separate initialization (which may occur via deserialization) from construction.
+         * However, for non-top-level contracts, we want to be able to invoke the constructor as a
+         * regular constructor.
+         *
+         * Because we don't know whether this class will be instantiated at runtime (as opposed to at deployment),
+         * we generate both versions for all contracts.
+         */
+    def translateConstructors(decls: Seq[Constructor],
+                              newClass: JDefinedClass,
+                              translationContext: TranslationContext,
+                              aContract: Contract): Unit = {
+        // This constructor will be used for parameter names
+        val mainConstr = decls.head
+        val mainArgs = mainConstr.args
+        val argNames = mainArgs.map(_.varName)
+
+        val name = "new_" + mainConstr.name
+
+        val newDispatcher = newClass.method(JMod.PRIVATE, model.VOID, name)
+        newDispatcher._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
+        newDispatcher._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+
+        /* add args to method and collect them in a list */
+        val argList: Seq[(String, JVar)] = mainArgs.map((arg: VariableDeclWithSpec) =>
+            (arg.varName, newDispatcher.param(resolveType(arg.typIn), arg.varName))
+        )
+
+        // We need to pass in a stub as well since we might need
+        // to deserialize some objects in here (for example, if we call a method on a parameter
+        // that returns a property of one of its child objects which isn't yet loaded)
+        newDispatcher.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+
+        /* construct the local context from this list */
+        val localContext: immutable.Map[String, JVar] = argList.toMap
+
+        def checkState(argName: String)(st: String): IJExpression =
+            invokeGetState(JExpr.ref(argName), true).invoke("toString").invoke("equals").arg(JExpr.lit(st))
+
+        def anyExpr(exprs: TraversableOnce[IJExpression]): IJExpression = exprs.fold(JExpr.FALSE)(_.cor(_))
+        def allExpr(exprs: TraversableOnce[IJExpression]): IJExpression = exprs.fold(JExpr.TRUE)(_.cand(_))
+
+        // Because constructor may have different parameter names, we make copies of parameters with multiple names as appropriate
+        def genArgCopy(argPair: (VariableDeclWithSpec, String)): Unit = argPair match {
+            case (arg, argName) => newDispatcher.body().decl(resolveType(arg.typIn), arg.varName, JExpr.ref(argName))
+        }
+
+        def buildConditions(arg: VariableDeclWithSpec): List[IJExpression] =
+            arg.typIn match {
+                case StateType(_, states, _) => anyExpr(states.map(checkState(arg.varName))) :: Nil
+                case _ => Nil
+            }
+
+        // Build the conditions to check whether transaction's body to run
+        val conditions = decls.map(constructor => (constructor, allExpr(constructor.args.flatMap(buildConditions))))
+
+        def setOwned(block: JBlock, constructor: Constructor): JBlock =
+            block.assign(JExpr.ref(constructorReturnsOwnedFieldName), JExpr.lit(constructor.resultType.isOwned))
+
+        def addDispatchCondition(ifSt: JConditional)(info: (Constructor, IJExpression)): Unit = info match {
+            case (decl, cond) =>
+                translateBody(setOwned(ifSt._elseif(cond)._then(), decl), decl.body, translationContext, localContext)
+        }
+
+        // add bodies for each constructor
+        conditions.headOption match {
+            case Some((constructor, cond)) => {
+                val distinctArgNames = decls.tail.flatMap(_.args.zip(argNames)).groupBy {
+                        case (arg, argName) => arg.varName
+                    }.values.map(_.head)
+
+                distinctArgNames.foreach(genArgCopy)
+
+                val ifStmt = newDispatcher.body()._if(cond)
+                translateBody(setOwned(ifStmt._then(), constructor), constructor.body, translationContext, localContext)
+
+                conditions.tail.foreach(addDispatchCondition(ifStmt))
+            }
+
+            case None => ()
+        }
+
+        assignNewGUID(newClass, aContract, newDispatcher)
+
+        /* When an object is newly created, we always mark it as modified (and loaded). */
+        newDispatcher.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
+        newDispatcher.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
+
+        // Put the entry in the GUID map so we can find it later.
+        val putEntryInvocation = newDispatcher.body().invoke(JExpr.ref(serializationParamName), "putEntry")
+
+        putEntryInvocation.arg(newClass.fields get guidFieldName)
+        putEntryInvocation.arg(JExpr._this())
+
+        // Put the class in the returned object map so we can invoke transaction with -receiver on it
+        target match {
+            case Client(mainContract, _) => ()
+            case Server(mainContract, _) =>
+                if (translationContext.contract == mainContract) {
+                    val mapReturnedObjectInvocation = newDispatcher.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+                    mapReturnedObjectInvocation.arg(JExpr._this())
+                    mapReturnedObjectInvocation.arg(JExpr.FALSE)
+                }
+        }
+
+        // -----------------------------------------------------------------------------
+        // Also generate a constructor that calls the new_ method that we just generated.
+        val constructor = newClass.constructor(JMod.PUBLIC)
+        constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        constructor._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
+
+        val invocation = constructor.body().invoke(name)
+
+        /* add args to method and collect them in a list */
+        for (arg <- mainArgs) {
+            constructor.param(resolveType(arg.typIn), arg.varName)
+            invocation.arg(JExpr.ref(arg.varName))
+        }
+
+        constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        invocation.arg(JExpr.ref(serializationParamName))
+
+        newClass.field(JMod.PRIVATE, model.BOOLEAN, constructorReturnsOwnedFieldName, JExpr.FALSE)
+        generateConstructorReturnsOwnedReference(newClass)
+    }
+
     private def translateContract(
                     aContract: Contract,
                     newClass: JDefinedClass,
@@ -927,7 +1054,20 @@ class CodeGen (val target: Target) {
         }
         generateLazySerializationCode(aContract, newClass, translationContext)
 
-        for (decl <- aContract.declarations) {
+        // TODO: Make this nicer, make sure it's not partial
+        aContract.declarations.filter {
+            case c: Constructor => true
+//            case t: Transaction => true // TODO: Put this back?
+            case _ => false
+        }.map(decl => decl.asInstanceOf[Constructor]).groupBy {
+            case c: Constructor => c.args.map(d => (resolveType(d.typIn).name(), resolveType(d.typOut).name()))
+//            case t: Transaction => (false, t.name, t.args)
+            case _ => Nil // TODO: Make sure this case is impossible
+        }.foreach {
+            case (args, decls) => translateConstructors(decls, newClass, translationContext, aContract)
+        }
+
+        for (decl <- aContract.declarations if !decl.isInstanceOf[Constructor]) {
             translateDeclaration(decl, newClass, translationContext, aContract)
         }
 
@@ -1054,7 +1194,8 @@ class CodeGen (val target: Target) {
                 generateInitMethod(translationContext, newClass, stubType, constructorTypes)
         }
         if (constructor.isEmpty) {
-            generateConstructorReturnsOwnedReference(newClass, true)
+            newClass.field(JMod.PRIVATE, model.BOOLEAN, constructorReturnsOwnedFieldName, JExpr.TRUE)
+            generateConstructorReturnsOwnedReference(newClass)
         }
     }
 
@@ -1954,8 +2095,6 @@ class CodeGen (val target: Target) {
                     aContract: Contract): Unit = {
         declaration match {
             /* the main contract has special generated code, so many functions are different */
-            case (c: Constructor) =>
-                translateConstructor(c, newClass, translationContext, aContract)
             case (f: Field) =>
                 translateFieldDecl(f, newClass)
             case (t: Transaction) =>
@@ -1969,6 +2108,9 @@ class CodeGen (val target: Target) {
             case t: TypeDecl =>
                 assert(false, "TODO")
                 ()
+            // There is no case for constructors because they are handled separately outside of this
+            // method (see translateConstructors()). This should never be hit.
+            case _ => assert(false, "Translating unexpected declaration: " + declaration)
         }
     }
 
@@ -2177,99 +2319,11 @@ class CodeGen (val target: Target) {
         }
     }
 
-
-    /* Constructors are mapped to "new_" methods because we need to
-     *separate initialization (which may occur via deserialization) from construction.
-     * However, for non-top-level contracts, we want to be able to invoke the constructor as a
-     * regular constructor.
-     *
-     * Because we don't know whether this class will be instantiated at runtime (as opposed to at deployment),
-     * we generate both versions for all contracts.
-     */
-    private def translateConstructor(
-                                        c: Constructor,
-                                        newClass: JDefinedClass,
-                                        translationContext: TranslationContext,
-                                        aContract: Contract) = {
-
-        val methodName = "new_" + newClass.name()
-        var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
-        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
-
-        /* add args to method and collect them in a list */
-        val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
-        )
-
-        // We need to pass in a stub as well since we might need
-        // to deserialize some objects in here (for example, if we call a method on a parameter
-        // that returns a property of one of its child objects which isn't yet loaded)
-        meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
-
-        /* construct the local context from this list */
-        val localContext: immutable.Map[String, JVar] = argList.toMap
-
-        /* add body */
-        translateBody(meth.body(), c.body, translationContext, localContext)
-
-        assignNewGUID(newClass, aContract, meth)
-
-        /* When an object is newly created, we always mark it as modified (and loaded). */
-        meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
-        meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
-
-        // Put the entry in the GUID map so we can find it later.
-        val putEntryInvocation = meth.body().invoke(JExpr.ref(serializationParamName), "putEntry")
-
-        putEntryInvocation.arg(newClass.fields get guidFieldName)
-        putEntryInvocation.arg(JExpr._this())
-
-        // Put the class in the returned object map so we can invoke transaction with -receiver on it
-        target match {
-            case Client(mainContract, _) =>
-                ()
-            case Server(mainContract, _) =>
-                if (translationContext.contract == mainContract) {
-                    val mapReturnedObjectInvocation = meth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
-                    mapReturnedObjectInvocation.arg(JExpr._this())
-                    mapReturnedObjectInvocation.arg(JExpr.FALSE)
-                }
-        }
-
-        // -----------------------------------------------------------------------------
-        // Also generate a constructor that calls the new_ method that we just generated.
-        val constructor = newClass.constructor(JMod.PUBLIC)
-        constructor._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
-        constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
-
-        val invocation = constructor.body().invoke(methodName)
-
-        /* add args to method and collect them in a list */
-        for (arg <- c.args) {
-            constructor.param(resolveType(arg.typIn), arg.varName)
-            invocation.arg(JExpr.ref(arg.varName))
-        }
-
-        constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
-        invocation.arg(JExpr.ref(serializationParamName))
-
-        generateConstructorReturnsOwnedReference(newClass, c.resultType.isOwned)
-    }
-
-    private def generateConstructorReturnsOwnedReference(newClass: JDefinedClass, returnsOwned : Boolean): Unit = {
+    private def generateConstructorReturnsOwnedReference(newClass: JDefinedClass): Unit = {
         val ownedRefMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "constructorReturnsOwnedReference")
-        ownedRefMethod.annotate(model.ref("Override"));
-        val returnsOwnedExpr =
-            if (returnsOwned) {
-                JExpr.TRUE
-            }
-            else {
-                JExpr.FALSE
-            }
+        ownedRefMethod.annotate(model.ref("Override"))
 
-        ownedRefMethod.body()._return(returnsOwnedExpr)
-
+        ownedRefMethod.body()._return(JExpr.ref(constructorReturnsOwnedFieldName))
     }
 
     // Generates a new_Foo() method, which takes the serialization state as a parameter, and initializes all the fields.
