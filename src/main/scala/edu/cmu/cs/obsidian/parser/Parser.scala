@@ -561,7 +561,7 @@ object Parser extends Parsers {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
                 permission match {
                     case None =>
-                        err(s"${name._2}: Missing a permission on constructor for ${name._1} " +
+                        err(s"Missing a permission on constructor for ${name._1} " +
                             s"(e.g., ${name._1}@Owned, ${name._1}@State, where State is a valid state for ${name._1}).")
                     case _ => {
                         val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, defaultOwned = true)
