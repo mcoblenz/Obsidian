@@ -1,0 +1,16 @@
+main contract TransactionInConstructor {
+    int y;
+
+    TransactionInConstructor@Owned() {
+        y = simpleTransaction();
+    }
+
+    transaction simpleTransaction(TransactionInConstructor@Unowned this) returns int {
+         return 1;
+    }
+
+    transaction getY() returns int {
+        return y;
+    }
+}
+
