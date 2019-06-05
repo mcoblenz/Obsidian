@@ -288,7 +288,7 @@ case class InconsistentTypeAssignmentError(declaredType: ObsidianType, actualTyp
 }
 
 case class ArgumentSubtypingError(tName: String, arg: String, t1: ObsidianType, t2: ObsidianType) extends Error {
-    val msg: String = s"Found type '$t1' as an argument to '$tName', but the argument '$arg' is expected something of type '$t2'."
+    val msg: String = s"Found type '$t1' as an argument to '$tName', but the argument '$arg' expects something of type '$t2'."
 }
 
 case class FieldTypesDeclaredOnPublicTransactionError(tName: String) extends Error {
