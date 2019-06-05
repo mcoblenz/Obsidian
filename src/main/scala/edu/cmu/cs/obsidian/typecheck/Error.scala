@@ -319,6 +319,10 @@ case class InvalidLocalVariablePermissionDeclarationError() extends Error {
 case class ImportError(msg: String) extends Error {
 }
 
+case class DuplicateContractError(contractName: String) extends Error {
+    val msg: String = s"Duplicate contract $contractName."
+}
+
 case class UninitializedFieldError(fieldName: String) extends Error {
     val msg: String = s"Field $fieldName may not be initialized in this constructor."
 }
