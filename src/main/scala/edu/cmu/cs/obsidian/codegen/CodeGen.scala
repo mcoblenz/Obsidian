@@ -1054,17 +1054,11 @@ class CodeGen (val target: Target) {
         }
         generateLazySerializationCode(aContract, newClass, translationContext)
 
-        // TODO: Make this nicer, make sure it's not partial
-        aContract.declarations.filter {
-            case c: Constructor => true
-//            case t: Transaction => true // TODO: Put this back?
-            case _ => false
-        }.map(decl => decl.asInstanceOf[Constructor]).groupBy {
-            case c: Constructor => c.args.map(d => (resolveType(d.typIn).name(), resolveType(d.typOut).name()))
-//            case t: Transaction => (false, t.name, t.args)
-            case _ => Nil // TODO: Make sure this case is impossible
-        }.foreach {
-            case (args, decls) => translateConstructors(decls, newClass, translationContext, aContract)
+        aContract.declarations.flatMap {
+            case c: Constructor => c :: Nil
+            case _ => Nil
+        }.groupBy(c => c.args.map(d => resolveType(d.typIn).name())).foreach {
+            case (_, constructors) => translateConstructors(constructors, newClass, translationContext, aContract)
         }
 
         for (decl <- aContract.declarations if !decl.isInstanceOf[Constructor]) {

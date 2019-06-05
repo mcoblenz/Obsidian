@@ -2057,6 +2057,10 @@ private def checkStatement(
             logError(contract, NoConstructorError(contract.name))
         }
 
+        if (contract.isMain && constructors.length > 1) {
+            logError(contract, MultipleConstructorsError(contract.name))
+        }
+
         val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typIn.topPermissionType))
         val matchingConstructors = constructorsByArgTypes.filter(_._2.size > 1)
 
