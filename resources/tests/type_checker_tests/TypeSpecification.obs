@@ -62,7 +62,7 @@ contract A {
     state Available;
     state Unavailable;
 
-    A() {
+    A@Available() {
         ->Available;
     }
 

@@ -1,6 +1,6 @@
 main contract C {
 
-    C() {
+    C@Start() {
         ->Start;
     }
 

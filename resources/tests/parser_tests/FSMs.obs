@@ -3,7 +3,7 @@ main contract SimpleFSM {
     state S2;
     state S3;
 
-    SimpleFSM() {
+    SimpleFSM@S1() {
         ->S1;
     }
 

@@ -1,0 +1,8 @@
+main contract A {
+    state S1;
+
+    A() {
+        ->S1;
+    }
+}
+

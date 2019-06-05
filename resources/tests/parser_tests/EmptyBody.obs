@@ -1,4 +1,4 @@
 main contract DefaultState {
-    DefaultState() {
+    DefaultState@Owned() {
     }
 }

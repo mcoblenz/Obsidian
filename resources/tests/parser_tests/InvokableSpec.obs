@@ -6,7 +6,7 @@ contract C {
     state S1 {}
     state S2 {}
 
-    C() { return; }
+    C@Owned() { return; }
 
     C@S1() { return; }
 

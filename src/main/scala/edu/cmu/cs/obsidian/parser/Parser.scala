@@ -557,10 +557,17 @@ object Parser extends Parsers {
 
     // maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor = {
-        parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+        parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() >> {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, true)
-                Constructor(name._1, args, resultType, body).setLoc(name)
+                permission match {
+                    case None =>
+                        err(s"${name._2}: Missing a permission on constructor for ${name._1} " +
+                            s"(e.g., ${name._1}@Owned, ${name._1}@State, where State is a valid state for ${name._1}).")
+                    case _ => {
+                        val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, defaultOwned = true)
+                        success(Constructor(name._1, args, resultType, body).setLoc(name))
+                    }
+                }
         }
     }
 

@@ -1,7 +1,7 @@
 main contract NegativeNumber {
     int x;
 
-    NegativeNumber() {
+    NegativeNumber@Owned() {
         x = -5;
     }
 
