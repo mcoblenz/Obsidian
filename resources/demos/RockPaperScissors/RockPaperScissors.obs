@@ -25,42 +25,6 @@ contract Player {
 
         return this;
     }
-
-    transaction beats(Player@(Rock | Paper | Scissors) this, Player@(Rock | Paper | Scissors) opponent) returns int {
-        if (this in Rock) {
-            if (opponent in Rock) {
-                return 0;
-            } else {
-                if (opponent in Scissors) {
-                    return 1;
-                } else {
-                    return -1;
-                }
-            }
-        } else {
-            if (this in Scissors) {
-                if (opponent in Scissors) {
-                    return 0;
-                } else {
-                    if (opponent in Paper) {
-                        return 1;
-                    } else {
-                        return -1;
-                    }
-                }
-            } else {
-                if (opponent in Paper) {
-                    return 0;
-                } else {
-                    if (opponent in Rock) {
-                        return 1;
-                    } else {
-                        return -1;
-                    }
-                }
-            }
-        }
-    }
 }
 
 main contract RockPaperScissors {
@@ -86,16 +50,38 @@ main contract RockPaperScissors {
         ->PlayerTwoChose(playerTwo = new Player().choose(choice));
     }
 
-    transaction result(RockPaperScissors@PlayerTwoChose >> (PlayerOneWin | PlayerTwoWin | Tie) this) {
-        int res = playerOne.beats(playerTwo);
-
-        if (res == 1) {
-            ->PlayerOneWin;
-        } else {
-            if (res == -1) {
-                ->PlayerTwoWin;
-            } else {
+    transaction computeWinner(RockPaperScissors@PlayerTwoChose >> (PlayerOneWin | PlayerTwoWin | Tie) this) {
+        if (playerOne in Rock) {
+            if (playerTwo in Rock) {
                 ->Tie;
+            } else {
+                if (playerTwo in Scissors) {
+                    ->PlayerOneWin;
+                } else {
+                    ->PlayerTwoWin;
+                }
+            }
+        } else {
+            if (playerOne in Scissors) {
+                if (playerTwo in Scissors) {
+                    ->Tie;
+                } else {
+                    if (playerTwo in Paper) {
+                        ->PlayerOneWin;
+                    } else {
+                        ->PlayerTwoWin;
+                    }
+                }
+            } else {
+                if (playerTwo in Paper) {
+                    ->Tie;
+                } else {
+                    if (playerTwo in Rock) {
+                        ->PlayerOneWin;
+                    } else {
+                        ->PlayerTwoWin;
+                    }
+                }
             }
         }
     }
