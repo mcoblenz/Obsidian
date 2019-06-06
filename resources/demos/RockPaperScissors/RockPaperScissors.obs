@@ -4,7 +4,7 @@ contract Player {
     state Paper;
     state Scissors;
 
-    Player() {
+    Player@ToChoose() {
         ->ToChoose;
     }
 
@@ -38,7 +38,7 @@ main contract RockPaperScissors {
     Player@(Rock | Paper | Scissors) playerOne available in PlayerOneChose, PlayerTwoChose;
     Player@(Rock | Paper | Scissors) playerTwo available in PlayerTwoChose;
 
-    RockPaperScissors() {
+    RockPaperScissors@GameStart() {
         ->GameStart;
     }
 
