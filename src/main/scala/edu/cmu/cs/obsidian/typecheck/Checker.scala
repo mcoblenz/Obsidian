@@ -414,12 +414,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             (checkIsSubtype(e, tPrime, t), contextPrime, ePrime)
         }
 
+        //Too many outputs: two expressions are needed so they can be packaged in different binary
+        // expression types. TODO: refactor to remove multiple outputs.
         def assertOperationType(e1: Expression, e2: Expression, t: ObsidianType): (ObsidianType, Context, Expression, Expression) = {
             val (_, c1, e1Prime) = assertTypeEquality(e1, t, context)
             val (_, c2, e2Prime) = assertTypeEquality(e2, t, c1)
             (t, c2, e1Prime, e2Prime)
         }
 
+        //Too many outputs: two expressions are needed so they can be packaged in different binary
+        // expression types. TODO: refactor to remove multiple outputs.
         def assertComparisonType(e1: Expression, e2: Expression): (ObsidianType, Context, Expression, Expression) = {
             val (_, c1, e1Prime) = assertTypeEquality(e1, IntType(), context)
             val (_, c2, e2Prime) = assertTypeEquality(e2, IntType(), c1)
@@ -660,10 +664,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                  (BottomType(), context, e)
                          }
 
+                     //TODO: propagate the new expression here.
                      case _ =>
                          inferAndCheckExpr(decl, context, eDeref, ownershipConsumptionMode) match {
                              case (np: NonPrimitiveType, context, _) =>
                                  logError(e, InvalidNonThisFieldAccess())
+                             //TODO: propagate new expression here.
                              case (typ, context, _) =>
                                  if (!typ.isBottom) {
                                      logError(e, DereferenceError(typ))
@@ -1431,7 +1437,7 @@ private def checkStatement(
                     logError(s, InvalidValAssignmentError())
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
-                (contextPrime, Assignment(ReferenceIdentifier(x), ePrime))
+                (contextPrime, Assignment(ReferenceIdentifier(x), ePrime).setLoc(s))
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
                 if (eDeref != This()) {
@@ -1440,7 +1446,7 @@ private def checkStatement(
                 }
                 else {
                     val (contextPrime, statementPrime, ePrime) = checkAssignment(f, e, context, true)
-                    (contextPrime, Assignment(Dereference(eDeref, f), ePrime))
+                    (contextPrime, Assignment(Dereference(eDeref, f), ePrime).setLoc(s))
                 }
             case Assignment(StateInitializer(stateName, fieldIdentifier), e) =>
                 val stateOption = context.contractTable.state(stateName._1)
@@ -1468,7 +1474,7 @@ private def checkStatement(
             case Assignment(subE: Expression, e: Expression) =>
                 val (_, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
                 logError(s, AssignmentError())
-                (contextPrime, Assignment(subE, ePrime))
+                (contextPrime, Assignment(subE, ePrime).setLoc(s))
 
             case Revert(e) =>
                 val (contextPrime, ePrime) =
@@ -1482,7 +1488,7 @@ private def checkStatement(
 
                 // If exceptions are ever catchable, we will need to make sure the fields of this have types consistent with their declarations.
                 // For now, we treat this like a permanent abort.
-                (contextPrime.makeThrown, Revert(ePrime))
+                (contextPrime.makeThrown, Revert(ePrime).setLoc(s))
 
             case If(eCond: Expression, body: Seq[Statement]) =>
                 val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
@@ -1520,20 +1526,20 @@ private def checkStatement(
                           logError(e, StateCheckOnPrimitiveError())
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, IfInState(ePrime, state, body1, body2))
+                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
                     case _ =>
                         if (!t.isBottom) {
                             logError(e, SwitchError(t))
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, IfInState(ePrime, state, body1, body2))
+                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
                 }
 
                 val contractTable = context.contractTable.lookupContract(contractName) match {
                     case Some(table) => table
                     case None =>
                         logError(e, SwitchError(t))
-                        return (contextPrime, IfInState(ePrime, state, body1, body2))
+                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
                 }
 
                 val allStates = contractTable.possibleStates
@@ -1623,13 +1629,13 @@ private def checkStatement(
                             logError(e, SwitchError(t))
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, Switch(ePrime, cases))
+                        return (contextPrime, Switch(ePrime, cases).setLoc(s))
                 }
 
                 val contractTable = context.contractTable.lookupContract(contractName) match {
                     case Some(table) => table
                     case None => logError(e, SwitchError(t))
-                        return (contextPrime, Switch(ePrime, cases))
+                        return (contextPrime, Switch(ePrime, cases).setLoc(s))
                 }
 
                 def checkSwitchCase(sc: SwitchCase) : (Context, SwitchCase) = {
@@ -1686,7 +1692,7 @@ private def checkStatement(
             // TODO maybe allow constructors as statements later, but it's not very important
             case d@Disown (e) =>
                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, d, ConsumingOwnedGivesShared())
-                (contextPrime, Disown(ePrime))
+                (contextPrime, Disown(ePrime).setLoc(s))
             case e: Expression =>
                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesShared())
                 if (typ.isOwned) {
@@ -1742,7 +1748,7 @@ private def checkStatement(
                     case InterfaceContractType(name, _) => assert(false, "Should have already eliminated this case")
                 }
 
-                (context, StaticAssert(ePrime, allowedStatesOrPermissions)) // Not contextPrime!
+                (context, StaticAssert(ePrime, allowedStatesOrPermissions).setLoc(s)) // Not contextPrime!
             case _ =>
                 logError(s, NoEffectsError(s))
                 (context, s)
@@ -2158,12 +2164,6 @@ private def checkStatement(
             case ffiContract : javaFFIContractImpl => ffiContract
         }
     }
-
-    //private def checkFFIContract(contract : javaFFIContractImpl): Unit = {
-
-    //}
-
-
 
     // Returns a new program (in a symbol table) with additional type information, paired with errors from the program.
     def checkProgram(): (Seq[ErrorRecord], SymbolTable) = {

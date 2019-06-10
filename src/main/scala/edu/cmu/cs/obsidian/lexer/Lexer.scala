@@ -63,8 +63,6 @@ object Lexer extends RegexParsers {
         case "with" => WithT()
         case "implements" => ImplementsT()
         case id => IdentifierT(id)
-        //Adding to the lexer for TestFFI
-
     }
 
     /* comment parser: must be parsed before [forwardSlashP] */
