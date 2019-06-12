@@ -60,6 +60,8 @@ object Lexer extends RegexParsers {
         case "disown" => DisownT()
         case "private" => PrivateT()
         case "transitions" => TransitionsT()
+        case "with" => WithT()
+        case "implements" => ImplementsT()
         case id => IdentifierT(id)
     }
 
@@ -101,6 +103,7 @@ object Lexer extends RegexParsers {
     private def rBracketP = """\]""".r ^^^  RBracketT()
     private def pipeP = """\|""".r ^^^  PipeT()
     private def chevP = """>>""".r ^^^  ChevT()
+    private def colonP  = """:""".r ^^^ ColonT()
 
 
     private def oneToken: Parser[Token] =
@@ -113,7 +116,7 @@ object Lexer extends RegexParsers {
         /* order is important here because some tokens contain the others */
         chevP | gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
 
-        plusP | starP | forwardSlashP | minusP | coloncolonP | atP | lBracketP | rBracketP | pipeP
+        plusP | starP | forwardSlashP | minusP | coloncolonP | atP | lBracketP | rBracketP | pipeP | colonP
     )
 
     private def tokenParser: Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))

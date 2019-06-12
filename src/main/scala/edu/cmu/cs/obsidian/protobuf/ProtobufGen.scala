@@ -69,7 +69,8 @@ object ProtobufGen {
     private def translateDeclaration(declaration: Declaration): Option[ProtobufDeclaration] = {
         declaration match {
             case c: Constructor => None // TODO
-            case c: Contract => Some(translateContract(c))
+            case c: ObsidianContractImpl => Some(translateContract(c))
+            case c: JavaFFIContractImpl => None
             case t: TypeDecl => None // TODO
             case f: edu.cmu.cs.obsidian.parser.Field => Some(translateFieldDecl(f))
             case t: Transaction => None
