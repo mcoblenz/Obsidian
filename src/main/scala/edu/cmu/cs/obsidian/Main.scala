@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian
 import java.io.File
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
-
+import org.apache.commons.io.FileUtils
 import scala.collection.mutable.HashSet
 import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
@@ -195,20 +195,15 @@ object Main {
             val buildPath = fabricPath.resolve("build.gradle")
             val settingsPath = fabricPath.resolve("settings.gradle")
             val srcPath = fabricPath.resolve("src")
-            val copyFabricFolderInvocation: String =
-                "cp -R " + buildPath.toString + " " +
-                    settingsPath.toString + " " +
-                    srcPath.toString + " " +
-                    path + File.separator
-            println("copying: " + copyFabricFolderInvocation)
-            copyFabricFolderInvocation.!
+
+            Files.copy(buildPath, path.resolve("build.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            Files.copy(settingsPath, path.resolve("settings.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            FileUtils.copyDirectory(srcPath.toFile, path.resolve("src").toFile)
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
             val javaTargetLocation = Paths.get(path.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
-            val copyAllGeneratedClasses : String =
-                "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
-            println("copying: " + copyAllGeneratedClasses)
-            copyAllGeneratedClasses.!
+
+            FileUtils.copyDirectory(tmpGeneratedCodePath.toFile, javaTargetLocation.toFile)
 
             //place the correct class name in the build.gradle
             val gradlePath = Paths.get(path.toString, "build.gradle")
@@ -217,11 +212,9 @@ object Main {
 
             //sed automatically creates a backup of the original file, has to be deleted
             val gradleBackupPath = Paths.get(path.toString, "build.gradle.backup")
-            val deleteSedBackupFile: String =
-                "rm " + gradleBackupPath.toString
 
             replaceClassNameInGradleBuild.!
-            deleteSedBackupFile.!
+            new File(gradleBackupPath.toString).delete()
             println("Successfully generated Fabric chaincode at " + path)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
@@ -275,7 +268,6 @@ object Main {
                 path
             case None => Paths.get(".")
         }
-
 
         Files.createDirectories(srcDir)
         Files.createDirectories(bytecodeDir)
@@ -379,10 +371,16 @@ object Main {
                         Paths.get(mainName)
                 }
                 val protobufOutputPath = outputPath.resolve("protos")
+                val temp = protobufOutputPath.toFile
+                if (temp.exists()) {
+                    FileUtils.deleteDirectory(temp)
+                }
                 Files.createDirectories(protobufOutputPath)
-                val copyProtobufCmd = s"cp $protobufPath $protobufOutputPath"
-                copyProtobufCmd.!
 
+                val sourceFile = (Paths.get(s"$protobufPath"))
+                val destFile = Paths.get(s"$protobufOutputPath")
+                val newDest = Paths.get(destFile.toString() + File.separator + sourceFile.getFileName())
+                Files.copy(sourceFile, newDest, StandardCopyOption.REPLACE_EXISTING)
             }
 
             generateFabricCode(mainName, options.outputPath, srcDir)
