@@ -116,7 +116,7 @@ case class StateType(contractName: String, stateNames: Set[String], override val
             return Yes()
         }
 
-        val stateIsAsset = contract match {
+        contract match {
             case None => No() // This will result in an error elsewhere.
             case Some(contractTable) =>
                 val statesAreAssets = stateNames.map((sn: String) =>
@@ -125,10 +125,15 @@ case class StateType(contractName: String, stateNames: Set[String], override val
                     case None => No()
                     case Some(stateTable) => if(stateTable.ast.isAsset) Yes() else No()
                 })
-                statesAreAssets.reduce((p1: Possibility, p2: Possibility) => if (p1 == p2) p1 else Maybe())
-        }
 
-        stateIsAsset
+
+                // If there's no possible states (i.e., statesAreAssets is empty), then there should be error elsewhere
+                if (statesAreAssets.isEmpty) {
+                    No()
+                } else {
+                    statesAreAssets.reduce((p1: Possibility, p2: Possibility) => if (p1 == p2) p1 else Maybe())
+                }
+        }
     }
 
     override def remoteType: NonPrimitiveType = StateType(contractName, stateNames, true)
