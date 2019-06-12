@@ -48,6 +48,8 @@ case class AssetT() extends Token { override def toString: String = "asset" }
 case class DisownT() extends Token { override def toString: String = "disown" }
 case class PrivateT() extends Token { override def toString: String = "private" }
 case class TransitionsT() extends Token { override def toString: String = "transitions" }
+case class WithT() extends Token { override def toString: String = "with"}
+case class ImplementsT() extends Token { override def toString: String = "implements" }
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }
@@ -80,6 +82,7 @@ case class LBracketT() extends Token { override def toString: String ="[" }
 case class RBracketT() extends Token { override def toString: String ="]" }
 case class PipeT() extends Token { override def toString: String ="|" }
 case class ChevT() extends Token { override def toString: String =">>" }
+case class ColonT() extends Token { override def toString: String = ":"}
 
 
     /* comment token: the parser never sees this; comments should be pruned in the lexer */

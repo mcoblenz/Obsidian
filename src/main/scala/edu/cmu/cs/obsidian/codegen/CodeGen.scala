@@ -20,7 +20,7 @@ trait Target {
 case class Client(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
 case class Server(mainContract: Contract, generateDebugOutput: Boolean = false) extends Target
 
-class CodeGen (val target: Target) {
+class CodeGen (val target: Target, table: SymbolTable) {
 
     private val model: JCodeModel = new JCodeModel()
 
@@ -61,6 +61,14 @@ class CodeGen (val target: Target) {
         JExpr.ref("__isInsideInvocation")
     }
 
+    private def invokeGetState(receiver: IJExpression, loadSerialization: Boolean): JInvocation = {
+        if (loadSerialization) {
+            JExpr.invoke(receiver, getStateMeth).arg(JExpr.ref(serializationParamName))
+        } else {
+            JExpr.invoke(receiver, getStateMeth).arg(JExpr._null())
+        }
+    }
+
     private def transactionGetMethodName(txName: String, stOption: Option[String]): String = {
         stOption match {
             case Some(stName) => txName + "__" + "state" + stName
@@ -83,8 +91,8 @@ class CodeGen (val target: Target) {
                                         protobufOuterClassNames: mutable.HashMap[String, String]): Unit = {
         protobufOuterClassNames += (contractNameResolutionMap(contract) -> (packageName + "." + protobufOuterClassName))
 
-        for (d <- contract.declarations if d.isInstanceOf[Contract]) {
-            val innerContract = d.asInstanceOf[Contract]
+        for (d <- contract.declarations if d.isInstanceOf[ObsidianContractImpl]) {
+            val innerContract = d.asInstanceOf[ObsidianContractImpl]
             populateProtobufOuterClassNames(innerContract, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
         }
     }
@@ -104,21 +112,36 @@ class CodeGen (val target: Target) {
 
         assert(program.imports.isEmpty, "Imports should be empty after processing.")
 
+        /* again match on c to check if it is a ObsidianContract or a javaFFIContract
+         */
         for (c <- program.contracts) {
-            populateProtobufOuterClassNames(c, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+            c match {
+                case obsContract: ObsidianContractImpl => populateProtobufOuterClassNames(obsContract, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames)
+                case javaContract: JavaFFIContractImpl =>
+            }
         }
 
+        /* match on c to check which type of contract it is */
         for (c <- program.contracts) {
             // TODO : generate code for interfaces (issue #117)
-            if (!c.isInterface) {
-                val newClass: JDefinedClass = programPackage._class(c.name)
-                val translationContext = makeTranslationContext(c, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
-                translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
 
-                if (c.isImport) {
-                    translateStubContract(c, programPackage, translationContext)
+            c match {
+
+                case c: ObsidianContractImpl => {
+                    if (!c.isInterface) {
+                        val newClass: JDefinedClass = programPackage._class(c.name)
+                        val translationContext = makeTranslationContext(c, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
+                        translateOuterContract(c, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
+
+                        if (c.isImport) {
+                            translateStubContract(c, programPackage, translationContext)
+                        }
+                    }
                 }
+
+                case c: JavaFFIContractImpl =>
             }
+
         }
         model
     }
@@ -238,7 +261,7 @@ class CodeGen (val target: Target) {
                 JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
             case _ =>
-                val targetClass = resolveType(typ).asInstanceOf[AbstractJClass]
+                val targetClass = resolveType(typ, table).asInstanceOf[AbstractJClass]
                 val constructorInvocation = JExpr._new(targetClass)
                 constructorInvocation.arg(JExpr.ref("connectionManager"))
 
@@ -264,7 +287,7 @@ class CodeGen (val target: Target) {
                 val stringType = model.ref("java.lang.String")
                 val intAsString = JExpr._new(stringType).arg(marshalledExpr)
                 intAsString.arg(charset)
-                val intType = resolveType(initialTyp)
+                val intType = resolveType(initialTyp, table)
                 val decl = body.decl(intType, "unmarshalledInt" + paramIndex, JExpr._new(intType).arg(intAsString))
                 val test = body._if(decl.eq(JExpr._null()))
                 val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
@@ -299,7 +322,7 @@ class CodeGen (val target: Target) {
                 val enumGetter = "getEitherCase"
                 val guidEnumName = protobufClassName + "OrGUID" + "." + "EitherCase" + "." + "GUID"
 
-                val unarchivedObjDecl = body.decl(resolveType(initialTyp), "unarchivedObj" + paramIndex)
+                val unarchivedObjDecl = body.decl(resolveType(initialTyp, table), "unarchivedObj" + paramIndex)
                 // If we have a GUID…
                 val hasGUID = archive.invoke(enumGetter).invoke("equals").arg(JExpr.direct(guidEnumName))
 
@@ -310,10 +333,10 @@ class CodeGen (val target: Target) {
                 val loadInvocation = JExpr.ref(serializationParamName).invoke("loadContractWithGUID").arg(stub).arg(guid)
                 loadInvocation.arg(np.isOwned)
                 loadInvocation.arg(finalTyp.isOwned)
-                cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(initialTyp), loadInvocation))
+                cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(initialTyp, table), loadInvocation))
 
                 // If we have an object…
-                val targetClass = resolveType(initialTyp).asInstanceOf[AbstractJClass]
+                val targetClass = resolveType(initialTyp, table).asInstanceOf[AbstractJClass]
                 val classInstance = JExpr._new(targetClass)
 
                 cond._else().assign(unarchivedObjDecl, classInstance)
@@ -350,7 +373,7 @@ class CodeGen (val target: Target) {
         }
 
         val javaRetType = obsidianRetType match {
-            case Some(retType) => resolveType(retType)
+            case Some(retType) => resolveType(retType, table)
             case None => model.VOID
         }
 
@@ -361,7 +384,7 @@ class CodeGen (val target: Target) {
         var argExpressions: List[IJExpression] = Nil
         /* add args */
         for (arg <- transaction.args) {
-            argExpressions = argExpressions :+ meth.param(resolveType(arg.typIn), arg.varName)
+            argExpressions = argExpressions :+ meth.param(resolveType(arg.typIn, table), arg.varName)
         }
         /* add SerializationState as argument */
         argExpressions = argExpressions :+ meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
@@ -435,14 +458,14 @@ class CodeGen (val target: Target) {
      * (i.e. defined in some states but not in the entire contract) of type X */
     def makeFieldInfo(newClass: JDefinedClass, stateLookup: Map[String, StateContext])
                      (name: String, declSeq: Seq[(State, Field)]): FieldInfo = {
-        val fieldType = resolveType(declSeq.head._2.typ)
+        val fieldType = resolveType(declSeq.head._2.typ, table)
 
         /* setup get method */
         val getMeth = newClass.method(JMod.PRIVATE, fieldType, fieldGetMethodName(name))
         val getBody = getMeth.body()
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            getBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
+            getBody._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))
                    ._then()
                    ._return(stateLookup(st.name).innerClassField.ref(f.name))
         }
@@ -456,7 +479,7 @@ class CodeGen (val target: Target) {
         val newValue = setMeth.param(fieldType, "newValue")
         for ((st, f) <- declSeq) {
             // dynamically check the state
-            setBody._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))
+            setBody._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))
                 ._then()
                 .assign(stateLookup(st.name).innerClassField.ref(f.name), newValue)
         }
@@ -472,7 +495,7 @@ class CodeGen (val target: Target) {
         val txExampleName = transactionGetMethodName(txExample.name, Some(stExample.name))
 
         val (hasReturn, retType) = txExample.retType match {
-            case Some(typ) => (true, resolveType(typ))
+            case Some(typ) => (true, resolveType(typ, table))
             case None => (false, model.VOID)
         }
                              
@@ -481,7 +504,7 @@ class CodeGen (val target: Target) {
 
 
       /* add the appropriate args to the method and collect them in a list */
-        val jArgs = txExample.args.map( (arg: VariableDeclWithSpec) => meth.param(resolveType(arg.typIn), arg.varName) )
+        val jArgs = txExample.args.map( (arg: VariableDeclWithSpec) => meth.param(resolveType(arg.typIn, table), arg.varName) )
 
         val body = meth.body()
 
@@ -492,7 +515,7 @@ class CodeGen (val target: Target) {
             jArgs.foldLeft(inv)((inv: JInvocation, arg: JVar) => inv.arg(arg))
 
             // dynamically check the state
-            val stBody = body._if(JExpr.invoke(getStateMeth).eq(stateLookup(st.name).enumVal))._then()
+            val stBody = body._if(invokeGetState(JExpr._this(), true).eq(stateLookup(st.name).enumVal))._then()
 
             if (hasReturn) stBody._return(inv)
             else stBody.add(inv)
@@ -656,7 +679,15 @@ class CodeGen (val target: Target) {
 
             /* setup the state field and the [getState] method */
             stateEnumField = Some(newClass.field(JMod.PRIVATE, stateEnum, stateField))
+
             val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
+            stateMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+            stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
+
+            stateMeth.body()
+                ._if(JExpr.ref(serializationParamName).neNull())
+                ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
+
             if (!isStub) {
                 stateMeth.body()._return(JExpr.ref(stateField))
             } else {
@@ -669,7 +700,7 @@ class CodeGen (val target: Target) {
                 val tryBlock = stateMeth.body()._try()
 
                 val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
-                doTransactionInvocation.arg("getState")
+                doTransactionInvocation.arg(getStateMeth)
                 doTransactionInvocation.arg(argArray)
                 doTransactionInvocation.arg(JExpr.invoke("__getGUID"))
                 doTransactionInvocation.arg(true)
@@ -708,10 +739,12 @@ class CodeGen (val target: Target) {
         for (decl <- aContract.declarations if decl.isInstanceOf[Field]) {
             val field: Field = decl.asInstanceOf[Field]
             val meth = newClass.method(JMod.PUBLIC, model.ref("boolean"), fieldInScopeMethodName(field.name))
+            meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
             field.availableIn match {
                 case None => meth.body()._return(JExpr.TRUE)
                 case Some(states) =>
-                    val currentState = JExpr.invoke(getStateMeth)
+                    // Safe to not load here because by the time we get to it, we will have already exited if we have not loaded
+                    val currentState = invokeGetState(JExpr._this(), false)
                     val availableInStatesArray = JExpr.newArray(model.ref("String"))
                     states.foreach( (state : String) => availableInStatesArray.add(JExpr.lit(state)))
 
@@ -779,6 +812,7 @@ class CodeGen (val target: Target) {
           .narrow(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
         // __resetModified collects the set of modified fields and resets the set of modified fields.
         val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__resetModified")
+        getModifiedMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         // add a list of things we've already checked so we don't get stuck in loops
         getModifiedMeth.param(setType, "checked");
         val modBody = getModifiedMeth.body()
@@ -858,12 +892,13 @@ class CodeGen (val target: Target) {
          * Invariant for use: [getStateMeth] returns the current state, the new state is passed
          * as an argument. The new state's inner class field must be non-null. */
         val conserveMeth = newClass.method(JMod.PRIVATE, model.VOID, conserveFieldsName)
+        conserveMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
         val nextState = conserveMeth.param(translationContext.stateEnumClass.get, "nextState")
         val conserveBody = conserveMeth.body()
         /* match on the current state */
         for (stFrom <- translationContext.states.values) {
             val thisStateBody = conserveBody._if(
-                    JExpr.invoke(getStateMeth).eq(stFrom.enumVal))
+                    invokeGetState(JExpr._this(), false).eq(stFrom.enumVal))
                 ._then()
             /* match on the target state */
             for (stTo <- translationContext.states.values if stTo != stFrom) {
@@ -882,10 +917,12 @@ class CodeGen (val target: Target) {
         /* method to null out old state
          * Invariant for use: [getStateMeth] returns the current state; this will be the state
          * whose inner class field this method nullifies. */
-        val deleteBody = newClass.method(JMod.PRIVATE, model.VOID, deleteOldStateName).body()
+        val deleteMeth = newClass.method(JMod.PRIVATE, model.VOID, deleteOldStateName)
+        deleteMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
+        val deleteBody = deleteMeth.body()
         for (st <- translationContext.states.values) {
             deleteBody._if(
-                    JExpr.invoke(getStateMeth).eq(st.enumVal))
+                    invokeGetState(JExpr._this(), false).eq(st.enumVal))
                 ._then()
                 .assign(st.innerClassField, JExpr._null())
         }
@@ -903,6 +940,14 @@ class CodeGen (val target: Target) {
             case Server(_, _) =>
                 newClass._implements(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized"))
         }
+
+//        aContract match {
+//            case javaFFIContractImpl(name, interface, javaPath, declarations) => {
+//                newClass._extends(model.directClass((javaPath.map(tuple=> tuple._1)).mkString(".")))
+//            }
+//            case _ =>
+//        }
+
         generateLazySerializationCode(aContract, newClass, translationContext)
 
         for (decl <- aContract.declarations) {
@@ -1210,7 +1255,7 @@ class CodeGen (val target: Target) {
                         case Some(stateSet) =>
                             var test: IJExpression = JExpr.TRUE
                             for (stateName <- stateSet) {
-                                val thisTest = JExpr.invoke(getStateMeth)
+                                val thisTest = invokeGetState(JExpr._this(), true)
                                   .eq(translationContext.getEnum(stateName))
 
                                 test = JOp.cor(test, thisTest)
@@ -1244,7 +1289,7 @@ class CodeGen (val target: Target) {
                 var runArgNumber = 0
                 for (txArg <- tx.args) {
                     val runArg = runArgs.component(JExpr.lit(runArgNumber))
-                    val javaArgType = resolveType(txArg.typIn)
+                    val javaArgType = resolveType(txArg.typIn, table)
                     val errorBlock = new JBlock()
 
                     val transactionArgExpr = unmarshallExprExpectingFullObjects(translationContext, enoughArgs, runArg, txArg.typIn, txArg.typOut, errorBlock, runArgNumber)
@@ -1265,7 +1310,7 @@ class CodeGen (val target: Target) {
                 if (tx.retType.isDefined) {
                     txInvoke = JExpr.invoke(txMethName)
 
-                    val returnObj = enoughArgs.decl(resolveType(tx.retType.get), "returnObj", txInvoke)
+                    val returnObj = enoughArgs.decl(resolveType(tx.retType.get, table), "returnObj", txInvoke)
 
                     // Record the UUID of this object (if it is one).
                     tx.retType.get match {
@@ -1334,12 +1379,12 @@ class CodeGen (val target: Target) {
             notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
 
             val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
-            exception.arg("getState")
+            exception.arg(getStateMeth)
             exception.arg(runArgs.ref("length"))
             exception.arg(0)
             notEnoughArgs._throw(exception)
 
-            enoughArgs.assign(returnBytes, JExpr.invoke(getStateMeth).invoke("name").invoke("getBytes"))
+            enoughArgs.assign(returnBytes, invokeGetState(JExpr._this(), true).invoke("name").invoke("getBytes"))
         }
 
         /* Find where to throw a 'no such transaction' error.
@@ -1417,7 +1462,7 @@ class CodeGen (val target: Target) {
 
             // The main transaction expects to be passed a stub of a particular type. Construct it.
             val stubType: ObsidianType = mainTransaction.args(0).typIn
-            val stubJavaType = resolveType(stubType)
+            val stubJavaType = resolveType(stubType, table)
             val newStubExpr = JExpr._new(stubJavaType)
             newStubExpr.arg(JExpr.ref("connectionManager"))
             val generateUUID = stubType match {
@@ -1448,8 +1493,8 @@ class CodeGen (val target: Target) {
 
         val subcontracts = contract.declarations.filter(d => d.isInstanceOf[Contract])
 
-        for (c <- contract.declarations if c.isInstanceOf[Contract]) {
-            val innerContract: Contract = c.asInstanceOf[Contract]
+        for (c <- contract.declarations if c.isInstanceOf[ObsidianContractImpl]) {
+            val innerContract: ObsidianContractImpl = c.asInstanceOf[ObsidianContractImpl]
             val javaInnerClasses = inClass.classes().asScala
             val javaInnerClassOption = javaInnerClasses.find((c: AbstractJClass) => (c.name().equals(innerContract.name)))
 
@@ -1515,7 +1560,7 @@ class CodeGen (val target: Target) {
                     body: JBlock,
                     translationContext: TranslationContext,
                     inContract: Contract): Unit = {
-        val javaFieldType = resolveType(field.typ)
+        val javaFieldType = resolveType(field.typ, table)
 
         def handleNonPrimitive(name: String, n: ObsidianType): Unit = {
             val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
@@ -1588,6 +1633,7 @@ class CodeGen (val target: Target) {
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = stateClass.method(JMod.PUBLIC, archiveType, "archive")
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
@@ -1619,6 +1665,7 @@ class CodeGen (val target: Target) {
 
         val archiveType = model.directClass(protobufClassName)
         val archiveMethod = inClass.method(JMod.PUBLIC, archiveType, "archive")
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archiveBody = archiveMethod.body()
 
         val protobufMessageClassBuilder: String = protobufClassName + ".Builder"
@@ -1645,7 +1692,10 @@ class CodeGen (val target: Target) {
         if (translationContext.states.nonEmpty) {
             for (stDecl <- declarations.filter(d => d.isInstanceOf[State])) {
                 val st = stDecl.asInstanceOf[State]
-                val cond = translationContext.getEnum(st.name).eq(JExpr.invoke(getStateMeth))
+
+                // Safe to not load here because we should always be loaded when we are archiving,
+                // and therefore we will never actually try to use __st
+                val cond = translationContext.getEnum(st.name).eq(invokeGetState(JExpr._this(), false))
                 val thisStateBody = archiveBody._if(cond)._then()
 
                 val stateField = translationContext.states(st.name).innerClassField
@@ -1663,6 +1713,8 @@ class CodeGen (val target: Target) {
     // Generates a method, __archiveBytes(), which outputs a string in protobuf format.
     private def generateSerializer(contract: Contract, inClass: JDefinedClass): Unit = {
         val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__archiveBytes")
+        archiveMethod.annotate(classOf[Override])
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
 
         val archiveBody = archiveMethod.body()
 
@@ -1674,6 +1726,8 @@ class CodeGen (val target: Target) {
     // Generates a method, __wrappedArchiveBytes(), which wraps Foo in a FooOrGuid object and outputs as bytes
     private def generateWrapperSerializer(contract: Contract, inClass: JDefinedClass, translationContext: TranslationContext): Unit = {
         val archiveMethod = inClass.method(JMod.PUBLIC, model.parseType("byte[]"), "__wrappedArchiveBytes")
+        archiveMethod.annotate(classOf[Override])
+        archiveMethod._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val contractName = contract.name
 
         val protobufClassName = translationContext.getProtobufClassName(contract)
@@ -1707,7 +1761,7 @@ class CodeGen (val target: Target) {
                     inContract: Contract): Unit = {
         // generate: FieldArchive fieldArchive = field.archive();
         val javaFieldName: String = field.name
-        val javaFieldType: AbstractJType = resolveType(field.typ)
+        val javaFieldType: AbstractJType = resolveType(field.typ, table)
 
         def handleNonPrimitive(name: String, n: ObsidianType): Unit = {
             // foo = new Foo(); foo.initFromArchive(archive.getFoo());
@@ -1852,6 +1906,7 @@ class CodeGen (val target: Target) {
 
         /* [initFromArchive] setup */
         val fromArchiveMeth = newClass.method(JMod.PUBLIC, model.VOID, "initFromArchive")
+        fromArchiveMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         val archive = fromArchiveMeth.param(archiveType, "archive")
         // Also need the serialization-state b/c the object might
         // already be loaded.
@@ -1922,8 +1977,11 @@ class CodeGen (val target: Target) {
                     aContract: Contract): Unit = {
         declaration match {
             /* the main contract has special generated code, so many functions are different */
-            case (c: Constructor) =>
-                translateConstructor(c, newClass, translationContext, aContract)
+            case (c: Constructor) => aContract match{
+              case obsContract: ObsidianContractImpl => translateConstructor(c, newClass, translationContext, obsContract)
+              case javaContract: JavaFFIContractImpl => ()
+            }
+
             case (f: Field) =>
                 translateFieldDecl(f, newClass)
             case (t: Transaction) =>
@@ -1931,26 +1989,45 @@ class CodeGen (val target: Target) {
                 if (aContract.isMain) {
                     mainTransactions.add(t)
                 }
-            case (s@State(_, _, _)) =>
-                translateStateDecl(s, aContract, newClass, translationContext)
-            case (c@Contract(_, _, _,_, _, _)) => translateInnerContract(c, newClass, translationContext)
+            case (s@State(_, _, _)) => aContract match {
+              case obsContract: ObsidianContractImpl => translateStateDecl(s, obsContract, newClass, translationContext)
+              case javaContract: JavaFFIContractImpl => ()
+            }
+
+            case (c@ObsidianContractImpl(_, _, _,_, _, _)) => translateInnerContract(c, newClass, translationContext)
+
+            case (c@JavaFFIContractImpl(_,_,_,_,_)) => ()
+
             case t: TypeDecl =>
                 assert(false, "TODO")
                 ()
+
         }
     }
 
 
-    private def resolveType(typ: ObsidianType): AbstractJType = {
+    private def resolveType(typ: ObsidianType, table: SymbolTable): AbstractJType = {
         typ match {
             case IntType() => model.directClass("java.math.BigInteger")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
-            case n: NonPrimitiveType =>
-                val contractName = n.contractName
-                if (n.isRemote) model.ref(classNameForStub(contractName)) else model.ref(contractName)
+            case n: NonPrimitiveType => {
+                val contractTableOpt = table.contractLookup.get(n.contractName)
+                contractTableOpt match {
+                    case None => if (n.isRemote) model.ref(classNameForStub(n.contractName)) else model.ref(n.contractName)
+                    case Some(x) => x.contract match {
+                        case obsContract : ObsidianContractImpl =>
+                            if (n.isRemote) model.ref(classNameForStub(n.contractName)) else model.ref(n.contractName)
+                        case javaContract : JavaFFIContractImpl =>
+                            val pathSequence = javaContract.javaPath.map(x => x._1)
+                            val pathToJavaFile = pathSequence.mkString(".")
+                            model.parseType(pathToJavaFile)
+                    }
+                }
+            }
             case _ => model.VOID // TODO: translate PDTs
         }
+
     }
 
     // The NonPrimitiveType stores the type name as a string; this method figures out which contract that maps to
@@ -2035,25 +2112,26 @@ class CodeGen (val target: Target) {
     private def translateFieldDecl(decl: Field, newClass: JDefinedClass): Unit = {
         val initializer = fieldInitializerForType(decl.typ)
         if (initializer.isDefined) {
-            newClass.field(JMod.PUBLIC, resolveType(decl.typ), decl.name, initializer.get)
+            newClass.field(JMod.PUBLIC, resolveType(decl.typ, table), decl.name, initializer.get)
         }
         else {
-            newClass.field(JMod.PUBLIC, resolveType(decl.typ), decl.name)
+            newClass.field(JMod.PUBLIC, resolveType(decl.typ, table), decl.name)
         }
     }
 
     private def addArgs(inv: JInvocation,
                         args: Seq[Expression],
                         translationContext: TranslationContext,
-                        localContext: Map[String, JVar]): JInvocation = {
+                        localContext: Map[String, JVar], isFFIInvocation: Boolean): JInvocation = {
         val foldF = (inv: JInvocation, arg: Expression) =>
             inv.arg(translateExpr(arg, translationContext, localContext))
         args.foldLeft(inv)(foldF)
 
         // Pass chaincode stub to other invoked methods as well, in case
         // an object needs to be restored from the blockchain.
-        inv.arg(JExpr.ref(serializationParamName))
-
+        if (!isFFIInvocation) {
+            inv.arg(JExpr.ref(serializationParamName))
+        }
         inv
     }
 
@@ -2101,15 +2179,17 @@ class CodeGen (val target: Target) {
                     JExpr._new(model.parseType("java.math.BigInteger")).arg(stringResult)
                 }
                 else {
-                    addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext)
+                    addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, false)
                 }
             /* TODO : this shouldn't be an extra case */
-            case Invocation(This(), name, args) =>
-                addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext)
-            case Invocation(recipient, name, args) =>
-                addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext)
-            case Construction(name, args) =>
-                addArgs(JExpr._new(model.ref(name)), args, translationContext, localContext)
+            case Invocation(This(), name, args, isFFIInvocation) =>
+                addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, isFFIInvocation)
+            case Invocation(recipient, name, args, isFFIInvocation) =>
+                addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext, isFFIInvocation)
+            case Construction(name, args, isFFIInvocation) =>
+                val contractRefType = ContractReferenceType(ContractType(name), Owned(), false)
+                val resolvedType = resolveType(contractRefType, table)
+                addArgs(JExpr._new(resolvedType), args, translationContext, localContext, isFFIInvocation)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
             case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
@@ -2162,17 +2242,19 @@ class CodeGen (val target: Target) {
 
         val methodName = "new_" + newClass.name()
         var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
+        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
+            (arg.varName, meth.param(resolveType(arg.typIn, table), arg.varName))
         )
 
         // We need to pass in a stub as well since we might need
         // to deserialize some objects in here (for example, if we call a method on a parameter
         // that returns a property of one of its child objects which isn't yet loaded)
         meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+
 
         /* construct the local context from this list */
         val localContext: immutable.Map[String, JVar] = argList.toMap
@@ -2183,6 +2265,7 @@ class CodeGen (val target: Target) {
         assignNewGUID(newClass, aContract, meth)
 
         /* When an object is newly created, we always mark it as modified (and loaded). */
+        meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         meth.body().assign(newClass.fields get modifiedFieldName, JExpr.lit(true))
         meth.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
 
@@ -2207,13 +2290,14 @@ class CodeGen (val target: Target) {
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
         val constructor = newClass.constructor(JMod.PUBLIC)
+        constructor._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
         val invocation = constructor.body().invoke(methodName)
 
         /* add args to method and collect them in a list */
         for (arg <- c.args) {
-            constructor.param(resolveType(arg.typIn), arg.varName)
+            constructor.param(resolveType(arg.typIn, table), arg.varName)
             invocation.arg(JExpr.ref(arg.varName))
         }
 
@@ -2287,12 +2371,12 @@ class CodeGen (val target: Target) {
     private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
         typ match {
             case StateType(_, states, _) => {
-                val currentState = expr.invoke(getStateMeth)
+                val currentState = invokeGetState(expr, true)
 
                 var cond: IJExpression = JExpr.TRUE
                 // check if the current state is in any of the possible states
                 for (st <- states) {
-                    val className = resolveType(typ).name()
+                    val className = resolveType(typ, table).name()
                     val enumClassName = stateEnumNameForClassName(className)
                     val enumClass = model.ref(packageName + "." + className + "." + enumClassName)
                     val enumConstant = JExpr.enumConstantRef(enumClass, st)
@@ -2316,7 +2400,7 @@ class CodeGen (val target: Target) {
                     translationContext: TranslationContext): JMethod = {
         // Put all transactions at the top level, for now.
         val javaRetType = tx.retType match {
-            case Some(typ) => resolveType(typ)
+            case Some(typ) => resolveType(typ, table)
             case None => model.VOID
         }
 
@@ -2336,7 +2420,7 @@ class CodeGen (val target: Target) {
         }
                     /* ensure the object is loaded before trying to do anything.
                      * (even checking the state!) */
-        meth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
+        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         target match {
             case Client(mainContract, _) =>
                 if (translationContext.contract != mainContract) {
@@ -2352,7 +2436,7 @@ class CodeGen (val target: Target) {
 
         /* add args to method and collect them in a list */
         val jArgs: Seq[(String, JVar)] = tx.args.map((arg: VariableDeclWithSpec) =>
-            (arg.varName, meth.param(resolveType(arg.typIn), arg.varName))
+            (arg.varName, meth.param(resolveType(arg.typIn, table), arg.varName))
         )
 
         val argsWithVars = jArgs.zip (tx.args)
@@ -2370,7 +2454,8 @@ class CodeGen (val target: Target) {
         val reentrancyTest = if (tx.isPrivate) JExpr.FALSE else isInsideInvocationFlag()
         val jIf = jTry.body()._if(reentrancyTest)
         val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
-        exception.arg(translationContext.contract.sourcePath)
+        //
+        exception.arg(translationContext.contract.asInstanceOf[ObsidianContractImpl].sourcePath)
         exception.arg(tx.loc.line)
         jIf._then()._throw(exception)
 
@@ -2455,9 +2540,9 @@ class CodeGen (val target: Target) {
                     case BoolType() => JExpr.lit(false)
                     case _ => JExpr._null()
                 }
-                nextContext = localContext.updated(name, body.decl(resolveType(typ), name, initializer))
+                nextContext = localContext.updated(name, body.decl(resolveType(typ, table), name, initializer))
             case VariableDeclWithInit(typ, name, e) =>
-                nextContext = localContext.updated(name, body.decl(resolveType(typ), name, translateExpr(e, translationContext, localContext)))
+                nextContext = localContext.updated(name, body.decl(resolveType(typ, table), name, translateExpr(e, translationContext, localContext)))
             case Return() => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newStateName, updates, permission) =>
@@ -2473,7 +2558,7 @@ class CodeGen (val target: Target) {
 
                     val ifStateLocked = body._if(stateLockCheck)
                     val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.StateLockException"))
-                    exception.arg(translationContext.contract.sourcePath)
+                    exception.arg(translationContext.contract.asInstanceOf[ObsidianContractImpl].sourcePath)
                     exception.arg(statement.loc.line)
                     ifStateLocked._then()._throw(exception)
                 }
@@ -2506,6 +2591,9 @@ class CodeGen (val target: Target) {
 
                 /* change the enum to reflect the new state */
                 body.assign(JExpr.ref(stateField), translationContext.getEnum(newStateName))
+
+                /* note that we've been modified so the changes will be saved */
+                body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
 
                 // Assign according to the state initialization statements, e.g. S1::foo = bar.
                 // Do this after updating the current state because assignVariable may invoke setters.
@@ -2546,7 +2634,7 @@ class CodeGen (val target: Target) {
                         declSeq.find((p: (State, Field)) => p._1 == state).get._2
                 }
 
-                val tempVarType = resolveType(field.typ)
+                val tempVarType = resolveType(field.typ, table)
 
                 val tempVar = body.decl(tempVarType,
                     stateInitializationVariableName(stateName._1, fieldName._1),
@@ -2561,7 +2649,7 @@ class CodeGen (val target: Target) {
                     case Some (expr) => translateExpr(expr, translationContext, localContext)
                 }
                 val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
-                exception.arg(translationContext.contract.sourcePath)
+                exception.arg(translationContext.contract.asInstanceOf[ObsidianContractImpl].sourcePath)
                 exception.arg(statement.loc.line)
                 exception.arg(translatedExpr)
                 body._throw(exception)
@@ -2588,7 +2676,8 @@ class CodeGen (val target: Target) {
                     /* somewhat of a bad workaround, but the alternative involves knowing the
                      * type of the expression jEx: in general, this requires an analysis
                      * to link references to declarations */
-                    JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
+                    invokeGetState(jEx, true).invoke("toString").invoke("equals").arg(JExpr.lit(s))
+
                 val jIf = body._if(eqState(h.stateName))
                 translateBody(jIf._then(), h.body, translationContext, localContext)
 
@@ -2603,10 +2692,9 @@ class CodeGen (val target: Target) {
                 val jEx = translateExpr(e, translationContext, localContext)
 
                 val eqState = (s: String) =>
-                    JExpr.invoke(jEx, "getState").invoke("toString").invoke("equals").arg(JExpr.lit(s))
+                    invokeGetState(jEx, true).invoke("toString").invoke("equals").arg(JExpr.lit(s))
 
                 val jIf = body._if(eqState(state._1))
-
 
                 val shouldStateLock = e match {
                     case ReferenceIdentifier(x) => true
@@ -2623,21 +2711,21 @@ class CodeGen (val target: Target) {
                     translateBody(jIf._then(), s1, translationContext, localContext)
                 }
 
-                if (!s2.isEmpty) {
+                if (s2.nonEmpty) {
                     translateBody(jIf._else(), s2, translationContext, localContext)
                 }
 
             case LocalInvocation(methName, args) =>
                 body.add(addArgs(translationContext.invokeTransaction(methName),
-                        args, translationContext, localContext))
+                        args, translationContext, localContext, false))
             /* TODO : it's bad that this is a special case */
-            case Invocation(This(), methName, args) =>
+            case Invocation(This(), methName, args, isFFIInvocation) =>
                 body.add(addArgs(translationContext.invokeTransaction(methName),
-                        args, translationContext, localContext))
+                        args, translationContext, localContext, isFFIInvocation))
 
-            case Invocation(e, methName, args) =>
+            case Invocation(e, methName, args, isFFIInvocation) =>
                 addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName),
-                        args, translationContext, localContext)
+                        args, translationContext, localContext, isFFIInvocation)
             case StaticAssert(e, l) => () // Nothing to do
             /* all expressions can be statements but no other expressions have a reasonable meaning */
             case _ => ()
