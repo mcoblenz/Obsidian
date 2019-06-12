@@ -3,14 +3,13 @@ package edu.cmu.cs.obsidian
 import java.io.File
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
-import scala.collection.mutable.HashSet
 import org.apache.commons.io.FileUtils
-
+import scala.collection.mutable.HashSet
 import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.protobuf._
-import edu.cmu.cs.obsidian.typecheck.{StateNameValidator, Checker, InferTypes}
+import edu.cmu.cs.obsidian.typecheck.{Checker, DuplicateContractError, ErrorRecord, InferTypes, StateNameValidator}
 import edu.cmu.cs.obsidian.util._
 
 import scala.sys.process._
@@ -290,9 +289,10 @@ object Main {
             val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
             val set = new HashSet[String]
+            var duplicateErrors = Seq.empty[ErrorRecord]
             for (contract <- fieldsLiftedAst.contracts) {
                 if (set.contains(contract.name)) {
-                    println("Warning: Duplicate contract " + contract.name + " will be ignored")
+                    duplicateErrors = duplicateErrors :+ ErrorRecord(DuplicateContractError(contract.name), contract.loc, contract.sourcePath)
                 }
                 set.add(contract.name)
             }
@@ -308,7 +308,7 @@ object Main {
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val (typecheckingErrors, checkedTable) = checker.checkProgram()
 
-            val allSortedErrors = (importErrors ++ transformErrors ++ typecheckingErrors)//.sorted
+            val allSortedErrors = (duplicateErrors ++ importErrors ++ transformErrors ++ typecheckingErrors)//.sorted
 
             if (!allSortedErrors.isEmpty) {
                 val errorCount = allSortedErrors.size

@@ -271,7 +271,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* Subtyping definitions */
 
     /* true iff [t1 <: t2] */
-    private def isSubtype(t1: ObsidianType, t2: ObsidianType): Option[Error] = {
+    private def isSubtype(t1: ObsidianType, t2: ObsidianType, isThis: Boolean): Option[Error] = {
         (t1, t2) match {
             case (BottomType(), _) => None
             case (_, BottomType()) => None
@@ -288,16 +288,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         c2 == ContractType(c)
                     case _ => false
                 }
-                if (!mainSubtype) Some(SubtypingError(t1, t2))
+                if (!mainSubtype) Some(SubtypingError(t1, t2, isThis))
                 // TODO: make sure this is unnecessary: else if (!modifierSubtype) Some(OwnershipSubtypingError(t1, t2))
                 else None
-            case _ => Some(SubtypingError(t1, t2))
+            case _ => Some(SubtypingError(t1, t2, isThis))
         }
     }
 
     /* returns [t1] if [t1 <: t2], logs an error and returns [BottomType] otherwise */
     private def checkIsSubtype(ast: AST, t1: ObsidianType, t2: ObsidianType): ObsidianType = {
-        val errorOpt = isSubtype(t1, t2)
+        val errorOpt = isSubtype(t1, t2, ast.isInstanceOf[This])
         if (errorOpt.isDefined) {
             logError(ast, errorOpt.get)
             BottomType()
@@ -450,7 +450,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 return (BottomType(), contextAfterReceiver)
             }
 
-            if (!invokable.isStatic && isSubtype(receiverType, invokable.thisType).isDefined) {
+            if (!invokable.isStatic && isSubtype(receiverType, invokable.thisType, receiver.isInstanceOf[This]).isDefined) {
                 logError(e, ReceiverTypeIncompatibleError(name, receiverType, invokable.thisType))
             }
 
@@ -459,7 +459,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val currentFieldType = context.lookupCurrentFieldTypeInThis(fieldName)
                 currentFieldType match {
                    case None => ()
-                   case Some(cft) => if(isSubtype(cft, requiredInitialFieldType).isDefined) {
+                   case Some(cft) => if(isSubtype(cft, requiredInitialFieldType, receiver.isInstanceOf[This]).isDefined) {
                        logError(e, FieldSubtypingError(fieldName, cft, requiredInitialFieldType))
                    }
                 }
@@ -808,7 +808,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case None =>
                     assert(false, "Bug: invalid field in field type context")
                 case Some(declaredFieldType) =>
-                    if (isSubtype(typ, declaredFieldType).isDefined) {
+                    if (isSubtype(typ, declaredFieldType, false).isDefined) {
                         logError(tx, InvalidInconsistentFieldType(field, typ, declaredFieldType))
                     }
             }
@@ -823,7 +823,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case None =>
                         logError(tx, InvalidFinalFieldTypeDeclarationError(field))
                     case Some(currentTyp) =>
-                        if (isSubtype(currentTyp, requiredTyp).isDefined) {
+                        if (isSubtype(currentTyp, requiredTyp, false).isDefined) {
                             logError(tx, InvalidInconsistentFieldType(field, currentTyp, requiredTyp))
                         }
                 }
@@ -965,7 +965,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val (argType, contextAfterArg) = inferAndCheckExpr(decl, contextAfterArgs, arg, ownershipConsumptionMode)
 
-                if (isSubtype(argType, specInputType).isDefined) {
+                if (isSubtype(argType, specInputType, false).isDefined) {
                     val err = ArgumentSubtypingError(decl.name, spec(i).varName, argType, specInputType)
                     errList = (ast, err)::errList
                 }
@@ -1770,7 +1770,7 @@ private def checkStatement(
         for (arg <- tx.args) {
             outputContext.get(arg.varName) match {
                 case Some(actualTypOut) =>
-                    val errorOpt = isSubtype(actualTypOut, arg.typOut)
+                    val errorOpt = isSubtype(actualTypOut, arg.typOut, false)
                     if (errorOpt.isDefined) {
                         logError(tx, ArgumentSpecificationError(arg.varName, tx.name, arg.typOut, actualTypOut))
                     }
@@ -2019,7 +2019,7 @@ private def checkStatement(
         for (arg <- constr.args) {
             outputContext.get(arg.varName) match {
                 case Some(actualTypOut) =>
-                    val errorOpt = isSubtype(actualTypOut, arg.typOut)
+                    val errorOpt = isSubtype(actualTypOut, arg.typOut, false)
                     if (errorOpt.isDefined) {
                         logError(constr, ArgumentSpecificationError(arg.varName, constr.name, arg.typOut, actualTypOut))
                     }
@@ -2028,7 +2028,8 @@ private def checkStatement(
         }
 
         val expectedThisType: NonPrimitiveType = constr.resultType
-        checkIsSubtype(constr, outputContext("this"), expectedThisType)
+        val thisAST = This().setLoc(constr.loc) // Make a fake "this" AST so we generate the right error message.
+        checkIsSubtype(thisAST, outputContext("this"), expectedThisType)
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
         checkForUnusedStateInitializers(outputContext)

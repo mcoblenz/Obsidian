@@ -2,63 +2,64 @@ package edu.cmu.cs.obsidian.parser
 
 import java.nio.file.{Files, Paths}
 
-import edu.cmu.cs.obsidian.typecheck.{ErrorRecord, ImportError}
+import edu.cmu.cs.obsidian.typecheck.{DuplicateContractError, ErrorRecord, ImportError}
+
+import scala.collection.mutable
+import scala.util.parsing.input.Position
 
 object ImportProcessor {
+    val filesAlreadyProcessed = new mutable.HashSet[String]
 
     class ImportException (val message : String) extends Exception {}
 
     def processImports(inFile: String, ast: Program): (Program, Seq[ErrorRecord]) = {
+        if (filesAlreadyProcessed.contains(inFile)) {
+            (ast, Seq.empty)
+        }
+        else {
+            filesAlreadyProcessed.add(inFile)
 
-        var allContracts = ast.contracts
-        var importErrors: Seq[ErrorRecord] = Seq.empty[ErrorRecord]
+            var allContracts = ast.contracts
+            var importErrors: Seq[ErrorRecord] = Seq.empty[ErrorRecord]
 
-        ast.imports.foreach(i => {
-            val contracts = processImport(i.name, Seq(Import(inFile)), ast.contracts.map(_.name))
+            ast.imports.foreach(i => {
+                val contracts = processImport(i.name, filesAlreadyProcessed, i.loc, inFile)
 
-            contracts match {
-                case Left(msg) =>
-                    val newErrors = importErrors :+ ErrorRecord(ImportError(msg), i.loc, inFile)
-                    importErrors = newErrors
-                case Right(cs) => allContracts = cs ++ allContracts
-            }
-        })
+                contracts match {
+                    case Left(error) =>
+                        val newErrors = importErrors :+ error
+                        importErrors = newErrors
+                    case Right(cs) => allContracts = cs ++ allContracts
+                }
+            })
 
-        (Program(Seq.empty, allContracts).setLoc(ast), importErrors)
+            (Program(Seq.empty, allContracts).setLoc(ast), importErrors)
+        }
     }
 
-    def processImport(importPath: String, seen: Seq[Import], contractNames: Seq[String]) : Either[String, Seq[Contract]] = {
+    def processImport(importPath: String, seenFiles: mutable.HashSet[String], importPos: Position, importFilename: String) : Either[ErrorRecord, Seq[Contract]] = {
         if (Files.exists(Paths.get(importPath))) {
             val importedProgram = Parser.parseFileAtPath(importPath, printTokens = false)
 
             var contracts = filterTags(importedProgram.contracts)
 
-            importedProgram.contracts.foreach(c => {
-                if (contractNames.contains(c.name)) {
-                    return Left("Repeat contract " + c.name + " in " + importPath)
-                }
-            })
-
-            val updatedSeen = seen :+ Import(importPath)
-            val updatedContractNames = contractNames ++ importedProgram.contracts.map(_.name)
+            seenFiles.add(importPath)
 
             importedProgram.imports.foreach(i => {
-                if (seen.contains(i)) {
-                    return Left("Cyclical import " + i + " from " + importPath)
-                }
+                if (!seenFiles.contains(i.name)) {
+                    val cs = processImport(i.name, seenFiles, i.loc, importPath)
 
-                val cs = processImport(i.name, updatedSeen, updatedContractNames)
+                    cs match {
+                        case Left(err) => return Left(err)
+                        case Right(c) => contracts = c ++ contracts
 
-                cs match {
-                    case Left(err) => return Left(err)
-                    case Right(c) => contracts = c ++ contracts
-
+                    }
                 }
             })
             Right(contracts)
         }
         else {
-            Left(s"Unable to read file: $importPath")
+            Left(ErrorRecord(ImportError(s"Unable to read file: $importPath"), importPos, importFilename))
         }
     }
 
@@ -67,7 +68,7 @@ object ImportProcessor {
     def filterTags(contracts: Seq[Contract]): Seq[Contract] = {
         contracts.map(c => {
             val newMods = c.modifiers - IsMain() + IsImport()
-            val newC = Contract(newMods, c.name, c.declarations, c.transitions, c.isInterface, c.sourcePath)
+            val newC = Contract(newMods, c.name, c.declarations, c.transitions, c.isInterface, c.sourcePath).setLoc(c)
             newC
         })
     }

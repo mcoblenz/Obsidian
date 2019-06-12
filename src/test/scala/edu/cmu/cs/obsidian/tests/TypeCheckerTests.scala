@@ -52,11 +52,11 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def basicTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ExampleTypeFailure.obs",
-            (SubtypingError(BoolType(), IntType()), 19)
+            (SubtypingError(BoolType(), IntType(), false), 19)
                 ::
                 (WrongArityError(1, 0, "createC"), 21)
                 ::
-                (SubtypingError(BoolType(), IntType()), 23)
+                (SubtypingError(BoolType(), IntType(), false), 23)
                 ::
                 Nil
         )
@@ -64,27 +64,27 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def operationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleOperations.obs",
-            (SubtypingError(BoolType(), IntType()), 8)
+            (SubtypingError(BoolType(), IntType(), false), 8)
                 ::
                 (SubtypingError(
                     StringType(),
-                    IntType()), 10)
+                    IntType(), false), 10)
                 ::
                 (SubtypingError(
                     BoolType(),
-                    IntType()), 12)
+                    IntType(), false), 12)
                 ::
                 (SubtypingError(
                     StringType(),
-                    BoolType()), 14)
+                    BoolType(), false), 14)
                 ::
                 (SubtypingError(
                     IntType(),
-                    BoolType()), 16)
+                    BoolType(), false), 16)
                 ::
                 (SubtypingError(
                     IntType(),
-                    BoolType()), 16)
+                    BoolType(), false), 16)
                 ::
                 Nil
         )
@@ -92,27 +92,27 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def comparisonTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleComparisons.obs",
-            (SubtypingError(BoolType(), IntType()), 8)
+            (SubtypingError(BoolType(), IntType(), false), 8)
                 ::
                 (SubtypingError(
                     BoolType(),
-                    IntType()), 10)
+                    IntType(), false), 10)
                 ::
                 (SubtypingError(
                     StringType(),
-                    IntType()), 12)
+                    IntType(), false), 12)
                 ::
                 (SubtypingError(
                     StringType(),
-                    IntType()), 14)
+                    IntType(), false), 14)
                 ::
                 (SubtypingError(
                     BoolType(),
-                    IntType()), 16)
+                    IntType(), false), 16)
                 ::
                 (SubtypingError(
                     BoolType(),
-                    IntType()), 16)
+                    IntType(), false), 16)
                 :: Nil
         )
     }
@@ -135,7 +135,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
-            (SubtypingError(BoolType(), IntType()), 38)
+            (SubtypingError(BoolType(), IntType(), false), 38)
                 ::
                 (InconsistentContractTypeError("C_Shared", "C_Owned"), 41)
                 ::
@@ -168,7 +168,7 @@ class TypeCheckerTests extends JUnitSuite {
                 (MustReturnError("t_ret_nonprimitive"), 31)
                 ::
                 (SubtypingError(IntType(),
-                    ContractReferenceType(ContractType("C_Owned"), Owned(), false)), 33)
+                    ContractReferenceType(ContractType("C_Owned"), Owned(), false), false), 33)
                 ::
                 (MustReturnError("no_return"), 38)
                 ::
@@ -393,12 +393,12 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/EndsInState.obs",
             (SubtypingError(
                 StateType("C", "S1", false),
-                StateType("C", "S2", false)), 3
+                StateType("C", "S2", false), true), 3
             )
                 ::
                 (SubtypingError(
                     StateType("C", "S2", false),
-                    StateType("C", "S1", false)), 8
+                    StateType("C", "S1", false), false), 8
                 )
                 ::
                 Nil
@@ -411,12 +411,12 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (SubtypingError(
                     StateType("C1", Set("S1", "S2"), false),
-                    StateType("C1", Set("S1", "S3"), false)), 17
+                    StateType("C1", Set("S1", "S3"), false), false), 17
                 )
                 ::
                 (SubtypingError(
                     StateType("C2", Set("S1", "S2"), false),
-                    StateType("C2", "S1", false)), 30
+                    StateType("C2", "S1", false), true), 30
                 )
                 ::
                 (
@@ -451,7 +451,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (SubtypingError(
                     ContractReferenceType(ContractType("Money"), Unowned(), false),
-                    ContractReferenceType(ContractType("Money"), Owned(), false)), 37)
+                    ContractReferenceType(ContractType("Money"), Owned(), false), false), 37)
                 ::
                 (NonAssetOwningAssetError("BadWallet",
                     Field(false,
@@ -578,7 +578,7 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def typeSpecificationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/TypeSpecification.obs",
             (SubtypingError(StateType("C", Set("S3", "S2"), false),
-                StateType("C", "S1", false)), 24)
+                StateType("C", "S1", false), false), 24)
                 ::
                 (ArgumentSpecificationError("a", "badChangeA",
                     StateType("A", "Unavailable", false),
@@ -648,7 +648,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def revertTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Revert.obs",
-            (SubtypingError(IntType(), StringType()), 12) :: Nil)
+            (SubtypingError(IntType(), StringType(), false), 12) :: Nil)
     }
 
     @Test def inStateTest(): Unit = {
