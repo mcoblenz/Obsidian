@@ -264,12 +264,4 @@ class ParserTests extends JUnitSuite {
             """.stripMargin
         )
     }
-
-    @Test def constructorPermissionRequired(): Unit = {
-        shouldSucceedFile("resources/tests/parser_tests/ConstructorPermissionRequired.obs")
-    }
-
-    @Test def constructorPermissionRequiredMissing(): Unit = {
-        shouldFailFile("resources/tests/parser_tests/ConstructorPermissionRequiredMissing.obs")
-    }
 }
