@@ -288,7 +288,7 @@ case class InconsistentTypeAssignmentError(declaredType: ObsidianType, actualTyp
 }
 
 case class ArgumentSubtypingError(tName: String, arg: String, t1: ObsidianType, t2: ObsidianType) extends Error {
-    val msg: String = s"Found type '$t1' as an argument to '$tName', but the argument '$arg' is expected something of type '$t2'."
+    val msg: String = s"Found type '$t1' as an argument to '$tName', but the argument '$arg' is expected to be something of type '$t2'."
 }
 
 case class FieldTypesDeclaredOnPublicTransactionError(tName: String) extends Error {
@@ -317,6 +317,10 @@ case class InvalidLocalVariablePermissionDeclarationError() extends Error {
 }
 
 case class ImportError(msg: String) extends Error {
+}
+
+case class DuplicateContractError(contractName: String) extends Error {
+    val msg: String = s"Duplicate contract $contractName."
 }
 
 case class UninitializedFieldError(fieldName: String) extends Error {

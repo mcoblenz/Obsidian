@@ -3,13 +3,13 @@ package edu.cmu.cs.obsidian
 import java.io.File
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
+import org.apache.commons.io.FileUtils
 import scala.collection.mutable.HashSet
-
 import com.helger.jcodemodel.JCodeModel
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.protobuf._
-import edu.cmu.cs.obsidian.typecheck.{StateNameValidator, Checker, InferTypes}
+import edu.cmu.cs.obsidian.typecheck.{Checker, DuplicateContractError, ErrorRecord, InferTypes, StateNameValidator}
 import edu.cmu.cs.obsidian.util._
 
 import scala.sys.process._
@@ -112,27 +112,31 @@ object Main {
         return mainContractOption.get.name
     }
 
-    def translateServerASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
+    def translateServerASTToJava (ast: Program, protobufOuterClassName: String, table: SymbolTable): JCodeModel = {
         // Server must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val codeGen = new CodeGen(Server(mainContractOption.get))
+        val codeGen = new CodeGen(Server(mainContractOption.get), table)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
+    /* match on c to get either javaFFIcontract or ObdisianFFIContract */
     def findMainContract(ast: Program): Option[Contract] = {
-        ast.contracts.find((c: Contract) => c.modifiers.contains(IsMain()))
+        ast.contracts.find((c: Contract) => c match {
+            case c: ObsidianContractImpl => c.modifiers.contains(IsMain())
+            case c: JavaFFIContractImpl => false
+        })
     }
 
-    def translateClientASTToJava (ast: Program, protobufOuterClassName: String): JCodeModel = {
+    def translateClientASTToJava (ast: Program, protobufOuterClassName: String, table: SymbolTable): JCodeModel = {
         // Client programs must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val codeGen = new CodeGen(Client(mainContractOption.get))
+        val codeGen = new CodeGen(Client(mainContractOption.get), table)
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
@@ -195,20 +199,15 @@ object Main {
             val buildPath = fabricPath.resolve("build.gradle")
             val settingsPath = fabricPath.resolve("settings.gradle")
             val srcPath = fabricPath.resolve("src")
-            val copyFabricFolderInvocation: String =
-                "cp -R " + buildPath.toString + " " +
-                    settingsPath.toString + " " +
-                    srcPath.toString + " " +
-                    path + File.separator
-            println("copying: " + copyFabricFolderInvocation)
-            copyFabricFolderInvocation.!
+
+            Files.copy(buildPath, path.resolve("build.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            Files.copy(settingsPath, path.resolve("settings.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            FileUtils.copyDirectory(srcPath.toFile, path.resolve("src").toFile)
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
             val javaTargetLocation = Paths.get(path.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
-            val copyAllGeneratedClasses : String =
-                "cp -R " + tmpGeneratedCodePath.toString + File.separator + " " + javaTargetLocation.toString
-            println("copying: " + copyAllGeneratedClasses)
-            copyAllGeneratedClasses.!
+
+            FileUtils.copyDirectory(tmpGeneratedCodePath.toFile, javaTargetLocation.toFile)
 
             //place the correct class name in the build.gradle
             val gradlePath = Paths.get(path.toString, "build.gradle")
@@ -217,11 +216,9 @@ object Main {
 
             //sed automatically creates a backup of the original file, has to be deleted
             val gradleBackupPath = Paths.get(path.toString, "build.gradle.backup")
-            val deleteSedBackupFile: String =
-                "rm " + gradleBackupPath.toString
 
             replaceClassNameInGradleBuild.!
-            deleteSedBackupFile.!
+            new File(gradleBackupPath.toString).delete()
             println("Successfully generated Fabric chaincode at " + path)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
@@ -276,7 +273,6 @@ object Main {
             case None => Paths.get(".")
         }
 
-
         Files.createDirectories(srcDir)
         Files.createDirectories(bytecodeDir)
         Files.createDirectories(protoDir)
@@ -297,9 +293,10 @@ object Main {
             val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
             val set = new HashSet[String]
+            var duplicateErrors = Seq.empty[ErrorRecord]
             for (contract <- fieldsLiftedAst.contracts) {
                 if (set.contains(contract.name)) {
-                    println("Warning: Duplicate contract " + contract.name + " will be ignored")
+                    duplicateErrors = duplicateErrors :+ ErrorRecord(DuplicateContractError(contract.name), contract.loc, contract.sourcePath)
                 }
                 set.add(contract.name)
             }
@@ -315,7 +312,7 @@ object Main {
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val (typecheckingErrors, checkedTable) = checker.checkProgram()
 
-            val allSortedErrors = (importErrors ++ transformErrors ++ typecheckingErrors)//.sorted
+            val allSortedErrors = (duplicateErrors ++ importErrors ++ transformErrors ++ typecheckingErrors)//.sorted
 
             if (!allSortedErrors.isEmpty) {
                 val errorCount = allSortedErrors.size
@@ -334,8 +331,8 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(checkedTable.ast, protobufOuterClassName)
-            else translateServerASTToJava(checkedTable.ast, protobufOuterClassName)
+            val javaModel = if (options.buildClient) translateClientASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
+            else translateServerASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
             javaModel.build(srcDir.toFile)
 
             val mainName = findMainContractName(checkedTable.ast)
@@ -378,10 +375,16 @@ object Main {
                         Paths.get(mainName)
                 }
                 val protobufOutputPath = outputPath.resolve("protos")
+                val temp = protobufOutputPath.toFile
+                if (temp.exists()) {
+                    FileUtils.deleteDirectory(temp)
+                }
                 Files.createDirectories(protobufOutputPath)
-                val copyProtobufCmd = s"cp $protobufPath $protobufOutputPath"
-                copyProtobufCmd.!
 
+                val sourceFile = (Paths.get(s"$protobufPath"))
+                val destFile = Paths.get(s"$protobufOutputPath")
+                val newDest = Paths.get(destFile.toString() + File.separator + sourceFile.getFileName())
+                Files.copy(sourceFile, newDest, StandardCopyOption.REPLACE_EXISTING)
             }
 
             generateFabricCode(mainName, options.outputPath, srcDir)

@@ -68,20 +68,28 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseType: Parser[ObsidianType] = {
-        def parseDotPath: Parser[Seq[Identifier]] = DotT() ~ (parseId | ParentT()) ~ opt(parseDotPath) ^^ {
-            case _ ~ ident ~ rest => {
-                val identifier: Identifier = ident match {
-                    case t: Token => (t.toString, t.pos)
-                    // For obscure type erasure reasons, a pattern match on Identifier type doesn't work.
-                    case ident => ident.asInstanceOf[Identifier]
-                }
-                rest match {
-                    case Some(path) => List(identifier) ++ path
-                    case None => List(identifier)
-                }
+
+
+    private def parseDotPath: Parser[Seq[Identifier]] = DotT() ~ parseId ~ opt(parseDotPath) ^^ {
+        case _ ~ ident ~ rest => {
+            rest match {
+                case Some(path) => List(ident) ++ path
+                case None => List(ident)
             }
         }
+    }
+
+    private def parsePath: Parser[Seq[Identifier]] = parseId ~ opt(parseDotPath) ^^{
+      case ident ~ rest => {
+        rest match {
+          case Some(path) => List(ident) ++ path
+          case None => List(ident)
+        }
+      }
+    }
+
+    private def parseType: Parser[ObsidianType] = {
+
 
         val parseNonPrimitive: Parser[NonPrimitiveType] = {
              opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseIdAlternatives) ^^ {
@@ -344,7 +352,7 @@ object Parser extends Parsers {
             dots.foldLeft(e)(
                 (e: Expression, inv: DotExpr) => inv match {
                     case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
-                    case Right((funcName, args)) => Invocation(e, funcName._1, args).setLoc(funcName)
+                    case Right((funcName, args)) => Invocation(e, funcName._1, args, false).setLoc(funcName)
                 }
             )
         }
@@ -374,7 +382,7 @@ object Parser extends Parsers {
 
         val parseNew = {
             NewT() ~! parseId ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
-                case _new ~ name ~ _ ~ args ~ _ => Construction(name._1, args).setLoc(_new)
+                case _new ~ name ~ _ ~ args ~ _ => Construction(name._1, args, false).setLoc(_new)
             }
         }
 
@@ -620,7 +628,7 @@ object Parser extends Parsers {
                         case _ => false
                     }).map(_.asInstanceOf[Declaration])
 
-                    Contract(mod.toSet, name._1, decls, transitions, isInterface, srcPath).setLoc(ct)
+                    ObsidianContractImpl(mod.toSet, name._1, decls, transitions, isInterface, srcPath).setLoc(ct)
             }
         }
     }
@@ -631,8 +639,17 @@ object Parser extends Parsers {
         }
     }
 
+    private def parseFFIContractImpl(srcPath: String) = {
+        /* contract IOImpl implements IO with java: edu.cmu.cs.obsidian.stdlib.IO */
+        ContractT() ~! parseId ~! ImplementsT() ~! parseId ~! WithT() ~! parseId ~! ColonT() ~! parsePath ~! SemicolonT() ^^ {
+            case _ ~ implName ~ _ ~ interfaceName ~ _ ~ _ ~ _ ~ javaSource ~ _ =>
+                JavaFFIContractImpl(implName._1, interfaceName._1, javaSource, srcPath).setLoc(implName)
+        }
+    }
+
+
     private def parseProgram(srcPath: String) = {
-        phrase(rep(parseImport) ~ rep1(parseContractDecl(srcPath))) ^^ {
+        phrase(rep(parseImport) ~ rep1(parseContractDecl(srcPath) | parseFFIContractImpl(srcPath))) ^^ {
             case imports ~ contracts => Program(imports, contracts).setLoc(contracts.head)
         }
     }
@@ -673,7 +690,6 @@ object Parser extends Parsers {
             case Left(msg) => throw new ParseException(msg + " in " + srcPath)
             case Right(tree) => tree
         }
-
         ast
     }
 }

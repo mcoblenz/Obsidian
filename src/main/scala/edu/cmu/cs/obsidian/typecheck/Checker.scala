@@ -1,5 +1,6 @@
 package edu.cmu.cs.obsidian.typecheck
 
+import edu.cmu.cs.obsidian.lexer.FalseT
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.parser._
 
@@ -270,6 +271,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     //-------------------------------------------------------------------------
     /* Subtyping definitions */
 
+    /* method to check if contract is actually implementing an interface */
+    private def contractIsSubtype(c1: String, c2: String): Boolean = {
+        val c1Table = globalTable.contractLookup(c1)
+        val c2Table = globalTable.contractLookup(c2)
+
+        (c1Table.contract, c2Table.contract) match {
+            case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) => (obs1 == obs2)
+            case (jvcon1: JavaFFIContractImpl, jvcon2: JavaFFIContractImpl) => (jvcon1 == jvcon2)
+            case (obs: ObsidianContractImpl, jvcon: JavaFFIContractImpl) => false
+            case (jvcon: JavaFFIContractImpl, obs:ObsidianContractImpl) => (obs.name == jvcon.interface)
+        }
+    }
+
+
     /* true iff [t1 <: t2] */
     private def isSubtype(t1: ObsidianType, t2: ObsidianType, isThis: Boolean): Option[Error] = {
         (t1, t2) match {
@@ -281,9 +296,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 val mainSubtype: Boolean = (np1, np2) match {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
-                        c1 == c2 && isSubpermission(c1p, c2p)
+                        contractIsSubtype(c1.contractName, c2.contractName) && isSubpermission(c1p, c2p)
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
-                        c1 == c2 && ss1.subsetOf(ss2)
+                        contractIsSubtype(c1, c2) && ss1.subsetOf(ss2)
                     case (StateType(c, ss1, _), ContractReferenceType(c2, c2p, _)) =>
                         c2 == ContractType(c)
                     case _ => false
@@ -391,46 +406,65 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def inferAndCheckExpr(decl: InvokableDeclaration,
                                   context: Context,
                                   e: Expression,
-                                  ownershipConsumptionMode: OwnershipConsumptionMode): (ObsidianType, Context) = {
+                                  ownershipConsumptionMode: OwnershipConsumptionMode): (ObsidianType, Context, Expression) = {
 
         /* returns [t] if [e : t], otherwise returns BottomType */
-        def assertTypeEquality(e: Expression, t: ObsidianType, c: Context): (ObsidianType, Context) = {
-            val (tPrime, contextPrime) = inferAndCheckExpr(decl, c, e, NoOwnershipConsumption())
-            (checkIsSubtype(e, tPrime, t), contextPrime)
+        def assertTypeEquality(e: Expression, t: ObsidianType, c: Context): (ObsidianType, Context, Expression) = {
+            val (tPrime, contextPrime, ePrime) = inferAndCheckExpr(decl, c, e, NoOwnershipConsumption())
+            (checkIsSubtype(e, tPrime, t), contextPrime, ePrime)
         }
 
-        def assertOperationType(e1: Expression, e2: Expression, t: ObsidianType): (ObsidianType, Context) = {
-            val (_, c1) = assertTypeEquality(e1, t, context)
-            val (_, c2) = assertTypeEquality(e2, t, c1)
-            (t, c2)
+        //Too many outputs: two expressions are needed so they can be packaged in different binary
+        // expression types. TODO: refactor to remove multiple outputs.
+        def assertOperationType(e1: Expression, e2: Expression, t: ObsidianType): (ObsidianType, Context, Expression, Expression) = {
+            val (_, c1, e1Prime) = assertTypeEquality(e1, t, context)
+            val (_, c2, e2Prime) = assertTypeEquality(e2, t, c1)
+            (t, c2, e1Prime, e2Prime)
         }
 
-        def assertComparisonType(e1: Expression, e2: Expression): (ObsidianType, Context) = {
-            val (_, c1) = assertTypeEquality(e1, IntType(), context)
-            val (_, c2) = assertTypeEquality(e2, IntType(), c1)
-            (BoolType(), c2)
+        //Too many outputs: two expressions are needed so they can be packaged in different binary
+        // expression types. TODO: refactor to remove multiple outputs.
+        def assertComparisonType(e1: Expression, e2: Expression): (ObsidianType, Context, Expression, Expression) = {
+            val (_, c1, e1Prime) = assertTypeEquality(e1, IntType(), context)
+            val (_, c2, e2Prime) = assertTypeEquality(e2, IntType(), c1)
+            (BoolType(), c2, e1Prime, e2Prime)
         }
 
         def handleInvocation(
                 context: Context,
                 name: String,
                 receiver: Expression,
-                args: Seq[Expression]): (ObsidianType, Context) = {
-            val (receiverType, contextAfterReceiver) = inferAndCheckExpr(decl, context, receiver, NoOwnershipConsumption())
+                args: Seq[Expression]): (ObsidianType, Context, Boolean, Expression, Seq[Expression]) = {
+            val (receiverType, contextAfterReceiver, receiverPrime) = inferAndCheckExpr(decl, context, receiver, NoOwnershipConsumption())
+
 
             // Terrible special case just for now. TODO: remove this.
             if (name == "sqrt" && args.length == 1) {
                 // Int isn't really right either, but it will have to do for now.
-                return (IntType(), context)
+                return (IntType(), context, false, receiverPrime, args)
             }
 
             // Eliminate things we can't invoke methods on first.
             val nonPrimitiveReceiverType = receiverType match {
-                case BottomType() => return (BottomType(), contextAfterReceiver)
+                case BottomType() => return (BottomType(), contextAfterReceiver, false, receiverPrime, args)
                 case UnitType() | IntType() | BoolType() | StringType() =>
                     logError(e, NonInvokeableError(receiverType))
-                    return (BottomType(), contextAfterReceiver)
+                    return (BottomType(), contextAfterReceiver, false, receiverPrime, args)
                 case np: NonPrimitiveType => np
+            }
+
+            //Finding out if the Contract is a FFIContract
+            val isFFIInvocation = receiverType match {
+                case BottomType() | UnitType() | IntType() | BoolType() | StringType() => false
+                case np : NonPrimitiveType =>
+                    val contractTableOpt = context.contractTable.lookupContract(np.contractName)
+                    contractTableOpt match {
+                        case None => false
+                        case Some(x) => x.contract match {
+                            case obsContract : ObsidianContractImpl => false
+                            case javaContract : JavaFFIContractImpl => true
+                        }
+                    }
             }
 
 
@@ -440,14 +474,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case None =>
                     val err = MethodUndefinedError(nonPrimitiveReceiverType, name)
                     logError(e, err)
-                    return (BottomType(), contextAfterReceiver)
+                    return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, args)
                 case Some(t) => t
             }
 
             if (receiverType.isInstanceOf[InterfaceContractType] && !foundTransaction.get.isStatic) {
                 val err = NonStaticAccessError(foundTransaction.get.name, receiver.toString)
                 logError(e, err)
-                return (BottomType(), contextAfterReceiver)
+                return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, args)
             }
 
             if (!invokable.isStatic && isSubtype(receiverType, invokable.thisType, receiver.isInstanceOf[This]).isDefined) {
@@ -469,9 +503,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val spec = invokable.args
             val specList = (spec, invokable)::Nil
 
-            val (contextAfterArgs, correctInvokable) =
+            val (exprSequence, contextAfterArgs, correctInvokable) =
                 checkArgs(e, contextAfterReceiver, specList, args) match {
-                    case None => return (BottomType(), contextAfterReceiver)
+                    case None => return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, args)
                     case Some(x) => x
                 }
 
@@ -490,7 +524,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             // Update field types if we invoked a private method.
             val contextAfterPrivateInvocation = updateFieldsForPrivateInvocation(contextPrime, foundTransaction.get)
 
-            (resultType, contextAfterPrivateInvocation)
+            (resultType, contextAfterPrivateInvocation, isFFIInvocation, receiverPrime, exprSequence)
 
         }
 
@@ -504,35 +538,35 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          // But consuming in a context that expects sharing results in Shared.
                          val newType = t.residualType(ownershipConsumptionMode)
                          if (newType != t) {
-                             (t, context.updated(x, newType))
+                             (t, context.updated(x, newType), e)
                          }
                          else {
-                             (t, context)
+                             (t, context, e)
                          }
                      case (_, Some(t)) =>
                          val newType = t.residualType(ownershipConsumptionMode)
                          if (newType != t) {
-                             (t, context.updatedThisFieldType(x, newType))
+                             (t, context.updatedThisFieldType(x, newType), e)
                          }
                          else {
-                             (t, context)
+                             (t, context, e)
                          }
                      case (None, None) =>
                          val tableLookup = context.contractTable.lookupContract(x)
                          if (!tableLookup.isEmpty) {
                              val contractTable = tableLookup.get
                              val nonPrimitiveType = ContractReferenceType(contractTable.contractType, Shared(), false)
-                             (InterfaceContractType(contractTable.name, nonPrimitiveType), context)
+                             (InterfaceContractType(contractTable.name, nonPrimitiveType), context, e)
                          }
                          else {
                              logError(e, VariableUndefinedError(x, context.thisType.toString))
-                             (BottomType(), context)
+                             (BottomType(), context, e)
                          }
                  }
-             case NumLiteral(_) => (IntType(), context)
-             case StringLiteral(_) => (StringType(), context)
-             case TrueLiteral() => (BoolType(), context)
-             case FalseLiteral() => (BoolType(), context)
+             case NumLiteral(_) => (IntType(), context, e)
+             case StringLiteral(_) => (StringType(), context, e)
+             case TrueLiteral() => (BoolType(), context, e)
+             case FalseLiteral() => (BoolType(), context, e)
              case This() =>
                  val thisType = context.thisType
                  val newContext =
@@ -542,7 +576,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      else {
                          context
                      }
-                 (thisType, newContext)
+                 (thisType, newContext, e)
              case Parent() =>
                  assert(false, "TODO: re-add support for parents")
                  /*
@@ -563,44 +597,54 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      (BottomType(), context)
                  }
                  */
-                 (BottomType(), context)
+                 (BottomType(), context, e)
              case Conjunction(e1: Expression, e2: Expression) =>
-                 assertOperationType(e1, e2, BoolType())
+                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, BoolType())
+                 (typ, con, Conjunction(e1Prime, e2Prime).setLoc(e))
              case Disjunction(e1: Expression, e2: Expression) =>
-                 assertOperationType(e1, e2, BoolType())
+                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, BoolType())
+                 (typ, con, Disjunction(e1Prime, e2Prime).setLoc(e))
              case LogicalNegation(e: Expression) =>
                  assertTypeEquality(e, BoolType(), context)
              case Add(e1: Expression, e2: Expression) =>
-                 assertOperationType(e1, e2, IntType())
+                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
+                 (typ, con, Add(e1Prime, e2Prime).setLoc(e))
              case Subtract(e1: Expression, e2: Expression) =>
-                 assertOperationType(e1, e2, IntType())
+                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
+                 (typ, con, Subtract(e1Prime, e2Prime).setLoc(e))
              case Divide(e1: Expression, e2: Expression) =>
-                 assertOperationType(e1, e2, IntType())
+                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
+                 (typ, con, Divide(e1Prime, e2Prime).setLoc(e))
              case Multiply(e1: Expression, e2: Expression) =>
-                 assertOperationType(e1, e2, IntType())
+                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
+                 (typ, con, Multiply(e1Prime, e2Prime).setLoc(e))
              case Negate(e: Expression) =>
                  assertTypeEquality(e, IntType(), context)
              case Equals(e1: Expression, e2: Expression) =>
-                 val (t1, c1) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
-                 val (t2, c2) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
-                 if (t1 == t2) (BoolType(), c2) else {
+                 val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
+                 val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
+                 if (t1 == t2) (BoolType(), c2, Equals(e1Prime, e2Prime).setLoc(e)) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
-                     (BottomType(), c2)
+                     (BottomType(), c2, Equals(e1Prime, e2Prime).setLoc(e))
                  }
              case GreaterThan(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 val (typ, con, e1Prime, e2Prime) = assertComparisonType(e1, e2)
+                 (typ, con, GreaterThan(e1Prime, e2Prime).setLoc(e))
              case GreaterThanOrEquals(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 val (typ, con, e1Prime, e2Prime) = assertComparisonType(e1, e2)
+                 (typ, con, GreaterThanOrEquals(e1Prime, e2Prime).setLoc(e))
              case LessThan(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 val (typ, con, e1Prime, e2Prime) = assertComparisonType(e1, e2)
+                 (typ, con, LessThan(e1Prime, e2Prime).setLoc(e))
              case LessThanOrEquals(e1: Expression, e2: Expression) =>
-                 assertComparisonType(e1, e2)
+                 val (typ, con, e1Prime, e2Prime) = assertComparisonType(e1, e2)
+                 (typ, con, LessThanOrEquals(e1Prime, e2Prime).setLoc(e))
              case NotEquals(e1: Expression, e2: Expression) =>
-                 val (t1, c1) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
-                 val (t2, c2) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
-                 if (t1 == t2) (BoolType(), c2) else {
+                 val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
+                 val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
+                 if (t1 == t2) (BoolType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e)) else {
                      logError(e, DifferentTypeError(e1, t1, e2, t2))
-                     (BottomType(), c2)
+                     (BottomType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e))
                  }
 
              case Dereference(eDeref: Expression, fieldName) =>
@@ -610,39 +654,53 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                              case Some(t) =>
                                  val newType = t.residualType(ownershipConsumptionMode)
                                  if (newType != t) {
-                                     (t, context.updatedThisFieldType(fieldName, newType))
+                                     (t, context.updatedThisFieldType(fieldName, newType), e)
                                  }
                                  else {
-                                     (t, context)
+                                     (t, context, e)
                                  }
                              case None =>
                                  logError(e, FieldUndefinedError(context.thisType, fieldName))
-                                 (BottomType(), context)
+                                 (BottomType(), context, e)
                          }
 
                      case _ =>
-                         inferAndCheckExpr(decl, context, eDeref, ownershipConsumptionMode) match {
-                             case (np: NonPrimitiveType, context) =>
-                                 logError(e, InvalidNonThisFieldAccess())
-                             case (typ, context) =>
-                                 if (!typ.isBottom) {
-                                     logError(e, DereferenceError(typ))
-                                 }
-                         }
-                         (BottomType(), context)
+                         val (newExpr: Expression, newContext: Context) =
+                             inferAndCheckExpr(decl, context, eDeref, ownershipConsumptionMode) match {
+                                 case (np: NonPrimitiveType, c, ePrime) =>
+                                     logError(e, InvalidNonThisFieldAccess())
+                                     (ePrime, c)
+                                 case (typ, c, ePrime) =>
+                                     if (!typ.isBottom) {
+                                         logError(e, DereferenceError(typ))
+                                         (ePrime, c)
+                                     }
+                             }
+                         (BottomType(), newContext, newExpr)
                  }
 
              case LocalInvocation(name, args: Seq[Expression]) =>
-                 handleInvocation(context, name, This(), args)
+                 val (typ, con, _, _, newArgs) = handleInvocation(context, name, This(), args)
+                 //This may need correction.
+                 (typ, con, LocalInvocation(name, newArgs))
 
-             case Invocation(receiver: Expression, name, args: Seq[Expression]) =>
-                 handleInvocation(context, name, receiver, args)
+             case Invocation(receiver: Expression, name, args: Seq[Expression], isFFIInvocation) =>
+                 val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, args)
+                 (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv))
 
-             case Construction(name, args: Seq[Expression]) =>
+             case Construction(name, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(name)
+                 val isFFIInv = tableLookup match {
+                     case None => false
+                     case Some(x) => x.contract match {
+                         case obsContract: ObsidianContractImpl => false
+                         case javaContract: JavaFFIContractImpl => true
+                     }
+                 }
+
                  if (tableLookup.isEmpty) {
                      logError(e, ContractUndefinedError(name))
-                     return (BottomType(), context)
+                     return (BottomType(), context, e)
                  }
 
                  val ctTableOfConstructed = tableLookup.get
@@ -653,17 +711,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  val result = checkArgs(e, context, constrSpecs, args)
 
-                 val (simpleType, contextPrime) = result match {
+                 val (exprList, simpleType, contextPrime) = result match {
                      // Even if the args didn't check, we can still output a type
-                     case None => (ContractReferenceType(ctTableOfConstructed.contractType, Owned(), false), context)
-                     case Some((cntxt, constr)) => (constr.asInstanceOf[Constructor].resultType, cntxt)
+                     case None => (Nil, ContractReferenceType(ctTableOfConstructed.contractType, Owned(), false), context)
+                     case Some((newExprSequence, cntxt, constr)) => (newExprSequence, constr.asInstanceOf[Constructor].resultType, cntxt)
                  }
 
-                 (simpleType, contextPrime)
+                 (simpleType, contextPrime, Construction(name, exprList, isFFIInv))
+
              case Disown(e) =>
                  // The expression "disown e" evaluates to an unowned value but also side-effects the context
                  // so that e is no longer owned (if it is a variable).
-                 val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, ownershipConsumptionMode)
+                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ownershipConsumptionMode)
                  if (!typ.isOwned) {
                     logError(e, DisownUnowningExpressionError(e))
                  }
@@ -678,7 +737,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case ReferenceIdentifier(x) => contextPrime.updated(x, newTyp)
                      case _ => contextPrime
                  }
-                 (newTyp, finalContext)
+                 (newTyp, finalContext, ePrime)
              case StateInitializer(stateName, fieldName) =>
                  // A state initializer expression has its field's type.
 
@@ -692,7 +751,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          }
                  }
 
-                 (fieldType, context)
+                 (fieldType, context, e)
          }
     }
 
@@ -933,7 +992,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             decl: InvokableDeclaration,
             context: Context,
             spec: Seq[VariableDeclWithSpec],
-            args: Seq[Expression]): Either[Seq[(AST, Error)], Context] = {
+            args: Seq[Expression]): Either[Seq[(AST, Error)], (Seq[Expression], Context)] = {
 
         var errList: List[(AST, Error)] = Nil
         val (specL, argsL) = (spec.length, args.length)
@@ -943,6 +1002,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             Left((ast, WrongArityError(specL, argsL, name))::errList)
         } else {
             var contextAfterArgs = context
+            var expressionList = Seq[Expression]()
             for (i <- args.indices) {
                 val arg = args(i)
                 val specInputType = spec(i).typIn
@@ -963,7 +1023,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         consumptionModeForType(specInputType)
                     }
 
-                val (argType, contextAfterArg) = inferAndCheckExpr(decl, contextAfterArgs, arg, ownershipConsumptionMode)
+                val (argType, contextAfterArg, e) = inferAndCheckExpr(decl, contextAfterArgs, arg, ownershipConsumptionMode)
 
                 if (isSubtype(argType, specInputType, false).isDefined) {
                     val err = ArgumentSubtypingError(decl.name, spec(i).varName, argType, specInputType)
@@ -971,9 +1031,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 contextAfterArgs = contextAfterArg
+                expressionList = (expressionList :+ e)
             }
 
-            if (errList.isEmpty) Right(contextAfterArgs)
+            if (errList.isEmpty) Right((expressionList, contextAfterArgs))
             else Left(errList)
         }
     }
@@ -984,12 +1045,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             ast: AST,
             context: Context,
             specs: Seq[(Seq[VariableDeclWithSpec], InvokableDeclaration)],
-            args: Seq[Expression]): Option[(Context, InvokableDeclaration)] = {
+            args: Seq[Expression]): Option[(Seq[Expression], Context, InvokableDeclaration)] = {
 
         var errs: List[(AST, Error)] = Nil
         for ((spec, invokable) <- specs) {
             checkArgsWithSpec(ast, invokable, context, spec, args) match {
-                case Right(context) => return Some((context, invokable))
+                case Right((expressionList, context)) => return Some((expressionList, context, invokable))
                 case Left(newErrs) =>
                     errs = newErrs.toList ++ errs
             }
@@ -1060,9 +1121,9 @@ private def checkStatement(
                                   s: Statement
                               ): (Context, Statement) = {
 
-        def checkAssignment(x: String, e: Expression, context: Context, mustBeField: Boolean): (Context, Statement) = {
+        def checkAssignment(x: String, e: Expression, context: Context, mustBeField: Boolean): (Context, Statement, Expression) = {
             // Consuming owned gives unowned because the lvalue is going to be of owning type.
-            val (exprType, contextPrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
+            val (exprType, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
             val localVariableType =
                 if (mustBeField) {
                     // Don't look for a matching local variable if this is required to be a field.
@@ -1128,7 +1189,7 @@ private def checkStatement(
                     checkIsSubtype(s, exprType, variableType)
                     contextWithAssignmentUpdate
             }
-            (newContext, s)
+            (newContext, s, ePrime)
         }
 
 
@@ -1144,7 +1205,7 @@ private def checkStatement(
                 (context.updated(name, typ), s)
 
             case VariableDeclWithInit(typ: ObsidianType, name, e: Expression) =>
-                val (exprType, contextPrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
+                val (exprType, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
                 val declaredType = typ match {
                     case np: NonPrimitiveType =>
                         val declaredContractName = np.contractName
@@ -1187,7 +1248,7 @@ private def checkStatement(
                         typ
                 }
 
-                (contextPrime.updated(name, declaredType), s)
+                (contextPrime.updated(name, declaredType), VariableDeclWithInit(exprType, name, ePrime))
 
             case Return() =>
                 decl match {
@@ -1214,7 +1275,7 @@ private def checkStatement(
                     case Some(retType) => consumptionModeForType(retType)
                 }
 
-                val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, consumeOwnership)
+                val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, consumeOwnership)
 
                 val thisSetToExclude = e match {
                     case ReferenceIdentifier(xOther)
@@ -1234,7 +1295,7 @@ private def checkStatement(
                 checkForUnusedOwnershipErrors(s, contextPrime, thisSetToExclude ++ argsSetToExclude)
 
                 if (retTypeOpt.isDefined && !retTypeOpt.get.isBottom) checkIsSubtype(s, typ, retTypeOpt.get)
-                (contextPrime, s)
+                (contextPrime, ReturnExpr(ePrime))
 
             case Transition(newStateName, updates: Option[Seq[(ReferenceIdentifier, Expression)]], p) =>
                 // TO CHECK:
@@ -1334,16 +1395,22 @@ private def checkStatement(
                 }
 
                 var contextPrime = context
+                val newUpdates = Seq.empty
+                var newUpdatesOption :Option[Seq[(ReferenceIdentifier, Expression)]] = None
+
                 if (updates.isDefined) {
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
                         val fieldAST = newStateTable.lookupField(f)
                         if (fieldAST.isDefined) {
-                            val (t, contextPrime2) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))
+                            val (t, contextPrime2, ePrime) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))
+                            newUpdates :+ (ReferenceIdentifier(f), ePrime)
                             contextPrime = contextPrime2
                             checkIsSubtype(s, t, fieldAST.get.typ)
                         }
                     }
+                    newUpdatesOption = Some(newUpdates)
                 }
+
 
                 // Check for potentially-dropped resources.
                 val toCheckForDroppedAssets = possibleCurrentFields -- newFields // fields that we might currently have minus fields we're initializing now
@@ -1364,13 +1431,14 @@ private def checkStatement(
                         oldType
                     }
 
-                (contextPrime.updated("this", newSimpleType).updatedAfterTransition(), Transition(newStateName, updates, context.thisType.permission).setLoc(s))
+                (contextPrime.updated("this", newSimpleType).updatedAfterTransition(), Transition(newStateName, newUpdatesOption, context.thisType.permission).setLoc(s))
 
             case Assignment(ReferenceIdentifier(x), e: Expression) =>
                 if (context.valVariables.contains(x)) {
                     logError(s, InvalidValAssignmentError())
                 }
-                checkAssignment(x, e, context, false)
+                val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
+                (contextPrime, Assignment(ReferenceIdentifier(x), ePrime).setLoc(s))
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
                 if (eDeref != This()) {
@@ -1378,7 +1446,8 @@ private def checkStatement(
                     (context, s)
                 }
                 else {
-                    checkAssignment(f, e, context, true)
+                    val (contextPrime, statementPrime, ePrime) = checkAssignment(f, e, context, true)
+                    (contextPrime, Assignment(Dereference(eDeref, f), ePrime).setLoc(s))
                 }
             case Assignment(StateInitializer(stateName, fieldIdentifier), e) =>
                 val stateOption = context.contractTable.state(stateName._1)
@@ -1391,47 +1460,48 @@ private def checkStatement(
                         }
                 }
 
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, consumptionModeForType(fieldType))
+                val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, consumptionModeForType(fieldType))
 
                 checkIsSubtype(s, t, fieldType)
                 if (fieldType == BottomType()) {
                     (contextPrime, s)
                 }
                 else {
-                    (contextPrime.updatedWithTransitionInitialization(stateName._1, fieldIdentifier._1, s), s)
+                    (contextPrime.updatedWithTransitionInitialization(stateName._1, fieldIdentifier._1, s),
+                      Assignment(StateInitializer(stateName, fieldIdentifier), ePrime))
                 }
 
             // assignment target is neither a variable nor a field
-            case Assignment(_, e: Expression) =>
-                val (_, contextPrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
+            case Assignment(subE: Expression, e: Expression) =>
+                val (_, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
                 logError(s, AssignmentError())
-                (contextPrime, s)
+                (contextPrime, Assignment(subE, ePrime).setLoc(s))
 
             case Revert(e) =>
-                val contextPrime =
+                val (contextPrime, ePrime) =
                     e match {
-                        case None => context
+                        case None => (context, e)
                         case Some(expr) =>
-                            val (eTyp, exprContext) = inferAndCheckExpr(decl, context, e.get, NoOwnershipConsumption())
+                            val (eTyp, exprContext, newE) = inferAndCheckExpr(decl, context, e.get, NoOwnershipConsumption())
                             checkIsSubtype(expr, eTyp, StringType())
-                            exprContext
+                            (exprContext, Some(newE))
                     }
 
                 // If exceptions are ever catchable, we will need to make sure the fields of this have types consistent with their declarations.
                 // For now, we treat this like a permanent abort.
-                (contextPrime.makeThrown, s)
+                (contextPrime.makeThrown, Revert(ePrime).setLoc(s))
 
             case If(eCond: Expression, body: Seq[Statement]) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
+                val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
                 checkIsSubtype(s, t, BoolType())
                 val (newContext, checkedStatements) = checkStatementSequence(decl, contextPrime, body)
                 val contextIfTrue = pruneContext(s,
                     newContext,
                     contextPrime)
-                (mergeContext(s, contextPrime, contextIfTrue), If(eCond, checkedStatements).setLoc(s))
+                (mergeContext(s, contextPrime, contextIfTrue), If(ePrime, checkedStatements).setLoc(s))
 
             case IfThenElse(eCond: Expression, body1: Seq[Statement], body2: Seq[Statement]) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
+                val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
                 checkIsSubtype(s, t, BoolType())
                 val (trueContext, checkedTrueStatements) = checkStatementSequence(decl, contextPrime, body1)
                 val contextIfTrue = pruneContext(s,
@@ -1443,11 +1513,11 @@ private def checkStatement(
                 val contextIfFalse = pruneContext(s,
                     falseContext,
                     contextPrime)
-                (mergeContext(s, contextIfFalse, contextIfTrue), IfThenElse(eCond, checkedTrueStatements, checkedFalseStatements).setLoc(s))
+                (mergeContext(s, contextIfFalse, contextIfTrue), IfThenElse(ePrime, checkedTrueStatements, checkedFalseStatements).setLoc(s))
 
             case IfInState(e, state, body1, body2) =>
 
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
+                val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
 
                 val contractName = t match {
                     case np: NonPrimitiveType =>
@@ -1457,20 +1527,20 @@ private def checkStatement(
                           logError(e, StateCheckOnPrimitiveError())
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, s)
+                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
                     case _ =>
                         if (!t.isBottom) {
                             logError(e, SwitchError(t))
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, s)
+                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
                 }
 
                 val contractTable = context.contractTable.lookupContract(contractName) match {
                     case Some(table) => table
                     case None =>
                         logError(e, SwitchError(t))
-                        return (contextPrime, s)
+                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
                 }
 
                 val allStates = contractTable.possibleStates
@@ -1542,7 +1612,7 @@ private def checkStatement(
                     contextPrime)
 
                 val mergedContext = mergeContext(s, contextIfFalse, contextIfTrue)
-                val newStatement = IfInState(e, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
+                val newStatement = IfInState(ePrime, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
 
                 (mergedContext, newStatement)
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
@@ -1559,7 +1629,7 @@ private def checkStatement(
                 (mergeContext(s, contextIfTry, contextIfCatch), TryCatch(checkedTryStatements, checkedCatchStatements).setLoc(s))
 
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
-                val (t, contextPrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
+                val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
 
                 val contractName = t match {
                     case np: NonPrimitiveType =>
@@ -1569,13 +1639,13 @@ private def checkStatement(
                             logError(e, SwitchError(t))
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, s)
+                        return (contextPrime, Switch(ePrime, cases).setLoc(s))
                 }
 
                 val contractTable = context.contractTable.lookupContract(contractName) match {
                     case Some(table) => table
                     case None => logError(e, SwitchError(t))
-                        return (contextPrime, s)
+                        return (contextPrime, Switch(ePrime, cases).setLoc(s))
                 }
 
                 def checkSwitchCase(sc: SwitchCase) : (Context, SwitchCase) = {
@@ -1627,25 +1697,25 @@ private def checkStatement(
                 }
 
 
-                (mergedContext, Switch(e, newCases).setLoc(s))
+                (mergedContext, Switch(ePrime, newCases).setLoc(s))
 
             // TODO maybe allow constructors as statements later, but it's not very important
             case d@Disown (e) =>
-                val (typ, contextPrime) = inferAndCheckExpr(decl, context, d, ConsumingOwnedGivesShared())
-                (contextPrime, s)
+                val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, d, ConsumingOwnedGivesShared())
+                (contextPrime, Disown(ePrime).setLoc(s))
             case e: Expression =>
-                val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesShared())
+                val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesShared())
                 if (typ.isOwned) {
                     logError(s, UnusedExpressionOwnershipError(e))
                 }
                 if (!(s.isInstanceOf[LocalInvocation] || s.isInstanceOf[Invocation])) {
                     logError(s, NoEffectsError(s))
                 }
-                (contextPrime, s)
+                (contextPrime, ePrime)
             case StaticAssert(e, allowedStatesOrPermissions) =>
                 // We claim to consume ownership here so that typ include all the ownership information.
                 // But at the end, we're going to throw out contextPrime and just continue with context.
-                val (typ, contextPrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
+                val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
 
                 def checkStateOrPermissionValid(contractName: String, stateOrPermission: Identifier): Unit = {
                     val stateOrPermissionStr = stateOrPermission._1
@@ -1688,7 +1758,7 @@ private def checkStatement(
                     case InterfaceContractType(name, _) => assert(false, "Should have already eliminated this case")
                 }
 
-                (context, s) // Not contextPrime!
+                (context, StaticAssert(ePrime, allowedStatesOrPermissions).setLoc(s)) // Not contextPrime!
             case _ =>
                 logError(s, NoEffectsError(s))
                 (context, s)
@@ -2052,7 +2122,7 @@ private def checkStatement(
         constr.copy(body = newBody)
     }
 
-    private def checkConstructors(constructors: Seq[Constructor], contract: Contract, table: ContractTable): Unit = {
+    private def checkConstructors(constructors: Seq[Constructor], contract: ObsidianContractImpl, table: ContractTable): Unit = {
         if (constructors.isEmpty && table.stateLookup.nonEmpty) {
             logError(contract, NoConstructorError(contract.name))
         }
@@ -2092,23 +2162,29 @@ private def checkStatement(
     }
 
     private def checkContract(contract: Contract): Contract = {
-        currentContractSourcePath = contract.sourcePath
 
-        val table = globalTable.contractLookup(contract.name)
-        val newDecls = contract.declarations.map(checkDeclaration(table))
+        contract match {
+            case obsContract : ObsidianContractImpl =>
+                val table = globalTable.contractLookup(obsContract.name)
+                val newDecls = obsContract.declarations.map(checkDeclaration(table))
 
-        checkConstructors(table.constructors, contract, table)
+                checkConstructors(table.constructors, obsContract, table)
 
-        contract.copy(declarations = newDecls)
+                obsContract.copy(declarations = newDecls)
+            case ffiContract : JavaFFIContractImpl => ffiContract
+        }
     }
-
 
     // Returns a new program (in a symbol table) with additional type information, paired with errors from the program.
     def checkProgram(): (Seq[ErrorRecord], SymbolTable) = {
         checkForMainContract(globalTable.ast)
 
-        val newContracts = globalTable.ast.contracts.map(checkContract)
+        var checkDiffContract = (x: Contract) => x match {
+            case obsContract : ObsidianContractImpl => checkContract(obsContract)
+            case ffiContract : JavaFFIContractImpl => ffiContract
+        }
 
+        val newContracts = globalTable.ast.contracts.map(checkDiffContract)
 
         (errors, new SymbolTable(new Program(globalTable.ast.imports, newContracts)))
     }
