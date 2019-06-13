@@ -1128,24 +1128,41 @@ class CodeGen (val target: Target, table: SymbolTable) {
         generateServerMainMethod(newClass)
     }
 
+    def addTransactionExceptions(meth: JMethod, translationContext: TranslationContext): Unit = {
+        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
+        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
+
+        target match {
+            case Client(mainContract, _) =>
+                if (translationContext.contract == mainContract) {
+                    meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+                }
+            case Server(_, _) => ()
+        }
+    }
+
     private def generateInitMethod(
                                     translationContext: TranslationContext,
                                     newClass: JDefinedClass,
                                     stubType: AbstractJClass,
                                     types: Seq[(ObsidianType, ObsidianType)]): Unit = {
         val initMeth: JMethod = newClass.method(JMod.PUBLIC, model.BYTE.array(), "init")
+        initMeth.annotate(classOf[Override])
         initMeth.param(stubType, serializationParamName)
         val runArgs = initMeth.param(model.BYTE.array().array(), "args")
 
-        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
-        initMeth._throws(exceptionType.asInstanceOf[AbstractJClass])
-        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
-        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
-        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
-        initMeth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
+        addTransactionExceptions(initMeth, translationContext)
 
         // have to check that the args parameter has the correct number of arguments
         val cond = runArgs.ref("length").ne(JExpr.lit(types.length))
+        val exceptionType = model.parseType("com.google.protobuf.InvalidProtocolBufferException")
         initMeth.body()._if(cond)._then()._throw(JExpr._new(exceptionType).arg("Incorrect number of arguments to constructor."))
 
         val constructorName = "new_" + newClass.name()
@@ -2242,8 +2259,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         val methodName = "new_" + newClass.name()
         var meth = newClass.method(JMod.PRIVATE, model.VOID, methodName)
-        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        addTransactionExceptions(meth, translationContext)
 
         /* add args to method and collect them in a list */
         val argList: Seq[(String, JVar)] = c.args.map((arg: VariableDeclWithSpec) =>
@@ -2290,8 +2306,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
         // -----------------------------------------------------------------------------
         // Also generate a constructor that calls the new_ method that we just generated.
         val constructor = newClass.constructor(JMod.PUBLIC)
-        constructor._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
-        constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
+        addTransactionExceptions(constructor, translationContext)
 
         val invocation = constructor.body().invoke(methodName)
 
@@ -2405,22 +2420,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
         }
 
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, tx.name)
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ReentrancyException"))
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadTransactionException"))
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
-        meth._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
+        addTransactionExceptions(meth, translationContext)
 
-        target match {
-            case Client(mainContract, _) =>
-                if (translationContext.contract == mainContract) {
-                    meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
-                }
-            case Server(_, _) => ()
-        }
-                    /* ensure the object is loaded before trying to do anything.
-                     * (even checking the state!) */
-        meth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
+        /* ensure the object is loaded before trying to do anything.
+         * (even checking the state!) */
         target match {
             case Client(mainContract, _) =>
                 if (translationContext.contract != mainContract) {
@@ -2461,14 +2464,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         /* otherwise, we set the flag to true */
         jIf._else().assign(isInsideInvocationFlag(), JExpr.lit(true))
-
-        target match {
-            case Client(mainContract, _) =>
-                if ((translationContext.contract == mainContract) && tx.name.equals("main")) {
-                    meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
-                }
-            case Server(_, _) =>
-        }
 
         val argList: Seq[(String, JVar)] =
         // We need to pass the ChaincodeStub to methods so that the objects can

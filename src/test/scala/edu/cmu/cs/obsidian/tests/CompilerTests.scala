@@ -60,6 +60,10 @@ class CompilerTests extends JUnitSuite {
     testContract("GiftCertificate")
   }
 
+  @Test def transactionInConstructor(): Unit = {
+    testContract("TransactionInConstructor")
+  }
+
   @Test def testFFI(): Unit = {
     testContract(contractName = "TestFFI")
   }

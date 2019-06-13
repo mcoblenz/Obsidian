@@ -10,9 +10,14 @@ public interface ObsidianSerialized {
     byte[] __wrappedArchiveBytes() throws InvalidProtocolBufferException;
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-            BadTransactionException, BadArgumentException, NoSuchTransactionException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;
+                BadTransactionException, NoSuchTransactionException, BadArgumentException,
+                WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException,
+                IllegalOwnershipConsumptionException, StateLockException;
     public abstract byte[] init(SerializationState st, byte[][] args)
-            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;
+            throws InvalidProtocolBufferException, ReentrancyException,
+                BadTransactionException, NoSuchTransactionException, BadArgumentException,
+                WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException,
+                IllegalOwnershipConsumptionException, StateLockException;
 
     public void flush();
     public abstract boolean methodReceiverIsOwnedAtBeginning(String transactionName);
