@@ -2131,12 +2131,67 @@ private def checkStatement(
             logError(contract, MultipleConstructorsError(contract.name))
         }
 
-        val constructorsByArgTypes = constructors.groupBy(c => c.args.map(_.typIn.topPermissionType))
-        val matchingConstructors = constructorsByArgTypes.filter(_._2.size > 1)
+        def baseTypeName(arg: VariableDeclWithSpec): String =
+            arg.typIn match {
+                case t: NonPrimitiveType => t.contractName
+                case t => t.toString
+            }
 
-        matchingConstructors.foreach(typeAndConstructors => {
-            val greatestLine = typeAndConstructors._2.maxBy(_.loc.line)
-            logError(greatestLine, RepeatConstructorsError(contract.name))
+        // We have two group by's because the groupings are not exactly the same: this one disregards states
+        // to ensure that the generated Java code (which will not have states) will work
+        val constructorGroups = constructors.groupBy(_.args.map(baseTypeName))
+
+        def states(t: NonPrimitiveType): Set[String]=
+            t match {
+                case ContractReferenceType(contractType, permission, isRemote) =>
+                    table.lookupContract(contractType.contractName).map(_.possibleStates).getOrElse(Set())
+                case InterfaceContractType(name, simpleType) => states(simpleType)
+                case StateType(contractName, stateNames, isRemote) => stateNames
+            }
+
+        // Two types are distinguishable iff they are both owned and have non-overlapping state lists
+        def distinguishable(args: (ObsidianType, ObsidianType)): Option[String] = {
+            args match {
+                case (t1: NonPrimitiveType, t2: NonPrimitiveType) =>
+                    (t1.permission, t2.permission) match {
+                        case (Unowned(), p)     => Some(s"${t2.contractName}@${p.toString}")
+                        case (p, Unowned())     => Some(s"${t2.contractName}@${p.toString}")
+                        case (Shared(), p)      => Some(s"${t2.contractName}@${p.toString}")
+                        case (p, Shared())      => Some(s"${t2.contractName}@${p.toString}")
+                        case (Owned(), Owned()) =>
+                            states(t1).intersect(states(t2)).headOption.map(state => s"${t1.contractName}@$state")
+                        case _                  => None
+                    }
+
+                // Should always (?) fail, since we grouped on type name (e.g., int is never distinguishable from another int)
+                case (t1: PrimitiveType, t2: PrimitiveType) =>
+                    if (t1.toString != t2.toString) { None } else { Some(t1.toString) }
+
+                // This case should never happen, since we already grouped the constructor arguments on type
+                case _ => assert(false, s"Unexpected distinguishability test: $args"); None
+            }
+        }
+
+        // Returns the first argument pair that is ambiguous, if EVERY argument pair is ambiguous
+        // If any pair is distinguisable, that means the both constructors are themselves distinguishable
+        def distinguish(constructor: Constructor, other: Constructor): Option[(String, (VariableDeclWithSpec, VariableDeclWithSpec))] =
+            constructor.args.zip(other.args).map(args =>
+                    distinguishable((args._1.typIn, args._2.typIn)).flatMap(ex => Some(ex, args))
+            ).reduceOption((a, b) => if (a.isDefined && b.isDefined) { a } else { None } ).flatten
+
+
+        // Check each group of constructors whose parameters have the same base type for ambiguity
+        constructorGroups.values.foreach(group => {
+            for (constructor <- group) {
+                // So we don't do double or self-comparisons
+                for (other <- group.drop(group.indexOf(constructor) + 1)) {
+                    distinguish(constructor, other) match {
+                        case None => ()
+                        case Some((example, (arg1, arg2))) =>
+                            logError(other, AmbiguousConstructorError(contract.name, arg1, arg2, example))
+                    }
+                }
+            }
         })
     }
 
