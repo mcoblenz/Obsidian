@@ -1,14 +1,9 @@
 contract Player {
-    state ToChoose;
     state Rock;
     state Paper;
     state Scissors;
 
-    Player@ToChoose() {
-        ->ToChoose;
-    }
-
-    transaction choose(Player@Owned >> Unowned this, string choice) returns Player@(Rock | Paper | Scissors) {
+    Player@Owned(string choice) {
         if (choice == "rock") {
             ->Rock;
         } else {
@@ -18,12 +13,11 @@ contract Player {
                 if (choice == "scissors") {
                     ->Scissors;
                 } else {
+                    ->Rock;
                     revert "choice must be one of: rock, paper, scissors";
                 }
             }
         }
-
-        return this;
     }
 }
 
@@ -35,19 +29,19 @@ main contract RockPaperScissors {
     state PlayerTwoWin;
     state Tie;
 
-    Player@(Rock | Paper | Scissors) playerOne available in PlayerOneChose, PlayerTwoChose;
-    Player@(Rock | Paper | Scissors) playerTwo available in PlayerTwoChose;
+    Player@Owned playerOne available in PlayerOneChose, PlayerTwoChose;
+    Player@Owned playerTwo available in PlayerTwoChose;
 
     RockPaperScissors@GameStart() {
         ->GameStart;
     }
 
     transaction playerOneChoose(RockPaperScissors@GameStart >> PlayerOneChose this, string choice) {
-        ->PlayerOneChose(playerOne = new Player().choose(choice));
+        ->PlayerOneChose(playerOne = new Player(choice));
     }
 
     transaction playerTwoChoose(RockPaperScissors@PlayerOneChose >> PlayerTwoChose this, string choice) {
-        ->PlayerTwoChose(playerTwo = new Player().choose(choice));
+        ->PlayerTwoChose(playerTwo = new Player(choice));
     }
 
     transaction computeWinner(RockPaperScissors@PlayerTwoChose >> (PlayerOneWin | PlayerTwoWin | Tie) this) {

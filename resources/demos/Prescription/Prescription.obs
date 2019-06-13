@@ -19,10 +19,9 @@ contract Prescription {
 	string patientName; // Assume that patient names are unique.
 
 	Prescription(string prescriptionText, int refills, string patientName) {
-        // TODO: Put this back, can't be here now because can't call transactions in constructors
-		/* if (not new AccessControl().loggedInAsDoctor()) { */
-            /* revert "Invalid access: Not logged in as doctor!"; */
-		/* } */
+		if (not new AccessControl().loggedInAsDoctor()) {
+            revert "Invalid access: Not logged in as doctor!";
+		}
 
 		this.prescriptionText = prescriptionText;
 		this.refills = refills;
