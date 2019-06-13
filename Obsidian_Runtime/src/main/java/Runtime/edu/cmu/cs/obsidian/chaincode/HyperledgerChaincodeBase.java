@@ -263,7 +263,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
             try {
                 contract.init(serializationState, args);
             }
-            catch (InvalidProtocolBufferException e) {
+            catch (InvalidProtocolBufferException | ReentrancyException | InvalidStateException | BadTransactionException | NoSuchTransactionException e) {
                 System.err.println("Unable to initialize contract: " + e);
                 return null;
             }
@@ -302,9 +302,14 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     public abstract String __getGUID();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,
-                   BadTransactionException, NoSuchTransactionException, BadArgumentException, WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;
+                   BadTransactionException, NoSuchTransactionException, BadArgumentException,
+                   WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException,
+                   IllegalOwnershipConsumptionException, StateLockException;
     public abstract byte[] init(SerializationState st, byte[][] args)
-            throws InvalidProtocolBufferException, BadArgumentException, WrongNumberOfArgumentsException, ObsidianRevertException, IllegalOwnershipConsumptionException, StateLockException;
+            throws InvalidProtocolBufferException, ReentrancyException,
+                   BadTransactionException, NoSuchTransactionException, BadArgumentException,
+                   WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException,
+                   IllegalOwnershipConsumptionException, StateLockException;
     public abstract HyperledgerChaincodeBase __initFromArchiveBytes(byte[] archiveBytes, SerializationState __st)
         throws InvalidProtocolBufferException;
     public abstract byte[] __archiveBytes() throws InvalidProtocolBufferException;
