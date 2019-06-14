@@ -1,7 +1,7 @@
 // testing whether transactions available only in certain states are generated properly
 main contract StateTransactions {
 
-   StateTransactions() {
+   StateTransactions@S1() {
        ->S1;
    }
 

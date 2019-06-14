@@ -4,7 +4,7 @@ main contract Uninitialized {
     int z;
     int a;
 
-    Uninitialized() {
+    Uninitialized@Owned() {
         // ERROR: failed to initialize field "x".
         // ERROR: failed to initialize field "z".
         y = 3;

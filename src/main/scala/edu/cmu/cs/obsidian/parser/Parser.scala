@@ -567,7 +567,7 @@ object Parser extends Parsers {
     private def parseConstructor = {
         parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, true)
+                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, defaultOwned = false)
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }

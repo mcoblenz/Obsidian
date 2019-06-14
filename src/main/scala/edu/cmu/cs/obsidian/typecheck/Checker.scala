@@ -2038,7 +2038,6 @@ private def checkStatement(
             logError(constr, AssetContractConstructorError(table.name))
         }
 
-
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
         var initContext = Context(table,
                                   new TreeMap[String, ObsidianType](),
@@ -2082,6 +2081,10 @@ private def checkStatement(
                     }
                 }
             }
+
+            case ContractReferenceType(_, Inferred(), _) =>
+                logError(constr, ConstructorAnnotationMissingError(table.name))
+
             case _ => ()
         }
 

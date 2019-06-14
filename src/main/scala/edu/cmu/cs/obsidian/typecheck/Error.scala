@@ -338,3 +338,8 @@ case class StateCheckRedundant() extends Error {
 case class InvalidValAssignmentError() extends Error {
     val msg: String = s"Can't reassign to variables that are formal parameters or which are used in a dynamic state check."
 }
+
+case class ConstructorAnnotationMissingError(contractName: String) extends Error {
+    val msg: String = s"Missing a permission on a constructor of $contractName " +
+                      s"(e.g., $contractName@Owned, $contractName@State, where State is a valid state for $contractName)."
+}

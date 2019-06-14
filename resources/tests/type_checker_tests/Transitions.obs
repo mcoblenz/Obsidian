@@ -1,5 +1,5 @@
 main contract Test {
-    Test() {
+    Test@S2() {
         ->S2;
     }
 

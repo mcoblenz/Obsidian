@@ -1,6 +1,6 @@
 contract NoStates {
 
-    NoStates(){
+    NoStates@Owned(){
         int x = 1;
     }
 
@@ -9,7 +9,7 @@ contract NoStates {
 contract HasStates {
 
     // Error: constructor does not transition to a named state
-    HasStates() {
+    HasStates@Owned() {
         int x = 1;
     }
 

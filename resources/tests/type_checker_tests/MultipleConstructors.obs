@@ -9,7 +9,7 @@ main contract C {
         y = 0;
     }
     // error: main contracts should have one constructor
-    C(int first, int second) {
+    C@Owned(int first, int second) {
         x = first;
         y = second;
     }

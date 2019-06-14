@@ -3,7 +3,7 @@ main contract MultistateFields {
   state S2 {}
   state S3 {}
 
-  MultistateFields() {
+  MultistateFields@S1() {
     ->S1(foo = 0);
   }
 
