@@ -1,14 +1,12 @@
 package edu.cmu.cs.obsidian.tests
 
 
-import java.nio.file.Files
-
-import org.scalatest.junit.JUnitSuite
-import org.junit.Assert.{assertTrue, fail}
 import _root_.org.junit.Test
+import edu.cmu.cs.obsidian._
+import org.junit.Assert.assertTrue
+import org.scalatest.junit.JUnitSuite
 
 import scala.sys.process._
-import edu.cmu.cs.obsidian._
 
 class CompilerTests extends JUnitSuite {
 
@@ -22,6 +20,10 @@ class CompilerTests extends JUnitSuite {
     assertTrue(gradleResult == 0)
     val deleteCmd = s"rm -rf obs_output/$contractName"
     deleteCmd.!
+  }
+
+  @Test def multipleConstructors(): Unit = {
+      testContract("MultipleConstructors")
   }
 
   @Test def intContainer(): Unit = {

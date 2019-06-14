@@ -169,6 +169,7 @@ sealed trait ObsidianType extends HasLocation {
 
     def isAssetReference(contextContractTable: ContractTable): Possibility = No()
 
+    def baseTypeName: String = toString
 }
 
 /* int, bool, or string */
@@ -189,6 +190,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     val contractName: String
 
+    override def baseTypeName: String = contractName
 
     //    override def toString: String = {
     //        val modifiersString = modifiers.map(m => m.toString).mkString(" ")

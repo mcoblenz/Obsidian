@@ -1,0 +1,28 @@
+contract B {
+    B@Owned(C@(S1 | S2 | S3) s1c) {}
+    B@Owned(C@S2 s2c) {}
+}
+
+main contract C {
+    state S1;
+    state S2;
+    state S3;
+
+    C@S1() { ->S1; }
+}
+
+contract D {
+    D@Owned(C@Owned s1c) {}
+    D@Owned(C@S2 s2c) {}
+}
+
+contract E {
+    E@Owned(C@(S1 | S2 | S3) s1c) {}
+    E@Owned(C@Unowned s2c) {}
+}
+
+contract F {
+    F@Owned(C@Owned s1c) {}
+    F@Owned(C@Shared s2c) {}
+}
+
