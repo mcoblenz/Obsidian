@@ -618,6 +618,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case Multiply(e1: Expression, e2: Expression) =>
                  val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
                  (typ, con, Multiply(e1Prime, e2Prime).setLoc(e))
+             case Mod(e1: Expression, e2: Expression) =>
+                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
+                 (typ, con, Mod(e1Prime, e2Prime).setLoc(e))
              case Negate(e: Expression) =>
                  assertTypeEquality(e, IntType(), context)
              case Equals(e1: Expression, e2: Expression) =>
@@ -2038,7 +2041,6 @@ private def checkStatement(
             logError(constr, AssetContractConstructorError(table.name))
         }
 
-
         val stateSet: Set[(String, StateTable)] = table.stateLookup.toSet
         var initContext = Context(table,
                                   new TreeMap[String, ObsidianType](),
@@ -2082,6 +2084,10 @@ private def checkStatement(
                     }
                 }
             }
+
+            case ContractReferenceType(_, Inferred(), _) =>
+                logError(constr, ConstructorAnnotationMissingError(table.name))
+
             case _ => ()
         }
 

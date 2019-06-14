@@ -2,7 +2,7 @@ contract C {
     state S1;
     state S2;
 
-    C() {
+    C@S1() {
         ->S1;
     }
 }

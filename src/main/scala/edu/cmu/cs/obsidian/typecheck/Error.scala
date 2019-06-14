@@ -347,3 +347,8 @@ case class AmbiguousConstructorError(contractName: String,
         s"For example, a value of type $exampleFailure could be either ${arg1.typIn} or ${arg2.typIn}.\n" +
         s"Either delete one of the conflicting constructors or change the argument types so that they are distinguishable."
 }
+
+case class ConstructorAnnotationMissingError(contractName: String) extends Error {
+    val msg: String = s"Missing a permission on a constructor of $contractName " +
+                      s"(e.g., $contractName@Owned, $contractName@State, where State is a valid state for $contractName)."
+}

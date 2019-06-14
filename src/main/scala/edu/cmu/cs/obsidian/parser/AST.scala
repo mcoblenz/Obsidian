@@ -65,6 +65,7 @@ case class Add(e1: Expression, e2: Expression) extends Expression
 case class Subtract(e1: Expression, e2: Expression) extends Expression
 case class Divide(e1: Expression, e2: Expression) extends Expression
 case class Multiply(e1: Expression, e2: Expression) extends Expression
+case class Mod(e1: Expression, e2: Expression) extends Expression
 case class Negate(e: Expression) extends Expression
 case class Equals(e1: Expression, e2: Expression) extends Expression
 case class GreaterThan(e1: Expression, e2: Expression) extends Expression

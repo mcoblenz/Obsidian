@@ -80,6 +80,7 @@ object Lexer extends RegexParsers {
     private def plusP = """\+""".r ^^^  PlusT()
     private def starP = """\*""".r ^^^  StarT()
     private def forwardSlashP = """/""".r ^^^  ForwardSlashT()
+    private def percentP = """%""".r ^^^  PercentT()
     private def minusP = """-""".r ^^^  MinusT()
     private def lBraceP = """\{""".r ^^^  LBraceT()
     private def rBraceP = """\}""".r ^^^  RBraceT()
@@ -116,7 +117,7 @@ object Lexer extends RegexParsers {
         /* order is important here because some tokens contain the others */
         chevP | gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
 
-        plusP | starP | forwardSlashP | minusP | coloncolonP | atP | lBracketP | rBracketP | pipeP | colonP
+        plusP | starP | forwardSlashP | percentP | minusP | coloncolonP | atP | lBracketP | rBracketP | pipeP | colonP
     )
 
     private def tokenParser: Parser[Seq[Token]] = phrase(rep1(positioned(oneToken)))

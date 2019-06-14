@@ -669,6 +669,16 @@ class TypeCheckerTests extends JUnitSuite {
 
     }
 
+    @Test def constructorPermissionRequired(): Unit = {
+        runTest("resources/tests/parser_tests/ConstructorPermissionRequired.obs", Nil)
+    }
+
+    @Test def constructorPermissionRequiredMissing(): Unit = {
+        runTest("resources/tests/parser_tests/ConstructorPermissionRequiredMissing.obs",
+            (ConstructorAnnotationMissingError("A"), 4)::
+                Nil)
+    }
+
     @Test def multipleConstructorAmbiguousTest(): Unit = {
         runTest("resources/tests/type_checker_tests/MultiConstrAmbiguous.obs",
             (AmbiguousConstructorError("B",

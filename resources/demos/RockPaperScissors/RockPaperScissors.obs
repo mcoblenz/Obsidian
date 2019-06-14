@@ -1,0 +1,87 @@
+contract Player {
+    state Rock;
+    state Paper;
+    state Scissors;
+
+    Player@Owned(string choice) {
+        if (choice == "rock") {
+            ->Rock;
+        } else {
+            if (choice == "paper") {
+                ->Paper;
+            } else {
+                if (choice == "scissors") {
+                    ->Scissors;
+                } else {
+                    ->Rock;
+                    revert "choice must be one of: rock, paper, scissors";
+                }
+            }
+        }
+    }
+}
+
+main contract RockPaperScissors {
+    state GameStart;
+    state PlayerOneChose;
+    state PlayerTwoChose;
+    state PlayerOneWin;
+    state PlayerTwoWin;
+    state Tie;
+
+    Player@Owned playerOne available in PlayerOneChose, PlayerTwoChose;
+    Player@Owned playerTwo available in PlayerTwoChose;
+
+    RockPaperScissors@GameStart() {
+        ->GameStart;
+    }
+
+    transaction playerOneChoose(RockPaperScissors@GameStart >> PlayerOneChose this, string choice) {
+        ->PlayerOneChose(playerOne = new Player(choice));
+    }
+
+    transaction playerTwoChoose(RockPaperScissors@PlayerOneChose >> PlayerTwoChose this, string choice) {
+        ->PlayerTwoChose(playerTwo = new Player(choice));
+    }
+
+    transaction computeWinner(RockPaperScissors@PlayerTwoChose >> (PlayerOneWin | PlayerTwoWin | Tie) this) {
+        if (playerOne in Rock) {
+            if (playerTwo in Rock) {
+                ->Tie;
+            } else {
+                if (playerTwo in Scissors) {
+                    ->PlayerOneWin;
+                } else {
+                    ->PlayerTwoWin;
+                }
+            }
+        } else {
+            if (playerOne in Scissors) {
+                if (playerTwo in Scissors) {
+                    ->Tie;
+                } else {
+                    if (playerTwo in Paper) {
+                        ->PlayerOneWin;
+                    } else {
+                        ->PlayerTwoWin;
+                    }
+                }
+            } else {
+                if (playerTwo in Paper) {
+                    ->Tie;
+                } else {
+                    if (playerTwo in Rock) {
+                        ->PlayerOneWin;
+                    } else {
+                        ->PlayerTwoWin;
+                    }
+                }
+            }
+        }
+    }
+
+    transaction reset(RockPaperScissors@Owned >> GameStart this) {
+        ->GameStart;
+    }
+}
+

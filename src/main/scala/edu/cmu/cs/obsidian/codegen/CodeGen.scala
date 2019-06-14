@@ -2302,6 +2302,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             case Add(e1, e2) => recurse(e1).invoke("add").arg(recurse(e2))
             case Subtract(e1, e2) => recurse(e1).invoke("subtract").arg(recurse(e2))
             case Multiply(e1, e2) => recurse(e1).invoke("multiply").arg(recurse(e2))
+            case Mod(e1, e2) => recurse(e1).invoke("mod").arg(recurse(e2))
             case Divide(e1, e2) => recurse(e1).invoke("divide").arg(recurse(e2))
             case Negate(e) => recurse(e).invoke("negate")
             case Equals(e1, e2) => recurse(e1).invoke("equals").arg(recurse(e2))

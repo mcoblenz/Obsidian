@@ -325,7 +325,8 @@ object Parser extends Parsers {
     private def parseAddition = parseBinary(PlusT(), Add.apply, parseSubtraction)
     private def parseSubtraction = parseBinary(MinusT(), Subtract.apply, parseMultiplication)
     private def parseMultiplication = parseBinary(StarT(), Multiply.apply, parseDivision)
-    private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseNot)
+    private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseMod)
+    private def parseMod = parseBinary(PercentT(), Mod.apply, parseNot)
     private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseUnaryMinus)
     private def parseUnaryMinus = parseUnary(MinusT(), Negate.apply, parseExprBottom)
 
@@ -567,7 +568,7 @@ object Parser extends Parsers {
     private def parseConstructor = {
         parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, true)
+                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, defaultOwned = false)
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }
