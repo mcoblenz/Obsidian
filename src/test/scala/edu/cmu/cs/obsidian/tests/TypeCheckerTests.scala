@@ -731,4 +731,8 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/MultiConstrDistinguishable.obs",
             Nil)
     }
+
+    @Test def interfaceDoesntRequireReturnTest(): Unit = {
+        runTest("resources/tests/type_checker_tests/InterfaceWithReturn.obs", Nil)
+    }
 }
