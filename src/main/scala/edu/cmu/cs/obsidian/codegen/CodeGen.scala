@@ -989,7 +989,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         def addDispatchCondition(ifSt: JConditional)(info: (Constructor, IJExpression)): Unit = info match {
             case (decl, cond) =>
-                translateBody(setOwned(ifSt._elseif(cond)._then(), decl), decl.body, translationContext, localContext)
+                setOwned(ifSt._elseif(cond)._then(), decl)
+                translateBody(ifSt._elseif(cond)._then(), decl.body, translationContext, localContext)
         }
 
         // add bodies for each constructor

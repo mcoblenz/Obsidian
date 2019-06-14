@@ -682,33 +682,48 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def multipleConstructorAmbiguousTest(): Unit = {
         runTest("resources/tests/type_checker_tests/MultiConstrAmbiguous.obs",
             (AmbiguousConstructorError("B",
-                VariableDeclWithSpec(StateType("C", Set("S1", "S2", "S3"), false), StateType("C", Set("S1", "S2", "S3"), false), "s1c"),
-                VariableDeclWithSpec(StateType("C", "S2", false), StateType("C", "S2", false), "s2c"),
-                "C@S2"), 3) ::
-            (AmbiguousConstructorError("D",
-                VariableDeclWithSpec(
-                    ContractReferenceType(ContractType("C"), Owned(), false),
-                    ContractReferenceType(ContractType("C"), Owned(), false),
-                    "s1c"),
-                VariableDeclWithSpec(StateType("C", "S2", false), StateType("C", "S2", false), "s2c"),
-                "C@S2"), 16) ::
-            (AmbiguousConstructorError("E",
-                VariableDeclWithSpec(StateType("C", Set("S1", "S2", "S3"), false), StateType("C", Set("S1", "S2", "S3"), false), "s1c"),
-                VariableDeclWithSpec(
-                    ContractReferenceType(ContractType("C"), Unowned(), false),
-                    ContractReferenceType(ContractType("C"), Unowned(), false),
-                    "s2c"),
-                "C@Owned"), 21) ::
-            (AmbiguousConstructorError("F",
-                VariableDeclWithSpec(
-                    ContractReferenceType(ContractType("C"), Owned(), false),
-                    ContractReferenceType(ContractType("C"), Owned(), false),
-                    "s1c"),
-                VariableDeclWithSpec(
-                    ContractReferenceType(ContractType("C"), Shared(), false),
-                    ContractReferenceType(ContractType("C"), Shared(), false),
-                    "s2c"),
-                "C@Owned"), 26) ::
+                List(AmbiguousConstructorExample("C@S2",
+                    VariableDeclWithSpec(
+                        StateType("C", Set("S1", "S2", "S3"), false),
+                        StateType("C", Set("S1", "S2", "S3"), false),
+                        "s1c"),
+                    VariableDeclWithSpec(
+                        StateType("C", "S2", false),
+                        StateType("C", "S2", false),
+                        "s2c")))
+                    ), 3) ::
+                (AmbiguousConstructorError("D",
+                    List(AmbiguousConstructorExample("C@S2",
+                        VariableDeclWithSpec(
+                            ContractReferenceType(ContractType("C"), Owned(), false),
+                            ContractReferenceType(ContractType("C"), Owned(), false),
+                            "s1c"),
+                        VariableDeclWithSpec(
+                            StateType("C", "S2", false),
+                            StateType("C", "S2", false), "s2c")))
+                    ), 16) ::
+                (AmbiguousConstructorError("E",
+                    List(AmbiguousConstructorExample("C@Owned",
+                        VariableDeclWithSpec(
+                            StateType("C", Set("S1", "S2", "S3"), false),
+                            StateType("C", Set("S1", "S2", "S3"), false),
+                            "s1c"),
+                        VariableDeclWithSpec(
+                            ContractReferenceType(ContractType("C"), Unowned(), false),
+                            ContractReferenceType(ContractType("C"), Unowned(), false),
+                            "s2c"))),
+                    ), 21) ::
+                (AmbiguousConstructorError("F",
+                    List(AmbiguousConstructorExample("C@Owned",
+                        VariableDeclWithSpec(
+                            ContractReferenceType(ContractType("C"), Owned(), false),
+                            ContractReferenceType(ContractType("C"), Owned(), false),
+                            "s1c"),
+                    VariableDeclWithSpec(
+                        ContractReferenceType(ContractType("C"), Shared(), false),
+                        ContractReferenceType(ContractType("C"), Shared(), false),
+                        "s2c"))),
+                    ), 26) ::
         Nil)
     }
 

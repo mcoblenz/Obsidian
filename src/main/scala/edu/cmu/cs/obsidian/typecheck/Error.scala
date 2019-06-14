@@ -339,12 +339,16 @@ case class InvalidValAssignmentError() extends Error {
     val msg: String = s"Can't reassign to variables that are formal parameters or which are used in a dynamic state check."
 }
 
-case class AmbiguousConstructorError(contractName: String,
-                                     arg1: VariableDeclWithSpec, arg2: VariableDeclWithSpec,
-                                     exampleFailure: String) extends Error {
-    val msg: String = s"Constructors are ambiguous in contract $contractName: " +
+case class AmbiguousConstructorExample(example: String, arg1: VariableDeclWithSpec, arg2: VariableDeclWithSpec) {
+    val msg: String =
         s"Cannot distinguish the type of the argument ${arg1.varName} of type ${arg1.typIn} from ${arg2.varName} of type ${arg2.typIn}.\n" +
-        s"For example, a value of type $exampleFailure could be either ${arg1.typIn} or ${arg2.typIn}.\n" +
+        s"For example, a value of type $example could be either ${arg1.typIn} or ${arg2.typIn}."
+}
+
+case class AmbiguousConstructorError(contractName: String,
+                                     examples: Seq[AmbiguousConstructorExample]) extends Error {
+    val msg: String = s"Constructors are ambiguous in contract $contractName: " +
+        examples.map(_.msg).mkString("\n") + "\n" +
         s"Either delete one of the conflicting constructors or change the argument types so that they are distinguishable."
 }
 
