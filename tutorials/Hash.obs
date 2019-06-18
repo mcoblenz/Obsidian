@@ -1,0 +1,7 @@
+interface HashFunction {
+    transaction hash(string message) returns string;
+    transaction hash(string message, string salt) returns string;
+}
+
+contract SHA256 implements HashFunction with java : edu.cmu.cs.obsidian.stdlib.SHA256;
+

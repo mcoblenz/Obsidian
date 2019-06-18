@@ -1,0 +1,38 @@
+import "Hash.obs"
+// Import paths are slightly weird
+
+main contract Lock {
+    state Locked {
+        string hash;
+        string salt;
+    }
+
+    state Unlocked;
+
+    Lock@Unlocked() {
+        ->Unlocked;
+    }
+
+    // Not great, because we really ought to be able to write `return this in Locked;`
+    transaction isLocked() returns bool {
+        if (this in Locked) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // very important we make sure we're unlocked first, otherwise someone could "relock" it with whatever they want and instantly gain access
+    transaction lock(Lock@Unlocked >> Locked this, string _hash, string _salt) {
+        ->Locked(hash = _hash, salt = _salt);
+    }
+
+    transaction unlock(Lock@Locked >> Unlocked this, string password) {
+        if (new SHA256().hash(password, salt) == hash) {
+            ->Unlocked;
+        } else {
+            revert "Incorrect password!";
+        }
+    }
+}
+
