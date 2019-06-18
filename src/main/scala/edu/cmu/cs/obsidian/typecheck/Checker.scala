@@ -1856,8 +1856,7 @@ private def checkStatement(
         lexicallyInsideOf.contract match {
             case ObsidianContractImpl(modifiers, name, declarations, transitions, isInterface, sp) =>
                 // Don't need to check interface methods to make sure they return
-                // Use & instead of && to ensure that all conditions evaluate (hasReturn checks for multiple things)
-                if (!isInterface & tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
+                if (!hasReturnStatement(tx, tx.body) && !isInterface && tx.retType.isDefined) {
                     val ast =
                         if (tx.body.nonEmpty) {
                             tx.body.last
