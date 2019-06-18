@@ -1,5 +1,7 @@
 # Introduction
 
+// Syntax highlighting?
+
 Obsidian is a programming language for implementing smart contracts.
 It has several features which keep you safe while writing programs, including:
 
@@ -93,7 +95,7 @@ A couple notes:
 We can implement `unlock` differently:
 
 ```obsidian
-transaction unlock(Lock@Locked >> (Locked | Unlocked) this, string _password) {
+transaction unlock(Lock@Locked >> (Locked | Unlocked) this, string password) {
     if (new SHA256().hash(password, salt) == hash) {
         ->Unlocked;
     }
@@ -104,6 +106,36 @@ Note the difference in type on `this` in the transaction declaration.
 This type means "this transaction can only be called in the `Locked` state, and `this` will either be `Locked` or `Unlocked` at the end."
 `(Locked | Unlocked)` is called a *state list*, and can be useful in most (all?) places that a normal state annotation can be.
 State lists are useful in cases in which the transaction has multiple valid possible outcomes.
+
+
+## Full Program:
+
+```obsidian
+import "Hash.obs"
+
+main contract Lock {
+    state Locked {
+        string hash;
+        string salt;
+    }
+
+    state Unlocked;
+
+    Lock@Unlocked() {
+        ->Unlocked;
+    }
+
+    transaction lock(Lock@Unlocked >> Locked this, string _hash, string _salt) {
+        ->Locked(hash = _hash, salt = _salt);
+    }
+
+    transaction unlock(Lock@Locked >> (Locked | Unlocked) this, string password) {
+        if (new SHA256().hash(password, salt) == hash) {
+            ->Unlocked;
+        }
+    }
+}
+```
 
 ## Remarks
 
