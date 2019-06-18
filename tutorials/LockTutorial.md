@@ -27,9 +27,8 @@ main contract Lock {
 }
 ```
 
-Similar to how a Java program must have a main class (which contains a main method), Obsidian programs must contain exactly one main contract.
-In the example above, this is the `Lock` contract.
-This contract will be initialized and will receive all invocation requests.
+Similar to how a Java program must have a main class (which contains a main method), Obsidian programs must contain exactly one *main contract*.
+In the example above, we only have one contract, `Lock`, which is also the main contract.
 
 We can also see that this contract has two *states*: `Locked` and `Unlocked`.
 
