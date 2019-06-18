@@ -1,0 +1,6 @@
+interface Test {
+    transaction f() returns int;
+}
+
+main contract C {}
+

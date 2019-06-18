@@ -1853,22 +1853,26 @@ private def checkStatement(
 
         checkForUnusedStateInitializers(outputContext)
 
-        if (tx.retType.isDefined & !hasReturnStatement(tx, tx.body)) {
-            val ast =
-                if (tx.body.length > 0) {
-                    tx.body.last
+        lexicallyInsideOf.contract match {
+            case ObsidianContractImpl(modifiers, name, declarations, transitions, isInterface, sp) =>
+                // Don't need to check interface methods to make sure they return
+                if (!hasReturnStatement(tx, tx.body) && !isInterface && tx.retType.isDefined) {
+                    val ast =
+                        if (tx.body.nonEmpty) {
+                            tx.body.last
+                        } else {
+                            tx
+                        }
+                    logError(ast, MustReturnError(tx.name))
+                } else if (tx.retType.isEmpty) {
+                    // We check for unused ownership errors at each return; if there isn't guaranteed to be one at the end, check separately.
+                    // Every arg whose output type is owned should be owned at the end.
+                    val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
+                    val ownedArgNames = ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
+                    checkForUnusedOwnershipErrors(tx, outputContext, Set("this") ++ ownedArgNames)
                 }
-                else {
-                    tx
-                }
-            logError(ast, MustReturnError(tx.name))
-        }
-        else if (!tx.retType.isDefined) {
-            // We check for unused ownership errors at each return; if there isn't guaranteed to be one at the end, check separately.
-            // Every arg whose output type is owned should be owned at the end.
-            val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
-            val ownedArgNames = ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
-            checkForUnusedOwnershipErrors(tx, outputContext, Set("this") ++ ownedArgNames)
+
+            case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) => ()
         }
 
         // Check to make sure all the field types are consistent with their declarations.
