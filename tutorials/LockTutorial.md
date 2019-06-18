@@ -145,5 +145,5 @@ This implementation is somewhat safer and more concise than a similar Java imple
 - There is no `null` in Obsidian, which allows us to elide some runtime checks.
 - States are either statically guaranteed to be correct, or the compiler will insert the necessary runtime checks for us.
 - Naming our states and explicitly defining transitions makes our intentions clearer and makes it more difficult to accidentally set flags or otherwise transition states.
-- The code can be run on the blockchain as is, with no additional libraries or configuration.
+- The code can be run on the blockchain as is, with no additional libraries or configuration. // Should we talk about how to do this (/should we talk about it in this tutorial?)
 
