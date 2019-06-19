@@ -1,4 +1,4 @@
-import "resources/demos/TinyVendingMachine.obs"
+import "resources/demos/TinyVendingMachine/TinyVendingMachine.obs"
 
 main contract TinyVendingMachineClient {
     transaction main(remote TinyVendingMachine@Shared machine) {
