@@ -53,5 +53,11 @@ if [[ -z "$VERSION" ]]; then
     VERSION="$(get_version)"
 fi
 
+CLI="$(docker ps -f name=cli -q)"
+if [ -z "$CLI" ]; then
+    echo "No fabric network found. Did you remember to start the network via 'up.sh -s PATH_TO_CHAINCODE'?"
+    exit 0
+fi
+
 docker exec cli scripts/upgrade.sh 0 1 "$INIT" "$VERSION"
 
