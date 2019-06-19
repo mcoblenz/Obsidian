@@ -1,0 +1,1602 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Obsidian",
+	"patterns": [
+		{
+			"begin": "\\b(package)\\b\\s*",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.other.package.obs"
+				}
+			},
+			"end": "\\s*(;)",
+			"endCaptures": {
+				"1": {
+					"name": "punctuation.terminator.obs"
+				}
+			},
+			"name": "meta.package.obs",
+			"contentName": "storage.modifier.package.obs",
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"match": "(?<=\\.)\\s*\\.|\\.(?=\\s*;)",
+					"name": "invalid.illegal.character_not_allowed_here.obs"
+				},
+				{
+					"match": "(?<!_)_(?=\\s*(\\.|;))|\\b\\d+|-+",
+					"name": "invalid.illegal.character_not_allowed_here.obs"
+				},
+				{
+					"match": "[A-Z]+",
+					"name": "invalid.deprecated.package_name_not_lowercase.obs"
+				},
+				{
+					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|boolean|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
+					"name": "invalid.illegal.character_not_allowed_here.obs"
+				},
+				{
+					"match": "\\.",
+					"name": "punctuation.separator.obs"
+				}
+			]
+		},
+		{
+			"begin": "\\b(import)\\b\\s*\\b(static)?\\b\\s",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.other.import.obs"
+				},
+				"2": {
+					"name": "storage.modifier.obs"
+				}
+			},
+			"end": "\\s*(;)",
+			"endCaptures": {
+				"1": {
+					"name": "punctuation.terminator.obs"
+				}
+			},
+			"name": "meta.import.obs",
+			"contentName": "storage.modifier.import.obs",
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"match": "(?<=\\.)\\s*\\.|\\.(?=\\s*;)",
+					"name": "invalid.illegal.character_not_allowed_here.obs"
+				},
+				{
+					"match": "(?<!\\.)\\s*\\*",
+					"name": "invalid.illegal.character_not_allowed_here.obs"
+				},
+				{
+					"match": "(?<!_)_(?=\\s*(\\.|;))|\\b\\d+|-+",
+					"name": "invalid.illegal.character_not_allowed_here.obs"
+				},
+				{
+					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|boolean|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
+					"name": "invalid.illegal.character_not_allowed_here.obs"
+				},
+				{
+					"match": "\\.",
+					"name": "punctuation.separator.obs"
+				},
+				{
+					"match": "\\*",
+					"name": "variable.language.wildcard.obs"
+				}
+			]
+		},
+		{
+			"include": "#code"
+		},
+		{
+			"include": "#module"
+		}
+	],
+	"repository": {
+		"all-types": {
+			"patterns": [
+				{
+					"include": "#primitive-arrays"
+				},
+				{
+					"include": "#primitive-types"
+				},
+				{
+					"include": "#object-types"
+				}
+			]
+		},
+		"annotations": {
+			"patterns": [
+				{
+					"match": "^@",
+					"name": "storage.type.annotation.obs"
+				}
+			]
+		},
+		"anonymous-block-and-instance-initializer": {
+			"begin": "{",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.section.block.begin.bracket.curly.obs"
+				}
+			},
+			"end": "}",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.section.block.end.bracket.curly.obs"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#code"
+				}
+			]
+		},
+		"anonymous-classes-and-new": {
+			"begin": "\\bnew\\b",
+			"beginCaptures": {
+				"0": {
+					"name": "keyword.control.new.obs"
+				}
+			},
+			"end": "(?=;|\\)|,|:|}|\\+)",
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#function-call"
+				},
+				{
+					"include": "#all-types"
+				},
+				{
+					"begin": "(?<!\\])\\s*({)",
+					"beginCaptures": {
+						"1": {
+							"name": "punctuation.section.inner-class.begin.bracket.curly.obs"
+						}
+					},
+					"end": "}",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.section.inner-class.end.bracket.curly.obs"
+						}
+					},
+					"name": "meta.inner-class.obs",
+					"patterns": [
+						{
+							"include": "#class-body"
+						}
+					]
+				},
+				{
+					"include": "#parens"
+				}
+			]
+		},
+		"assertions": {
+			"patterns": [
+				{
+					"begin": "\\b(assert)\\s",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.assert.obs"
+						}
+					},
+					"end": "$",
+					"name": "meta.declaration.assertion.obs",
+					"patterns": [
+						{
+							"match": ":",
+							"name": "keyword.operator.assert.expression-separator.obs"
+						},
+						{
+							"include": "#code"
+						}
+					]
+				}
+			]
+		},
+		"class": {
+			"begin": "(?=\\w?[\\w\\s]*\\b(?:contract|(?<!@)interface|enum)\\s+\\w+)",
+			"end": "}",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.section.class.end.bracket.curly.obs"
+				}
+			},
+			"name": "meta.class.obs",
+			"patterns": [
+				{
+					"include": "#storage-modifiers"
+				},
+				{
+					"include": "#return-modifier"
+				},
+				{
+					"include": "#generics"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"captures": {
+						"1": {
+							"name": "storage.modifier.obs"
+						},
+						"2": {
+							"name": "entity.name.type.class.obs"
+						}
+					},
+					"match": "(contract|(?<!@)interface|enum)\\s+(\\w+)",
+					"name": "meta.class.identifier.obs"
+				},
+				{
+					"begin": "extends",
+					"beginCaptures": {
+						"0": {
+							"name": "storage.modifier.extends.obs"
+						}
+					},
+					"end": "(?={|implements)",
+					"name": "meta.definition.class.inherited.classes.obs",
+					"patterns": [
+						{
+							"include": "#object-types-inherited"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				},
+				{
+					"begin": "(implements)\\s",
+					"beginCaptures": {
+						"1": {
+							"name": "storage.modifier.implements.obs"
+						}
+					},
+					"end": "(?=\\s*extends|\\{)",
+					"name": "meta.definition.class.implemented.interfaces.obs",
+					"patterns": [
+						{
+							"include": "#object-types-inherited"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				},
+				{
+					"begin": "{",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.section.class.begin.bracket.curly.obs"
+						}
+					},
+					"end": "(?=})",
+					"contentName": "meta.class.body.obs",
+					"patterns": [
+						{
+							"include": "#class-body"
+						}
+					]
+				}
+			]
+		},
+		"state": {
+			"begin": "(?=\\w?[\\w\\s]*\\b(?:state|(?<!@)interface|enum)\\s+\\w+)",
+			"end": "}",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.section.class.end.bracket.curly.obs"
+				}
+			},
+			"name": "meta.class.obs",
+			"patterns": [
+				{
+					"include": "#storage-modifiers"
+				},
+				{
+					"include": "#return-modifier"
+				},
+				{
+					"include": "#generics"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"captures": {
+						"1": {
+							"name": "storage.modifier.obs"
+						},
+						"2": {
+							"name": "entity.name.type.class.obs"
+						}
+					},
+					"match": "(state|(?<!@)interface|enum)\\s+(\\w+)",
+					"name": "meta.class.identifier.obs"
+				},
+				{
+					"begin": "{",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.section.class.begin.bracket.curly.obs"
+						}
+					},
+					"end": "(?=})",
+					"contentName": "meta.class.body.obs",
+					"patterns": [
+						{
+							"include": "#class-body"
+						}
+					]
+				}
+			]
+		},
+		"class-body": {
+			"patterns": [
+				{
+					"include": "#comments-obsdoc"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#enums"
+				},
+				{
+					"include": "#class"
+				},
+				{
+					"include": "#state"
+				},
+				{
+					"include": "#generics"
+				},
+				{
+					"include": "#static-initializer"
+				},
+				{
+					"include": "#class-fields-and-methods"
+				},
+				{
+					"include": "#annotations"
+				},
+				{
+					"include": "#member-variables"
+				},
+				{
+					"include": "#storage-modifiers"
+				},
+				{
+					"include": "#return-modifier"
+				},
+				{
+					"include": "#code"
+				}
+			]
+		},
+		"class-fields-and-methods": {
+			"patterns": [
+				{
+					"begin": "(?=\\=)",
+					"end": "(?=;)",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				},
+				{
+					"include": "#methods"
+				}
+			]
+		},
+		"code": {
+			"patterns": [
+				{
+					"include": "#annotations"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#enums"
+				},
+				{
+					"include": "#class"
+				},
+				{
+					"include": "#state"
+				},
+				{
+					"include": "#anonymous-block-and-instance-initializer"
+				},
+				{
+					"include": "#try-catch-finally"
+				},
+				{
+					"include": "#assertions"
+				},
+				{
+					"include": "#parens"
+				},
+				{
+					"include": "#constants-and-special-vars"
+				},
+				{
+					"include": "#numbers"
+				},
+				{
+					"include": "#anonymous-classes-and-new"
+				},
+				{
+					"include": "#lambda-expression"
+				},
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#storage-modifiers"
+				},
+				{
+					"include": "#return-modifier"
+				},
+				{
+					"include": "#method-call"
+				},
+				{
+					"include": "#function-call"
+				},
+				{
+					"include": "#variables"
+				},
+				{
+					"include": "#variables-local"
+				},
+				{
+					"include": "#objects"
+				},
+				{
+					"include": "#properties"
+				},
+				{
+					"include": "#strings"
+				},
+				{
+					"include": "#all-types"
+				},
+				{
+					"match": ",",
+					"name": "punctuation.separator.delimiter.obs"
+				},
+				{
+					"match": "\\.",
+					"name": "punctuation.separator.period.obs"
+				},
+				{
+					"match": ";",
+					"name": "punctuation.terminator.obs"
+				}
+			]
+		},
+		"comments": {
+			"patterns": [
+				{
+					"captures": {
+						"0": {
+							"name": "punctuation.definition.comment.obs"
+						}
+					},
+					"match": "/\\*\\*/",
+					"name": "comment.block.empty.obs"
+				},
+				{
+					"include": "#comments-inline"
+				}
+			]
+		},
+		"comments-inline": {
+			"patterns": [
+				{
+					"begin": "/\\*",
+					"captures": {
+						"0": {
+							"name": "punctuation.definition.comment.obs"
+						}
+					},
+					"end": "\\*/",
+					"name": "comment.block.obs"
+				},
+				{
+					"begin": "(^[ \\t]+)?(?=//)",
+					"beginCaptures": {
+						"1": {
+							"name": "punctuation.whitespace.comment.leading.obs"
+						}
+					},
+					"end": "(?!\\G)",
+					"patterns": [
+						{
+							"begin": "//",
+							"beginCaptures": {
+								"0": {
+									"name": "punctuation.definition.comment.obs"
+								}
+							},
+							"end": "\\n",
+							"name": "comment.line.double-slash.obs"
+						}
+					]
+				}
+			]
+		},
+		"constants-and-special-vars": {
+			"patterns": [
+				{
+					"match": "\\b(true|false|null)\\b",
+					"name": "constant.language.obs"
+				},
+				{
+					"match": "\\bthis\\b",
+					"name": "variable.language.this.obs"
+				},
+				{
+					"match": "\\bsuper\\b",
+					"name": "variable.language.obs"
+				},
+				{
+					"match": "\\bavailable\\b",
+					"name": "variable.language.obs"
+				}
+			]
+		},
+		"enums": {
+			"begin": "^\\s*([\\w\\s]*)(enum)\\s+(\\w+)",
+			"beginCaptures": {
+				"1": {
+					"patterns": [
+						{
+							"include": "#storage-modifiers"
+						},
+						{
+							"include": "#return-modifier"
+						}
+					]
+				},
+				"2": {
+					"name": "storage.modifier.obs"
+				},
+				"3": {
+					"name": "entity.name.type.enum.obs"
+				}
+			},
+			"end": "}",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.section.enum.end.bracket.curly.obs"
+				}
+			},
+			"name": "meta.enum.obs",
+			"patterns": [
+				{
+					"begin": "\\b(extends)\\b",
+					"beginCaptures": {
+						"1": {
+							"name": "storage.modifier.extends.obs"
+						}
+					},
+					"end": "(?={|\\bimplements\\b)",
+					"name": "meta.definition.class.inherited.classes.obs",
+					"patterns": [
+						{
+							"include": "#object-types-inherited"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				},
+				{
+					"begin": "\\b(implements)\\b",
+					"beginCaptures": {
+						"1": {
+							"name": "storage.modifier.implements.obs"
+						}
+					},
+					"end": "(?={|\\bextends\\b)",
+					"name": "meta.definition.class.implemented.interfaces.obs",
+					"patterns": [
+						{
+							"include": "#object-types-inherited"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				},
+				{
+					"begin": "{",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.section.enum.begin.bracket.curly.obs"
+						}
+					},
+					"end": "(?=})",
+					"patterns": [
+						{
+							"begin": "(?<={)",
+							"end": "(?=;|})",
+							"patterns": [
+								{
+									"include": "#comments-obsdoc"
+								},
+								{
+									"include": "#comments"
+								},
+								{
+									"begin": "(\\w+)\\s*({)",
+									"beginCaptures": {
+										"1": {
+											"name": "constant.other.enum.obs"
+										},
+										"2": {
+											"name": "punctuation.bracket.curly.obs"
+										}
+									},
+									"end": "\\}",
+									"endCaptures": {
+										"0": {
+											"name": "punctuation.bracket.curly.obs"
+										}
+									},
+									"patterns": [
+										{
+											"include": "#class-body"
+										}
+									]
+								},
+								{
+									"begin": "(\\w+)\\s*(\\()",
+									"beginCaptures": {
+										"1": {
+											"name": "constant.other.enum.obs"
+										},
+										"2": {
+											"name": "punctuation.bracket.round.obs"
+										}
+									},
+									"end": "\\)",
+									"endCaptures": {
+										"0": {
+											"name": "punctuation.bracket.round.obs"
+										}
+									},
+									"patterns": [
+										{
+											"include": "#code"
+										}
+									]
+								},
+								{
+									"match": "\\b\\w+\\b",
+									"name": "constant.other.enum.obs"
+								}
+							]
+						},
+						{
+							"include": "#class-body"
+						}
+					]
+				}
+			]
+		},
+		"function-call": {
+			"begin": "([A-Za-z_$][\\w$]*)\\s*(\\()",
+			"beginCaptures": {
+				"1": {
+					"name": "entity.name.function.obs"
+				},
+				"2": {
+					"name": "punctuation.definition.parameters.begin.bracket.round.obs"
+				}
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.parameters.end.bracket.round.obs"
+				}
+			},
+			"name": "meta.function-call.obs",
+			"patterns": [
+				{
+					"include": "#code"
+				}
+			]
+		},
+		"generics": {
+			"begin": "<",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.bracket.angle.obs"
+				}
+			},
+			"end": ">",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.bracket.angle.obs"
+				}
+			},
+			"patterns": [
+				{
+					"match": "\\b(extends|super)\\b",
+					"name": "storage.modifier.$1.obs"
+				},
+				{
+					"match": "(?<!\\.)([a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\s*<)",
+					"captures": {
+						"1": {
+							"name": "storage.type.obs"
+						}
+					}
+				},
+				{
+					"include": "#primitive-arrays"
+				},
+				{
+					"match": "[a-zA-Z$_][a-zA-Z0-9$_]*",
+					"name": "storage.type.generic.obs"
+				},
+				{
+					"match": "\\?",
+					"name": "storage.type.generic.wildcard.obs"
+				},
+				{
+					"match": "&",
+					"name": "punctuation.separator.types.obs"
+				},
+				{
+					"match": ",",
+					"name": "punctuation.separator.delimiter.obs"
+				},
+				{
+					"match": "\\.",
+					"name": "punctuation.separator.period.obs"
+				},
+				{
+					"include": "#parens"
+				},
+				{
+					"include": "#generics"
+				},
+				{
+					"include": "#comments"
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"match": "\\bthrow\\b",
+					"name": "keyword.control.throw.obs"
+				},
+				{
+					"match": "\\?|:",
+					"name": "keyword.control.ternary.obs"
+				},
+				{
+					"match": "\\b(return|break|case|continue|default|do|while|for|switch|if|else|in)\\b",
+					"name": "keyword.control.obs"
+				},
+				{
+					"match": "\\b(instanceof)\\b",
+					"name": "keyword.operator.instanceof.obs"
+				},
+				{
+					"match": "(<<|>>>?|~|\\^)",
+					"name": "keyword.operator.bitwise.obs"
+				},
+				{
+					"match": "((&|\\^|\\||<<|>>>?)=)",
+					"name": "keyword.operator.assignment.bitwise.obs"
+				},
+				{
+					"match": "(===?|!=|<=|>=|<>|<|>)",
+					"name": "keyword.operator.comparison.obs"
+				},
+				{
+					"match": "([+*/%-]=)",
+					"name": "keyword.operator.assignment.arithmetic.obs"
+				},
+				{
+					"match": "(=)",
+					"name": "keyword.operator.assignment.obs"
+				},
+				{
+					"match": "(\\-\\-|\\+\\+)",
+					"name": "keyword.operator.increment-decrement.obs"
+				},
+				{
+					"match": "(\\-|\\+|\\*|\\/|%)",
+					"name": "keyword.operator.arithmetic.obs"
+				},
+				{
+					"match": "(!|&&|\\|\\|)",
+					"name": "keyword.operator.logical.obs"
+				},
+				{
+					"match": "(\\||&)",
+					"name": "keyword.operator.bitwise.obs"
+				},
+				{
+					"match": "\\b(const|goto)\\b",
+					"name": "keyword.reserved.obs"
+				}
+			]
+		},
+		"lambda-expression": {
+			"patterns": [
+				{
+					"match": "->",
+					"name": "storage.type.function.arrow.obs"
+				}
+			]
+		},
+		"member-variables": {
+			"begin": "(?=private|protected|public|native|synchronized|abstract|threadsafe|transient|static|final)",
+			"end": "(?=\\=|;)",
+			"patterns": [
+				{
+					"include": "#storage-modifiers"
+				},
+				{
+					"include": "#return-modifier"
+				},
+				{
+					"include": "#variables"
+				},
+				{
+					"include": "#primitive-arrays"
+				},
+				{
+					"include": "#object-types"
+				}
+			]
+		},
+		"method-call": {
+			"begin": "(\\.)\\s*([A-Za-z_$][\\w$]*)\\s*(\\()",
+			"beginCaptures": {
+				"1": {
+					"name": "punctuation.separator.period.obs"
+				},
+				"2": {
+					"name": "entity.name.function.obs"
+				},
+				"3": {
+					"name": "punctuation.definition.parameters.begin.bracket.round.obs"
+				}
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.parameters.end.bracket.round.obs"
+				}
+			},
+			"name": "meta.method-call.obs",
+			"patterns": [
+				{
+					"include": "#code"
+				}
+			]
+		},
+		"methods": {
+			"begin": "(?!new)(?=[\\w<].*\\s+)(?=([^=/]|/(?!/))+\\()",
+			"end": "(})|(?=;)",
+			"endCaptures": {
+				"1": {
+					"name": "punctuation.section.method.end.bracket.curly.obs"
+				}
+			},
+			"name": "meta.method.obs",
+			"patterns": [
+				{
+					"include": "#storage-modifiers"
+				},
+				{
+					"include": "#return-modifier"
+				},
+				{
+					"begin": "(\\w+)\\s*(\\()",
+					"beginCaptures": {
+						"1": {
+							"name": "entity.name.function.obs"
+						},
+						"2": {
+							"name": "punctuation.definition.parameters.begin.bracket.round.obs"
+						}
+					},
+					"end": "\\)",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.definition.parameters.end.bracket.round.obs"
+						}
+					},
+					"name": "meta.method.identifier.obs",
+					"patterns": [
+						{
+							"include": "#parameters"
+						},
+						{
+							"include": "#parens"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				},
+				{
+					"include": "#generics"
+				},
+				{
+					"begin": "(?=\\w.*\\s+\\w+\\s*\\()",
+					"end": "(?=\\s+\\w+\\s*\\()",
+					"name": "meta.method.return-type.obs",
+					"patterns": [
+						{
+							"include": "#all-types"
+						},
+						{
+							"include": "#parens"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				},
+				{
+					"include": "#throws"
+				},
+				{
+					"begin": "{",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.section.method.begin.bracket.curly.obs"
+						}
+					},
+					"end": "(?=})",
+					"contentName": "meta.method.body.obs",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				},
+				{
+					"include": "#comments"
+				}
+			]
+		},
+		"module": {
+			"begin": "((open)\\s)?(module)\\s+(\\w+)",
+			"end": "}",
+			"beginCaptures": {
+				"1": {
+					"name": "storage.modifier.obs"
+				},
+				"3": {
+					"name": "storage.modifier.obs"
+				},
+				"4": {
+					"name": "entity.name.type.module.obs"
+				}
+			},
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.section.module.end.bracket.curly.obs"
+				}
+			},
+			"name": "meta.module.obs",
+			"patterns": [
+				{
+					"begin": "{",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.section.module.begin.bracket.curly.obs"
+						}
+					},
+					"end": "(?=})",
+					"contentName": "meta.module.body.obs",
+					"patterns": [
+						{
+							"match": "\\b(requires|transitive|exports|opens|to|uses|provides|with)\\b",
+							"name": "keyword.module.obs"
+						}
+					]
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"match": "(?x)\n\\b(?<!\\$)\n0(x|X)\n(\n  (?<!\\.)[0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?[Ll]?(?!\\.)\n  |\n  (\n    [0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?\\.?\n    |\n    ([0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?)?\\.[0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?\n  )\n  [Pp][+-]?[0-9]([0-9_]*[0-9])?[FfDd]?\n)\n\\b(?!\\$)",
+					"name": "constant.numeric.hex.obs"
+				},
+				{
+					"match": "\\b(?<!\\$)0(b|B)[01]([01_]*[01])?[Ll]?\\b(?!\\$)",
+					"name": "constant.numeric.binary.obs"
+				},
+				{
+					"match": "\\b(?<!\\$)0[0-7]([0-7_]*[0-7])?[Ll]?\\b(?!\\$)",
+					"name": "constant.numeric.octal.obs"
+				},
+				{
+					"match": "(?x)\n(?<!\\$)\n(\n  \\b[0-9]([0-9_]*[0-9])?\\.\\B(?!\\.)\n  |\n  \\b[0-9]([0-9_]*[0-9])?\\.([Ee][+-]?[0-9]([0-9_]*[0-9])?)[FfDd]?\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?\\.([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?\\.([0-9]([0-9_]*[0-9])?)([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]?\\b\n  |\n  (?<!\\.)\\B\\.[0-9]([0-9_]*[0-9])?([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]?\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?([Ee][+-]?[0-9]([0-9_]*[0-9])?)[FfDd]?\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]\\b\n  |\n  \\b(0|[1-9]([0-9_]*[0-9])?)(?!\\.)[Ll]?\\b\n)\n(?!\\$)",
+					"name": "constant.numeric.decimal.obs"
+				}
+			]
+		},
+		"object-types": {
+			"patterns": [
+				{
+					"include": "#generics"
+				},
+				{
+					"begin": "\\b((?:[A-Za-z]\\w*\\s*\\.\\s*)*)([A-Z]\\w*)\\s*(?=\\[)",
+					"beginCaptures": {
+						"1": {
+							"patterns": [
+								{
+									"match": "[A-Za-z]\\w*",
+									"name": "storage.type.obs"
+								},
+								{
+									"match": "\\.",
+									"name": "punctuation.separator.period.obs"
+								}
+							]
+						},
+						"2": {
+							"name": "storage.type.object.array.obs"
+						}
+					},
+					"end": "(?!\\s*\\[)",
+					"patterns": [
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#parens"
+						}
+					]
+				},
+				{
+					"match": "\\b((?:[A-Za-z]\\w*\\s*\\.\\s*)*[A-Z]\\w*)\\s*(?=<)",
+					"captures": {
+						"1": {
+							"patterns": [
+								{
+									"match": "[A-Za-z]\\w*",
+									"name": "storage.type.obs"
+								},
+								{
+									"match": "\\.",
+									"name": "punctuation.separator.period.obs"
+								}
+							]
+						}
+					}
+				},
+				{
+					"match": "\\b((?:[A-Za-z]\\w*\\s*\\.\\s*)*[A-Z]\\w*)\\b((?=\\s*[A-Za-z$_\\n])|(?=\\s*\\.\\.\\.))",
+					"captures": {
+						"1": {
+							"patterns": [
+								{
+									"match": "[A-Za-z]\\w*",
+									"name": "storage.type.obs"
+								},
+								{
+									"match": "\\.",
+									"name": "punctuation.separator.period.obs"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		"object-types-inherited": {
+			"patterns": [
+				{
+					"include": "#generics"
+				},
+				{
+					"match": "\\b(?:[A-Z]\\w*\\s*(\\.)\\s*)*[A-Z]\\w*\\b",
+					"name": "entity.other.inherited-class.obs",
+					"captures": {
+						"1": {
+							"name": "punctuation.separator.period.obs"
+						}
+					}
+				},
+				{
+					"match": ",",
+					"name": "punctuation.separator.delimiter.obs"
+				}
+			]
+		},
+		"objects": {
+			"match": "(?<![\\w$])[a-zA-Z_$][\\w$]*(?=\\s*\\.\\s*[\\w$]+)",
+			"name": "variable.other.object.obs"
+		},
+		"parameters": {
+			"patterns": [
+				{
+					"match": "\\bfinal\\b",
+					"name": "storage.modifier.obs"
+				},
+				{
+					"include": "#annotations"
+				},
+				{
+					"include": "#all-types"
+				},
+				{
+					"include": "#strings"
+				},
+				{
+					"match": "\\w+",
+					"name": "variable.parameter.obs"
+				},
+				{
+					"match": ",",
+					"name": "punctuation.separator.delimiter.obs"
+				},
+				{
+					"match": "\\.\\.\\.",
+					"name": "punctuation.definition.parameters.varargs.obs"
+				}
+			]
+		},
+		"parens": {
+			"patterns": [
+				{
+					"begin": "\\(",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.bracket.round.obs"
+						}
+					},
+					"end": "\\)",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.bracket.round.obs"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				},
+				{
+					"begin": "\\[",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.bracket.square.obs"
+						}
+					},
+					"end": "\\]",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.bracket.square.obs"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				},
+				{
+					"begin": "{",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.bracket.curly.obs"
+						}
+					},
+					"end": "}",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.bracket.curly.obs"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				}
+			]
+		},
+		"primitive-arrays": {
+			"patterns": [
+				{
+					"begin": "\\b(void|boolean|byte|char|short|int|float|long|double|string)\\b\\s*(?=\\[)",
+					"beginCaptures": {
+						"1": {
+							"name": "storage.type.primitive.array.obs"
+						}
+					},
+					"end": "(?!\\s*\\[)",
+					"patterns": [
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#parens"
+						}
+					]
+				}
+			]
+		},
+		"primitive-types": {
+			"match": "\\b(void|boolean|byte|char|short|int|float|long|double|string)\\b",
+			"name": "storage.type.primitive.obs"
+		},
+		"properties": {
+			"patterns": [
+				{
+					"match": "(\\.)\\s*([a-zA-Z_$][\\w$]*)(?=\\s*\\.\\s*[a-zA-Z_$][\\w$]*)",
+					"captures": {
+						"1": {
+							"name": "punctuation.separator.period.obs"
+						},
+						"2": {
+							"name": "variable.other.object.property.obs"
+						}
+					}
+				},
+				{
+					"match": "(\\.)\\s*([a-zA-Z_$][\\w$]*)",
+					"captures": {
+						"1": {
+							"name": "punctuation.separator.period.obs"
+						},
+						"2": {
+							"name": "variable.other.property.obs"
+						}
+					}
+				},
+				{
+					"match": "(\\.)\\s*([0-9][\\w$]*)",
+					"captures": {
+						"1": {
+							"name": "punctuation.separator.period.obs"
+						},
+						"2": {
+							"name": "invalid.illegal.identifier.obs"
+						}
+					}
+				}
+			]
+		},
+		"static-initializer": {
+			"patterns": [
+				{
+					"include": "#anonymous-block-and-instance-initializer"
+				},
+				{
+					"match": "static",
+					"name": "storage.modifier.obs"
+				}
+			]
+		},
+		"storage-modifiers": {
+			"match": "\\b(main|asset|state|transaction|public|private|protected|static|final|native|synchronized|abstract|threadsafe|transient|volatile|default|strictfp)\\b",
+			"name": "storage.modifier.obs"
+		},
+		"return-modifier": {
+			"match": "\\b(returns)\\b\\s",
+			"name": "storage.return.modifier.obs",
+			"patterns": [
+				{
+					"captures": {
+						"1": {
+							"name": "storage.modifier.obs"
+						},
+						"2": {
+							"name": "entity.name.type.class.obs"
+						}
+					},
+					"match": "(returns)\\s+(\\w+)",
+					"name": "meta.class.identifier.obs"
+				},
+				{
+					"include": "#annotations"
+				}
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"begin": "\"",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.begin.obs"
+						}
+					},
+					"end": "\"",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.end.obs"
+						}
+					},
+					"name": "string.quoted.double.obs",
+					"patterns": [
+						{
+							"match": "\\\\.",
+							"name": "constant.character.escape.obs"
+						}
+					]
+				},
+				{
+					"begin": "'",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.begin.obs"
+						}
+					},
+					"end": "'",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.end.obs"
+						}
+					},
+					"name": "string.quoted.single.obs",
+					"patterns": [
+						{
+							"match": "\\\\.",
+							"name": "constant.character.escape.obs"
+						}
+					]
+				}
+			]
+		},
+		"throws": {
+			"begin": "throws",
+			"beginCaptures": {
+				"0": {
+					"name": "storage.modifier.obs"
+				}
+			},
+			"end": "(?={|;)",
+			"name": "meta.throwables.obs",
+			"patterns": [
+				{
+					"match": ",",
+					"name": "punctuation.separator.delimiter.obs"
+				},
+				{
+					"match": "[a-zA-Z$_][\\.a-zA-Z0-9$_]*",
+					"name": "storage.type.obs"
+				}
+			]
+		},
+		"try-catch-finally": {
+			"patterns": [
+				{
+					"begin": "\\btry\\b",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.control.try.obs"
+						}
+					},
+					"end": "}",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.section.try.end.bracket.curly.obs"
+						}
+					},
+					"name": "meta.try.obs",
+					"patterns": [
+						{
+							"begin": "\\(",
+							"beginCaptures": {
+								"0": {
+									"name": "punctuation.section.try.resources.begin.bracket.round.obs"
+								}
+							},
+							"end": "\\)",
+							"endCaptures": {
+								"0": {
+									"name": "punctuation.section.try.resources.end.bracket.round.obs"
+								}
+							},
+							"name": "meta.try.resources.obs",
+							"patterns": [
+								{
+									"include": "#code"
+								}
+							]
+						},
+						{
+							"begin": "{",
+							"beginCaptures": {
+								"0": {
+									"name": "punctuation.section.try.begin.bracket.curly.obs"
+								}
+							},
+							"end": "(?=})",
+							"contentName": "meta.try.body.obs",
+							"patterns": [
+								{
+									"include": "#code"
+								}
+							]
+						}
+					]
+				},
+				{
+					"begin": "\\b(catch)\\b\\s*(?=\\(\\s*[^\\s]+\\s*[^)]+\\))",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.catch.obs"
+						}
+					},
+					"end": "}",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.section.catch.end.bracket.curly.obs"
+						}
+					},
+					"name": "meta.catch.obs",
+					"patterns": [
+						{
+							"begin": "\\(",
+							"beginCaptures": {
+								"0": {
+									"name": "punctuation.definition.parameters.begin.bracket.round.obs"
+								}
+							},
+							"end": "\\)",
+							"endCaptures": {
+								"0": {
+									"name": "punctuation.definition.parameters.end.bracket.round.obs"
+								}
+							},
+							"contentName": "meta.catch.parameters.obs",
+							"patterns": [
+								{
+									"include": "#comments"
+								},
+								{
+									"include": "#storage-modifiers"
+								},
+								{
+									"include": "#return-modifier"
+								},
+								{
+									"match": "\\|",
+									"name": "punctuation.catch.separator.obs"
+								},
+								{
+									"match": "([a-zA-Z$_][\\.a-zA-Z0-9$_]*)\\s*(\\w+)?",
+									"captures": {
+										"1": {
+											"name": "storage.type.obs"
+										},
+										"2": {
+											"name": "variable.parameter.obs"
+										}
+									}
+								}
+							]
+						},
+						{
+							"begin": "{",
+							"beginCaptures": {
+								"0": {
+									"name": "punctuation.section.catch.begin.bracket.curly.obs"
+								}
+							},
+							"end": "(?=})",
+							"contentName": "meta.catch.body.obs",
+							"patterns": [
+								{
+									"include": "#code"
+								}
+							]
+						}
+					]
+				},
+				{
+					"begin": "\\bfinally\\b",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.control.finally.obs"
+						}
+					},
+					"end": "}",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.section.finally.end.bracket.curly.obs"
+						}
+					},
+					"name": "meta.finally.obs",
+					"patterns": [
+						{
+							"begin": "{",
+							"beginCaptures": {
+								"0": {
+									"name": "punctuation.section.finally.begin.bracket.curly.obs"
+								}
+							},
+							"end": "(?=})",
+							"contentName": "meta.finally.body.obs",
+							"patterns": [
+								{
+									"include": "#code"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		"variables": {
+			"begin": "(?x)\n(?=\n  (\n    \\b(void|boolean|byte|char|short|int|float|long|double|string)\\b\n    |\n    (?>(\\w+\\.)*[A-Z]+\\w*) # e.g. `obsx.ws.rs.Response`, or `String`\n  )\n  \\s*\n  (\n    <[\\w<>,\\.?\\s\\[\\]]*> # e.g. `HashMap<Integer, String>`, or `List<obs.lang.String>`\n  )?\n  \\s*\n  (\n    (\\[\\])* # int[][]\n  )?\n  \\s+\n  [A-Za-z_$][\\w$]* # At least one identifier after space\n  ([\\w\\[\\],$][\\w\\[\\],\\s]*)? # possibly primitive array or additional identifiers\n  \\s*(=|:|;)\n)",
+			"end": "(?=\\=|:|;)",
+			"name": "meta.definition.variable.obs",
+			"patterns": [
+				{
+					"match": "([A-Za-z$_][\\w$]*)(?=\\s*(\\[\\])*\\s*(;|:|=|,))",
+					"captures": {
+						"1": {
+							"name": "variable.other.definition.obs"
+						}
+					}
+				},
+				{
+					"include": "#all-types"
+				},
+				{
+					"include": "#code"
+				}
+			]
+		},
+		"variables-local": {
+			"begin": "(?=\\b(var)\\b\\s+[A-Za-z_$][\\w$]*\\s*(=|:|;))",
+			"end": "(?=\\=|:|;)",
+			"name": "meta.definition.variable.local.obs",
+			"patterns": [
+				{
+					"match": "\\bvar\\b",
+					"name": "storage.type.local.obs"
+				},
+				{
+					"match": "([A-Za-z$_][\\w$]*)(?=\\s*(\\[\\])*\\s*(=|:|;))",
+					"captures": {
+						"1": {
+							"name": "variable.other.definition.obs"
+						}
+					}
+				},
+				{
+					"include": "#code"
+				}
+			]
+		}
+	},
+	"scopeName": "source.obs"
+}
