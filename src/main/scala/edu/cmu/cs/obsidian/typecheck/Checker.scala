@@ -1398,15 +1398,16 @@ private def checkStatement(
                 }
 
                 var contextPrime = context
-                val newUpdates = Seq.empty
-                var newUpdatesOption :Option[Seq[(ReferenceIdentifier, Expression)]] = None
+                var newUpdatesOption: Option[Seq[(ReferenceIdentifier, Expression)]] = None
 
                 if (updates.isDefined) {
+                    var newUpdates = Seq.empty[(ReferenceIdentifier, Expression)]
+
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
                         val fieldAST = newStateTable.lookupField(f)
                         if (fieldAST.isDefined) {
                             val (t, contextPrime2, ePrime) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))
-                            newUpdates :+ (ReferenceIdentifier(f), ePrime)
+                            newUpdates = newUpdates :+ (ReferenceIdentifier(f), ePrime)
                             contextPrime = contextPrime2
                             checkIsSubtype(s, t, fieldAST.get.typ)
                         }
