@@ -34,8 +34,11 @@ To deploy and invoke the generated chaincode in a real Fabric environment, follo
 3. Run `./invoke.sh FUNCTION_NAME ARG1 ARG2 ...`, for instance: `./invoke.sh setS randomstring`
 4. After you are done, run `./down.sh` to kill and cleanup all Docker containers.
 
+If you wish to upgrade the chaincode on the network without destroying and recreating the entire network, you can run `./update.sh.
+This command uses the same path to the chaincode that you originally uploaded, so there is no need to pass any arguments.
 
 ###### Runtime .jar generation (for those working on Obsidian itself)
 If changes are made to the Obsidian_Runtime code, a new .jar has to be generated and published since the Fabric chaincode relies on it.
 To do so, go to the Obsidian_Runtime folder and run `gradle publish`.
 Then, push the modified .jar to the Git master branch, and it will be available online at `http://obsidian-lang.com/repository`
+
