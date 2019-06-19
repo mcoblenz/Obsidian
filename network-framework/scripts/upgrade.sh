@@ -97,3 +97,5 @@ verifyResult $res "Chaincode upgrade on peer${PEER}.org${ORG} has failed"
 echo "===================== Chaincode is upgraded on peer${PEER}.org${ORG} ===================== "
 echo
 
+sleep $DELAY
+

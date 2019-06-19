@@ -101,3 +101,5 @@ verifyResult $res "Chaincode instantiation on peer${PEER}.org${ORG} on channel '
 echo "===================== Chaincode is instantiated on peer${PEER}.org${ORG} on channel '$CHANNEL_NAME' ===================== "
 echo
 
+sleep $DELAY
+
