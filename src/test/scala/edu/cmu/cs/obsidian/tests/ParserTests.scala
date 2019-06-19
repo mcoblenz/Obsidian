@@ -264,4 +264,11 @@ class ParserTests extends JUnitSuite {
             """.stripMargin
         )
     }
+
+    @Test def parseModOperator() = {
+        shouldSucceed(
+            """
+              | main contract C { transaction f(int y) { int x = 1 % y; } }
+            """.stripMargin)
+    }
 }

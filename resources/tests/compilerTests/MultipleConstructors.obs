@@ -1,0 +1,50 @@
+main contract MultipleConstructors {
+    transaction doS1() returns int {
+        return new B(new C()).getX();
+    }
+
+    transaction doS2() returns int {
+        return new B(new C().toS2()).getX();
+    }
+
+    transaction doS3() returns int {
+        return new B(new C().toS3()).getX();
+    }
+}
+
+contract B {
+    int x;
+
+    B@Owned(C@(S1 | S3) s1c) {
+        x = 1;
+    }
+
+    B@Owned(C@S2 s2c) {
+        x = 2;
+    }
+
+    transaction getX() returns int {
+        return x;
+    }
+}
+
+contract C {
+    state S1;
+    state S2;
+    state S3;
+
+    C@S1() {
+        ->S1;
+    }
+
+    transaction toS2(C@Owned >> Unowned this) returns C@S2 {
+        ->S2;
+        return this;
+    }
+
+    transaction toS3(C@Owned >> Unowned this) returns C@S3 {
+        ->S3;
+        return this;
+    }
+}
+

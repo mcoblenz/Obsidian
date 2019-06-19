@@ -77,6 +77,7 @@ case class PlusT() extends Token { override def toString: String = "+" }
 case class StarT() extends Token { override def toString: String = "*" }
 case class ForwardSlashT() extends Token { override def toString: String = "/" }
 case class MinusT() extends Token { override def toString: String = "-" }
+case class PercentT() extends Token { override def toString: String = "%" }
 case class AtT() extends Token { override def toString: String = "@" }
 case class LBracketT() extends Token { override def toString: String ="[" }
 case class RBracketT() extends Token { override def toString: String ="]" }

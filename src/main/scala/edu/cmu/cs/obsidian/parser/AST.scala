@@ -65,6 +65,7 @@ case class Add(e1: Expression, e2: Expression) extends Expression
 case class Subtract(e1: Expression, e2: Expression) extends Expression
 case class Divide(e1: Expression, e2: Expression) extends Expression
 case class Multiply(e1: Expression, e2: Expression) extends Expression
+case class Mod(e1: Expression, e2: Expression) extends Expression
 case class Negate(e: Expression) extends Expression
 case class Equals(e1: Expression, e2: Expression) extends Expression
 case class GreaterThan(e1: Expression, e2: Expression) extends Expression
@@ -92,7 +93,9 @@ case class StateInitializer(stateName: Identifier, fieldName: Identifier) extend
 /* statements and control flow constructs */
 case class VariableDecl(typ: ObsidianType, varName: String) extends Statement
 case class VariableDeclWithInit(typ: ObsidianType, varName: String, e: Expression) extends Statement
+
 case class VariableDeclWithSpec(typIn: ObsidianType, typOut: ObsidianType, varName: String) extends Statement
+
 case class Return() extends Statement
 case class ReturnExpr(e: Expression) extends Statement
 

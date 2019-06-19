@@ -15,7 +15,7 @@ main asset contract GiftCertificate {
 	state Expired;
 	state Redeemed;
 
-	GiftCertificate(Money@Owned >> Unowned b, Date @ Unowned d) {
+	GiftCertificate@Active(Money@Owned >> Unowned b, Date @ Unowned d) {
 	    expirationDate = d;
 	    ->Active(balance = b);
 	}

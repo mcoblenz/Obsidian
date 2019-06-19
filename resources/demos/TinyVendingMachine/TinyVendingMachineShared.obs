@@ -21,7 +21,7 @@ main asset contract TinyVendingMachine {
     }
     state Empty; // No candy if the machine is empty.
 
-    TinyVendingMachine() {
+    TinyVendingMachine@Owned() {
         coinBin = new Coins(); // Start with an empty coin bin.
         ->Empty;
     }

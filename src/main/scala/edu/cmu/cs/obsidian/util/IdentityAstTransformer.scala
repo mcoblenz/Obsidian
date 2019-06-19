@@ -139,6 +139,8 @@ class IdentityAstTransformer {
                 Divide(transformExpression(d.e1), transformExpression(d.e2)).setLoc(d)
             case m: Multiply =>
                 Multiply(transformExpression(m.e1), transformExpression(m.e2)).setLoc(m)
+            case mod: Mod =>
+                Mod(transformExpression(mod.e1), transformExpression(mod.e2)).setLoc(mod)
             case n: Negate =>
                 Negate(transformExpression(n.e)).setLoc(n)
             case eq: Equals =>

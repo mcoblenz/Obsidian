@@ -109,7 +109,8 @@ public class SerializationState {
     // If the returned reference is owned, record that so that we can re-claim ownership when we see the object again.
     public void mapReturnedObject(ObsidianSerialized obj, boolean returnedReferenceIsOwned) {
         loadReturnedObjectsMap(stub);
-
+        System.out.println("returnedObjectClassMap: " + returnedObjectClassMap);
+        System.out.println("obj: " + obj);
         returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
     }
 
@@ -252,22 +253,9 @@ public class SerializationState {
         } else {
             boolean outstandingOwnedReference = refState.getIsOwnedReference();
 
-            if (requireOwnership) {
-                if (!outstandingOwnedReference) {
-                    throw new IllegalOwnershipConsumptionException(guid);
-                }
-                else if (!ownershipRemains) {
-                    // We've now consumed ownership, so record that fact.
-                    // We can't remove the object from the map because the client may well still have a reference.
-                    mapReturnedObject(receiverContract, false);
-                }
-            }
-            else if (ownershipRemains && !outstandingOwnedReference) {
-                mapReturnedObject(receiverContract, true);
-            }
-
             if (receiverContract == null) {
                 try {
+                    // We haven't loaded this object yet. Make a shell object by calling its constructor; we'll load the fields lazily later.
                     Class objectClass = refState.getClassRef();
                     Constructor constructor = objectClass.getConstructor(String.class);
                     Object loadedObject = constructor.newInstance(guid);
@@ -289,7 +277,23 @@ public class SerializationState {
                     return null;
                 }
             }
+
+            if (requireOwnership) {
+                if (!outstandingOwnedReference) {
+                    throw new IllegalOwnershipConsumptionException(guid);
+                }
+                else if (!ownershipRemains) {
+                    // We've now consumed ownership, so record that fact.
+                    // We can't remove the object from the map because the client may well still have a reference.
+                    mapReturnedObject(receiverContract, false);
+                }
+            }
+            else if (ownershipRemains && !outstandingOwnedReference) {
+                mapReturnedObject(receiverContract, true);
+            }
+
         }
+
 
         return receiverContract;
     }
