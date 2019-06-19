@@ -34,7 +34,7 @@
 					"name": "invalid.deprecated.package_name_not_lowercase.obs"
 				},
 				{
-					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|boolean|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
+					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|bool|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
 					"name": "invalid.illegal.character_not_allowed_here.obs"
 				},
 				{
@@ -78,7 +78,7 @@
 					"name": "invalid.illegal.character_not_allowed_here.obs"
 				},
 				{
-					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|boolean|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
+					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|bool|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
 					"name": "invalid.illegal.character_not_allowed_here.obs"
 				},
 				{
@@ -1232,7 +1232,7 @@
 		"primitive-arrays": {
 			"patterns": [
 				{
-					"begin": "\\b(void|boolean|byte|char|short|int|float|long|double|string)\\b\\s*(?=\\[)",
+					"begin": "\\b(void|bool|byte|char|short|int|float|long|double|string)\\b\\s*(?=\\[)",
 					"beginCaptures": {
 						"1": {
 							"name": "storage.type.primitive.array.obs"
@@ -1251,7 +1251,7 @@
 			]
 		},
 		"primitive-types": {
-			"match": "\\b(void|boolean|byte|char|short|int|float|long|double|string)\\b",
+			"match": "\\b(void|bool|byte|char|short|int|float|long|double|string)\\b",
 			"name": "storage.type.primitive.obs"
 		},
 		"properties": {
@@ -1555,7 +1555,7 @@
 			]
 		},
 		"variables": {
-			"begin": "(?x)\n(?=\n  (\n    \\b(void|boolean|byte|char|short|int|float|long|double|string)\\b\n    |\n    (?>(\\w+\\.)*[A-Z]+\\w*) # e.g. `obsx.ws.rs.Response`, or `String`\n  )\n  \\s*\n  (\n    <[\\w<>,\\.?\\s\\[\\]]*> # e.g. `HashMap<Integer, String>`, or `List<obs.lang.String>`\n  )?\n  \\s*\n  (\n    (\\[\\])* # int[][]\n  )?\n  \\s+\n  [A-Za-z_$][\\w$]* # At least one identifier after space\n  ([\\w\\[\\],$][\\w\\[\\],\\s]*)? # possibly primitive array or additional identifiers\n  \\s*(=|:|;)\n)",
+			"begin": "(?x)\n(?=\n  (\n    \\b(void|bool|byte|char|short|int|float|long|double|string)\\b\n    |\n    (?>(\\w+\\.)*[A-Z]+\\w*) # e.g. `obsx.ws.rs.Response`, or `String`\n  )\n  \\s*\n  (\n    <[\\w<>,\\.?\\s\\[\\]]*> # e.g. `HashMap<Integer, String>`, or `List<obs.lang.String>`\n  )?\n  \\s*\n  (\n    (\\[\\])* # int[][]\n  )?\n  \\s+\n  [A-Za-z_$][\\w$]* # At least one identifier after space\n  ([\\w\\[\\],$][\\w\\[\\],\\s]*)? # possibly primitive array or additional identifiers\n  \\s*(=|:|;)\n)",
 			"end": "(?=\\=|:|;)",
 			"name": "meta.definition.variable.obs",
 			"patterns": [
