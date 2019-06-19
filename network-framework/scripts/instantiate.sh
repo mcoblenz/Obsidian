@@ -102,3 +102,4 @@ echo "===================== Chaincode is instantiated on peer${PEER}.org${ORG} o
 echo
 
 sleep $DELAY
+

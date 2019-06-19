@@ -1,25 +1,33 @@
 #!/bin/bash
 
-CHANNEL_NAME="mychannel"
-DELAY="3"
 : ${CHANNEL_NAME:="mychannel"}
 : ${DELAY:="3"}
 : ${LANGUAGE:="java"}
 : ${TIMEOUT:="10"}
 : ${VERBOSE:="false"}
 LANGUAGE="$(echo "$LANGUAGE" | tr [:upper:] [:lower:])"
-TIMEOUT="10"
-VERBOSE="false"
 
 PEER="$1"
 ORG="$2"
-CC_SRC_PATH=$CC_SRC_PATH
+INIT_ARGS="$3"
+VERSION=${4:-1.0}
 
 ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 PEER0_ORG1_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
 PEER0_ORG2_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
 PEER0_ORG3_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
 
+SCRIPTS_PATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts
+
+if [ -n "${INIT_ARGS}" ] ; then
+    if [ "${INIT_ARGS}" == "-" ] ; then
+        INIT='["init"]'
+    else
+        INIT='["init",'${INIT_ARGS}']'
+    fi
+else
+    INIT='["init"]'
+fi
 
 verifyResult() {
   if [ $1 -ne 0 ]; then
@@ -70,16 +78,24 @@ setGlobals() {
   fi
 }
 
-# Install chaincode
-echo "===================== Installing chaincode on peer${PEER}.org${ORG} ===================== "
+# Install chaincode on all peers
+for org in 1 2; do
+    bash "$SCRIPTS_PATH/install.sh" 0 "$org" "$VERSION"
+done
+
+echo "===================== Upgrading chaincode on peer${PEER}.org${ORG} ===================== "
 setGlobals $PEER $ORG
-VERSION=${3:-1.0}
 set -x
-peer chaincode install -n mycc -v ${VERSION} -l ${LANGUAGE} -p ${CC_SRC_PATH} >&log.txt
+peer chaincode upgrade -o orderer.example.com:7050 -C "$CHANNEL_NAME" -n mycc\
+    --tls "$CORE_PEER_TLS_ENABLED" --cafile "$ORDERER_CA" -l "${LANGUAGE}"\
+    -v "${VERSION}" -c "{\"Args\":${INIT}}" -p "${CC_SRC_PATH}"\
+    -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
 res=$?
 set +x
 cat log.txt
-verifyResult $res "Chaincode installation on peer${PEER}.org${ORG} has failed"
-echo "===================== Chaincode is installed on peer${PEER}.org${ORG} ===================== "
+verifyResult $res "Chaincode upgrade on peer${PEER}.org${ORG} has failed"
+echo "===================== Chaincode is upgraded on peer${PEER}.org${ORG} ===================== "
 echo
+
+sleep $DELAY
 
