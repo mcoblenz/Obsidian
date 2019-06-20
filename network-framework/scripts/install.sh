@@ -1,9 +1,7 @@
 #!/bin/bash
 
 CHANNEL_NAME="mychannel"
-DELAY="3"
 : ${CHANNEL_NAME:="mychannel"}
-: ${DELAY:="3"}
 : ${LANGUAGE:="java"}
 : ${TIMEOUT:="10"}
 : ${VERBOSE:="false"}
