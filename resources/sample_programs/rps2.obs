@@ -1,0 +1,90 @@
+contract Player {
+    string move;
+
+    Player@Owned() {
+        move = "none";
+    }
+
+    transaction getMove(Player@Owned >> Owned this) returns string {
+        return move;
+    }
+
+    transaction setMove(Player@Owned >> Owned this, string newMove) {
+        if ((move != "rock") or (move != "paper") or (move != "scissors")) {
+            revert("Possible moves: rock, paper, scissors");
+        }
+        move = newMove;
+    }
+}
+main contract Game {
+    Player@Owned p1;
+    Player@Owned p2;
+
+    state P1Win;
+    state P2Win;
+    state Tie;
+    state Start;
+    state AllPlayed;
+    state P1Done;
+
+    Game@Start() {
+        p1 = new Player();
+        p2 = new Player();
+        -> Start;
+    }
+
+    transaction nextGame() returns string {
+        -> Start;
+        return "Starting new game ...";
+    }
+
+    transaction p1Move(Game@Start >> P1Done this, string move) {
+        p1.setMove(move);
+        -> P1Done;
+    }
+
+    transaction p2Move(Game@P1Done >> AllPlayed this, string move) {
+        p2.setMove(move);
+        -> AllPlayed;
+    }
+
+    transaction play(Game@AllPlayed >> (Tie | P1Win | P2Win) this) returns string {
+
+        string p1Move = p1.getMove();
+        string p2Move = p2.getMove();
+
+        if (p1Move == "rock") {
+            if (p2Move == "scissors") {
+                -> P1Win;
+                return "Player 1 wins!";
+            }
+            if (p2Move == "paper") {
+                -> P2Win;
+                return "Player 2 wins!";
+            }
+        }
+        if (p1Move == "paper") {
+            if (p2Move == "rock") {
+                -> P1Win;
+                return "Player 1 wins!";
+            }
+            if (p2Move == "scissors") {
+                -> P2Win;
+                return "Player 2 wins!";
+            }
+        }
+        if (p1Move == "scissors") {
+            if (p2Move == "paper") {
+                -> P1Win;
+                return "Player 1 wins!";
+            }
+            if (p2Move == "rock") {
+                -> P2Win;
+                return "Player 2 wins!";
+            }
+        }
+        ->Tie;
+        return "Tie";
+
+    }
+}
