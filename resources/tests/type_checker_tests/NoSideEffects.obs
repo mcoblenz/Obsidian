@@ -11,7 +11,7 @@ main contract NoSideEffects {
         // should fail
         1 < x;
         // should fail
-        true or false;
+        true || false;
     }
 
 }
