@@ -18,7 +18,7 @@ contract Prescription {
 	int refills;
 	string patientName; // Assume that patient names are unique.
 
-	Prescription(string prescriptionText, int refills, string patientName) {
+	Prescription@Owned(string prescriptionText, int refills, string patientName) {
 		if (!new AccessControl().loggedInAsDoctor()) {
             revert "Invalid access: Not logged in as doctor!";
 		}
