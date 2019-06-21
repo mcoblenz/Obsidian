@@ -19,7 +19,7 @@ contract Prescription {
 	string patientName; // Assume that patient names are unique.
 
 	Prescription(string prescriptionText, int refills, string patientName) {
-		if (not new AccessControl().loggedInAsDoctor()) {
+		if (!new AccessControl().loggedInAsDoctor()) {
             revert "Invalid access: Not logged in as doctor!";
 		}
 
@@ -131,7 +131,7 @@ contract PharmacyPrescriptionRecordList {
 
     transaction contains(PharmacyPrescriptionRecordList@Shared this, Prescription@Unowned prescription) returns bool {
         if (this in Cons) {
-            return (record.getPrescription() == prescription) or next.contains(prescription);
+            return (record.getPrescription() == prescription) || next.contains(prescription);
         } else {
             return false;
         }

@@ -56,6 +56,6 @@ contract Policy {
         int latitudeDist = weather.getLatitude() - latitude;
         int dist = sqrt(longitudeDist * longitudeDist + latitudeDist * latitudeDist);
 
-        return (dist < radius) and (weather.getMoisture() < moistureContent);
+        return (dist < radius) && (weather.getMoisture() < moistureContent);
     }
 }

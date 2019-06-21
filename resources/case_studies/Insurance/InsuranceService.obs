@@ -102,7 +102,7 @@ main asset contract InsuranceService {
 
     // Returns a payment.
     transaction claim(InsuranceService@Ready this, Policy@Active >> Claimed policy, WeatherRecord@Shared weatherRecord, Signature s) returns Money@Owned {
-        if (not s.verify(weatherRecord)) {
+        if (!s.verify(weatherRecord)) {
             // Invalid signature; can't pay a claim with it.
             revert "Unable to verify weather record signature.";
         }
