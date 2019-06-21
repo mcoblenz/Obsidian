@@ -31,9 +31,6 @@ object Lexer extends RegexParsers {
         case "try" => TryT()
         case "catch" => CatchT()
         case "revert" => RevertT()
-        case "not" => NotT()
-        case "and" => AndT()
-        case "or" => OrT()
         case "return" => ReturnT()
         case "returns" => ReturnsT()
         case "new" => NewT()
@@ -77,6 +74,9 @@ object Lexer extends RegexParsers {
     }
 
     /* Punctuation */
+    private def notP = """!""".r ^^^ NotT()
+    private def andP = """&&""".r ^^^ AndT()
+    private def orP = """\|\|""".r ^^^ OrT()
     private def plusP = """\+""".r ^^^  PlusT()
     private def starP = """\*""".r ^^^  StarT()
     private def forwardSlashP = """/""".r ^^^  ForwardSlashT()
@@ -115,7 +115,7 @@ object Lexer extends RegexParsers {
         lBraceP | rBraceP | lParenP | rParenP | commaP | dotP | semicolonP |
 
         /* order is important here because some tokens contain the others */
-        chevP | gtEqP | ltEqP | eqEqP | notEqP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
+        orP | andP | chevP | gtEqP | ltEqP | eqEqP | notEqP | notP | rightArrowP | bigRightArrowP | ltP | gtP | eqP |
 
         plusP | starP | forwardSlashP | percentP | minusP | coloncolonP | atP | lBracketP | rBracketP | pipeP | colonP
     )
