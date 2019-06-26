@@ -1,0 +1,263 @@
+/*
+- TRAPS: 
+    losing resources --> losing shares when out of scope
+    doing things in the wrong state
+        -> a nonshareholder voting
+        -> nonshareholder selling shares
+*/
+
+
+contract Person {
+    int numShares;
+    string name;
+    int totalMoney;
+
+    state RegisteredShareholder;
+    state BeneficialShareholder;
+    state NonShareholder;
+
+    Person@Owned(string n, int money) {
+        name = n;
+        numShares = 0;
+        totalMoney = money;
+        -> NonShareholder;
+    }
+
+    transaction getName(Person@(RegisteredShareholder | BeneficialShareholder | NonShareholder) >> (RegisteredShareholder | BeneficialShareholder | NonShareholder) this) returns string {
+        return name;
+    }
+
+    transaction getNumShares(Person@(RegisteredShareholder | BeneficialShareholder | NonShareholder) >> (RegisteredShareholder | BeneficialShareholder | NonShareholder) this) returns int {
+        return numShares;
+    }
+
+    transaction getMoney(Person@(RegisteredShareholder | BeneficialShareholder | NonShareholder) >> (RegisteredShareholder | BeneficialShareholder | NonShareholder) this) returns int {
+        return totalMoney;
+    }
+
+    transaction addShares(Person@(RegisteredShareholder | BeneficialShareholder | NonShareholder) >> (RegisteredShareholder | BeneficialShareholder) this, int numNewShares, bool fromBroker, int cost) {
+        numShares = numShares + numNewShares;
+        totalMoney = totalMoney - cost;
+        if (fromBroker) {
+            -> BeneficialShareholder;
+        }
+        else {
+            -> RegisteredShareholder;
+        }
+    }
+
+    transaction removeShares(Person@(RegisteredShareholder | BeneficialShareholder) >> (RegisteredShareholder | BeneficialShareholder | NonShareholder) this, int numRemove, int cost) {
+        numShares = numShares - numRemove;
+        totalMoney = totalMoney + cost;
+        if (numShares == 0) {
+            -> NonShareholder;
+        }
+    }
+
+}
+
+contract Broker {
+    string name;
+    int numShares;
+    int totalMoney;
+
+    transaction getName(Broker@Owned >> Owned this) returns string {
+        return name;
+    }
+
+    transaction getNumShares(Broker@Owned >> Owned this) returns int {
+        return numShares;
+    }
+
+    transaction getMoney(Broker@Owned >> Owned this) returns int {
+        return totalMoney;
+    }
+
+    Broker@Owned(string n, int shares, int money) {
+        name = n;
+        numShares = shares;
+        totalMoney = money;
+    }
+
+    transaction addShares(Broker@Owned >> Owned this, int numNewShares, int cost) {
+        numShares = numShares + numNewShares;
+        totalMoney = totalMoney - cost;
+    }
+
+    transaction removeShares(Broker@Owned >> Owned this, int numRemove, int cost) {
+        numShares = numShares - numRemove;
+        totalMoney = totalMoney + cost;
+    }
+
+}
+
+contract Proposal {
+    int numVotesFor;
+    int numVotesAgainst;
+    string name;
+
+    state Passed;
+    state Failed;
+    state Undecided;
+
+    Proposal@Owned(string n) {
+        numVotesFor = 0;
+        numVotesAgainst = 0;
+        name = n;
+        -> Undecided;
+    }
+
+    transaction addVotes(Proposal@Undecided >> Undecided this, int num, bool pass) {
+        if (pass) {
+            numVotesFor = numVotesFor + num;
+        }
+        else {
+            numVotesAgainst = numVotesAgainst + num;
+        }
+    }
+
+    transaction getVotes() returns int {
+        return numVotesFor;
+    }
+
+    transaction didPass(Proposal@Undecided >> (Passed | Failed) this) returns string {
+        if (numVotesFor > numVotesAgainst) {
+            -> Passed;
+            return "The proposal passed.";
+        }
+        else {
+            -> Failed;
+            return "The proposal failed.";
+        }
+    }
+}
+
+contract Share {
+    int price;
+
+    Share@Owned() {
+        price = 35;
+    }
+
+    transaction getPrice(Share@Owned >> Owned this) returns int {
+        return price;
+    }
+
+    // transaction setPrice(int num) {
+    //     price = num;
+    // }
+}
+
+main contract Market {
+
+    int totalShares;
+    int sharesSelling;
+    int sharesBuying;
+    Broker@Owned b;
+    Person@Owned p; //List of Persons
+    Share@Owned s; //List of Shares
+    Proposal@Owned prop; //List of Proposals
+    
+    Market@Owned() {
+        totalShares = 5000;
+        sharesSelling = totalShares;
+        sharesBuying = 0;
+        b = new Broker("Bank", 600, 10000);
+        p = new Person("Alice", 100);
+        s = new Share();
+        prop = new Proposal("Compost");
+    }
+
+    transaction getTotalShares() returns int {
+        return totalShares;
+    }
+
+    transaction getSellingShares() returns int {
+        return sharesSelling;
+    }
+
+    transaction getBuyingShares() returns int {
+        return sharesBuying;
+    }
+
+    transaction buySharesDirect(string personName, int numShares) {
+        //Person with name "personName"
+        int cost = numShares * s.getPrice();
+        if (sharesSelling < numShares) {
+            revert("There aren't enough shares being sold for this purchase.");
+        }
+        // if (p in RegisteredShareholder or p in NonShareholder) {
+            if (cost > p.getMoney()) {
+                revert("Cannot spend more money than owned.");
+            }
+            p.addShares(numShares, false, cost);
+            sharesSelling = sharesSelling - numShares;
+            sharesBuying = sharesBuying + numShares;
+        // }
+    }
+
+    transaction buySharesFromBroker(string personName, string brokerName, int numShares) {
+        int cost = numShares * s.getPrice();
+        if (sharesSelling < numShares) {
+            revert("There aren't enough shares being sold for this purchase.");
+        }
+        if (cost > p.getMoney()) {
+                revert("Cannot spend more money than owned.");
+        }
+        b.addShares(numShares, cost);
+        p.addShares(numShares, false, cost);
+        sharesSelling = sharesSelling - numShares;
+        sharesBuying = sharesBuying + numShares;
+
+        Share@Unowned indirectS = s;
+
+    }
+
+    transaction sellSharesDirect(string personName, int numShares) {
+        //Person with name "personName"
+        int cost = numShares * s.getPrice();
+        if (numShares > p.getNumShares()) {
+            revert("Can only sell less than or equal to your owned shares");
+        }
+        if (sharesBuying < numShares) {
+            revert("There aren't enough buyers for this many shares.");
+        }
+        if (not p in NonShareholder) {
+            p.removeShares(numShares, cost);
+            sharesSelling = sharesSelling + numShares;
+            sharesBuying = sharesBuying - numShares;
+        }
+        else {
+            revert("Person is not a shareholder.");
+        }
+    }
+
+    transaction sellSharesFromBroker(string personName, string brokerName, int numShares) {
+        int cost = numShares * s.getPrice();
+        if (numShares > p.getNumShares()) {
+            revert("Can only sell less than or equal to your owned shares");
+        }
+        if (sharesBuying < numShares) {
+            revert("There aren't enough buyers for this many shares.");
+        }
+        if (not p in NonShareholder) {
+            b.removeShares(numShares, cost);
+            p.removeShares(numShares, cost);
+            sharesSelling = sharesSelling + numShares;
+            sharesBuying = sharesBuying - numShares;
+        }
+        else {
+            revert("Person is not a shareholder.");
+        }
+    }
+
+    transaction vote(string personName, string proposalName, bool pass) {
+        numVotes = p.getNumShares();
+        prop.addVotes(numVotes, pass);
+    }
+
+    transaction calculateWin() returns string {
+        return prop.didPass();
+    }
+
+}

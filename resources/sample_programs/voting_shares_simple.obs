@@ -1,0 +1,192 @@
+
+contract Person {
+    string name;
+    int totalMoney;
+    // ShareList@Owned shares;
+    int numShares;
+
+    state Shareholder;
+    state NonShareholder;
+    state Voted;
+
+    Person@Owned(string n, int money) {
+        name = n;
+        totalMoney = money;
+        shares = new ShareList();
+        ->NonShareholder;
+    }
+
+    // transaction addShare(Person@Owned >> Owned this, Share s) {
+    //     shares.append(s);
+    // }
+}
+
+contract Proposal {
+    int numVotesFor;
+    int numVotesAgainst;
+    string name;
+
+    state Passed;
+    state Failed;
+    state Undecided;
+
+    Proposal@Owned(string n) {
+        numVotesFor = 0;
+        numVotesAgainst = 0;
+        name = n;
+        -> Undecided;
+    }
+
+    transaction addVotes(Proposal@Undecided >> Undecided this, int num, bool pass) {
+        if (pass) {
+            numVotesFor = numVotesFor + num;
+        }
+        else {
+            numVotesAgainst = numVotesAgainst + num;
+        }
+    }
+
+    transaction getVotes() returns int {
+        return numVotesFor;
+    }
+
+    transaction didPass(Proposal@Undecided >> (Passed | Failed) this) returns string {
+        if (numVotesFor > numVotesAgainst) {
+            -> Passed;
+            return "The proposal passed.";
+        }
+        else {
+            -> Failed;
+            return "The proposal failed.";
+        }
+    }
+}
+
+// contract Share {
+
+// }
+
+// contract ShareList {
+//     asset state HasNext {
+//         ShareList@Owned next;
+//     }
+
+//     asset state NoNext;
+//     state Empty;
+
+//     Share@Unowned val available in HasNext, NoNext;
+
+
+//     ShareList@Empty() {
+//         ->Empty;
+//     }
+
+//     transaction getValue(ShareList@HasNext this) returns Share@Unowned {
+//         return val;
+//     }
+
+//     transaction disconnectNext(ShareList@HasNext >> NoNext this) returns ShareList@Owned {
+//         ShareList removedNext = next;
+//         ->NoNext;
+//         return removedNext;
+//     }
+
+//     transaction reconnectNext(ShareList@NoNext >> HasNext this, ShareList@Owned >> Unowned newNext) {
+//         ->HasNext(next = newNext);
+//     }
+
+//     private transaction removeValue(ShareList@NoNext >> Empty this) returns Share@Unowned {
+//         Share valCopy = val;
+//         ->Empty;
+//         return valCopy;
+//     }
+
+//     transaction append(ShareList@Owned this, Share@Unowned >> Unowned v) {
+//         switch this {
+//             case HasNext {
+//                 next.append(v);
+//             }
+//             case Empty {
+//                 ->HasNext(val = v, next = new ShareList());
+//             }
+//         }
+//     }
+
+//     // Removes prevNode.next, returning the PolicyRecord that was previously owned by prevNode.next.
+//     // Precondition: this is not the last node of the linked totalShares.
+//     transaction removeNext(ShareList@HasNext this) returns Share@Unowned {
+//         ShareList removedNode = this.next;
+//         [removedNode@Owned];
+
+//         switch removedNode {
+//             case Empty {
+//                 revert; // this case doesn't make any sense.
+//             }
+//             case HasNext {
+//                 this.next = removedNode.disconnectNext();
+//                 [removedNode@NoNext];
+//                 return removedNode.removeValue();
+//             }
+//         }
+//     }
+// }
+
+main contract Market {
+
+    // ShareList@Owned totalShares;
+    int sharePrice;
+    int totalShares;
+    Person@Owned p;
+    Proposal@Owned prop;
+
+    state VotingOpen;
+    state VotingClosed;
+
+    Market@Owned() {
+        sharePrice = 40;
+        totalShares = 10000//new ShareList();
+        // Share s = new Share();
+        // totalShares.append(s);
+        p = new Person("Alice", 500);
+        prop = new Proposal("Board of Directors");
+        -> VotingOpen;
+    }
+
+    // transaction buyShares (Market@Owned this) {
+    //     p.addShare(get());
+    // }
+
+    // transaction get(Market@Owned this) returns Share@Unowned {
+    //     Share removed;
+
+    //     switch totalShares {
+    //         case Empty {
+    //             revert;
+    //         }
+    //         case HasNext {
+    //             ShareList secondNode = totalShares.disconnectNext();
+    //             [totalShares@NoNext];
+    //             removed = totalShares.removeValue();
+    //             totalShares = secondNode;
+    //         }
+    //     }
+
+    //     return removed;
+
+    // }
+
+
+    transaction vote(Market@VotingOpen this, string personName, string proposalName, bool pass) {
+        numVotes = p.getNumShares();
+        prop.addVotes(numVotes, pass);
+    }
+
+    transaction closeElection(Market@VotingOpen >> VotingClosed this) {
+        -> VotingClosed;
+    }
+
+    transaction calculateWin() returns string {
+        return prop.didPass();
+    }
+
+}
