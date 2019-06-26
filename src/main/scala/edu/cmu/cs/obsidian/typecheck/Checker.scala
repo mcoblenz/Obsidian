@@ -2224,6 +2224,7 @@ private def checkStatement(
     }
 
     private def checkContract(contract: Contract): Contract = {
+        currentContractSourcePath = contract.sourcePath
 
         contract match {
             case obsContract : ObsidianContractImpl =>
