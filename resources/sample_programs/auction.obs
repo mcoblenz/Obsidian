@@ -1,24 +1,25 @@
 //English Auction
-//Money, balance, record of unowned money references, remove fee
-
 
 contract Bidder {
     string name;
     int bidAmount;
+    int balance;
 
     state WonItem {
         Item@Owned item;
     }
     state Bidding;
 
-    Bidder@Owned(string n, int b) {
+    Bidder@Owned(string n, int m, int b) {
         bidAmount = b;
         name = n;
+        balance = m;
         -> Bidding;
     }
 
     transaction createBid(Bidder@Owned this) returns Bid@Owned {
         Bid bid = new Bid(bidAmount);
+        balance = balance - bidAmount;
         return bid;
     }
 
@@ -32,6 +33,10 @@ contract Bidder {
 
     transaction won(Bidder@Owned >> WonItem this, Item@Owned >> Unowned i) {
         -> WonItem(item = i);
+    }
+
+    transaction returnBidMoney(Bidder@Owned this, Bid@Owned bid) {
+        balance = balance + bid.getAmount();
     }
 }
 
@@ -66,14 +71,24 @@ contract Fee {
 
 }
 
+
 contract Bid {
     int amount;
+
+    state Open;
+    state Stale;
+
     Bid@Owned(int num) {
         amount = num;
+        ->Open;
     }
 
     transaction getAmount(Bid@Owned this) returns int {
         return amount;
+    }
+
+    transaction bidSurpassed(Bid@Open >> Stale this) {
+        -> Stale;
     }
 }
 
@@ -83,10 +98,15 @@ main contract Auction {
     Bidder@Owned maxBidder;
     Seller@Owned seller;
 
-    state Open {
+    state Initial {
         Item@Owned item;
-        Bid@Owned bid;
         Fee@Owned fee;
+    }
+
+    state Open {
+        Item@Owned itemSame;
+        Bid@Owned bid;
+        Fee@Owned f;
     }
     state BiddingDone {
         Item@Owned it;
@@ -95,19 +115,21 @@ main contract Auction {
     state Closed;
 
 
-    Auction@Owned() {
-        maxBidder = new Bidder("none", 0);
+    Auction@Owned(Item@Owned >> Unowned i, Fee@Owned >> Unowned f) {
+        maxBidder = new Bidder("none",0, 0);
         seller = new Seller();
-        -> Closed;
+        -> Initial(item = i, fee = f);
     }
 
-    transaction receiveItemFromSeller(Auction@Closed >> Open this, Item@Owned >> Unowned i, Fee@Owned >> Unowned f) {
-        Bid b = new Bid(0);
-        -> Open(item = i, bid = b, fee = f);
-    }
-
-    transaction makeBid(Auction@Open this, Bidder@Owned >> Unowned bidder) {
+    transaction makeBid(Auction@Initial >> Open this, Bidder@Owned >> Unowned bidder) {
+        -> Open(itemSame = item, bid = new Bid(0), f = fee);
         if (bidder.getBidAmount() > bid.getAmount()) {
+            if (maxBidder.getName() != "none") {
+                if (bid in Open) {
+                    maxBidder.returnBidMoney(bid);
+                    bid.bidSurpassed();
+                }
+            }
             bid = bidder.createBid();
             maxBidder = bidder;
         }
@@ -116,10 +138,10 @@ main contract Auction {
     transaction closeBidding(Auction@Open >> BiddingDone this) {
         if (bid.getAmount() <= 0) {
             if (seller in Unsold) {
-                seller.getBackFee(fee);
+                seller.getBackFee(f);
             }
         }
-        -> BiddingDone(it = item, finalBid = bid);
+        -> BiddingDone(it = itemSame, finalBid = bid);
     }
 
     transaction giveItem(Auction@BiddingDone >> Closed this) {
