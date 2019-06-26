@@ -1,0 +1,71 @@
+import "License/Licensor.obs"
+import "License/Token.obs"
+import "License/Money.obs"
+
+// This is just meant to simulate a "payable" entity: the client implementation of the licensee could be whatever, as it just needs
+// to send requests to the LicenseManager
+asset contract Licensee {
+    Money@Owned balance;
+
+    transaction pay(Licensee@Owned this, Money@Owned >> Unowned money) {
+        balance.merge(money);
+    }
+
+    transaction withdraw(Licensee@Owned this, int amount) returns Money@Owned {
+        return balance.split(amount);
+    }
+}
+
+// How should these tokens be done so that we can check that the licensor actually issued them?
+// Do we need actual encryption?
+asset main contract LicenseManager {
+    state Unlicensed;
+    state Licensed;
+
+    state Commissioned {
+        Commission@Valid commission;
+    }
+
+    state Approved {
+        Approval@Valid approval;
+    }
+
+    state Published;
+    state Terminated; // If the contract is violated
+
+    License@Valid license available in Licensed, Approved, Commissioned;
+
+    Money@Owned fee available in Licensed, Approved, Commissioned;
+
+    Licensor@Owned licensor;
+    Licensee@Owned licensee;
+
+    LicenseManager@Unlicensed(Licensor@Owned >> Unowned licensor, Licensee@Owned >> Unowned licensee) {
+        this.licensor = licensor;
+        this.licensee = licensee;
+
+        ->Unlicensed;
+    }
+
+    // This method could be another exercise, both writing/filling in types and just implementation
+
+    // TODO TASK 1: Complete the declaration for this transaction
+    transaction obtainLicense(/* YOUR TYPE HERE */ this, License@Unknown >> Unowned _license) {
+        // TODO TASK 2: Complete the body of this transaction
+    }
+
+    transaction approve(LicenseManager@Licensed >> Approved this, Approval@Unknown >> Unowned _approval) {
+        _approval.checkToken(licensor);
+        ->Approved(approval = _approval);
+    }
+
+    transaction commission(LicenseManager@Licensed >> Commissioned this, Commission@Unknown >> Unowned _commission) {
+        _commission.checkToken(licensor);
+        ->Commissioned(commission = _commission);
+    }
+
+    transaction publish(LicenseManager@(Approved | Commissioned) >> Published this) {
+        // TODO TASK 3: Complete the body of this transaction
+    }
+}
+
