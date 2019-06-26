@@ -1,0 +1,24 @@
+<pre>
+<code class="language-obsidian">
+asset class Prescription {…}
+
+interface Pharmacy {
+  void depositPrescription(owned Prescription &gt;&gt; unowned Prescription p);  
+  owned Prescription removePrescription(unowned Prescription p);
+  unowned Prescription getAnyPrescription();
+}
+ 
+class Patient {
+  void fillPrescription(unowned Pharmacy pharmacy, unowned Prescription pre) {
+    pharmacy.depositPrescription(pre); // Location (A)    
+    
+    Prescription pre2 = pharmacy.getAnyPrescription(); [pre2 unowned];
+    Prescription removedPrescription = pharmacy.removePrescription(pre2); [removedPrescription owned]; // Location (B)
+    pharmacy.depositPrescription(removedPrescription); [removedPrescription unowned]; // Location (C)
+  }
+}
+</code>
+</pre>
+
+
+<div>For each location where the compiler will give an error, check the corresponding box and explain why there is an error.</div>
