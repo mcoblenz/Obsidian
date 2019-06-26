@@ -1,0 +1,210 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Part 1: Ownership and Assets</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h2><strong>Part 1: Ownership and Assets</strong></h2>
+ <!-- local variables never include annotatations. Params and fields always do. -->
+<p>Our new programming language is object-oriented. As usual, it includes <em>classes</em>, which can have <em>fields</em>.  In addition, of the many <strong>variables</strong> or <strong>fields</strong> that reference objects, <strong>one</strong> of them can own the object. For example:</p>
+
+<pre>
+<code>
+class Money {
+}
+
+<strong>class</strong> Wallet {
+    owned Money m; // 'owned' indicates that m owns the object it refers to
+}
+</code>
+</pre>
+
+<p>The compiler tracks ownership of each variable every time the variable is used. This information is part of the <em>type</em> of the variable. For example, the type of <code>m</code> is <code>owned Money</code>. Information about ownership is NOT available at runtime; it is only available during compilation.</p>
+
+<ul>
+    <li>If a reference is the only one that holds ownership, then it is <code>owned</code>.</li>
+    <li>If all references to the object are the same (there is no owner), then each reference is <code>shared</code>.</li>
+    <li>If a reference is NOT the owning one, but there might be another owning reference, then the reference is <code>unowned</code>.</li>
+</ul>
+
+<h2><strong>Assets</strong></h2>
+
+<p>One benefit of tracking ownership is preventing accidental loss of valuable objects, such as money. To do so, we can declare classes with the keyword <code>asset</code>. Let's do this for <code>Money</code>:</p>
+
+<pre>
+<code>
+asset class Money {
+}
+</code>
+</pre>
+
+<p>Now, if we accidentally lose track of an owning reference to a <code>Money</code> object (by letting it go out of scope without transferring ownership to somewhere else, such as a field), the compiler will give an error:
+
+<pre>
+<code>
+void test() {
+    Money m = ...; // OK, m is owned here
+    // ERROR: cannot drop reference to owned asset m
+}
+</code>
+</pre>
+
+We can fix this by (for example) returning m, assigning it to an owning field, or passing it as an argument to an appropriate method. For example:
+
+<pre>
+<code>
+owned Money test() {
+    Money m = ...; // OK, m is owned here
+    return m; // gives ownership of m to the caller of test()
+}
+</code>
+</pre>
+
+<p>Note that non-owning references to <code>Money</code> are not restricted; the compiler gives no errors when they go out of scope.</p>
+
+
+<h3>Method return types</h3>
+<p>
+When methods return objects, the return types can be annotated. For example:
+<pre>
+<code>
+owned Money withdraw() {
+    // body not shown
+}
+</code>
+</pre>
+If the return type is unannotated, then <code>unowned</code> is assumed.
+</p>
+
+<h3>Method parameters</h3>
+<p>When a reference is passed to a method as an argument, the method's declaration specifies initial and final ownership with <code>>></code>. For example:</p>
+
+<pre>
+<code>
+void spend(owned Money >> unowned Money m) { // m is owned initially but must be unowned at the end.
+	// implementation not shown
+};
+
+void testSpend(owned Money >> Unowned Money m) {
+	spend(m);
+	// m is now of type unowned Money due to specification on spend() declaration.
+}
+</code>
+</pre>
+
+<p>If a method expects an argument that is <code>unowned</code>, this means that the method cannot take ownership. As a result, it is safe to pass an <code>owned</code> reference as an argument to a method that expects an <code>unowned</code> argument. After the method returns, the caller still holds ownership.</p>
+
+<p>If a method parameter lacks >>, then ownership will not change. For example, <code>void test(owned Money m)</code> is equivalent to <code>void test(owned Money >> owned Money m)</code>. <code>void foo(unowned Money m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that method.
+
+<p>If a method parameter lacks an annotation, then <code>unowned</code> is assumed.
+
+<h3>Assignment</h3>
+<p>Assignment (<code>=</code>) transfers ownership when the variables on both sides are owning references. That is, the variable on the left becomes the <strong>new</strong> owner, and the variable on the right loses ownership. For example:</p>
+
+<pre>
+<code>
+owned Money m = ...;
+owned Money newMoney = m;
+// Now m is of type unowned Money, not owned Money. 
+
+unowned Money n = newMoney; // Ownership is still with newMoney because n is unowned
+</code>
+</pre>
+
+<h3>Invoking methods</h3>
+<p> The compiler checks each invocation to make sure it is permitted according to the ownership of the method arguments. For example:</p>
+
+<pre>
+<code>
+void spend(owned Money >> unowned Money m) {
+	// implementation not shown
+};
+void print(unowned Money m) {
+    // implementation not shown
+}
+
+void test() {
+	owned Money m = ...
+	print(m);
+	spend(m);
+	spend(m); // COMPILE ERROR: spend() requires owned input, but m is unowned here
+}
+</code>
+</pre>
+
+<h3>Local variables</h3>
+Local variables are declared <strong>without</strong> any ownership specified; instead, you can optionally write compiler ownership checks <code>[]</code> to specify their ownership. The compiler will output an error if the ownership does not match the check. For example:
+<pre>
+<code>
+owned Money withdraw() {
+    // body not shown
+}
+
+void test() {
+    Money m = withdraw(); [m owned];
+    spend(m); [m unowned];
+    [m owned]; // COMPILE ERROR: m is unowned here
+
+}
+</code>
+</pre>
+
+<h3>Getting rid of ownership</h3>
+<p>If ownership is no longer desired, <code>disown</code> can be used to relinquish ownership. For example:</p>
+<pre>
+<code>
+class Money {
+    int amount;
+    
+    void merge(owned Money >> unowned Money mergeFrom) {
+        amount += mergeFrom.amount;
+        disown mergeFrom; // We absorbed the value of mergeFrom, so the owner doesn't own it anymore.
+    }
+}
+</code>
+</pre>
+
+<h3>Method receivers (<code>this</code>)</h3>
+<p>Sometimes the ownership of <code>this</code> needs to change in a method. That fact can be specified by adding <code>this</code> as the first argument in the method declaration. For example:</p>
+
+<pre>
+<code>
+class Money {
+    void discard(owned Money >> unowned Money this) {
+        disown this;
+    }
+}
+
+class Wallet {
+    void throwAwayMoney(owned Money >> unowned Money money) {
+        money.discard(); // 'this' argument is implicit; do not include it in method call.
+    }
+}
+</code>
+</pre>
+
+<h3>Fields</h3>
+<p><strong>Field declarations</strong>&nbsp;MUST include ownership specifications. These mean that&nbsp;at the END of each method, the state of the object the field references MUST match the annotation on the field. For example:</p>
+<br>
+<pre>
+<code>
+class Wallet {
+	owned Money money; // Note that this annotation is on a field declaration!
+	
+	// exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
+	owned Money exchange(owned Money >> unowned Money otherMoney) {
+        Money temporaryMoney = money; // OK temporarily...
+        money = otherMoney; // as long as ownership of money is restored by the end of the method.
+        return temporaryMoney;
+	}
+}
+</code>
+</pre>
+
+
+
+</body></html>

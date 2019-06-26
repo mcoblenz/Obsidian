@@ -1,0 +1,20 @@
+The following code is a partial implementation of a vending machine, which takes special VendingTokens and returns Beverage objects.
+<pre>
+<code class="language-obsidian">
+class VendingToken {}
+
+class VendingMachine {
+  public Beverage processSale(VendingToken token) { // Location (A)
+    // Dispense beverage (code not shown)
+  }
+}
+
+class User {
+  public buyBeverage(VendingMachine machine, VendingToken token) {  // Location (B)
+    machine.processSale(token);
+  }
+}
+</code>
+</pre>
+
+The declaration of processSale (Location A) is missing ownership annotations. Please re-write it correctly.

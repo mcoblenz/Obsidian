@@ -605,7 +605,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, BoolType())
                  (typ, con, Disjunction(e1Prime, e2Prime).setLoc(e))
              case LogicalNegation(e: Expression) =>
-                 assertTypeEquality(e, BoolType(), context)
+                 val (typ, con, ePrime) = assertTypeEquality(e, BoolType(), context)
+                 (typ, con, LogicalNegation(ePrime).setLoc(e))
              case Add(e1: Expression, e2: Expression) =>
                  val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
                  (typ, con, Add(e1Prime, e2Prime).setLoc(e))
@@ -2223,6 +2224,7 @@ private def checkStatement(
     }
 
     private def checkContract(contract: Contract): Contract = {
+        currentContractSourcePath = contract.sourcePath
 
         contract match {
             case obsContract : ObsidianContractImpl =>

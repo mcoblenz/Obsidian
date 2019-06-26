@@ -1,0 +1,52 @@
+<pre>
+<code class="language-obsidian">
+asset class Prescription {…}
+
+interface Pharmacy {
+  void depositPrescription(Prescription @ Owned &gt;&gt; Unowned p);  
+  Prescription @ Owned removePrescription(Prescription @ Unowned p);
+  Prescription @ Unowned getAnyPrescription();
+}
+ 
+class Patient {
+  void fillPrescription(Pharmacy @ Unowned pharmacy, Prescription @ Unowned pre) {
+    pharmacy.depositPrescription(pre); // Location (A)    
+    
+    Prescription pre2 = pharmacy.getAnyPrescription(); [pre2 @ Unowned];
+    Prescription removedPrescription = pharmacy.removePrescription(pre2); [removedPrescription @ Owned]; // Location (B)
+    pharmacy.depositPrescription(removedPrescription); [removedPrescription @ Unowned]; // Location (C)
+  }
+}
+</code>
+</pre>
+
+<div>For each location where the compiler will give an error, check the corresponding box and explain why there is an error.</div>
+
+
+
+------------
+
+<pre>
+<code class="language-obsidian">
+asset class Prescription {…}
+
+interface Pharmacy {
+  void depositPrescription(Prescription @ Owned &gt;&gt; Unowned p);  
+  Prescription @ Owned removePrescription(Prescription @ Unowned p);
+  Prescription @ Unowned getAnyPrescription();
+}
+ 
+class Patient {
+  void fillPrescription(Pharmacy @ Unowned pharmacy, Prescription @ Unowned pre) {
+    pharmacy.depositPrescription(pre); // Location (A)    
+    
+    Prescription pre2 = pharmacy.getAnyPrescription(); [pre2 @ Unowned];
+    Prescription removedPrescription = pharmacy.removePrescription(pre2); [removedPrescription @ Owned]; // Location (B)
+    pharmacy.depositPrescription(removedPrescription); [removedPrescription @ Unowned]; // Location (C)
+    // Location (D)
+  }
+}
+</code>
+</pre>
+
+At Location (D), what ownership does <code class="language-obsidian">removedPrescription</code> have according to the compiler?

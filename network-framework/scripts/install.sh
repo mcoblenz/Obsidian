@@ -1,8 +1,11 @@
 #!/bin/bash
 
 CHANNEL_NAME="mychannel"
-DELAY="3"
-LANGUAGE="java"
+: ${CHANNEL_NAME:="mychannel"}
+: ${LANGUAGE:="java"}
+: ${TIMEOUT:="10"}
+: ${VERBOSE:="false"}
+LANGUAGE="$(echo "$LANGUAGE" | tr [:upper:] [:lower:])"
 TIMEOUT="10"
 VERBOSE="false"
 
@@ -78,4 +81,3 @@ verifyResult $res "Chaincode installation on peer${PEER}.org${ORG} has failed"
 echo "===================== Chaincode is installed on peer${PEER}.org${ORG} ===================== "
 echo
 
-sleep $DELAY

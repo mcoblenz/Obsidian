@@ -1,21 +1,33 @@
 #!/bin/bash
 
-CHANNEL_NAME="mychannel"
-DELAY="3"
-LANGUAGE="java"
-TIMEOUT="10"
-VERBOSE="false"
+: ${CHANNEL_NAME:="mychannel"}
+: ${DELAY:="3"}
+: ${LANGUAGE:="java"}
+: ${TIMEOUT:="10"}
+: ${VERBOSE:="false"}
+LANGUAGE="$(echo "$LANGUAGE" | tr [:upper:] [:lower:])"
 
 PEER="$1"
 ORG="$2"
 INIT_ARGS="$3"
-CC_SRC_PATH=$CC_SRC_PATH
+VERSION=${4:-1.0}
 
 ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 PEER0_ORG1_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
 PEER0_ORG2_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
 PEER0_ORG3_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
 
+SCRIPTS_PATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts
+
+if [ -n "${INIT_ARGS}" ] ; then
+    if [ "${INIT_ARGS}" == "-" ] ; then
+        INIT='["init"]'
+    else
+        INIT='["init",'${INIT_ARGS}']'
+    fi
+else
+    INIT='["init"]'
+fi
 
 verifyResult() {
   if [ $1 -ne 0 ]; then
@@ -66,39 +78,23 @@ setGlobals() {
   fi
 }
 
-# Instantiate chaincode
-echo "===================== instantiating Chaincode on peer${PEER}.org${ORG} on channel '$CHANNEL_NAME' ====================="
+# Install chaincode on all peers
+for org in 1 2; do
+    bash "$SCRIPTS_PATH/install.sh" 0 "$org" "$VERSION"
+done
+
+echo "===================== Upgrading chaincode on peer${PEER}.org${ORG} ===================== "
 setGlobals $PEER $ORG
-VERSION=${3:-1.0}
-
-if [ -n "${INIT_ARGS}" ] ; then
-    if [ "${INIT_ARGS}" == "-" ] ; then
-        INIT='["init"]'
-    else
-        INIT='["init",'${INIT_ARGS}']'
-    fi
-else
-    INIT='["init"]'
-fi
-
-
-# while 'peer chaincode' command can get the orderer endpoint from the peer
-# (if join was successful), let's supply it directly as we know it using
-# the "-o" option
-if [ -z "$CORE_PEER_TLS_ENABLED" -o "$CORE_PEER_TLS_ENABLED" = "false" ]; then
 set -x
-peer chaincode instantiate -o orderer.example.com:7050 -C $CHANNEL_NAME -n mycc -l ${LANGUAGE} -v ${VERSION} -c \{\"Args\":${INIT}\} -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
+peer chaincode upgrade -o orderer.example.com:7050 -C "$CHANNEL_NAME" -n mycc\
+    --tls "$CORE_PEER_TLS_ENABLED" --cafile "$ORDERER_CA" -l "${LANGUAGE}"\
+    -v "${VERSION}" -c "{\"Args\":${INIT}}" -p "${CC_SRC_PATH}"\
+    -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
 res=$?
 set +x
-else
-set -x
-peer chaincode instantiate -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc -l ${LANGUAGE} -v 1.0 -c \{\"Args\":${INIT}\} -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
-res=$?
-set +x
-fi
 cat log.txt
-verifyResult $res "Chaincode instantiation on peer${PEER}.org${ORG} on channel '$CHANNEL_NAME' failed"
-echo "===================== Chaincode is instantiated on peer${PEER}.org${ORG} on channel '$CHANNEL_NAME' ===================== "
+verifyResult $res "Chaincode upgrade on peer${PEER}.org${ORG} has failed"
+echo "===================== Chaincode is upgraded on peer${PEER}.org${ORG} ===================== "
 echo
 
 sleep $DELAY

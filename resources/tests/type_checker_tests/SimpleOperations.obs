@@ -11,8 +11,8 @@ main contract Operations {
         // should fail: dividing with boolean
         int c = true/10;
         // should fail: bool op with string
-        bool d = true and "false";
+        bool d = true && "false";
         // should fail twice (2 errors): bool op with ints
-        bool e = 5 or 6;
+        bool e = 5 || 6;
     }
 }

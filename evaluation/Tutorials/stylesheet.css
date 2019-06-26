@@ -1,0 +1,13 @@
+body {
+    font-size: 14px;
+    font-family: Poppins;
+}
+
+.code {
+    font-family: courier new, courier, monospace;
+}
+
+.boxed {
+	padding: 25px;
+	max-width: 500px;
+}
