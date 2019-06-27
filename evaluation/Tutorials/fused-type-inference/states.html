@@ -98,13 +98,13 @@ transaction test1(LightSwitch@Shared s) {
 </code>
 </pre>
 
-In the above situation, the programmer might need to check the state dynamically with <code>if...is</code>.
+In the above situation, the programmer might need to check the state dynamically with <code>if...in</code>.
 
 <h3>Testing states with <code>is</code></h3>
 <pre>
 <code>
 transaction test2(LightSwitch@Shared s) {
-    if (s is On) { // runtime check to see whether the object referenced by s is in state On
+    if (s in On) { // runtime check to see whether the object referenced by s is in state On
         s.turnOff(); // OK due to runtime check
     }
 
@@ -112,7 +112,7 @@ transaction test2(LightSwitch@Shared s) {
 </code>
 </pre>
 
-<p>Within the scope of the <code>if...is</code> block, the compiler requires that if there <string>is</strong> an owner of the object referenced by <code>s</code>, then the owner's state specification is never violated. If it is, then the program is terminated; it is up to the programmer to make sure the body of the <code>if is</code> block does not change the state inappropriately.</p>
+<p>Within the scope of the <code>if...in</code> block, the compiler requires that if there <string>is</strong> an owner of the object referenced by <code>s</code>, then the owner's state specification is never violated. If it is, then the program is terminated; it is up to the programmer to make sure the body of the <code>if is</code> block does not change the state inappropriately.</p>
 
 <h3>Implicit casts</h3>
 <p>When a <code>Shared</code> reference is needed, an <code>Owned</code> suffices as long as the reference is NOT to an asset. For example, an <code>Owned</code> reference can be passed as an argument to a transaction that expects a <code>Shared</code> reference to a non-resource object. However, the caller is left with a <code>Shared</code> reference.</p>
