@@ -1,8 +1,9 @@
 package edu.cmu.cs.obsidian.parser
 
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Path, Paths}
 
-import edu.cmu.cs.obsidian.typecheck.{DuplicateContractError, ErrorRecord, ImportError}
+import com.google.common.base.{MoreObjects, Objects}
+import edu.cmu.cs.obsidian.typecheck.{ErrorRecord, ImportError}
 
 import scala.collection.mutable
 import scala.util.parsing.input.Position
@@ -11,6 +12,18 @@ object ImportProcessor {
     val filesAlreadyProcessed = new mutable.HashSet[String]
 
     class ImportException (val message : String) extends Exception {}
+
+    private def standardLibraryPath(fileName: String): Path =
+        Paths.get(MoreObjects.firstNonNull(System.getenv("OBSIDIAN_STDLIB"), "")).resolve(fileName)
+
+    private def relativePath(importingFile: String, fileName: String): Path =
+        Paths.get(importingFile).resolve(fileName)
+
+    private def searchPaths(importingFile: String, fileName: String): Seq[Path] =
+        List(standardLibraryPath(fileName), relativePath(importingFile, fileName))
+
+    def searchImportFile(importingFile: String, fileName: String): Option[Path] =
+        searchPaths(importingFile, fileName).find(Files.exists(_))
 
     def processImports(inFile: String, ast: Program): (Program, Seq[ErrorRecord]) = {
         if (filesAlreadyProcessed.contains(inFile)) {
@@ -38,28 +51,29 @@ object ImportProcessor {
     }
 
     def processImport(importPath: String, seenFiles: mutable.HashSet[String], importPos: Position, importFilename: String) : Either[ErrorRecord, Seq[Contract]] = {
-        if (Files.exists(Paths.get(importPath))) {
-            val importedProgram = Parser.parseFileAtPath(importPath, printTokens = false)
+        searchImportFile(importFilename, importPath) match {
+            case Some(path) => {
+                val importedProgram = Parser.parseFileAtPath(path.toAbsolutePath.toString, printTokens = false)
 
-            var contracts = filterTags(importedProgram.contracts)
+                var contracts = filterTags(importedProgram.contracts)
 
-            seenFiles.add(importPath)
+                seenFiles.add(importPath)
 
-            importedProgram.imports.foreach(i => {
-                if (!seenFiles.contains(i.name)) {
-                    val cs = processImport(i.name, seenFiles, i.loc, importPath)
+                importedProgram.imports.foreach(i => {
+                    if (!seenFiles.contains(i.name)) {
+                        val cs = processImport(i.name, seenFiles, i.loc, importPath)
 
-                    cs match {
-                        case Left(err) => return Left(err)
-                        case Right(c) => contracts = c ++ contracts
+                        cs match {
+                            case Left(err) => return Left(err)
+                            case Right(c) => contracts = c ++ contracts
 
+                        }
                     }
-                }
-            })
-            Right(contracts)
-        }
-        else {
-            Left(ErrorRecord(ImportError(s"Unable to read file: $importPath"), importPos, importFilename))
+                })
+                Right(contracts)
+            }
+            case None =>
+                Left(ErrorRecord(ImportError(s"Unable to read file: $importPath"), importPos, importFilename))
         }
     }
 
