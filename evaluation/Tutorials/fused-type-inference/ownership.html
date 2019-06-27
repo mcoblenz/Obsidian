@@ -205,7 +205,7 @@ contract Wallet {
 	Money@Owned money; // Note that this annotation is on a field declaration!
 
 	// exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
-	Money@Owned exchange(Money@Owned >> Unowned otherMoney) {
+	transaction exchange(Money@Owned >> Unowned otherMoney) returns Money@Owned {
         Money temporaryMoney = money; [money@Unowned]; // OK temporarily...
         money = otherMoney; [money@Owned]; // as long as money@Owned is restored by the end of the transaction.
         return temporaryMoney;
