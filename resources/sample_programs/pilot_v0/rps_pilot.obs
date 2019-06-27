@@ -1,0 +1,170 @@
+/*
+This program simulates a game of Rock, Paper Scissors. There are two Players,
+each of whom can make a move of "rock", "paper", or "scissors". The normal
+rules for winning, losing, or tie-ing apply.
+
+Answer all the TODO statements.
+*/
+
+contract Player {
+    string move;
+
+    Player@Owned() {
+        move = "none";
+    }
+
+    transaction getMove(Player@Owned >> Owned this) returns string {
+        return move;
+    }
+
+    transaction setMove(Player@Owned >> Owned this, string newMove) {
+        if ((move != "rock") or (move != "paper") or (move != "scissors")) {
+            revert("Possible moves: rock, paper, scissors");
+        }
+        move = newMove;
+    }
+}
+
+main contract Game {
+    Player@Owned p1;
+    Player@Owned p2;
+
+    state Start;
+    ...
+
+    //Constructor
+    Game@Start() {
+        p1 = new Player();
+        p2 = new Player();
+        -> Start;
+    }
+
+    transaction nextGame() returns string {
+        -> Start;
+        return "Starting new game ...";
+    }
+
+    //Player 1 makes a move
+    transaction p1Move(...) {
+        ...
+    }
+
+    //Player 2 makes a move
+    transaction p2Move(...) {
+        ...
+    }
+
+    //Game play between the players, and deciding winner
+    transaction play(...) {
+        ...
+    }
+}
+
+/*
+TODO:
+Given the definition of Player and partial definition of Game above, what
+states do you think Game should have and why? One state (Start) has been listed
+as an example.
+
+States:
+    - Start -> A state for the game to start in
+    -
+
+
+
+
+*/
+
+
+
+//DO NOT SCROLL PAST HERE UNTIL FINISHED WITH PREVIOUS PROBLEM ----------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//DO NOT SCROLL PAST HERE UNTIL FINISHED WITH PREVIOUS PROBLEM ----------------------
+
+
+
+/*
+Below is a more filled-out version of Game. The code for Player is included again for convenience.
+*/
+
+contract Player {
+    string move;
+
+    Player@Owned() {
+        move = "none";
+    }
+
+    transaction getMove(Player@Owned >> Owned this) returns string {
+        return move;
+    }
+
+    transaction setMove(Player@Owned >> Owned this, string newMove) {
+        if ((move != "rock") or (move != "paper") or (move != "scissors")) {
+            revert("Possible moves: rock, paper, scissors");
+        }
+        move = newMove;
+    }
+}
+
+main contract Game {
+    Player@Owned p1;
+    Player@Owned p2;
+
+    state P1Win;
+    state P2Win;
+    state Tie;
+    state Start;
+    state AllPlayed;
+    state P1Done;
+
+    Game@Start() {
+        p1 = new Player();
+        p2 = new Player();
+        -> Start;
+    }
+
+    transaction nextGame() returns string {
+        -> Start;
+        return "Starting new game ...";
+    }
+
+    transaction p1Move(Game@Start >> P1Done this, string move) {
+        p1.setMove(move);
+        -> P1Done;
+    }
+
+    transaction p2Move(Game@P1Done >> AllPlayed this, string move) {
+        p2.setMove(move);
+        -> AllPlayed;
+    }
+
+    transaction play(Game@AllPlayed >> (Tie | P1Win | P2Win) this) returns string {
+
+        string p1Move = p1.getMove();
+        string p2Move = p2.getMove();
+
+        //TODO: finish the rest of this transaction: write the code for calculating the winner
+        //Keep in mind a move can be "rock", "paper", or "scissors"
+        //The return string should tell whether Player 1 wins, Player 2 wins, or there is a tie.
+
+    }
+}
