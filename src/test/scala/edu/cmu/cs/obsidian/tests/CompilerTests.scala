@@ -69,4 +69,8 @@ class CompilerTests extends JUnitSuite {
   @Test def testFFI(): Unit = {
     testContract(contractName = "TestFFI")
   }
+
+  @Test def multipleConstructorGroup(): Unit = {
+    testContract(contractName = "MultipleConstructorGroup")
+  }
 }

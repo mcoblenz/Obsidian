@@ -1,0 +1,91 @@
+contract MaybeRecord {
+    asset state Just {
+        PharmacyPrescriptionRecord@HasFills record;
+    }
+
+    state Nothing;
+
+    MaybeRecord@Nothing() {
+        ->Nothing;
+    }
+
+    MaybeRecord@Just(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) {
+        ->Just(record = newRecord);
+    }
+
+    transaction getRecord(MaybeRecord@Just >> Nothing this) returns PharmacyPrescriptionRecord@HasFills {
+        PharmacyPrescriptionRecord result = record;
+        ->Nothing;
+        return result;
+    }
+}
+
+contract PharmacyPrescriptionRecordList {
+    state Nil;
+    asset state Cons {
+        PharmacyPrescriptionRecord@HasFills record;
+        PharmacyPrescriptionRecordList@Shared next;
+    }
+
+    PharmacyPrescriptionRecordList@Nil() {
+        ->Nil;
+    }
+
+    PharmacyPrescriptionRecordList@Cons(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
+                                        PharmacyPrescriptionRecordList@Shared tail) {
+        ->Cons(record = newRecord, next = tail);
+    }
+
+    transaction prepend(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
+        return new PharmacyPrescriptionRecordList(newRecord, this);
+    }
+
+    transaction prependIfNotEmpty(PharmacyPrescriptionRecord@Owned >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
+        if (newRecord in HasFills) {
+            return prepend(newRecord);
+        } else {
+            disown newRecord;
+            return this;
+        }
+    }
+
+    transaction contains(Prescription@Unowned prescription) returns bool {
+        if (this in Cons) {
+            return (record.getPrescription() == prescription) || next.contains(prescription);
+        } else {
+            return false;
+        }
+    }
+
+    transaction removeIfExists(Prescription@Unowned prescription) returns MaybeRecord@Owned {
+        if (this in Cons) {
+            if (record.getPrescription() == prescription) {
+                PharmacyPrescriptionRecord oldRecord = record;
+
+                if (next in Nil) {
+                    ->Nil;
+                } else {
+                    PharmacyPrescriptionRecordList newNext = next.getNext();
+                    ->Cons(record = next.getRecord(), next = newNext);
+                }
+
+                return new MaybeRecord(oldRecord);
+            } else {
+                return next.removeIfExists(prescription);
+            }
+        } else {
+            return new MaybeRecord();
+        }
+    }
+
+    transaction getRecord(PharmacyPrescriptionRecordList@Cons >> Nil this) returns PharmacyPrescriptionRecord@HasFills {
+        PharmacyPrescriptionRecord res = record;
+        ->Nil;
+        return res;
+    }
+
+    transaction getNext(PharmacyPrescriptionRecordList@Cons this) returns PharmacyPrescriptionRecordList@Shared {
+        return next;
+    }
+}
+

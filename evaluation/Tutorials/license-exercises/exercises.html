@@ -1,0 +1,83 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>License</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h2>License</h2>
+
+<p> In this example, we will explore a licensing system, with a Licensor, Licensee, and a License.
+The Licensor grants the Licensee a License, which they can use the review a product.
+However, the Licensee may not publish their review of the product until the review has been Approved or Commissioned.
+To help ensure compliance, the Licensee must pay some amount of money to obtain the license, which will be returned to them upon publishing the approved or commissioned review.
+</p>
+
+<p>
+We wish to enforce the following points:
+
+<ol>
+    <li> The Licensee may not publish their review without Approval or Commission from the Licensor. </li>
+    <li> If the Licensor issues an Approval, then the Licensee may <code>publish</code> their review of the product, and the Licensee will receive the fee they paid for the License. </li>
+    <li> If the Licensor issues a Commission, they must include some money as a payment for the publishing of the review. </li>
+    <li> If commissioned, the Licensee may <code>publish</code> their review of the product, and the Licensee will receive both the money from the commission as well as the fee they paid for the License. </li>
+</ol>
+</p>
+
+<p> The code in the file <code>License.obs</code>contains several tasks, each labeled <code> // TODO TASK #: ... </code>.
+You do not have to do the tasks in any particular order, but they are numbered by anticipated difficulty, with lower numbers being less time consuming. </p>
+
+<p>
+The Licensee has a <code>pay</code> transaction, which can be used to send them money, whose signature is shown below.
+</p>
+
+<pre>
+<code>
+transaction pay(Licensee@Owned this, Money@Owned >> Unowned money);
+</code>
+</pre>
+
+<p>
+Below are the declarations for the various tokens: <code>License</code>, <code>Approval</code>, and <code>Commission</code>.
+</p>
+
+<pre>
+<code>
+asset contract License {
+    state Unknown;
+    state Valid;
+
+    License@Unknown(Licensor@Unowned issuer, int feeAmount);
+
+    transaction checkToken(License@Unknown >> Valid this, Licensor@Unowned licensor);
+    transaction getFeeAmount(License@Unowned this) returns int;
+}
+
+asset contract Approval {
+    state Unknown;
+    state Valid;
+
+    Approval@Unknown(Licensor@Unowned issuer);
+
+    transaction checkToken(Approval@Unknown >> Valid this, Licensor@Unowned licensor);
+}
+
+asset contract Commission {
+    state Unknown;
+    state Valid;
+    state Completed;
+
+    Commission@Unknown(Licensor@Unowned issuer, Money@Owned >> Unowned _payment);
+
+    transaction checkToken(Commission@Unknown >> Valid this, Licensor@Unowned licensor);
+    transaction getPayment(Commission@Valid >> Completed this) returns Money@Owned;
+}
+</code>
+</pre>
+
+</body>
+</html>
+
