@@ -55,7 +55,7 @@ transaction test() {
 </code>
 </pre>
 
-We can fix this by (for example) returning m, assigning it to an owning field, or passing it as an argument to an appropriate method. For example:
+We can fix this by (for example) returning m, assigning it to an owning field, or passing it as an argument to an appropriate transaction. For example:
 
 <pre>
 <code>
@@ -70,7 +70,7 @@ transaction test() returns Money@Owned {
 
 <h3>Method return types</h3>
 <p>
-When methods return objects, the types must be annotated. For example:
+When transactions return objects, the types must be annotated. For example:
 <pre>
 <code>
 transaction withdraw() returns Money@Owned {
@@ -81,7 +81,7 @@ transaction withdraw() returns Money@Owned {
 </p>
 
 <h3>Method parameters</h3>
-<p>When a reference is passed to a method as an argument, the method's declaration specifies initial and final ownership with <code>>></code>. For example:</p>
+<p>When a reference is passed to a transaction as an argument, the transaction's declaration specifies initial and final ownership with <code>>></code>. For example:</p>
 
 <pre>
 <code>
@@ -96,9 +96,9 @@ transaction testSpend(Money@Owned >> Unowned m) {
 </code>
 </pre>
 
-<p>If a method expects an argument that is <code>Unowned</code>, this means that the method cannot take ownership. As a result, it is safe to pass an <code>Owned</code> reference as an argument to a method that expects an <code>Unowned</code> argument. After the method returns, the caller still holds ownership.</p>
+<p>If a transaction expects an argument that is <code>Unowned</code>, this means that the transaction cannot take ownership. As a result, it is safe to pass an <code>Owned</code> reference as an argument to a transaction that expects an <code>Unowned</code> argument. After the transaction returns, the caller still holds ownership.</p>
 
-<p>If a method parameter lacks >>, then ownership will not change. For example, <code>transaction test(Money@Owned m)</code> is equivalent to <code>transaction test(Money@Owned >> Owned m)</code>. <code>transaction foo(Money@Unowned m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that method.
+<p>If a transaction parameter lacks >>, then ownership will not change. For example, <code>transaction test(Money@Owned m)</code> is equivalent to <code>transaction test(Money@Owned >> Owned m)</code>. <code>transaction foo(Money@Unowned m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that transaction.
 
 
 <h3>Ownership checks</h3>
@@ -126,8 +126,8 @@ Money newMoney = m; [m@Unowned];
 </code>
 </pre>
 
-<h3>Invoking methods</h3>
-<p> The compiler checks each invocation to make sure it is permitted according to the ownership of the method arguments. For example:</p>
+<h3>Invoking transactions</h3>
+<p> The compiler checks each invocation to make sure it is permitted according to the ownership of the transaction arguments. For example:</p>
 
 <pre>
 <code>
@@ -178,7 +178,7 @@ contract Money {
 </pre>
 
 <h3>Method receivers (<code>this</code>)</h3>
-<p>Sometimes the ownership of <code>this</code> needs to change in a method. That fact can be specified by adding <code>this</code> as the first argument in the method declaration. For example:</p>
+<p>Sometimes the ownership of <code>this</code> needs to change in a transaction. That fact can be specified by adding <code>this</code> as the first argument in the transaction declaration. For example:</p>
 
 <pre>
 <code>
@@ -190,14 +190,14 @@ contract Money {
 
 contract Wallet {
     transaction throwAwayMoney(Money @ Owned >> Unowned money) {
-        money.discard(); // 'this' argument is implicit; do not include it in method call.
+        money.discard(); // 'this' argument is implicit; do not include it in transaction call.
     }
 }
 </code>
 </pre>
 
 <h3>Fields</h3>
-<p><strong>Field declarations</strong>&nbsp;MUST include ownership specifications. These mean that&nbsp;at the END of each method, the state of the object the field references MUST match the annotation on the field. For example:</p>
+<p><strong>Field declarations</strong>&nbsp;MUST include ownership specifications. These mean that&nbsp;at the END of each transaction, the state of the object the field references MUST match the annotation on the field. For example:</p>
 <br>
 <pre>
 <code>
@@ -207,7 +207,7 @@ contract Wallet {
 	// exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
 	Money@Owned exchange(Money@Owned >> Unowned otherMoney) {
         Money temporaryMoney = money; [money@Unowned]; // OK temporarily...
-        money = otherMoney; [money@Owned]; // as long as money@Owned is restored by the end of the method.
+        money = otherMoney; [money@Owned]; // as long as money@Owned is restored by the end of the transaction.
         return temporaryMoney;
 	}
 }
