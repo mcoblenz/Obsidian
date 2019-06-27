@@ -1,22 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 bin_dir="$(cd "$(dirname $BASH_SOURCE)"; pwd)"
-root_dir="$bin_dir/.."
-export OBSIDIAN_COMPILER_DIR="$root_dir"
 
-obsidian_jar="$root_dir/target/scala-2.12/obsidianc.jar"
-
-if [[ ! -e "$obsidian_jar" ]]; then
-    (
-        cd "$root_dir"
-        sbt assembly
-    )
-
-    if [[ "$?" != "0" ]]; then
-        echo "Error building jar file, exiting."
-        exit 1
-    fi
-fi
-
-java -jar "$obsidian_jar" $@
+java -jar "$bin_dirtarget/scala-2.12/obsidianc.jar "$@"
 

@@ -1,4 +1,4 @@
-import "evaluation/Tutorials/Prescription/Collections.obs"
+import "evaluation/Tutorials/prescription-exercises/Collections.obs"
 
 // Prescriptions are immutable by design; pharmacies that want to record information about
 // prescriptions must do so in a separate data structure.
@@ -22,7 +22,7 @@ contract Prescription {
 	}
 }
 
-contract PharmacyPrescriptionRecord {
+asset contract PharmacyPrescriptionRecord {
     state Empty;
 
     state HasFills {
@@ -30,9 +30,9 @@ contract PharmacyPrescriptionRecord {
         Prescription@Owned prescription;
     }
 
-    PharmacyPrescriptionRecord@(Empty | HasFills)(Prescription@Owned >> Unowned presc) {
-        if (presc.getRefills() > 0) {
-            ->HasFills(fillsLeft = presc.getRefills(), prescription = presc);
+    PharmacyPrescriptionRecord@Owned(Prescription@Owned >> Unowned _prescription) {
+        if (_prescription.getRefills() > 0) {
+            ->HasFills(fillsLeft = presc.getRefills(), prescription = _prescription);
         } else {
             ->Empty;
         }
@@ -57,21 +57,21 @@ contract PharmacyPrescriptionRecord {
  * Before filling a prescription, the pharmacy must make sure that there is at least one refill available.
  */
 main contract Pharmacy {
-    PharmacyPrescriptionRecordList@Shared prescriptions;
+    PharmacyPrescriptionRecordList@Shared prescriptionList;
 
 	// Must be called before the patient can fill a new prescription.
     // TODO TASK 1: Fill in the type signature of this transaction.
-	transaction depositPrescription(/* YOUR CODE HERE */ prescription) {
-		if (prescriptions.contains(prescription)) {
-            revert "PrescriptionAlreadyDepositedException";
-		}
+	/* transaction depositPrescription(/1* YOUR CODE HERE *1/ prescription) { */
+	/* 	if (prescriptionList.contains(prescription)) { */
+            /* revert "PrescriptionAlreadyDepositedException"; */
+	/* 	} */
 
-		prescriptions = prescriptions.prependIfNotEmpty(new PharmacyPrescriptionRecord(prescription));
-	}
+	/* 	prescriptionList = prescriptionList.prependIfNotEmpty(new PharmacyPrescriptionRecord(prescription)); */
+	/* } */
 
 	transaction fillPrescription(Prescription@Unowned prescription) {
         // The prescription list can only contain records in HasFills, so we remove the record, as we need to decrement the fills counter.
-		MaybeRecord maybeRecord = prescriptions.removeIfExists(prescription);
+		MaybeRecord maybeRecord = prescriptionList.removeIfExists(prescription);
 
         // TODO TASK 3: Fill in the rest of this transaction. You will need to call doFill() on the appropriate PharmacyPrescriptionRecord.
         //              Be sure to record that the prescription has been filled.
@@ -82,16 +82,16 @@ main contract Pharmacy {
 	}
 }
 
-contract Patient {
-	string name;
+/* contract Patient { */
+/* 	string name; */
 
-    transaction depositPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) {
-        pharmacy.depositPrescription(prescription);
-    }
+/*     transaction depositPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) { */
+/*         pharmacy.depositPrescription(prescription); */
+/*     } */
 
-	// Assume that this prescription is for this patient; no separate checking is needed.
-	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Unowned prescription) {
-		pharmacy.fillPrescription(prescription);
-	}
-}
+/* 	// Assume that this prescription is for this patient; no separate checking is needed. */
+/* 	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Unowned prescription) { */
+/* 		pharmacy.fillPrescription(prescription); */
+/* 	} */
+/* } */
 
