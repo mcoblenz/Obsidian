@@ -10,6 +10,8 @@ scalacOptions := Seq("-unchecked", "-deprecation")
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
 
+assemblyJarName in assembly := "obsidianc.jar"
+
 /* Don't throw TrapExitSecurityException.
  * Also, allow passing return code through SBT without
  * SBT throwing an exception. */
@@ -31,6 +33,7 @@ libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2"
 // don't get confused about multiple META-INF/MANIFEST.MF
 assemblyMergeStrategy in assembly := {
     case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+    case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard
     case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
     	oldStrategy(x)
