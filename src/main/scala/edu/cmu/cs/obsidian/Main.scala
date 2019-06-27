@@ -193,7 +193,10 @@ object Main {
             if (compilerDir == null) {
                 // TODO: package up the compiler as a jar file and use a path relative to that
                 // Requiring the working dir to be the compiler's directory is inconvenient.
-                compilerDir = Paths.get("").toAbsolutePath().toString
+                compilerDir = System.getenv("OBSIDIAN_COMPILER_DIR")
+                if (compilerDir == null) {
+                    compilerDir = Paths.get("").toAbsolutePath().toString
+                }
             }
             val fabricPath = Paths.get(compilerDir, "fabric", "java")
             val buildPath = fabricPath.resolve("build.gradle")
