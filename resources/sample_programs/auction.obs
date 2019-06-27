@@ -17,7 +17,7 @@ contract Bidder {
         -> Bidding;
     }
 
-    transaction createBid(Bidder@Owned this) returns Bid@Owned {
+    transaction createBid(Bidder@Bidding this) returns Bid@Owned {
         Bid bid = new Bid(bidAmount);
         balance = balance - bidAmount;
         return bid;
@@ -31,7 +31,7 @@ contract Bidder {
         return name;
     }
 
-    transaction won(Bidder@Owned >> WonItem this, Item@Owned >> Unowned i) {
+    transaction won(Bidder@Bidding >> WonItem this, Item@Owned >> Unowned i) {
         -> WonItem(item = i);
     }
 
@@ -98,15 +98,10 @@ main contract Auction {
     Bidder@Owned maxBidder;
     Seller@Owned seller;
 
-    state Initial {
-        Item@Owned item;
-        Fee@Owned fee;
-    }
-
     state Open {
-        Item@Owned itemSame;
+        Item@Owned item;
         Bid@Owned bid;
-        Fee@Owned f;
+        Fee@Owned fee;
     }
     state BiddingDone {
         Item@Owned it;
@@ -118,11 +113,10 @@ main contract Auction {
     Auction@Owned(Item@Owned >> Unowned i, Fee@Owned >> Unowned f) {
         maxBidder = new Bidder("none",0, 0);
         seller = new Seller();
-        -> Initial(item = i, fee = f);
+        -> Open(item = i, bid = new Bid(-1), fee = f);
     }
 
-    transaction makeBid(Auction@Initial >> Open this, Bidder@Owned >> Unowned bidder) {
-        -> Open(itemSame = item, bid = new Bid(0), f = fee);
+    transaction makeBid(Auction@Open this, Bidder@Owned >> Unowned bidder) {
         if (bidder.getBidAmount() > bid.getAmount()) {
             if (maxBidder.getName() != "none") {
                 if (bid in Open) {
@@ -130,22 +124,26 @@ main contract Auction {
                     bid.bidSurpassed();
                 }
             }
-            bid = bidder.createBid();
+            if (bidder in Bidding) {
+                bid = bidder.createBid();
+            }
             maxBidder = bidder;
         }
     }
 
-    transaction closeBidding(Auction@Open >> BiddingDone this) {
+    transaction finishBidding(Auction@Open >> BiddingDone this) {
         if (bid.getAmount() <= 0) {
             if (seller in Unsold) {
-                seller.getBackFee(f);
+                seller.getBackFee(fee);
             }
         }
-        -> BiddingDone(it = itemSame, finalBid = bid);
+        -> BiddingDone(it = item, finalBid = bid);
     }
 
     transaction giveItem(Auction@BiddingDone >> Closed this) {
-        maxBidder.won(it);
+        if (maxBidder in Bidding) {
+            maxBidder.won(it);
+        }
         if (seller in Unsold) {
             seller.receiveBid(finalBid);
         }

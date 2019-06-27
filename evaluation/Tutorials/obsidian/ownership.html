@@ -141,7 +141,7 @@ transaction test() {
 Local variables are declared just like other variables, including type information. For example:
 <pre>
 <code>
-Money@Owned withdraw() {
+transaction withdraw() returns Money@Owned {
     // body not shown
 }
 
@@ -195,7 +195,7 @@ contract Wallet {
 	Money@Owned money; // Note that this annotation is on a field declaration!
 	
 	// exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
-	Money@Owned exchange(Money@Owned >> Unowned otherMoney) {
+	transaction exchange(Money@Owned >> Unowned otherMoney) returns Money@Owned {
         Money@Owned temporaryMoney = money; // OK temporarily...
         money = otherMoney; // as long as money@Owned is restored by the end of the method.
         return temporaryMoney;

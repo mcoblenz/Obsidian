@@ -36,9 +36,10 @@ contract Bidder {
         -> Bidding;
     }
 
-    transaction createBid(Bidder@Owned this) returns Bid@Owned {
+    transaction createBid(Bidder@Bidding this) returns Bid@Owned {
         //5. TODO: Finish this transaction.
         //Create a new bid with the bid amount given for this Bidder. Be sure to update all necessary values.
+        
     }
 
     transaction getBidAmount(Bidder@Owned this) returns int {
@@ -49,7 +50,7 @@ contract Bidder {
         return name;
     }
 
-    transaction won(Bidder@Owned >> WonItem this, Item@Owned >> Unowned i) {
+    transaction won(Bidder@Bidding >> WonItem this, Item@Owned >> Unowned i) {
         -> WonItem(item = i);
     }
 
@@ -123,15 +124,10 @@ main contract Auction {
     Bidder@Owned maxBidder;
     Seller@Owned seller;
 
-    state Initial {
-        Item@Owned item;
-        Fee@Owned fee;
-    }
-
     state Open {
-        Item@Owned itemSame;
+        Item@Owned item;
         Bid@Owned bid;
-        Fee@Owned f;
+        Fee@Owned fee;
     }
     state BiddingDone {
         Item@Owned it;
@@ -142,19 +138,17 @@ main contract Auction {
     Auction@Owned(Item@Owned >> Unowned i, Fee@Owned >> Unowned f) {
         maxBidder = new Bidder("none",0, 0);
         seller = new Seller();
-        -> Initial(item = i, fee = f);
+        -> Open(item = i, bid = new Bid(-1), fee = f);
     }
 
-    
-    transaction makeBid(Auction@Initial >> Open this, Bidder@Owned >> Unowned bidder) {
-        -> Open(itemSame = item, bid = new Bid(0), f = fee);
+    transaction makeBid(Auction@Open this, Bidder@Owned >> Unowned bidder) {
         if (bidder.getBidAmount() > bid.getAmount()) {
-            //6. TODO: finish this if-statement. Be sure to update all necessary values.
+            //6. TODO: write what goes in this if-statement. Be sure to update all necessary values.
         }
     }
 
     //7. TODO: fill in the state transition for the parameters in the function below
-    transaction closeBidding(/* Fill this in */ this) {
+    transaction finishBidding(/* Fill this in */ this) {
         if (bid.getAmount() <= 0) {
             if (seller in Unsold) {
                 seller.getBackFee(f);
