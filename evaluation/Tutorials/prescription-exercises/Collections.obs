@@ -9,7 +9,7 @@ contract MaybeRecord {
         ->Nothing;
     }
 
-    MaybeRecord@Just(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) {
+    transaction just(MaybeRecord@Nothing >> Just this, PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) {
         ->Just(record = newRecord);
     }
 
@@ -31,13 +31,16 @@ contract PharmacyPrescriptionRecordList {
         ->Nil;
     }
 
-    PharmacyPrescriptionRecordList@Cons(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
-                                        PharmacyPrescriptionRecordList@Shared tail) {
+    transaction cons(PharmacyPrescriptionRecordList@Nil >> Cons this,
+                     PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
+                     PharmacyPrescriptionRecordList@Shared tail) {
         ->Cons(record = newRecord, next = tail);
     }
 
     transaction prepend(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
-        return new PharmacyPrescriptionRecordList(newRecord, this);
+        PharmacyPrescriptionRecordList list = new PharmacyPrescriptionRecordList();
+        list.cons(newRecord, this);
+        return list;
     }
 
     transaction prependIfNotEmpty(PharmacyPrescriptionRecord@Owned >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
@@ -69,7 +72,9 @@ contract PharmacyPrescriptionRecordList {
                     ->Cons(record = next.getRecord(), next = newNext);
                 }
 
-                return new MaybeRecord(oldRecord);
+                MaybeRecord maybeRecord = new MaybeRecord();
+                maybeRecord.just(oldRecord);
+                return maybeRecord;
             } else {
                 return next.removeIfExists(prescription);
             }
