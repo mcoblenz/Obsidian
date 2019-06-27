@@ -10,11 +10,11 @@
 <script src="../prism.js"></script>
 <h2>Part 2: States</h2>
 
-<p>In our new programming language, classes can define <em>states</em>. For example, a <code>LightSwitch</code> is always either <code>Off</code> or <code>On</code> (never both):</p>
+<p>In our new programming language, contracts can define <em>states</em>. For example, a <code>LightSwitch</code> is always either <code>Off</code> or <code>On</code> (never both):</p>
 
 <pre>
 <code>
-class LightSwitch {
+contract LightSwitch {
   state On;
   state Off;
 }
@@ -27,7 +27,7 @@ class LightSwitch {
 <code>
   LightSwitch() { // constructor
     ->Off; // Transition to Off state.
-  } 
+  }
 </code>
 </pre>
 
@@ -37,14 +37,14 @@ class LightSwitch {
 <code>
   LightSwitch@Off() { // constructor always ends with the object in Off state
     ->Off;
-  } 
+  }
 
-  void turnOn(LightSwitch@Off >> On this) // turnOn() can only be called on objects that are in Off state.
+  transaction turnOn(LightSwitch@Off >> On this) // turnOn() can only be called on objects that are in Off state.
   {
     ->On;
   }
-  
-  void turnOff(LightSwitch@On >> Off this)
+
+  transaction turnOff(LightSwitch@On >> Off this)
   {
     ->Off;
   }
@@ -55,9 +55,9 @@ class LightSwitch {
 
 <pre>
 <code>
-void foo() {
-    LightSwitch s = new LightSwitch(); 
-    s.turnOn(); 
+transaction foo() {
+    LightSwitch s = new LightSwitch();
+    s.turnOn();
 }
 </code>
 </pre>
@@ -66,7 +66,7 @@ The compiler checks method invocations to make sure they are safe:
 
 <pre>
 <code>
-void foo() {
+transaction foo() {
     LightSwitch s = new LightSwitch();
     s.turnOff(); // COMPILE ERROR: turnOff() requires that s is On, but here s is Off
 }
@@ -81,7 +81,7 @@ When there may be an owner of an object, other references cannot be used to modi
 
 <pre>
 <code>
-void foo(LightSwitch@Unowned s) {
+transaction foo(LightSwitch@Unowned s) {
     s.turnOff(); // COMPILE ERROR: can't change state of s through an unowned reference
 }
 </code>
@@ -92,7 +92,7 @@ If there is no owner of an object, then all references to the object are annotat
 
 <pre>
 <code>
-void test1(LightSwitch@Shared s) {
+transaction test1(LightSwitch@Shared s) {
     s.turnOn(); // COMPILE ERROR: turnOn requires that s be Off, but s is Shared.
 }
 </code>
@@ -103,7 +103,7 @@ In the above situation, the programmer might need to check the state dynamically
 <h3>Testing states with <code>is</code></h3>
 <pre>
 <code>
-void test2(LightSwitch@Shared s) {
+transaction test2(LightSwitch@Shared s) {
     if (s is On) { // runtime check to see whether the object referenced by s is in state On
         s.turnOff(); // OK due to runtime check
     }

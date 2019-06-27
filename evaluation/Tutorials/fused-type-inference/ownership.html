@@ -10,14 +10,14 @@
 <script src="../prism.js"></script>
 <h2><strong>Part 1: Ownership and Assets</strong></h2>
  <!-- local variables never include annotatations. Params and fields always do. -->
-<p>Our new programming language is object-oriented. As usual, it includes <em>classes</em>, which can have <em>fields</em>. In addition, of the many <strong>variables</strong> or <strong>fields</strong> that reference objects, <strong>one</strong> of them can own the object. For example:</p>
+<p>Our new programming language is object-oriented. It includes <em>contracts</em>, which are like classes, which can have <em>fields</em>. In addition, of the many <strong>variables</strong> or <strong>fields</strong> that reference objects, <strong>one</strong> of them can own the object. For example:</p>
 
 <pre>
 <code>
-class Money {
+contract Money {
 }
 
-<strong>class</strong> Wallet {
+<strong>contract</strong> Wallet {
     Money@Owned m; // @Owned indicates that m owns the object it refers to
 }
 </code>
@@ -35,11 +35,11 @@ class Money {
 
 <h2><strong>Assets</strong></h2>
 
-<p>Some owning references are to things that should not be accidentally lost. To prevent accidental loss, we can declare classes with the keyword <code>asset</code>. Let's do this for <code>Money</code>:</p>
+<p>Some owning references are to things that should not be accidentally lost. To prevent accidental loss, we can declare contracts with the keyword <code>asset</code>. Let's do this for <code>Money</code>:</p>
 
 <pre>
 <code>
-asset class Money {
+asset contract Money {
 }
 </code>
 </pre>
@@ -48,7 +48,7 @@ asset class Money {
 
 <pre>
 <code>
-void test() {
+transaction test() {
     Money m = ...; [m@Owned]; // OK, m is Owned here
     // ERROR: cannot drop reference to owned asset m
 }
@@ -59,7 +59,7 @@ We can fix this by (for example) returning m, assigning it to an owning field, o
 
 <pre>
 <code>
-Money@Owned test() {
+transaction test() returns Money@Owned {
     Money m = ...; [m@Owned]; // OK, m is Owned here
     return m; // gives ownership of m to the caller of test()
 }
@@ -73,7 +73,7 @@ Money@Owned test() {
 When methods return objects, the types must be annotated. For example:
 <pre>
 <code>
-Money@Owned withdraw() {
+transaction withdraw() returns Money@Owned {
     // body not shown
 }
 </code>
@@ -85,11 +85,11 @@ Money@Owned withdraw() {
 
 <pre>
 <code>
-void spend(Money@Owned >> Unowned m) { // m is Owned initially but must be Unowned at the end.
+transaction spend(Money@Owned >> Unowned m) { // m is Owned initially but must be Unowned at the end.
 	// implementation not shown
 };
 
-void testSpend(Money@Owned >> Unowned m) {
+transaction testSpend(Money@Owned >> Unowned m) {
 	spend(m);
 	// m is now of type Money@Unowned due to specification on spend() declaration.
 }
@@ -98,7 +98,7 @@ void testSpend(Money@Owned >> Unowned m) {
 
 <p>If a method expects an argument that is <code>Unowned</code>, this means that the method cannot take ownership. As a result, it is safe to pass an <code>Owned</code> reference as an argument to a method that expects an <code>Unowned</code> argument. After the method returns, the caller still holds ownership.</p>
 
-<p>If a method parameter lacks >>, then ownership will not change. For example, <code>void test(Money@Owned m)</code> is equivalent to <code>void test(Money@Owned >> Owned m)</code>. <code>void foo(Money@Unowned m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that method.
+<p>If a method parameter lacks >>, then ownership will not change. For example, <code>transaction test(Money@Owned m)</code> is equivalent to <code>transaction test(Money@Owned >> Owned m)</code>. <code>transaction foo(Money@Unowned m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that method.
 
 
 <h3>Ownership checks</h3>
@@ -106,7 +106,7 @@ void testSpend(Money@Owned >> Unowned m) {
 
 <pre>
 <code>
-void testSpend(Money@Owned >> Unowned  m) {
+transaction testSpend(Money@Owned >> Unowned  m) {
 	spend(m); [m@Unowned]; // OK
 	[m@Owned]; // COMPILE ERROR: m is Unowned here
 }
@@ -122,7 +122,7 @@ void testSpend(Money@Owned >> Unowned  m) {
 <code>
 Money m = ...; [m@Owned];
 Money newMoney = m; [m@Unowned];
-// Now m is of type Money@Unowned, not Money@Owned. 
+// Now m is of type Money@Unowned, not Money@Owned.
 </code>
 </pre>
 
@@ -131,14 +131,14 @@ Money newMoney = m; [m@Unowned];
 
 <pre>
 <code>
-void spend(Money@Owned >> Unowned m) {
+transaction spend(Money@Owned >> Unowned m) {
 	// implementation not shown
 };
-void print(Money@Unowned m) {
+transaction print(Money@Unowned m) {
     // implementation not shown
 }
 
-void test() {
+transaction test() {
 	Money m = ... // assume m is now owned.
 	print(m); [m@Owned];
 	spend(m); [m@Unowned];
@@ -151,11 +151,11 @@ void test() {
 Local variables are declared <strong>without</strong> any ownership specified; instead, you can optionally write compiler ownership checks <code>[]</code> to specify their ownership. The compiler will output an error if the ownership does not match the check. For example:
 <pre>
 <code>
-Money@Owned withdraw() {
+transaction withdraw() returns Money@Owned {
     // body not shown
 }
 
-void test() {
+transaction test() {
     Money m = withdraw(); [m@Owned];
     spend(m); [m@Unowned];
     [m@Owned]; // COMPILE ERROR: m is Unowned here
@@ -166,10 +166,10 @@ void test() {
 <p>If ownership is no longer desired, <code>disown</code> can be used to relinquish ownership. For example:</p>
 <pre>
 <code>
-class Money {
+contract Money {
     int amount;
-    
-    void merge(Money@Owned >> Unowned mergeFrom) {
+
+    transaction merge(Money@Owned >> Unowned mergeFrom) {
         amount += mergeFrom.amount;
         disown mergeFrom; // We absorbed the value of mergeFrom, so the owner doesn't own it anymore.
     }
@@ -182,14 +182,14 @@ class Money {
 
 <pre>
 <code>
-class Money {
-    void discard(Money@Owned >> Unowned this) {
+contract Money {
+    transaction discard(Money@Owned >> Unowned this) {
         disown this;
     }
 }
 
-class Wallet {
-    void throwAwayMoney(Money @ Owned >> Unowned money) {
+contract Wallet {
+    transaction throwAwayMoney(Money @ Owned >> Unowned money) {
         money.discard(); // 'this' argument is implicit; do not include it in method call.
     }
 }
@@ -201,9 +201,9 @@ class Wallet {
 <br>
 <pre>
 <code>
-class Wallet {
+contract Wallet {
 	Money@Owned money; // Note that this annotation is on a field declaration!
-	
+
 	// exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
 	Money@Owned exchange(Money@Owned >> Unowned otherMoney) {
         Money temporaryMoney = money; [money@Unowned]; // OK temporarily...
