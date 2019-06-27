@@ -71,7 +71,7 @@ main contract Pharmacy {
 
 	transaction fillPrescription(Prescription@Unowned prescription) {
         // The prescription list can only contain records in HasFills, so we remove the record, as we need to decrement the fills counter.
-		MaybeRecord result = prescriptions.removeIfExists(prescription);
+		MaybeRecord maybeRecord = prescriptions.removeIfExists(prescription);
 
         // TODO TASK 3: Fill in the rest of this transaction. You will need to call doFill() on the appropriate PharmacyPrescriptionRecord.
         //              Be sure to record that the prescription has been filled.

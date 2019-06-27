@@ -22,10 +22,10 @@ This system is intended to reflect the following rule on prescriptions:
     <li>Prescription-filling is implemented in Prescription.doFill(). </li>
 </ul>
 
-However, the Drug Enforcement Agency is worried that the code below might allow violations of the rule by
-malevolent patients, who might modify the Patient contract.
-The rest of the contracts, including Prescription and Pharmacy, cannot be modified by patients.
-Note that each contract may be instantiated multiple times.
+<!-- However, the Drug Enforcement Agency is worried that the code below might allow violations of the rule by -->
+<!-- malevolent patients, who might modify the Patient contract. -->
+<!-- The rest of the contracts, including Prescription and Pharmacy, cannot be modified by patients. -->
+<!-- Note that each contract may be instantiated multiple times. -->
 </p>
 
 <p> The code in the file <code>Prescription.obs</code>contains several tasks, each labeled <code> // TODO TASK #: ... </code>.
@@ -40,7 +40,8 @@ contract MaybeRecord {
     asset state Just;
 
     MaybeRecord@Nothing();
-    MaybeRecord@Just(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord);
+
+    transaction just(MaybeRecord@Nothing >> Just this, PharmacyPrescriptionRecord@HasFills >> Unowned newRecord);
 
     transaction getRecord(MaybeRecord@Just >> Nothing this) returns PharmacyPrescriptionRecord@HasFills;
 }
@@ -50,8 +51,6 @@ contract PharmacyPrescriptionRecordList {
     asset state Cons;
 
     PharmacyPrescriptionRecordList@Nil();
-    PharmacyPrescriptionRecordList@Cons(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
-                                        PharmacyPrescriptionRecordList@Shared tail);
 
     transaction prependIfNotEmpty(PharmacyPrescriptionRecord@Owned >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared;
 
