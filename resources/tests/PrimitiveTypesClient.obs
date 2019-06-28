@@ -1,4 +1,4 @@
-import "resources/tests/PrimitiveTypes.obs"
+import "PrimitiveTypes.obs"
 
 main contract PrimitiveTypesClient {
 	transaction main(remote PrimitiveTypes container) {

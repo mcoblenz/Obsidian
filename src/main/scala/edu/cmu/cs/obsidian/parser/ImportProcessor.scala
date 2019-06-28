@@ -13,23 +13,37 @@ object ImportProcessor {
 
     class ImportException (val message : String) extends Exception {}
 
-    private def standardLibraryPath(fileName: String): Path =
-        Paths.get(MoreObjects.firstNonNull(System.getenv("OBSIDIAN_STDLIB"), "")).resolve(fileName)
+    def compilerPath(): Path =
+        List("TRAVIS_BUILD_DIR","OBSIDIAN_COMPILER_DIR")
+            .map(System.getenv)
+            .find(_ != null)
+            .map(Paths.get(_).toAbsolutePath)
+            .getOrElse(Paths.get("").toAbsolutePath)
 
-    private def relativePath(importingFile: String, fileName: String): Path =
-        Paths.get(importingFile).toAbsolutePath.getParent.resolve(fileName)
+    def standardLibraryPath(): Path = {
+        val envPathStr = System.getenv("OBSIDIAN_STDLIB")
+        if (envPathStr == null) {
+            compilerPath().resolve("Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian/stdlib")
+        } else {
+            Paths.get(envPathStr).toAbsolutePath
+        }
+    }
 
-    private def searchPaths(importingFile: String, fileName: String): Seq[Path] =
-        List(standardLibraryPath(fileName), relativePath(importingFile, fileName))
+    private def relativePath(importingFile: String): Path =
+        Paths.get(importingFile).toAbsolutePath.getParent
+
+    private def searchPaths(importingFile: String): Seq[Path] =
+        List(relativePath(importingFile), standardLibraryPath(), compilerPath())
 
     def searchImportFile(importingFile: String, fileName: String): Option[Path] =
-        searchPaths(importingFile, fileName).find(Files.exists(_))
+        searchPaths(importingFile)
+            .map(_.resolve(fileName))
+            .find(Files.exists(_))
 
     def processImports(inFile: String, ast: Program): (Program, Seq[ErrorRecord]) = {
         if (filesAlreadyProcessed.contains(inFile)) {
             (ast, Seq.empty)
-        }
-        else {
+        } else {
             filesAlreadyProcessed.add(inFile)
 
             var allContracts = ast.contracts
@@ -54,25 +68,23 @@ object ImportProcessor {
         searchImportFile(importFilename, importPath) match {
             case Some(path) => {
                 val resolvedImportPath = path.toAbsolutePath.toString
+                if (!seenFiles.contains(resolvedImportPath)) {
+                    val importedProgram = Parser.parseFileAtPath(resolvedImportPath, printTokens = false)
 
-                val importedProgram = Parser.parseFileAtPath(resolvedImportPath, printTokens = false)
+                    var contracts = filterTags(importedProgram.contracts)
 
-                var contracts = filterTags(importedProgram.contracts)
+                    seenFiles.add(resolvedImportPath)
 
-                seenFiles.add(importPath)
-
-                importedProgram.imports.foreach(i => {
-                    if (!seenFiles.contains(i.name)) {
-                        val cs = processImport(i.name, seenFiles, i.loc, resolvedImportPath)
-
-                        cs match {
+                    importedProgram.imports.foreach(i => {
+                        processImport(i.name, seenFiles, i.loc, resolvedImportPath) match {
                             case Left(err) => return Left(err)
                             case Right(c) => contracts = c ++ contracts
-
                         }
-                    }
-                })
-                Right(contracts)
+                    })
+                    Right(contracts)
+                } else {
+                    Right(Nil)
+                }
             }
             case None =>
                 Left(ErrorRecord(ImportError(s"Unable to read file: $importPath"), importPos, importFilename))

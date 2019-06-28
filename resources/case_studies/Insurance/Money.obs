@@ -1,4 +1,4 @@
-main asset contract Money {
+asset contract Money {
     int amount;
 
     Money@Owned(int amt) {

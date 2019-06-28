@@ -177,13 +177,6 @@ object Main {
         f.delete()
     }
 
-    def compilerDir(): Path =
-        List("TRAVIS_BUILD_DIR","OBSIDIAN_COMPILER_DIR")
-        .map(System.getenv)
-        .find(_ != null)
-        .map(Paths.get(_).toAbsolutePath)
-        .getOrElse(Paths.get("").toAbsolutePath)
-
     def generateFabricCode(mainName: String, outputPath: Option[String], srcDir: Path): Unit = {
         try {
             //what we need to do now is move the .java class and the outerclass to a different folder
@@ -199,7 +192,7 @@ object Main {
 
             //copy the content of the fabric/java/ folder into a folder with the class name
             //have to add the trailing separator to avoid copying the java directory too
-            val fabricPath = compilerDir().resolve("fabric").resolve("java")
+            val fabricPath = ImportProcessor.compilerPath().resolve("fabric").resolve("java")
             val buildPath = fabricPath.resolve("build.gradle")
             val settingsPath = fabricPath.resolve("settings.gradle")
             val srcPath = fabricPath.resolve("src")
