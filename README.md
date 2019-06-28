@@ -49,6 +49,18 @@ To deploy and invoke the generated chaincode in a real Fabric environment, follo
 If you wish to upgrade the chaincode on the network without destroying and recreating the entire network, you can run `./upgrade.sh`.
 This command uses the same path to the chaincode that you originally uploaded, so there is no need to pass any arguments.
 
+## Obsidian language development
+
+###### IntelliJ setup (for working on the Obsidian compiler)
+1. Open the Obsidian project in IntellJ.
+2. Run > Edit Configurations…
+3. New Application Configuration.
+4. Set the main class as `edu.cmu.cs.obsidian.Main`
+5. Edit the configurations to run the program with the following arguments:
+	`PATH_TO_OBS_CODE.obs`
+6. Run the program
+7. A folder named after the input class will be generated at the root of the directory containing the structure needed for Fabric deployment.
+	
 ###### Runtime .jar generation (for those working on Obsidian itself)
 If changes are made to the Obsidian_Runtime code, a new .jar has to be generated and published since the Fabric chaincode relies on it.
 To do so, go to the Obsidian_Runtime folder and run `gradle publish`.
