@@ -217,12 +217,16 @@ sealed trait NonPrimitiveType extends ObsidianType {
     def topPermissionType = this
 
     override def isAssetReference(contextContractTable: ContractTable): Possibility = {
-        val contract = contextContractTable.lookupContract(contractName)
-        if (contract.isDefined && contract.get.contract.isAsset) {
-            Yes()
-        }
-        else {
-            No()
+        contextContractTable.lookupContract(contractName) match {
+            case Some(contract) => {
+                if (contract.contract.isAsset) {
+                    Yes()
+                } else {
+                    StateType(contractName, contract.possibleStates, isRemote).isAssetReference(contextContractTable)
+                }
+            }
+
+            case None => No()
         }
     }
 
