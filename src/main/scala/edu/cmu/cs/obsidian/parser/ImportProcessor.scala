@@ -17,7 +17,7 @@ object ImportProcessor {
         Paths.get(MoreObjects.firstNonNull(System.getenv("OBSIDIAN_STDLIB"), "")).resolve(fileName)
 
     private def relativePath(importingFile: String, fileName: String): Path =
-        Paths.get(importingFile).resolve(fileName)
+        Paths.get(importingFile).toAbsolutePath.getParent.resolve(fileName)
 
     private def searchPaths(importingFile: String, fileName: String): Seq[Path] =
         List(standardLibraryPath(fileName), relativePath(importingFile, fileName))
@@ -53,7 +53,9 @@ object ImportProcessor {
     def processImport(importPath: String, seenFiles: mutable.HashSet[String], importPos: Position, importFilename: String) : Either[ErrorRecord, Seq[Contract]] = {
         searchImportFile(importFilename, importPath) match {
             case Some(path) => {
-                val importedProgram = Parser.parseFileAtPath(path.toAbsolutePath.toString, printTokens = false)
+                val resolvedImportPath = path.toAbsolutePath.toString
+
+                val importedProgram = Parser.parseFileAtPath(resolvedImportPath, printTokens = false)
 
                 var contracts = filterTags(importedProgram.contracts)
 
@@ -61,7 +63,7 @@ object ImportProcessor {
 
                 importedProgram.imports.foreach(i => {
                     if (!seenFiles.contains(i.name)) {
-                        val cs = processImport(i.name, seenFiles, i.loc, importPath)
+                        val cs = processImport(i.name, seenFiles, i.loc, resolvedImportPath)
 
                         cs match {
                             case Left(err) => return Left(err)
