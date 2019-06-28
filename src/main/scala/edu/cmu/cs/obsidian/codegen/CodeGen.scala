@@ -37,6 +37,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
     private final val loadedFieldName: String = "__loaded"
     private final val serializationParamName: String = "__st"
     private final val constructorReturnsOwnedFieldName: String = "__constructorReturnsOwned"
+    private final val constructorReturnsOwnedReferenceMethName = "constructorReturnsOwnedReference"
 
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
@@ -1050,7 +1051,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
         constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
         invocation.arg(JExpr.ref(serializationParamName))
 
-        newClass.field(JMod.PRIVATE, model.BOOLEAN, constructorReturnsOwnedFieldName, JExpr.FALSE)
+        if (!newClass.fields().containsKey(constructorReturnsOwnedFieldName)) {
+            newClass.field(JMod.PRIVATE, model.BOOLEAN, constructorReturnsOwnedFieldName, JExpr.FALSE)
+        }
+
         generateConstructorReturnsOwnedReference(newClass)
     }
 
@@ -1210,7 +1214,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 generateInitMethod(translationContext, newClass, stubType, constructorTypes)
         }
         if (constructor.isEmpty) {
-            newClass.field(JMod.PRIVATE, model.BOOLEAN, constructorReturnsOwnedFieldName, JExpr.TRUE)
+            if (!newClass.fields().containsKey(constructorReturnsOwnedFieldName)) {
+                newClass.field(JMod.PRIVATE, model.BOOLEAN, constructorReturnsOwnedFieldName, JExpr.TRUE)
+            }
+
             generateConstructorReturnsOwnedReference(newClass)
         }
     }
@@ -2375,10 +2382,12 @@ class CodeGen (val target: Target, table: SymbolTable) {
     }
 
     private def generateConstructorReturnsOwnedReference(newClass: JDefinedClass): Unit = {
-        val ownedRefMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "constructorReturnsOwnedReference")
-        ownedRefMethod.annotate(model.ref("Override"))
+        if (!newClass.methods().asScala.exists(_.name() == constructorReturnsOwnedReferenceMethName)) {
+            val ownedRefMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, constructorReturnsOwnedReferenceMethName)
+            ownedRefMethod.annotate(model.ref("Override"))
 
-        ownedRefMethod.body()._return(JExpr.ref(constructorReturnsOwnedFieldName))
+            ownedRefMethod.body()._return(JExpr.ref(constructorReturnsOwnedFieldName))
+        }
     }
 
     // Generates a new_Foo() method, which takes the serialization state as a parameter, and initializes all the fields.

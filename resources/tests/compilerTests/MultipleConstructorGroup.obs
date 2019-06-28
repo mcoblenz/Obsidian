@@ -1,0 +1,16 @@
+contract B {
+    state S1;
+    state S2 {
+        int x;
+    }
+
+    B@S1() { ->S1; }
+
+    B@S2(int _x) {
+        ->S2(x = _x);
+    }
+}
+
+main contract MultipleConstructorGroup {
+}
+
