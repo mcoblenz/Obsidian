@@ -922,7 +922,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
         typ match {
             case t: NonPrimitiveType =>
-                if (t.isOwned && t.isAssetReference(context.contractTable) != No()) logError(ast, UnusedOwnershipError(variable))
+                if (t.isOwned && t.isAssetReference(context.contractTable) != No()) {
+                    logError(ast, UnusedOwnershipError(variable))
+                }
             case _ => ()
         }
     }

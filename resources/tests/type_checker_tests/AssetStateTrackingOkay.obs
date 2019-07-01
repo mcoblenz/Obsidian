@@ -1,0 +1,15 @@
+main contract AssetStateTracking {
+    asset state S1 {
+        int x;
+    }
+
+    AssetStateTracking@Owned() {
+        ->S1(x = 0);
+    }
+
+    transaction f() {
+        AssetStateTracking c = new AssetStateTracking();
+        disown c;
+    }
+}
+

@@ -735,4 +735,14 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def interfaceDoesntRequireReturnTest(): Unit = {
         runTest("resources/tests/type_checker_tests/InterfaceWithReturn.obs", Nil)
     }
+
+    @Test def assetStateTrackingOwned(): Unit = {
+        runTest("resources/tests/type_checker_tests/AssetStateTracking.obs",
+            (UnusedOwnershipError("c"), 10) ::
+                Nil)
+    }
+
+    @Test def assetStateTrackingOwnedOkay(): Unit = {
+        runTest("resources/tests/type_checker_tests/AssetStateTrackingOkay.obs", Nil)
+    }
 }
