@@ -1,5 +1,5 @@
-import "resources/case_studies/Insurance/InsuranceService.obs"
-import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/java-utilities/System.obs"
+import "InsuranceService.obs"
+import "IO.obs"
 
 main contract InsuranceClient {
 	transaction main(remote InsuranceService@Shared insService) {
@@ -14,12 +14,12 @@ main contract InsuranceClient {
 	    Policy@Offered policy = insService.requestBids(3);
 
         // test
-        System.println(policy.getCost());
+        new IO().println(policy.getCost());
 
         // now buy the policy
         Money@Owned refund = insService.buyPolicy(policy, new Money(10));
 
-        System.println(refund.getAmount());
+        new IO().println(refund.getAmount());
 
 	}
 }

@@ -1,6 +1,6 @@
-import "resources/case_studies/Insurance/InsuranceBid.obs"
-import "resources/case_studies/Insurance/Bank.obs"
-import "resources/case_studies/Insurance/TimeService.obs"
+import "InsuranceBid.obs"
+import "Bank.obs"
+import "TimeService.obs"
 
 // TODO : Collections
 

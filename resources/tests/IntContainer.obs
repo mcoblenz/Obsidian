@@ -3,7 +3,7 @@ main contract IntContainer {
     string s;
     bool b;
 
-    IntContainer() {
+    IntContainer@Owned() {
         x = 5;
         s = "aaa";
         b = true;

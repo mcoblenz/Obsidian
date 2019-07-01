@@ -1,11 +1,13 @@
-import "resources/tests/IntContainer.obs"
-import "Obsidian Runtime/src/Runtime/edu/cmu/cs/obsidian/java-utilities/System.obs"
+import "IntContainer.obs"
+
+import "IO.obs"
 
 main contract IntContainerClient {
     transaction main(remote IntContainer@Shared container) {
         int oldX = container.setX(3);
-        System.println(oldX);
+        new IO().println(oldX);
         oldX = container.setX(4);
-        System.println(oldX);
+        new IO().println(oldX);
     }
 }
+

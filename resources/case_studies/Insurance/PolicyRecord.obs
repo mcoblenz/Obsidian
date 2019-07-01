@@ -1,5 +1,5 @@
-import "resources/case_studies/Insurance/Policy.obs"
-import "resources/case_studies/Insurance/Money.obs"
+import "Policy.obs"
+import "Money.obs"
 
 
 main contract PolicyRecord {

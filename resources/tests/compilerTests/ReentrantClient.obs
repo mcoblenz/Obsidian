@@ -1,4 +1,4 @@
-import "resources/tests/compilerTests/Reentrant.obs"
+import "Reentrant.obs"
 
 main contract ReentrantClient {
 	transaction main(remote Reentrant c) {

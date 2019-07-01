@@ -1,4 +1,4 @@
-import "resources/case_studies/Insurance/PolicyRecord.obs"
+import "PolicyRecord.obs"
 
 
 // This implements a mutable linked list of Active policies.
