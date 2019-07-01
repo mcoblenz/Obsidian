@@ -1,6 +1,8 @@
 package edu.cmu.cs.obsidian.tests
 
 
+import java.io.FileInputStream
+
 import org.junit.Assert.{assertTrue, fail}
 import org.junit.Test
 import org.scalatest.junit.JUnitSuite
@@ -15,7 +17,7 @@ class TypeCheckerTests extends JUnitSuite {
     private def runTest(file: String, expectedErrors: Seq[(Error, LineNumber)]): Unit = {
         var prog: Program = null
         try {
-            prog = Parser.parseFileAtPath(file, printTokens = false)
+            prog = Parser.parseFileAtPath(file, new FileInputStream(file), printTokens = false)
         }
         catch {
             case p: Parser.ParseException =>

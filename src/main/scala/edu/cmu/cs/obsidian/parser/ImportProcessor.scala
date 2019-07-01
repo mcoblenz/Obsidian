@@ -1,8 +1,9 @@
 package edu.cmu.cs.obsidian.parser
 
-import java.nio.file.{Files, Path, Paths}
+import java.io.{FileInputStream, InputStream}
+import java.nio.file.{FileSystems, Files, Path, Paths}
 
-import com.google.common.base.{MoreObjects, Objects}
+import edu.cmu.cs.obsidian.Main
 import edu.cmu.cs.obsidian.typecheck.{ErrorRecord, ImportError}
 
 import scala.collection.mutable
@@ -13,32 +14,46 @@ object ImportProcessor {
 
     class ImportException (val message : String) extends Exception {}
 
-    def compilerPath(): Path =
-        List("TRAVIS_BUILD_DIR","OBSIDIAN_COMPILER_DIR")
-            .map(System.getenv)
-            .find(_ != null)
-            .map(Paths.get(_).toAbsolutePath)
-            .getOrElse(Paths.get("").toAbsolutePath)
-
-    def standardLibraryPath(): Path = {
-        val envPathStr = System.getenv("OBSIDIAN_STDLIB")
-        if (envPathStr == null) {
-            compilerPath().resolve("Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian/stdlib")
+    def resolvePathAndInputStream(path: Path, fileName: String): Option[(String, InputStream)] = {
+        val filePath = path.resolve(fileName)
+        if (Files.exists(filePath)) {
+            Some((filePath.toAbsolutePath.toString, new FileInputStream(filePath.toFile)))
         } else {
-            Paths.get(envPathStr).toAbsolutePath
+            None
         }
     }
 
-    private def relativePath(importingFile: String): Path =
-        Paths.get(importingFile).toAbsolutePath.getParent
+    private def relativePath(importingFile: String, fileName: String): Option[(String, InputStream)] =
+        resolvePathAndInputStream(Paths.get(importingFile).toAbsolutePath.getParent, fileName)
 
-    private def searchPaths(importingFile: String): Seq[Path] =
-        List(relativePath(importingFile), standardLibraryPath(), compilerPath())
+    private def compilerPath(fileName: String): Option[(String, InputStream)] =
+        resolvePathAndInputStream(Main.compilerPath(), fileName)
 
-    def searchImportFile(importingFile: String, fileName: String): Option[Path] =
-        searchPaths(importingFile)
-            .map(_.resolve(fileName))
-            .find(Files.exists(_))
+    // TODO: Write about the environment variables in the README
+    def standardLibraryPath(fileName: String): Option[(String, InputStream)] = {
+        val classLoader = Thread.currentThread().getContextClassLoader
+        val resourcePath = "stdlib/" + fileName
+        val resolvedUrl = classLoader.getResource(resourcePath)
+
+        if (resolvedUrl != null) {
+            val inputStream = classLoader.getResourceAsStream(resourcePath)
+            Some((resolvedUrl.toString, inputStream))
+        } else {
+            None
+        }
+    }
+
+    private def searchPaths(importingFile: String, fileName: String): Option[(String, InputStream)] = {
+        val searchFs = List(relativePath(importingFile, _: String), standardLibraryPath(_), compilerPath(_))
+        for (searchF <- searchFs) {
+            searchF(fileName) match {
+                case Some(x) => return Some(x)
+                case None => ()
+            }
+        }
+
+        None
+    }
 
     def processImports(inFile: String, ast: Program): (Program, Seq[ErrorRecord]) = {
         if (filesAlreadyProcessed.contains(inFile)) {
@@ -65,11 +80,10 @@ object ImportProcessor {
     }
 
     def processImport(importPath: String, seenFiles: mutable.HashSet[String], importPos: Position, importFilename: String) : Either[ErrorRecord, Seq[Contract]] = {
-        searchImportFile(importFilename, importPath) match {
-            case Some(path) => {
-                val resolvedImportPath = path.toAbsolutePath.toString
+        searchPaths(importFilename, importPath) match {
+            case Some((resolvedImportPath, inputStream)) => {
                 if (!seenFiles.contains(resolvedImportPath)) {
-                    val importedProgram = Parser.parseFileAtPath(resolvedImportPath, printTokens = false)
+                    val importedProgram = Parser.parseFileAtPath(resolvedImportPath, inputStream, printTokens = false)
 
                     var contracts = filterTags(importedProgram.contracts)
 

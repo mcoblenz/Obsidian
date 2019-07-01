@@ -1,10 +1,9 @@
 package edu.cmu.cs.obsidian
 
-import java.io.File
+import java.io.{File, FileInputStream}
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
 
-import com.google.common.base.MoreObjects
 import org.apache.commons.io.FileUtils
 
 import scala.collection.mutable.HashSet
@@ -177,6 +176,16 @@ object Main {
         f.delete()
     }
 
+    def compilerPath(): Path = {
+        val compilerDir = System.getenv("OBSIDIAN_COMPILER_DIR")
+
+        if (compilerDir != null) {
+            Paths.get(compilerDir).toAbsolutePath
+        } else {
+            Paths.get("").toAbsolutePath
+        }
+    }
+
     def generateFabricCode(mainName: String, outputPath: Option[String], srcDir: Path): Unit = {
         try {
             //what we need to do now is move the .java class and the outerclass to a different folder
@@ -192,7 +201,7 @@ object Main {
 
             //copy the content of the fabric/java/ folder into a folder with the class name
             //have to add the trailing separator to avoid copying the java directory too
-            val fabricPath = ImportProcessor.compilerPath().resolve("fabric").resolve("java")
+            val fabricPath = compilerPath().resolve("fabric").resolve("java")
             val buildPath = fabricPath.resolve("build.gradle")
             val settingsPath = fabricPath.resolve("settings.gradle")
             val srcPath = fabricPath.resolve("src")
@@ -278,7 +287,7 @@ object Main {
         val filename = options.inputFiles.head
 
         try {
-            val ast = Parser.parseFileAtPath(filename, options.printTokens)
+            val ast = Parser.parseFileAtPath(filename, new FileInputStream(filename), options.printTokens)
 
             if (options.printAST) {
                 println("AST:")
