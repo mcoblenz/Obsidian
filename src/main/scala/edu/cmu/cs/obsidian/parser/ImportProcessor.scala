@@ -29,7 +29,6 @@ object ImportProcessor {
     private def compilerPath(fileName: String): Option[(String, InputStream)] =
         resolvePathAndInputStream(Main.compilerPath(), fileName)
 
-    // TODO: Write about the environment variables in the README
     def standardLibraryPath(fileName: String): Option[(String, InputStream)] = {
         val classLoader = Thread.currentThread().getContextClassLoader
         val resourcePath = "stdlib/" + fileName
