@@ -324,7 +324,7 @@ case class DuplicateContractError(contractName: String) extends Error {
 }
 
 case class UninitializedFieldError(fieldName: String) extends Error {
-    val msg: String = s"Field $fieldName may not be initialized in this constructor."
+    val msg: String = s"Field '$fieldName' must be initialized in this constructor, but the constructor might not initialize it."
 }
 
 case class StateCheckOnPrimitiveError() extends Error {
