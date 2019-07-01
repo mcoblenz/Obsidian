@@ -1,4 +1,6 @@
-interface IO {
+interface IOInterface {
     transaction print(string s);
     transaction println(string s);
 }
+
+contract IO implements IOInterface with java : edu.cmu.cs.obsidian.stdlib.IO;

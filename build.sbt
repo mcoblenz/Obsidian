@@ -12,6 +12,9 @@ libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % 
 
 assemblyJarName in assembly := "obsidianc.jar"
 
+unmanagedResourceDirectories in Compile += baseDirectory.value / "Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian"
+includeFilter in (Compile, unmanagedResources) := "*.obs"
+
 /* Don't throw TrapExitSecurityException.
  * Also, allow passing return code through SBT without
  * SBT throwing an exception. */
@@ -38,3 +41,4 @@ assemblyMergeStrategy in assembly := {
         val oldStrategy = (assemblyMergeStrategy in assembly).value
     	oldStrategy(x)
 }
+

@@ -1,0 +1,4 @@
+import "resources/tests/compilerTests/StubExceptionsLib.obs"
+
+main contract StubExceptions {}
+

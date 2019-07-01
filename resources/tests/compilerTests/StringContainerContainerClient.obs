@@ -1,4 +1,4 @@
-import "resources/tests/compilerTests/StringContainerContainer.obs"
+import "StringContainerContainer.obs"
 
 main contract StringContainerContainerClient {
 	transaction main(remote StringContainerContainer@Shared c) {
@@ -7,3 +7,4 @@ main contract StringContainerContainerClient {
         remote StringContainer getCont = c.getContainer();
 	}
 }
+

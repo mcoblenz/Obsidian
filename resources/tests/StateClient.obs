@@ -1,4 +1,4 @@
-import "resources/tests/State.obs"
+import "State.obs"
 
 main contract StateClient {
     transaction main(remote StateTest st) {

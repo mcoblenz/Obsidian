@@ -1,8 +1,11 @@
 package edu.cmu.cs.obsidian.parser
 
+import java.io.{InputStream, StringWriter}
+
 import edu.cmu.cs.obsidian.lexer
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.typecheck._
+import org.apache.commons.io.IOUtils
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.input.Position
@@ -672,9 +675,14 @@ object Parser extends Parsers {
         }
     }
 
-    def parseFileAtPath(srcPath: String, printTokens: Boolean): Program = {
-        val bufferedSource = scala.io.Source.fromFile(srcPath)
-        val src = try bufferedSource.getLines() mkString "\n" finally bufferedSource.close()
+    def parseFileAtPath(srcPath: String, input: InputStream, printTokens: Boolean): Program = {
+        val src = try {
+            val writer = new StringWriter()
+            IOUtils.copy(input, writer)
+            writer.toString
+        } finally {
+            input.close()
+        }
 
         val tokens: Seq[Token] = Lexer.tokenize(src) match {
             case Left(msg) => throw new ParseException(msg)

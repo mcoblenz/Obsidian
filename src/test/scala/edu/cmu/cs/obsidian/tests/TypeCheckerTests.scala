@@ -1,6 +1,8 @@
 package edu.cmu.cs.obsidian.tests
 
 
+import java.io.FileInputStream
+
 import org.junit.Assert.{assertTrue, fail}
 import org.junit.Test
 import org.scalatest.junit.JUnitSuite
@@ -15,7 +17,7 @@ class TypeCheckerTests extends JUnitSuite {
     private def runTest(file: String, expectedErrors: Seq[(Error, LineNumber)]): Unit = {
         var prog: Program = null
         try {
-            prog = Parser.parseFileAtPath(file, printTokens = false)
+            prog = Parser.parseFileAtPath(file, new FileInputStream(file), printTokens = false)
         }
         catch {
             case p: Parser.ParseException =>
@@ -734,5 +736,15 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def interfaceDoesntRequireReturnTest(): Unit = {
         runTest("resources/tests/type_checker_tests/InterfaceWithReturn.obs", Nil)
+    }
+
+    @Test def assetStateTrackingOwned(): Unit = {
+        runTest("resources/tests/type_checker_tests/AssetStateTracking.obs",
+            (UnusedOwnershipError("c"), 10) ::
+                Nil)
+    }
+
+    @Test def assetStateTrackingOwnedOkay(): Unit = {
+        runTest("resources/tests/type_checker_tests/AssetStateTrackingOkay.obs", Nil)
     }
 }

@@ -1,4 +1,4 @@
-import "resources/case_studies/Insurance/WeatherRecord.obs"
+import "WeatherRecord.obs"
 
 contract Signature {
 	string signature; // If we had arrays of bytes, we'd use those, but we don't.
@@ -13,3 +13,4 @@ contract Signature {
 	    return true; // TODO
 	}
 }
+

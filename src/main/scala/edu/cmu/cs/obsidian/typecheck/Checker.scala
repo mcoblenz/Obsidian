@@ -352,8 +352,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         }
                     p1 match {
                         case Owned() => typeForMismatchedPermissions
-                        case Unowned() => if (p2 == Shared()) Some(t2) else typeForMismatchedPermissions
-                        case Shared() => if (p2 == Unowned()) Some(t1) else typeForMismatchedPermissions
+                        case Unowned() => if (p2 == Shared()) Some(t1) else typeForMismatchedPermissions
+                        case Shared() => if (p2 == Unowned()) Some(t2) else typeForMismatchedPermissions
                         case Inferred() => assert(false, "Inferred types should be removed"); None
                     }
                 }
@@ -922,7 +922,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
         typ match {
             case t: NonPrimitiveType =>
-                if (t.isOwned && t.isAssetReference(context.contractTable) != No()) logError(ast, UnusedOwnershipError(variable))
+                if (t.isOwned && t.isAssetReference(context.contractTable) != No()) {
+                    logError(ast, UnusedOwnershipError(variable))
+                }
             case _ => ()
         }
     }

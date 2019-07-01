@@ -324,7 +324,7 @@ case class DuplicateContractError(contractName: String) extends Error {
 }
 
 case class UninitializedFieldError(fieldName: String) extends Error {
-    val msg: String = s"Field $fieldName may not be initialized in this constructor."
+    val msg: String = s"Field '$fieldName' must be initialized in this constructor, but the constructor might not initialize it."
 }
 
 case class StateCheckOnPrimitiveError() extends Error {
@@ -353,6 +353,6 @@ case class AmbiguousConstructorError(contractName: String,
 }
 
 case class ConstructorAnnotationMissingError(contractName: String) extends Error {
-    val msg: String = s"Missing a permission on a constructor of $contractName " +
+    val msg: String = s"Missing a permission on the result type of a constructor of $contractName " +
                       s"(e.g., $contractName@Owned, $contractName@State, where State is a valid state for $contractName)."
 }

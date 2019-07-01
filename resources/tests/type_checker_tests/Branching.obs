@@ -94,4 +94,27 @@ main contract C {
         }
         [s1@Unowned];
     }
+
+    transaction t8() {
+        StructuralContract s1 = new StructuralContract();
+        [s1 @ Owned];
+        if (true) {
+            HoldReference h = new HoldReference(s1);
+            [s1 @ Unowned];
+        }
+        else {
+            disown s1;
+            [s1 @ Shared];
+        }
+        [s1 @ Unowned];
+    }
+
+}
+
+contract HoldReference {
+    StructuralContract@Owned ref;
+
+    HoldReference@Owned(StructuralContract@Owned >> Unowned s) {
+        ref = s;
+    }
 }
