@@ -86,7 +86,7 @@ case class Invocation(recipient: Expression, name: String, args: Seq[Expression]
         s"$recipient.$name($argString)"
     }
 }
-case class Construction(name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression
+case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression
 case class Disown(e: Expression) extends Expression
 case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression
 

@@ -81,13 +81,12 @@ case class Context(table: DeclarationTable,
             thisFieldTypes,
             valVariables + variableName)
 
-
     def get(s: String): Option[ObsidianType] = underlyingVariableMap.get(s)
 
     def apply(s: String): ObsidianType = underlyingVariableMap(s)
 
     def fieldIsInitialized(stateName: String, fieldName: String): Boolean =
-        transitionFieldsInitialized.find((e) => e._1 == stateName && e._2 == fieldName).isDefined
+        transitionFieldsInitialized.exists(e => e._1 == stateName && e._2 == fieldName)
 
     def makeThrown: Context = this.copy(isThrown = true)
 
@@ -114,14 +113,7 @@ case class Context(table: DeclarationTable,
                 // Look inside the contract.
                 val insideContractResult = contractTableOpt.flatMap(lookupFunction)
 
-
-                val possibleCurrentStateNames: Iterable[String] = np match {
-                    case ContractReferenceType(contractName, _, _) => contractTableOpt.get.stateLookup.values.map((s: StateTable) => s.name)
-                    case StateType(contractName, stateNames, _) =>
-                        stateNames
-                    case InterfaceContractType(name, interfaceInnerType) =>
-                        contractTableOpt.get.stateLookup.values.map((s: StateTable) => s.name)
-                }
+                val possibleCurrentStateNames: Iterable[String] = contractTable.possibleStatesFor(np)
 
                 // It's weird that the way we find the available state names depends on the current state; this is an artifact
                 // of the fact that lookup for things defined in exactly one state is different from lookup for things defined in more than one state
@@ -130,7 +122,7 @@ case class Context(table: DeclarationTable,
                     if (insideContractResult.isDefined) {
                         insideContractResult.get.availableIn match {
                             case None => // This identifier is available in all states of the contract.
-                                contractTableOpt.get.stateLookup.map(_._1)
+                                contractTableOpt.get.stateLookup.keys
                             case Some(identifiers) => identifiers
                         }
                     }
@@ -286,6 +278,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
 
     /* true iff [t1 <: t2] */
+    // TODO GENERIC: Will need to process the bounds here
     private def isSubtype(t1: ObsidianType, t2: ObsidianType, isThis: Boolean): Option[Error] = {
         (t1, t2) match {
             case (BottomType(), _) => None
@@ -298,9 +291,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
                         contractIsSubtype(c1.contractName, c2.contractName) && isSubpermission(c1p, c2p)
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
-                        contractIsSubtype(c1, c2) && ss1.subsetOf(ss2)
+                        contractIsSubtype(c1.contractName, c2.contractName) && ss1.subsetOf(ss2)
                     case (StateType(c, ss1, _), ContractReferenceType(c2, c2p, _)) =>
-                        c2 == ContractType(c)
+                        c2 == c
                     case _ => false
                 }
                 if (!mainSubtype) Some(SubtypingError(t1, t2, isThis))
@@ -381,10 +374,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         Some(ContractReferenceType(contractType, Unowned(), isRemote))
                     }
                 }
-            case (StateType(_, ss1, _), StateType(_, ss2, _)) =>
-                val c = t1.contractName
+            case (StateType(ct, ss1, _), StateType(_, ss2, _)) =>
                 val unionStates = ss1.union(ss2)
-                Some(StateType(c, unionStates, false))
+                // TODO GENERIC: Right now we just take the ct from the first one,
+                //  but there probably be some merging/checking to make sure merging is okay
+                Some(StateType(ct, unionStates, false))
             case _ => None
         }
     }
@@ -692,8 +686,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, args)
                  (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv))
 
-             case Construction(name, args: Seq[Expression], isFFIInvocation) =>
-                 val tableLookup = context.contractTable.lookupContract(name)
+             case Construction(contractType, args: Seq[Expression], isFFIInvocation) =>
+                 val tableLookup = context.contractTable.lookupContract(contractType.contractName)
                  val isFFIInv = tableLookup match {
                      case None => false
                      case Some(x) => x.contract match {
@@ -703,7 +697,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
 
                  if (tableLookup.isEmpty) {
-                     logError(e, ContractUndefinedError(name))
+                     logError(e, ContractUndefinedError(contractType.contractName))
                      return (BottomType(), context, e)
                  }
 
@@ -721,7 +715,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      case Some((newExprSequence, cntxt, constr)) => (newExprSequence, constr.asInstanceOf[Constructor].resultType, cntxt)
                  }
 
-                 (simpleType, contextPrime, Construction(name, exprList, isFFIInv))
+                 // TODO GENERIC: Will want to infer generic type parameters here
+                 (simpleType, contextPrime, Construction(contractType, exprList, isFFIInv))
 
              case Disown(e) =>
                  // The expression "disown e" evaluates to an unowned value but also side-effects the context
@@ -1332,12 +1327,7 @@ private def checkStatement(
                 // maybeOldFields is the set of fields from the old state that MAY be going away — 
                 //   we can't be sure when the current state is a union.
 
-                val possibleCurrentStates =
-                    oldType match {
-                        case ContractReferenceType(_, _, _) => thisTable.possibleStates
-                        case InterfaceContractType(_, _) => thisTable.possibleStates
-                        case StateType(_, stateNames, _) => stateNames
-                    }
+                val possibleCurrentStates = thisTable.possibleStatesFor(oldType)
 
                 def fieldsAvailableInState(stateName: String): Set[Field] = {
                     val allFields = thisTable.allFields
@@ -1431,7 +1421,8 @@ private def checkStatement(
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType =
                     if (oldType.isOwned) {
-                        StateType(thisTable.name, newStateName, false)
+                        // TODO GENERIC: Could probably reduce all this contractName/contractType duplication
+                        StateType(thisTable.contractType, newStateName, false)
                     }
                     else {
                         // If the old "this" was unowned, we'd better not steal ownership for ourselves here.
@@ -1567,23 +1558,24 @@ private def checkStatement(
                                 case This() => Some("this")
                                 case _ => None
                             }
+
                             ident match {
                                 case Some(x) =>
                                     np.permission match {
                                         case Owned() =>
-                                            val newType = StateType(np.contractName, Set(state._1), np.isRemote)
+                                            val newType = StateType(np.contractType, Set(state._1), np.isRemote)
                                             t match {
                                                 case StateType(_, specificStates, _) =>
                                                     if (specificStates.size == 1 && specificStates.contains(state._1)) {
                                                         logError(e, StateCheckRedundant())
                                                     }
-                                                    val typeFalse = StateType(np.contractName, specificStates - state._1, np.isRemote)
+                                                    val typeFalse = StateType(np.contractType, specificStates - state._1, np.isRemote)
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                                 case _ =>
                                                     if (allStates.size == 1 && allStates.contains(state._1)) {
                                                         logError(e, StateCheckRedundant())
                                                     }
-                                                    val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
+                                                    val typeFalse = StateType(np.contractType, allStates - state._1, np.isRemote)
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                             }
                                         case Unowned() => (contextPrime, contextPrime)
@@ -1592,8 +1584,8 @@ private def checkStatement(
                                             if (allStates.size == 1 && allStates.contains(state._1)) {
                                                 logError(e, StateCheckRedundant())
                                             }
-                                            val newType = StateType(np.contractName, Set(state._1), np.isRemote)
-                                            val typeFalse = StateType(np.contractName, allStates - state._1, np.isRemote)
+                                            val newType = StateType(np.contractType, Set(state._1), np.isRemote)
+                                            val typeFalse = StateType(np.contractType, allStates - state._1, np.isRemote)
                                             resetOwnership = Some((x, np))
                                             (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                     }
@@ -1659,7 +1651,7 @@ private def checkStatement(
                     val newType: ObsidianType =
                         contractTable.state(sc.stateName) match {
                             case Some(stTable) =>
-                                StateType(contractTable.name, stTable.name, false)
+                                StateType(contractTable.contractType, stTable.name, false)
                             case None =>
                                 logError(sc, StateUndefinedError(contractTable.name, sc.stateName))
                                 ContractReferenceType(contractTable.contractType, Owned(), false)
@@ -1742,6 +1734,9 @@ private def checkStatement(
 
                 val typToCheck = typ match {
                     case InterfaceContractType(name, realTyp) => realTyp
+
+                    // TODO GENERIC: This probably needs to be the bounds or something
+                    case g: GenericType => g.lookupInterface(context.contractTable).get.contractType
                     case _ => typ
                 }
 
@@ -2072,8 +2067,8 @@ private def checkStatement(
                 case ContractReferenceType(contractType, permission, isRemote) =>
                     val inferredType = ContractReferenceType(contractType, Inferred(), isRemote)
                     initContext = initContext.updatedThisFieldType(field.name, inferredType)
-                case StateType(contractName, stateNames, isRemote) =>
-                    val inferredType = ContractReferenceType(ContractType(contractName), Inferred(), isRemote)
+                case StateType(contractType, stateNames, isRemote) =>
+                    val inferredType = ContractReferenceType(contractType, Inferred(), isRemote)
                     initContext = initContext.updatedThisFieldType(field.name, inferredType)
                 case _ => () // Nothing to do
             }
@@ -2149,14 +2144,6 @@ private def checkStatement(
         // to ensure that the generated Java code (which will not have states) will work
         val constructorGroups = constructors.groupBy(constr => constr.args.map(_.typIn.baseTypeName))
 
-        def states(t: NonPrimitiveType): Set[String] =
-            t match {
-                case ContractReferenceType(contractType, permission, isRemote) =>
-                    table.lookupContract(contractType.contractName).map(_.possibleStates).getOrElse(Set())
-                case InterfaceContractType(name, simpleType) => states(simpleType)
-                case StateType(contractName, stateNames, isRemote) => stateNames
-            }
-
         // If the types are distinguishable, this function returns None
         // If they are NOT distinguishable, this function returns an example that is a subtype of both types
         // Two types are distinguishable iff they are both owned and have non-overlapping state lists
@@ -2169,7 +2156,7 @@ private def checkStatement(
                         case (Shared(), p)      => Some(s"${t2.contractName}@${p.toString}")
                         case (p, Shared())      => Some(s"${t2.contractName}@${p.toString}")
                         case (Owned(), Owned()) =>
-                            states(t1).intersect(states(t2)).headOption.map(state => s"${t1.contractName}@$state")
+                            table.possibleStatesFor(t1).intersect(table.possibleStatesFor(t2)).headOption.map(state => s"${t1.contractName}@$state")
                         case _                  => None
                     }
 

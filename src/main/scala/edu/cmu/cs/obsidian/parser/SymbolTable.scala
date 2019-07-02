@@ -48,8 +48,10 @@ class StateTable(
 
     def name: String = astNodeRaw.name
 
-    def nonPrimitiveType = StateType(contract.name, astNodeRaw.name, false)
-    def contractType: ContractType = ContractType(name)
+    // TODO GENERIC: Are these right (i.e., should it be nil or something else)?
+    // TODO GENERIC: Shouldn't both of these be referring to the same ContractType?
+    def nonPrimitiveType = StateType(ContractType(contract.name, Nil), astNodeRaw.name, false)
+    def contractType: ContractType = ContractType(name, Nil)
 
     def ast: State = astNode
 
@@ -108,8 +110,17 @@ class ContractTable(
         allFields.filter((f: Field) => f.availableIn.isEmpty || stateNames.subsetOf(f.availableIn.get))
     }
 
-    def contractType = ContractType(name)
+    // TODO GENERIC: should this be nil? Probably not, and should probably come from the contract's generic parameters
+    def contractType = ContractType(name, Nil)
 
+    def possibleStatesFor(typ: NonPrimitiveType): Set[String] =
+        typ match {
+            case ContractReferenceType(contractType, permission, isRemote) =>
+                lookupContract(contractType.contractName).map(_.possibleStates).getOrElse(Set())
+            case InterfaceContractType(name, simpleType) => possibleStatesFor(simpleType)
+            case StateType(contractName, stateNames, isRemote) => stateNames
+            case g: GenericType => g.lookupInterface(this).get.possibleStates
+        }
 
     val stateLookup: Map[String, StateTable] = {
         indexDecl[State](contract.declarations, StateDeclTag).mapValues(

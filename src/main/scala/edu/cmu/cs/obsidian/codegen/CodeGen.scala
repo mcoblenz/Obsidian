@@ -2342,8 +2342,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, isFFIInvocation)
             case Invocation(recipient, name, args, isFFIInvocation) =>
                 addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext, isFFIInvocation)
-            case Construction(name, args, isFFIInvocation) =>
-                val contractRefType = ContractReferenceType(ContractType(name), Owned(), false)
+            case Construction(contractType, args, isFFIInvocation) =>
+                val contractRefType = ContractReferenceType(contractType, Owned(), false)
                 val resolvedType = resolveType(contractRefType, table)
                 addArgs(JExpr._new(resolvedType), args, translationContext, localContext, isFFIInvocation)
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()

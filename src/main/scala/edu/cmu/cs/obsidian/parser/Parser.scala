@@ -91,19 +91,21 @@ object Parser extends Parsers {
       }
     }
 
-    private def parseType: Parser[ObsidianType] = {
+    private def parseNonPrimitive: Parser[NonPrimitiveType] = {
+        opt(RemoteT()) ~ parseId ~ opt(LBracketT() ~ rep(parseType) ~ RBracketT()) ~ opt(AtT() ~! parseIdAlternatives) ^^ {
+            case remote ~ id ~ genericParams ~ permissionToken => {
+                val isRemote = remote.isDefined
+                val actualGenerics = genericParams.map {
+                    case _ ~ params ~ _ => params
+                }.getOrElse(List())
 
-
-        val parseNonPrimitive: Parser[NonPrimitiveType] = {
-             opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseIdAlternatives) ^^ {
-                case remote ~ id ~ permissionToken => {
-                    val isRemote = remote.isDefined
-                    val typ = extractTypeFromPermission(permissionToken, id._1, isRemote, false)
-                    typ.setLoc(id)
-                }
+                val typ = extractTypeFromPermission(permissionToken, id._1, actualGenerics, isRemote, defaultOwned = false)
+                typ.setLoc(id)
             }
         }
+    }
 
+    private def parseType: Parser[ObsidianType] = {
         val intPrim = IntT() ^^ { t => IntType().setLoc(t) }
         val boolPrim = BoolT() ^^ { t => BoolType().setLoc(t) }
         val stringPrim = StringT() ^^ { t => StringType().setLoc(t) }
@@ -111,22 +113,25 @@ object Parser extends Parsers {
         parseNonPrimitive | intPrim | boolPrim | stringPrim
     }
 
-    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]], name: String, isRemote: Boolean, defaultOwned: Boolean): NonPrimitiveType = {
+    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]],
+                                          name: String, genericParams: Seq[ObsidianType],
+                                          isRemote: Boolean, defaultOwned: Boolean): NonPrimitiveType = {
         val defaultPermission = if (defaultOwned) Owned() else Inferred()
+
+        val contractType = ContractType(name, genericParams)
+
         permission match {
-            case None => ContractReferenceType(ContractType(name), defaultPermission, isRemote)
+            case None => ContractReferenceType(contractType, defaultPermission, isRemote)
             case Some(_ ~ permissionIdentSeq) =>
                 if (permissionIdentSeq.size == 1) {
                     val thePermissionOrState = permissionIdentSeq.head
-                    val permission = resolvePermission(thePermissionOrState._1)
-                    permission match {
-                        case None => StateType(name, thePermissionOrState._1, isRemote)
-                        case Some(p) => ContractReferenceType(ContractType(name), p, isRemote)
+                    resolvePermission(thePermissionOrState._1) match {
+                        case None => StateType(contractType, thePermissionOrState._1, isRemote)
+                        case Some(p) => ContractReferenceType(contractType, p, isRemote)
                     }
-                }
-                else {
+                } else {
                     val stateNames = permissionIdentSeq.map(_._1)
-                    StateType(name, stateNames.toSet, isRemote)
+                    StateType(contractType, stateNames.toSet, isRemote)
                 }
         }
     }
@@ -176,7 +181,7 @@ object Parser extends Parsers {
                                 }
                                 (correctedType, correctedType)
                             case Some(_ ~ idSeq) => {
-                                val typOut = extractTypeFromPermission(permission, t.contractName, t.isRemote, false)
+                                val typOut = extractTypeFromPermission(permission, t.contractName, t.genericParams, t.isRemote, false)
                                 (t, typOut)
                             }
                         }
@@ -386,7 +391,9 @@ object Parser extends Parsers {
 
         val parseNew = {
             NewT() ~! parseId ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
-                case _new ~ name ~ _ ~ args ~ _ => Construction(name._1, args, false).setLoc(_new)
+                // TODO GENERIC: The gen params are Nil for now, but will be inferred later...
+                //  if this is working. Should also let the programmer specify the arguments manually.
+                case _new ~ name ~ _ ~ args ~ _ => Construction(ContractType(name._1, Nil), args, false).setLoc(_new)
             }
         }
 
@@ -511,6 +518,7 @@ object Parser extends Parsers {
 
 
     private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
+        // TODO GENERIC: Add generic parameters here (and also to interfaces)
         parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
           opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
             case opts ~ privateMethodFieldTypes ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
@@ -530,12 +538,12 @@ object Parser extends Parsers {
                 }
 
                 val finalType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName), Shared(), false)
+                    case None => ContractReferenceType(ContractType(contractName, Nil), Shared(), false)
                     case Some(v) => v.typOut
                 }
 
                 val thisType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName), Shared(), false)
+                    case None => ContractReferenceType(ContractType(contractName, Nil), Shared(), false)
                     case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType]
 
                 }
@@ -567,11 +575,15 @@ object Parser extends Parsers {
         }
     }
 
-    // maybe we can check here that the constructor has the appropriate name?
+    // TODO: maybe we can check here that the constructor has the appropriate name?
     private def parseConstructor = {
-        parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, defaultOwned = false)
+        parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case name ~ params ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
+                val genParams = params.map {
+                    case _ ~ types ~ _ => types
+                }.getOrElse(List())
+
+                val resultType = extractTypeFromPermission(permission, name._1, genParams, isRemote = false, defaultOwned = false)
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }
@@ -601,9 +613,52 @@ object Parser extends Parsers {
         }
     }
 
+    private def parseGenericImplements = {
+        parseId ~ LBracketT() ~ rep(parseId) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
+            case name ~ _ ~ params ~ _ ~ permission =>
+                val perm = GenericBoundPerm(name._1, params.map(_._1), _: Permission)
+                val states = GenericBoundStates(name._1, params.map(_._1), _: Set[String])
+
+                permission match {
+                    case Some(_ ~ permissions) =>
+                        if (permissions.length == 1) {
+                            resolvePermission(permissions.head._1) match {
+                                case Some(value) => perm(value)
+                                case None => states(Set(permissions.head._1))
+                            }
+                        } else {
+                            states(permissions.map(_._1).toSet)
+                        }
+                    case None => perm(Unowned())
+                }
+        }
+    }
+
+    private def genericParam = {
+        opt(AssetT()) ~ parseId ~ opt(AtT() ~ parseId) ~ opt(ImplementsT() ~ parseGenericImplements) ^^ {
+            case assetMod ~ varId ~ stateVarId ~ implements =>
+                val stateVar = stateVarId.map(_._2._1)
+                val bound = implements.map(_._2)
+                val gVar = GenericVar(assetMod.isDefined, varId._1, stateVar)
+
+                GenericType(gVar, bound)
+        }
+    }
+
+    private def parseGenericParams = {
+        opt(RemoteT()) ~ parseId ~ LBracketT() ~ rep(parseType) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
+            case isRemote ~ name ~ _ ~ genParams ~ _ ~ permission =>
+                extractTypeFromPermission(permission, name._1, genParams, isRemote.isDefined, defaultOwned = false)
+        }
+    }
+
+    private def parseGenericId = {
+        parseId ~ LBracketT() ~ rep(genericParam) ~ RBracketT()
+    }
+
     private def parseContractDecl(srcPath: String) = {
-        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseId >> {
-            case mod ~ ct ~ name =>
+        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseId ~ opt(ImplementsT() ~ parseGenericImplements) >> {
+            case mod ~ ct ~ name ~ impl =>
                 val isInterface = ct == InterfaceT()
 
                 LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface, srcPath)(name._1)) ~! RBraceT() ^^ {
@@ -622,8 +677,7 @@ object Parser extends Parsers {
                     val transitions =
                         if (transitionsEdges.isEmpty) {
                             None
-                        }
-                        else {
+                        } else {
                             Some(Transitions(transitionsEdges))
                         }
 

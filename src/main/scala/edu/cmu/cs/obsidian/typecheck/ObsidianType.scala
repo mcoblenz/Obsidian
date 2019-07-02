@@ -24,7 +24,9 @@ case class ConsumingOwnedGivesUnowned() extends OwnershipConsumptionMode
 case class NoOwnershipConsumption() extends OwnershipConsumptionMode
 
 // Type of references to contracts.
-case class ContractReferenceType(contractType: ContractType, permission: Permission, override val isRemote: Boolean) extends NonPrimitiveType {
+case class ContractReferenceType(override val contractType: ContractType,
+                                 permission: Permission,
+                                 override val isRemote: Boolean) extends NonPrimitiveType {
     override def toString: String =
         if (permission == Inferred()) {
             contractName
@@ -55,7 +57,9 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
 
     override def topPermissionType: NonPrimitiveType = this.copy(permission = Unowned()).setLoc(this)
 
-    override def remoteType: NonPrimitiveType = ContractReferenceType(contractType, permission, true)
+    override def remoteType: NonPrimitiveType = ContractReferenceType(contractType, permission, isRemote = true)
+
+    override def genericParams: Seq[ObsidianType] = contractType.typeArgs
 }
 
 
@@ -63,11 +67,20 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
 // Type of actual contracts. This is ALMOST NEVER the right class; it is specially for actual contracts.
 // Almost everywhere will use ContractReferenceType. This intentionally does not extend ObsidianType
 // because it is not available in the language itself (for now).
-case class ContractType(contractName: String) {
+case class ContractType(contractName: String, typeArgs: Seq[ObsidianType]) {
     override def toString: String = contractName
 }
 
-trait Possibility
+object Possibility {
+    def fromBoolean(b: Boolean): Possibility =
+        if (b) {
+            Yes()
+        } else {
+            No()
+        }
+}
+
+sealed trait Possibility
 case class Yes() extends Possibility
 case class Maybe() extends Possibility
 case class No() extends Possibility
@@ -78,9 +91,10 @@ case class No() extends Possibility
  *
  * StateType is always owned.
  * */
-case class StateType(contractName: String, stateNames: Set[String], override val isRemote: Boolean) extends NonPrimitiveType {
-    def this(contractName: String, stateName: String, isRemote: Boolean) = {
-        this(contractName, Set(stateName), isRemote)
+case class StateType(override val contractType: ContractType, stateNames: Set[String], override val isRemote: Boolean) extends NonPrimitiveType {
+    // TODO GENERIC: Do we need this
+    def this(contractType: ContractType, stateName: String, isRemote: Boolean) = {
+        this(contractType, Set(stateName), isRemote)
     }
 
     private def orOfStates: String = stateNames.mkString(" | ")
@@ -104,7 +118,7 @@ case class StateType(contractName: String, stateNames: Set[String], override val
                     case NoOwnershipConsumption() => Owned()
                 }
 
-            ContractReferenceType(ContractType(contractName), newPermission, isRemote).setLoc(this)
+            ContractReferenceType(contractType, newPermission, isRemote).setLoc(this)
         }
     }
     override val topPermissionType: NonPrimitiveType = this
@@ -136,11 +150,16 @@ case class StateType(contractName: String, stateNames: Set[String], override val
         }
     }
 
-    override def remoteType: NonPrimitiveType = StateType(contractName, stateNames, true)
+    override def remoteType: NonPrimitiveType = StateType(contractType, stateNames, isRemote = true)
+
+    override val contractName: String = contractType.contractName
+
+    override def genericParams: Seq[ObsidianType] = contractType.typeArgs
 }
 
 object StateType {
-    def apply(contractName: String, stateName: String, isRemote: Boolean): StateType = new StateType(contractName, Set(stateName), isRemote)
+    def apply(contractType: ContractType, stateName: String, isRemote: Boolean): StateType =
+        new StateType(contractType, Set(stateName), isRemote)
 }
 
 
@@ -190,6 +209,10 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     val contractName: String
 
+    def contractType: ContractType = ContractType(contractName, genericParams)
+
+    def genericParams: Seq[ObsidianType]
+
     override def baseTypeName: String = contractName
 
     //    override def toString: String = {
@@ -222,7 +245,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
                 if (contract.contract.isAsset) {
                     Yes()
                 } else {
-                    StateType(contractName, contract.possibleStates, isRemote).isAssetReference(contextContractTable)
+                    StateType(contract.contractType, contract.possibleStates, isRemote).isAssetReference(contextContractTable)
                 }
             }
 
@@ -256,6 +279,7 @@ case class BottomType() extends ObsidianType {
     override def topPermissionType: ObsidianType = this
 }
 
+// TODO GENERIC: Does this need to be extended for generics?
 case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
     override val isBottom: Boolean = false
@@ -264,4 +288,44 @@ case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) ext
     override val contractName: String = name
     override val permission: Permission = simpleType.permission
     override def remoteType: NonPrimitiveType = this
+
+    override def genericParams: Seq[ObsidianType] = simpleType.genericParams
+}
+
+sealed trait GenericBound {
+    def interfaceName: String
+    def permission: Permission
+}
+
+case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[String], permission: Permission) extends GenericBound
+case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[String], states: Set[String]) extends GenericBound {
+    override def permission: Permission = Owned()
+}
+
+case class GenericVar(isAsset: Boolean, varName: String, stringVar: Option[String])
+
+case class GenericType(gVar: GenericVar, bound: Option[GenericBound]) extends NonPrimitiveType {
+    // TODO GENERIC: How should these be implemented
+
+    override val permission: Permission = bound.map(_.permission).getOrElse(Unowned())
+
+    // TODO GENERIC: Maybe redo this (Top is hardcoded, should probably at least extract a constant)
+    //  will need to at least generate the Top interface (or maybe put it in the standard library)
+    override val contractName: String = bound.map(_.interfaceName).getOrElse("Top")
+
+    override def remoteType: NonPrimitiveType = this
+
+    // TODO GENERIC: Uh what should this be
+    override def residualType(mode: OwnershipConsumptionMode): ObsidianType = ???
+
+    def lookupInterface(contractTable: ContractTable): Option[ContractTable] =
+        // TODO GENERIC: Does this work?
+        // TODO GENERIC: Allow the default of not including an interface at all
+        contractTable.lookupContract(bound.map(_.interfaceName).get)
+
+    override def isAssetReference(contextContractTable: ContractTable): Possibility =
+        Possibility.fromBoolean(gVar.isAsset)
+
+    // TODO GENERIC: ???????
+    override def genericParams: Seq[ObsidianType] = ???
 }
