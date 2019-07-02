@@ -614,7 +614,7 @@ object Parser extends Parsers {
     }
 
     private def parseGenericImplements = {
-        parseId ~ LBracketT() ~ rep(parseId) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
+        parseId ~ LBracketT() ~ repsep(parseId, CommaT()) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
             case name ~ _ ~ params ~ _ ~ permission =>
                 val perm = GenericBoundPerm(name._1, params.map(_._1), _: Permission)
                 val states = GenericBoundStates(name._1, params.map(_._1), _: Set[String])
@@ -646,14 +646,14 @@ object Parser extends Parsers {
     }
 
     private def parseGenericParams = {
-        opt(RemoteT()) ~ parseId ~ LBracketT() ~ rep(parseType) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
+        opt(RemoteT()) ~ parseId ~ LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
             case isRemote ~ name ~ _ ~ genParams ~ _ ~ permission =>
                 extractTypeFromPermission(permission, name._1, genParams, isRemote.isDefined, defaultOwned = false)
         }
     }
 
     private def parseGenericId = {
-        parseId ~ LBracketT() ~ rep(genericParam) ~ RBracketT()
+        parseId ~ LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()
     }
 
     private def parseContractDecl(srcPath: String) = {
