@@ -614,10 +614,12 @@ object Parser extends Parsers {
     }
 
     private def parseGenericImplements = {
-        parseId ~ LBracketT() ~ repsep(parseId, CommaT()) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
-            case name ~ _ ~ params ~ _ ~ permission =>
-                val perm = GenericBoundPerm(name._1, params.map(_._1), _: Permission)
-                val states = GenericBoundStates(name._1, params.map(_._1), _: Set[String])
+        parseId ~ opt(LBracketT() ~ repsep(parseId, CommaT()) ~ RBracketT()) ~ opt(AtT() ~ parseIdAlternatives) ^^ {
+            case name ~ optParams ~ permission =>
+                val params = optParams.map(_._1._2).getOrElse(List()).map(_._1)
+
+                val perm = GenericBoundPerm(name._1, params, _: Permission)
+                val states = GenericBoundStates(name._1, params, _: Set[String])
 
                 permission match {
                     case Some(_ ~ permissions) =>
@@ -653,15 +655,18 @@ object Parser extends Parsers {
     }
 
     private def parseGenericId = {
-        parseId ~ LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()
+        parseId ~ opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT())
     }
 
     private def parseContractDecl(srcPath: String) = {
-        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseId ~ opt(ImplementsT() ~ parseGenericImplements) >> {
-            case mod ~ ct ~ name ~ impl =>
+        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseGenericId ~ opt(ImplementsT() ~ parseGenericImplements) >> {
+            case mod ~ ct ~ identifier ~ impl =>
                 val isInterface = ct == InterfaceT()
 
-                LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface, srcPath)(name._1)) ~! RBraceT() ^^ {
+                // TODO GENERIC: Actually make use of the generic parameters, probably want to include these in the contract definition
+                val name = identifier._1._1
+
+                LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface, srcPath)(name)) ~! RBraceT() ^^ {
                 case _ ~ contents ~ _ =>
                     // Make sure there's only one transition diagram.
                     val separateTransitions = contents.filter({
@@ -686,7 +691,7 @@ object Parser extends Parsers {
                         case _ => false
                     }).map(_.asInstanceOf[Declaration])
 
-                    ObsidianContractImpl(mod.toSet, name._1, decls, transitions, isInterface, srcPath).setLoc(ct)
+                    ObsidianContractImpl(mod.toSet, name, decls, transitions, isInterface, srcPath).setLoc(ct)
             }
         }
     }

@@ -271,4 +271,75 @@ class ParserTests extends JUnitSuite {
               | main contract C { transaction f(int y) { int x = 1 % y; } }
             """.stripMargin)
     }
+
+    @Test def parseContractImplements() = {
+        shouldSucceed(
+            """
+              | contract C implements I {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractImplementsParams() = {
+        // This won't compile, but should parse
+        shouldSucceed(
+            """
+              | contract C implements I[X] {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractWithParams() = {
+        shouldSucceed(
+            """
+              | contract C[T] {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractWithParamsState() = {
+        shouldSucceed(
+            """
+              | contract C[T@s] {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractWithParamsWithBound() = {
+        shouldSucceed(
+            """
+              | contract C[T implements I] {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractWithParamsStateWithBound() = {
+        shouldSucceed(
+            """
+              | contract C[T@s implements I@Owned] {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractWithParamsWithBoundParams() = {
+        shouldSucceed(
+            """
+              | contract C[T implements I[T]] {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractWithParamsStateWithBoundParams() = {
+        shouldSucceed(
+            """
+              | contract C[T@s implements I[T]@Owned] {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractParamsAndImplements() = {
+        shouldSucceed(
+            """
+              | contract C[T] implements I {}
+            """.stripMargin)
+    }
+
+    @Test def parseContractParamsWithBoundAndImplements() = {
+        shouldSucceed(
+            """
+              | contract C[T@s implements I1[T]@Owned] implements I2[T] {}
+            """.stripMargin)
+    }
 }
