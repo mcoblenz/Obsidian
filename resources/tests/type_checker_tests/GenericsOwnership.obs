@@ -16,8 +16,8 @@ contract A[T] {
 }
 
 main contract C {
-    /* transaction f() returns A[C]@Owned { */
-    /*     return new A[C](new C()); */
-    /* } */
+    transaction f() returns A[C]@Owned {
+        return new A[C](new C());
+    }
 }
 

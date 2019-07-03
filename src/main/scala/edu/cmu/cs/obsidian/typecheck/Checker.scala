@@ -1,11 +1,9 @@
 package edu.cmu.cs.obsidian.typecheck
 
-import edu.cmu.cs.obsidian.lexer.FalseT
 import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.parser._
 
-import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
-
+import scala.collection.immutable.TreeMap
 
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
@@ -17,7 +15,6 @@ import scala.collection.immutable.{HashSet, TreeMap, TreeSet}
  * localFieldsInitialized is a set of state and contract fields that have been initialized.
  * valVariables is a set of variables that were declared val instead of var, i.e. reassignment to them is forbidden.
  */
-
 case class Context(table: DeclarationTable,
                    underlyingVariableMap: Map[String, ObsidianType],
                    isThrown: Boolean,
@@ -718,7 +715,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, args)
                  (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv))
 
-             // TODO GENERIC: Handle the type params
              case Construction(contractType, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(contractType.contractName)
                  val isFFIInv = tableLookup match {

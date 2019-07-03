@@ -85,6 +85,12 @@ case class ContractReferenceType(override val contractType: ContractType,
     override  def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType =
         ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(
             ContractReferenceType(contractType.substitute(genericParams, actualParams), permission, isRemote))
+            .withPermission(permission)
+
+    override def withStates(stateNames: Set[String]): NonPrimitiveType =
+        StateType(contractType, stateNames, isRemote)
+
+    override def withPermission(permission: Permission): NonPrimitiveType = copy(permission = permission)
 }
 
 
@@ -193,6 +199,17 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType =
         ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(
             StateType(contractType.substitute(genericParams, actualParams), stateNames, isRemote))
+            .withStates(stateNames)
+
+    override def withStates(stateNames: Set[String]): NonPrimitiveType = this.copy(stateNames = stateNames)
+
+    override def withPermission(permission: Permission): NonPrimitiveType =
+        if (permission == Owned()) {
+            this
+        } else {
+            // TODO GENERIC: Clean this up
+            assert(false, s"Permission $permission not compatible with state type $this"); this
+        }
 }
 
 object StateType {
@@ -212,6 +229,10 @@ object StateType {
 
 /* Invariant for permissioned types: any path that occurs in the type makes "this" explicit */
 sealed trait ObsidianType extends HasLocation {
+    // TODO GENERIC: Should this stuff be here?
+    def withStates(stateNames: Set[String]): ObsidianType
+    def withPermission(permission: Permission): ObsidianType
+
     // for tests
     val isBottom: Boolean
 
@@ -263,6 +284,9 @@ sealed trait PrimitiveType extends ObsidianType {
 
     // Substituting for primitives does nothing
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = this
+
+    override def withStates(stateNames: Set[String]): PrimitiveType = this
+    override def withPermission(permission: Permission): PrimitiveType = this
 }
 
 /* all permissioned types are associated with their corresponding symbol table
@@ -279,8 +303,10 @@ sealed trait NonPrimitiveType extends ObsidianType {
     override def isOwned: Boolean = permission == Owned()
 
     def contractType: ContractType = ContractType(contractName, genericParams)
-
     def genericParams: Seq[ObsidianType]
+
+    override def withStates(stateNames: Set[String]): NonPrimitiveType
+    override def withPermission(permission: Permission): NonPrimitiveType
 
     override def baseTypeName: String = contractName
 
@@ -325,7 +351,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
     def remoteType: NonPrimitiveType
 }
 
-
 case class IntType() extends PrimitiveType {
     override def toString: String = "int"
 }
@@ -348,6 +373,9 @@ case class BottomType() extends ObsidianType {
     override def topPermissionType: ObsidianType = this
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = this
+
+    override def withStates(stateNames: Set[String]): ObsidianType = BottomType()
+    override def withPermission(permission: Permission): ObsidianType = BottomType()
 }
 
 // TODO GENERIC: Does this need to be extended for generics?
@@ -369,9 +397,16 @@ case class FFIInterfaceContractType(name: String, simpleType: NonPrimitiveType) 
             case other => ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(this)
         }
     }
+
+    override def withStates(stateNames: Set[String]): NonPrimitiveType =
+        copy(simpleType = simpleType.withStates(stateNames))
+
+    override def withPermission(permission: Permission): NonPrimitiveType =
+        copy(simpleType = simpleType.withPermission(permission))
 }
 
 sealed trait GenericBound {
+    def withStates(stateNames: Set[String]): GenericBound
     def withPermission(permission: Permission): GenericBound
 
     def interfaceName: String
@@ -402,7 +437,10 @@ case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[String],
     }
 
     override def withPermission(permission: Permission): GenericBound =
-        GenericBoundPerm(interfaceName, interfaceParams, permission)
+        copy(permission = permission)
+
+    override def withStates(stateNames: Set[String]): GenericBound =
+        GenericBoundStates(interfaceName, interfaceParams, stateNames)
 }
 
 // TODO GENERIC: Should these params be strings or actual types?
@@ -431,14 +469,13 @@ case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[String
         } else {
             GenericBoundPerm(interfaceName, interfaceParams, permission)
         }
+
+    override def withStates(stateNames: Set[String]): GenericBound = copy(states = stateNames)
 }
 
 case class GenericVar(isAsset: Boolean, varName: String, stringVar: Option[String])
 
 case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimitiveType {
-    def withPermission(permission: Permission): GenericType =
-        GenericType(gVar, bound.withPermission(permission))
-
     // TODO GENERIC: How should these be implemented
 
     override val permission: Permission = bound.permission
@@ -463,13 +500,23 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
 
     // TODO GENERIC: Is there more substitution that needs to be done here or is this sufficient
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {
-        val idx = genericParams.indexWhere(_ == this)
+        val idx = genericParams.indexWhere(_.gVar.varName == this.gVar.varName)
 
         if (idx >= 0) {
-            actualParams(idx)
+            bound match {
+                case GenericBoundPerm(interfaceName, interfaceParams, perm) =>
+                    actualParams(idx).withPermission(perm)
+                case GenericBoundStates(interfaceName, interfaceParams, states) =>
+                    actualParams(idx).withStates(states)
+            }
         } else {
             this
         }
     }
 
+    override def withStates(stateNames: Set[String]): GenericType =
+        copy(bound = bound.withStates(stateNames))
+
+    override def withPermission(permission: Permission): GenericType =
+        GenericType(gVar, bound.withPermission(permission))
 }
