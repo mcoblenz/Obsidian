@@ -41,12 +41,10 @@ object StateNameValidator extends IdentityAstTransformer {
                     }
 
                 case None =>
-                    // TODO GENERIC: We also need to check if it's one of the generic parameters of the transaction, depending on the context here
-
                     lexicallyInsideOf.contract match {
                         case ObsidianContractImpl(modifiers, name, params, implementBound, declarations, transitions, isInterface, sp) =>
                             params.find(p => p.gVar.varName == np.contractName) match {
-                                case Some(genericType) => (genericType, List())
+                                case Some(genericType) => (genericType.withPermission(np.permission), List())
                                 case None =>
                                     (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                             }

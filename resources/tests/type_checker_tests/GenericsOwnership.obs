@@ -1,0 +1,23 @@
+contract A[T] {
+    T@Owned x;
+
+    A[T]@Owned(T@Owned >> Unowned x) {
+        this.x = x;
+    }
+
+    transaction f() returns T@Unowned {
+        return x;
+    }
+
+    transaction g() returns T@Owned {
+        // This one should fail, because field types will no longer be consistent
+        return x;
+    }
+}
+
+main contract C {
+    /* transaction f() returns A[C]@Owned { */
+    /*     return new A[C](new C()); */
+    /* } */
+}
+

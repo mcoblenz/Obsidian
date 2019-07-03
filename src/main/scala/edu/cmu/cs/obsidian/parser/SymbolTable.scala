@@ -157,6 +157,7 @@ class ContractTable(
                 ContractType(name, Nil)
         }
 
+    // TODO GENERIC: Will want to do state variable stuff here
     def possibleStatesFor(typ: NonPrimitiveType): Set[String] =
         typ match {
             case ContractReferenceType(contractType, permission, isRemote) =>

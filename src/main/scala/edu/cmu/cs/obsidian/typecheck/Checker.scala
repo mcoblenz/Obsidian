@@ -102,7 +102,7 @@ case class Context(table: DeclarationTable,
             return None
         }
 
-        val foundOpt: Option[FoundType] = inType match {
+        inType match {
             case np: NonPrimitiveType =>
                 // Look up the type in the current scope, NOT with lookupFunction.
                 val contractTableOpt = contractTable.lookupContract(np.contractName)
@@ -140,12 +140,7 @@ case class Context(table: DeclarationTable,
                 }
             case _ => None
         }
-
-        foundOpt
-
     }
-
-
 
     def lookupTransactionInThis(transactionName: String): Option[Transaction] = {
         lookupTransactionInType(thisType)(transactionName)
@@ -159,47 +154,52 @@ case class Context(table: DeclarationTable,
         lookupCurrentFieldTypeInType(thisType)(fieldName)
     }
 
+    // TODO GENERIC: Redo all of these lookup functions with the type parameters
     def lookupCurrentFieldTypeInType(typ: ObsidianType)(fieldName: String): Option[ObsidianType] = {
-        thisFieldTypes.get(fieldName) match {
-            case Some(typ) => Some(typ)
-            case None =>
-                doLookup((declTable: DeclarationTable) => declTable.lookupField(fieldName), typ) match {
-                case None => None
-                case Some(field) => Some(field.typ)
-            }
+        thisFieldTypes.get(fieldName).orElse(lookupDeclaredFieldTypeInType(typ)(fieldName))
+    }
+
+    // TODO GENERIC: Write some comments
+    def genericParams(typ: ObsidianType): Seq[GenericType] = {
+        typ match {
+            case np: NonPrimitiveType =>
+                val conOpt = if (np.contractName == contractTable.contract.name) {
+                    Some(contractTable.contract)
+                } else {
+                    contractTable.lookupContract(np.contractName).map(_.contract)
+                }
+
+                conOpt match {
+                    case Some(con) =>
+                        con match {
+                            case obsCon: ObsidianContractImpl => obsCon.params
+                            case javaCon: JavaFFIContractImpl => Nil
+                        }
+                    case None => Nil
+                }
+
+            case _ => Nil
         }
+    }
+
+    def actualParams: ObsidianType => Seq[ObsidianType] = {
+        case np: NonPrimitiveType => np.contractType.typeArgs
+        case _ => Nil
     }
 
     def lookupDeclaredFieldTypeInType(typ: ObsidianType)(fieldName: String): Option[ObsidianType] = {
-        doLookup((declTable: DeclarationTable) => declTable.lookupField(fieldName), typ) match {
-            case None => None
-            case Some(field) => Some(field.typ)
-        }
+        doLookup((declTable: DeclarationTable) => declTable.lookupField(fieldName), typ)
+            .map(_.typ)
+            .map(_.substitute(genericParams(typ), actualParams(typ)))
     }
 
-    def lookupTransactionInType(typ: ObsidianType) (transactionName: String): Option[Transaction] = {
-        if (typ.isBottom) {
-            return None
-        }
-
+    def lookupTransactionInType(typ: ObsidianType)(transactionName: String): Option[Transaction] = {
         typ match {
             case np: NonPrimitiveType =>
                 // Look up the type in the current scope, NOT with lookupFunction.
-                val contractTableOpt = contractTable.lookupContract(np.contractName)
-
-                contractTableOpt match {
-                    case None => None
-                    case Some(contractTable) =>
-                        val genericParams = contractTable.contract match {
-                            case obsCon: ObsidianContractImpl =>
-                                obsCon.params
-
-                            // TODO GENERIC: Handle java ffi contracts...
-                            case javaCon: JavaFFIContractImpl => Nil
-                        }
-
-                        contractTable.lookupTransaction(transactionName).map(_.substitute(genericParams, np.contractType.typeArgs))
-                }
+                contractTable.lookupContract(np.contractName)
+                    .flatMap(_.lookupTransaction(transactionName))
+                    .map(_.substitute(genericParams(np), actualParams(np)))
             case _ => None
         }
     }
@@ -217,11 +217,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case np: NonPrimitiveType =>
                 if (np.permission == Shared()) {
                     ConsumingOwnedGivesShared()
-                }
-                else if (np.isOwned) {
+                } else if (np.isOwned) {
                     ConsumingOwnedGivesUnowned()
-                }
-                else {
+                } else {
                     NoOwnershipConsumption()
                 }
             case _ => NoOwnershipConsumption()
@@ -322,7 +320,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         c2 == c
                     case _ => false
                 }
-                if (!mainSubtype) Some(SubtypingError(t1, t2, isThis))
+                if (!mainSubtype) {
+                    Some(SubtypingError(t1, t2, isThis))
+                }
                 // TODO: make sure this is unnecessary: else if (!modifierSubtype) Some(OwnershipSubtypingError(t1, t2))
                 else None
             case _ => Some(SubtypingError(t1, t2, isThis))
@@ -349,7 +349,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case Owned() => true
             case Unowned() => p2 == Unowned()
             case Shared() => (p2 == Shared()) || (p2 == Unowned())
-            case Inferred() => false
+
+            // TODO GENERIC: This used to be false...why?
+            case Inferred() => true
         }
     }
 

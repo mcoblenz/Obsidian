@@ -1,0 +1,20 @@
+contract A[T] {
+    T@Unowned x;
+
+    A[T]@Owned(T@Unowned x) {
+        this.x = x;
+    }
+
+    transaction f() returns T@Unowned {
+        return x;
+    }
+}
+
+main contract C {
+    transaction f() returns string {
+        A[int] a = new A[int](1);
+
+        return a.f();
+    }
+}
+

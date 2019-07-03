@@ -20,13 +20,11 @@ class IdentityAstTransformer {
         var contracts = List[Contract](ObsidianContractImpl(Set(), "Top", Nil, GenericBoundPerm("Top", Nil, Unowned()), Nil, None, isInterface = true, ""))
         assert(table.ast.imports.isEmpty, "Imports should be empty after processing.")
 
-
         for ((contractName, contractTable) <- table.contractLookup) {
             val (newContract, errors) = transformContract(table, contractTable)
             errorRecords = errorRecords ++ errors
             contracts = contracts :+ newContract
         }
-
 
         val newProgram = Program(Seq.empty, contracts).setLoc(table.ast)
 

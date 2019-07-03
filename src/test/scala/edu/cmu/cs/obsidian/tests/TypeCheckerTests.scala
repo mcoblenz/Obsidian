@@ -751,4 +751,17 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def okayBasicGenerics(): Unit = {
         runTest("resources/tests/type_checker_tests/BasicGenerics.obs", Nil)
     }
+
+    @Test def genericsMismatchIntString(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericsIntStringMismatch.obs",
+            (SubtypingError(IntType(), StringType(), false), 17) :: Nil)
+    }
+
+    @Test def genericsOwnership(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericsOwnership.obs",
+            (InvalidInconsistentFieldType("x",
+                GenericType(GenericVar(false,"T",None),GenericBoundPerm("Top",List(),Unowned())),
+                GenericType(GenericVar(false,"T",None),GenericBoundPerm("Top",List(),Owned()))), 12) ::
+            Nil)
+    }
 }

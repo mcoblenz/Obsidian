@@ -6,6 +6,15 @@ sealed trait Permission {
     def residual: Permission
 }
 
+// TODO GENERIC: We need a new permission: Unspecified() or Variable() or something
+
+// This should ONLY be used for passing generic type parameters to functions
+//case class Unspecified() extends Permission {
+//    override def toString: String = "Unspecified"
+//
+//    override def residual: Permission = Unspecified()
+//}
+
 case class Shared() extends Permission {
     override def toString: String = "Shared"
 
@@ -48,7 +57,7 @@ case class ContractReferenceType(override val contractType: ContractType,
 
     val contractName: String = contractType.contractName
 
-    override def isOwned = permission == Owned()
+    override def isOwned: Boolean = permission == Owned()
 
     override def residualType(mode: OwnershipConsumptionMode): NonPrimitiveType = {
         if (permission == Owned()) {
@@ -267,6 +276,8 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     val contractName: String
 
+    override def isOwned: Boolean = permission == Owned()
+
     def contractType: ContractType = ContractType(contractName, genericParams)
 
     def genericParams: Seq[ObsidianType]
@@ -361,9 +372,11 @@ case class FFIInterfaceContractType(name: String, simpleType: NonPrimitiveType) 
 }
 
 sealed trait GenericBound {
+    def withPermission(permission: Permission): GenericBound
+
     def interfaceName: String
     def permission: Permission
-    def residualType: GenericBound
+    def residualType(mode: OwnershipConsumptionMode): GenericBound
 
     // TODO GENERIC: This shouldn't be nil
     def contractType: ContractType = ContractType(interfaceName, Nil)
@@ -373,20 +386,59 @@ sealed trait GenericBound {
 }
 
 case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[String], permission: Permission) extends GenericBound {
-    override def residualType: GenericBound =
-        GenericBoundPerm(interfaceName, interfaceParams, permission.residual)
+    override def residualType(mode: OwnershipConsumptionMode): GenericBound = {
+        if (permission == Owned()) {
+            val newPermission =
+                mode match {
+                    case ConsumingOwnedGivesShared() => Shared()
+                    case ConsumingOwnedGivesUnowned() => Unowned()
+                    case NoOwnershipConsumption() => Owned()
+                }
+
+            this.copy(permission = newPermission)
+        } else {
+            this
+        }
+    }
+
+    override def withPermission(permission: Permission): GenericBound =
+        GenericBoundPerm(interfaceName, interfaceParams, permission)
 }
 
+// TODO GENERIC: Should these params be strings or actual types?
 case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[String], states: Set[String]) extends GenericBound {
     override def permission: Permission = Owned()
 
-    override def residualType: GenericBound =
-        GenericBoundPerm(interfaceName, interfaceParams, Unowned())
+    override def residualType(mode: OwnershipConsumptionMode): GenericBound =
+        if (mode == NoOwnershipConsumption()) {
+            this
+        } else {
+            val newPermission =
+                mode match {
+                    case ConsumingOwnedGivesShared() => Shared()
+                    case ConsumingOwnedGivesUnowned() => Unowned()
+
+                    // This shouldn't happen, since we check for it above
+                    case NoOwnershipConsumption() => Owned()
+                }
+
+            GenericBoundPerm(interfaceName, interfaceParams, newPermission)
+        }
+
+    override def withPermission(permission: Permission): GenericBound =
+        if (permission == Owned()) {
+            this
+        } else {
+            GenericBoundPerm(interfaceName, interfaceParams, permission)
+        }
 }
 
 case class GenericVar(isAsset: Boolean, varName: String, stringVar: Option[String])
 
 case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimitiveType {
+    def withPermission(permission: Permission): GenericType =
+        GenericType(gVar, bound.withPermission(permission))
+
     // TODO GENERIC: How should these be implemented
 
     override val permission: Permission = bound.permission
@@ -396,7 +448,7 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
 
     // TODO GENERIC: Uh what should this be
     override def residualType(mode: OwnershipConsumptionMode): ObsidianType =
-        GenericType(gVar, bound.residualType)
+        GenericType(gVar, bound.residualType(mode))
 
     def lookupInterface(contractTable: ContractTable): Option[ContractTable] =
         // TODO GENERIC: Does this work?
