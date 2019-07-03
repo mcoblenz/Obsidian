@@ -15,11 +15,17 @@ trait HasLocation {
 
 sealed abstract class AST() extends HasLocation
 
-sealed abstract class Statement() extends AST
+
+// TODO GENERIC: Should we split substitute off into a trait? Maybe not, since the ObsidianType substitute has a different return type (e.g., generic Obsidian type)
+sealed abstract class Statement() extends AST {
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Statement
+}
 
 /* All expressions are statements. We relegate the pruning of expressions
  * that don't have effects to a later analysis */
-sealed abstract class Expression() extends Statement
+sealed abstract class Expression() extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Expression
+}
 
 /* this is to circumnavigate type erasure: it makes it possible to match on the exact
  * type of a Declarations at runtime */
@@ -34,7 +40,10 @@ object TransactionDeclTag extends DeclarationTag
 sealed abstract class Declaration() extends AST {
     val name: String
     val tag: DeclarationTag
+
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Declaration
 }
+
 
 sealed abstract class InvokableDeclaration() extends Declaration {
     val args: Seq[VariableDeclWithSpec]
@@ -48,72 +57,217 @@ sealed abstract class InvokableDeclaration() extends Declaration {
 /* Expressions */
 case class ReferenceIdentifier(name: String) extends Expression {
     override val toString = name
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ReferenceIdentifier = this
 }
 
-case class NumLiteral(value: Int) extends Expression
-case class StringLiteral(value: String) extends Expression
-case class TrueLiteral() extends Expression
-case class FalseLiteral() extends Expression
+case class NumLiteral(value: Int) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): NumLiteral = this
+}
+case class StringLiteral(value: String) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StringLiteral = this
+}
+case class TrueLiteral() extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): TrueLiteral = this
+}
+case class FalseLiteral() extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): FalseLiteral = this
+}
 case class This() extends Expression {
     override def toString: String = "this"
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): This = this
 }
-case class Parent() extends Expression
-case class Conjunction(e1: Expression, e2: Expression) extends Expression
-case class Disjunction(e1: Expression, e2: Expression) extends Expression
-case class LogicalNegation(e: Expression) extends Expression
-case class Add(e1: Expression, e2: Expression) extends Expression
-case class Subtract(e1: Expression, e2: Expression) extends Expression
-case class Divide(e1: Expression, e2: Expression) extends Expression
-case class Multiply(e1: Expression, e2: Expression) extends Expression
-case class Mod(e1: Expression, e2: Expression) extends Expression
-case class Negate(e: Expression) extends Expression
-case class Equals(e1: Expression, e2: Expression) extends Expression
-case class GreaterThan(e1: Expression, e2: Expression) extends Expression
-case class GreaterThanOrEquals(e1: Expression, e2: Expression) extends Expression
-case class LessThan(e1: Expression, e2: Expression) extends Expression
-case class LessThanOrEquals(e1: Expression, e2: Expression) extends Expression
-case class NotEquals(e1: Expression, e2: Expression) extends Expression
+case class Parent() extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Parent = this
+}
+case class Conjunction(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Conjunction =
+        Conjunction(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class Disjunction(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Disjunction =
+        Disjunction(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class LogicalNegation(e: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LogicalNegation =
+        LogicalNegation(e.substitute(genericParams, actualParams))
+}
+case class Add(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Add =
+        Add(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class Subtract(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Subtract =
+        Subtract(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class Divide(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Divide =
+        Divide(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class Multiply(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Multiply =
+        Multiply(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class Mod(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Mod =
+    // TODO GENERIC: Will also need to handle the state substitution at some point
+        Mod(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class Negate(e: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Negate =
+        Negate(e.substitute(genericParams, actualParams))
+}
+case class Equals(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Equals =
+        Equals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class GreaterThan(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GreaterThan =
+        GreaterThan(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class GreaterThanOrEquals(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GreaterThanOrEquals =
+        GreaterThanOrEquals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class LessThan(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LessThan =
+        LessThan(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class LessThanOrEquals(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LessThanOrEquals =
+        LessThanOrEquals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
+case class NotEquals(e1: Expression, e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): NotEquals =
+        NotEquals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+}
 case class Dereference(e: Expression, f: String) extends Expression {
     override def toString: String = {
         s"$e.$f"
     }
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Dereference =
+        Dereference(e.substitute(genericParams, actualParams), f)
 }
 
-case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
+case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LocalInvocation =
+        LocalInvocation(name, args.map(_.substitute(genericParams, actualParams)))
+}
 case class Invocation(recipient: Expression, name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     override def toString: String = {
         val argString = args.mkString(",")
         s"$recipient.$name($argString)"
     }
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Invocation =
+        Invocation(recipient.substitute(genericParams, actualParams), name,
+            args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
 }
-case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression
-case class Disown(e: Expression) extends Expression
-case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression
+case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Construction =
+        Construction(contractType.substitute(genericParams, actualParams),
+            args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
+}
+case class Disown(e: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Disown =
+        Disown(e.substitute(genericParams, actualParams))
+}
+case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StateInitializer = this
+}
 
 /* statements and control flow constructs */
-case class VariableDecl(typ: ObsidianType, varName: String) extends Statement
-case class VariableDeclWithInit(typ: ObsidianType, varName: String, e: Expression) extends Statement
+case class VariableDecl(typ: ObsidianType, varName: String) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): VariableDecl =
+        VariableDecl(typ.substitute(genericParams, actualParams), varName)
+}
+case class VariableDeclWithInit(typ: ObsidianType, varName: String, e: Expression) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): VariableDeclWithInit =
+        VariableDeclWithInit(typ.substitute(genericParams, actualParams), varName,
+            e.substitute(genericParams, actualParams))
+}
 
-case class VariableDeclWithSpec(typIn: ObsidianType, typOut: ObsidianType, varName: String) extends Statement
+case class VariableDeclWithSpec(typIn: ObsidianType, typOut: ObsidianType, varName: String) extends Statement {
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): VariableDeclWithSpec =
+        VariableDeclWithSpec(typIn.substitute(genericParams, actualParams),
+            typOut.substitute(genericParams, actualParams), varName)
+}
 
-case class Return() extends Statement
-case class ReturnExpr(e: Expression) extends Statement
+case class Return() extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Return = this
+}
+case class ReturnExpr(e: Expression) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ReturnExpr =
+        ReturnExpr(e.substitute(genericParams, actualParams))
+}
 
 // We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
-case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]], thisPermission: Permission) extends Statement
-case class Assignment(assignTo: Expression, e: Expression) extends Statement
-case class Revert(maybeExpr: Option[Expression]) extends Statement
-case class If(eCond: Expression, s: Seq[Statement]) extends Statement
-case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) extends Statement
-case class IfInState(e: Expression, state: Identifier, s1: Seq[Statement], s2: Seq[Statement]) extends Statement
-case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement
-case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement
-case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST
-case class StaticAssert(expr: Expression, statesOrPermissions: Seq[Identifier]) extends Statement
+case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]], thisPermission: Permission) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Transition = {
+        // TODO GENERIC: We may need to do some substitute/lookup here for the state variables
+        def doSubstitute: ((ReferenceIdentifier, Expression)) => (ReferenceIdentifier, Expression) = {
+            case (id, expr) => (id, expr.substitute(genericParams, actualParams))
+        }
+
+        // TODO GENERIC: May have to do something here for the permission substitution
+        Transition(newStateName, updates.map(_.map(doSubstitute)), thisPermission)
+    }
+}
+case class Assignment(assignTo: Expression, e: Expression) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Assignment =
+        Assignment(assignTo.substitute(genericParams, actualParams), e.substitute(genericParams, actualParams))
+}
+case class Revert(maybeExpr: Option[Expression]) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Revert =
+        Revert(maybeExpr.map(_.substitute(genericParams, actualParams)))
+}
+case class If(eCond: Expression, s: Seq[Statement]) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): If =
+        If(eCond.substitute(genericParams, actualParams), s.map(_.substitute(genericParams, actualParams)))
+}
+case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): IfThenElse =
+        IfThenElse(eCond.substitute(genericParams, actualParams),
+            s1.map(_.substitute(genericParams, actualParams)),
+            s2.map(_.substitute(genericParams, actualParams)))
+}
+// TODO GENERIC: will need to handle state variables here
+case class IfInState(e: Expression, state: Identifier, s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): IfInState =
+        IfInState(e.substitute(genericParams, actualParams),
+            state,
+            s1.map(_.substitute(genericParams, actualParams)),
+            s2.map(_.substitute(genericParams, actualParams)))
+}
+case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): TryCatch =
+        TryCatch(s1.map(_.substitute(genericParams, actualParams)), s2.map(_.substitute(genericParams, actualParams)))
+}
+case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Switch =
+        Switch(e.substitute(genericParams, actualParams),
+            cases.map(_.substitute(genericParams, actualParams)))
+}
+case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST {
+    // TODO GENERIC: will need to handle state variables here
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): SwitchCase =
+        SwitchCase(stateName, body.map(_.substitute(genericParams, actualParams)))
+}
+
+// TODO GENERIC: Will need to handle state variables here
+case class StaticAssert(expr: Expression, statesOrPermissions: Seq[Identifier]) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StaticAssert =
+        StaticAssert(expr.substitute(genericParams, actualParams), statesOrPermissions)
+}
 
 /* Declarations */
 case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {
     val tag: DeclarationTag = TypeDeclTag
+
+    // TODO GENERIC: Does this still get used/matter?
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): TypeDecl = ???
 }
 
 sealed trait IsAvailableInStates {
@@ -125,6 +279,16 @@ case class Field(isConst: Boolean,
                  name: String,
                  availableIn: Option[Set[String]]) extends Declaration with IsAvailableInStates {
     val tag: DeclarationTag = FieldDeclTag
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Field = {
+        val idx = genericParams.indexWhere(_ == typ)
+
+        if (idx >= 0) {
+            Field(isConst, actualParams(idx), name, availableIn)
+        } else {
+            Field(isConst, typ.substitute(genericParams, actualParams), name, availableIn)
+        }
+    }
 }
 
 case class Constructor(name: String,
@@ -136,8 +300,16 @@ case class Constructor(name: String,
     val thisType: ObsidianType = resultType
     val thisFinalType: ObsidianType = resultType
     val isStatic: Boolean = false
+
+    // TODO GENERIC: Should probably give an error when we need to (e.g., when substitution is not appropriate)
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Constructor = {
+        Constructor(name, args.map(_.substitute(genericParams, actualParams)),
+            ObsidianType.requireNonPrimitive(resultType.substitute(genericParams, actualParams)),
+            body.map(_.substitute(genericParams, actualParams)))
+    }
 }
 
+// TODO GENERICS: Add generic parameters on transactions
 case class Transaction(name: String,
                        args: Seq[VariableDeclWithSpec],
                        retType: Option[ObsidianType],
@@ -156,6 +328,20 @@ case class Transaction(name: String,
         case StateType(_, stateNames, _) => Some(stateNames)
         case _ => None
     }
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Transaction =
+        Transaction(name,
+            args.map(_.substitute(genericParams, actualParams)),
+            retType.map(_.substitute(genericParams, actualParams)),
+            // TODO GENERIC: Seems like this doesn't do anything, but just in case
+            ensures.map(_.substitute(genericParams, actualParams)),
+            body.map(_.substitute(genericParams, actualParams)),
+            isStatic,
+            isPrivate,
+            ObsidianType.requireNonPrimitive(thisType.substitute(genericParams, actualParams)),
+            ObsidianType.requireNonPrimitive(thisFinalType.substitute(genericParams, actualParams)),
+            initialFieldTypes.mapValues(_.substitute(genericParams, actualParams)),
+            finalFieldTypes.mapValues(_.substitute(genericParams, actualParams)))
 }
 
 case class FSMEdge (fromState: Identifier, toState: Identifier) extends AST;
@@ -164,9 +350,15 @@ case class Transitions(edges: Seq[FSMEdge]) extends AST;
 
 case class State(name: String, fields: Seq[Field], isAsset: Boolean) extends Declaration {
     val tag: DeclarationTag = StateDeclTag
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): State =
+        State(name, fields.map(_.substitute(genericParams, actualParams)), isAsset)
 }
 
-case class Ensures(expr: Expression) extends AST
+case class Ensures(expr: Expression) extends AST {
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Ensures =
+        Ensures(expr.substitute(genericParams, actualParams))
+}
 
 sealed abstract trait ContractModifier extends HasLocation
 case class IsAsset() extends ContractModifier
@@ -185,20 +377,33 @@ sealed abstract class Contract(name: String, val sourcePath: String) extends Dec
 }
 
 case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
-                    name: String, override val declarations: Seq[Declaration],
+                    name: String, params: Seq[GenericType], implementBound: GenericBound,
+                    override val declarations: Seq[Declaration],
                     transitions: Option[Transitions],
                     isInterface: Boolean,
                     sp: String) extends Contract (name, sp) {
     val tag: DeclarationTag = ContractDeclTag
+
+    // TODO GENERIC: Should we remove the generic parameters, now that we've substituted for them?
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianContractImpl =
+        ObsidianContractImpl(modifiers, name, params, implementBound,
+            declarations.map(_.substitute(genericParams, actualParams)),
+            transitions,
+            isInterface, // TODO GENERIC: Should this ever be called for an interface?
+            sp)
 }
 
 /* FFI contract for Java */
+// TODO GENERIC: How do our generics interact with Java's? Probably just rely on the interface to get the types right?
 case class JavaFFIContractImpl(name: String,
                                interface: String,
                                javaPath: Seq[Identifier],
                                sp: String,
                                override val declarations: Seq[Declaration] = Seq.empty) extends Contract(name, sp){
     val tag: DeclarationTag = ContractDeclTag
+
+    // TODO GENERIC: Maybe this should actually do something
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): JavaFFIContractImpl = this
 }
 
 

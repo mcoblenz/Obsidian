@@ -89,7 +89,7 @@ case class FieldUndefinedError(fieldOf: NonPrimitiveType, fName: String) extends
     val msg: String = fieldOf match {
         case ContractReferenceType(cName, _, _) => s"Field '$fName' is not defined in contract '$cName'"
         case StateType(cName, stateNames, _) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
-        case InterfaceContractType(name, typ) => s"Interfaces do not include fields."
+        case FFIInterfaceContractType(name, typ) => s"Interfaces do not include fields."
     }
 }
 case class RecursiveFieldTypeError(cName: String, fName: String) extends Error {
@@ -114,7 +114,7 @@ case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extend
     val msg: String = receiver match {
         case ContractReferenceType(cName, _, _) =>
             s"No transaction or function with name '$name' was found in contract '$cName'"
-        case InterfaceContractType(cName, _) =>
+        case FFIInterfaceContractType(cName, _) =>
             s"No transaction or function with name '$name' was found in interface '$cName'"
         case StateType(cName, sNames, _) =>
             s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"

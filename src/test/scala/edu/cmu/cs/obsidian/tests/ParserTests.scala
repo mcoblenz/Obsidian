@@ -71,7 +71,7 @@ class ParserTests extends JUnitSuite {
         }
     }
 
-    @Test def simpleContracts() = {
+    @Test def simpleContracts(): Unit = {
         shouldSucceed(
             """
               | main contract C { transaction f() { hello = 1; world = 2; } }
@@ -84,7 +84,7 @@ class ParserTests extends JUnitSuite {
             """.stripMargin)
     }
 
-    @Test def goodExpressions() = {
+    @Test def goodExpressions(): Unit = {
         shouldSucceed(
             """
               | main contract C {
@@ -101,7 +101,7 @@ class ParserTests extends JUnitSuite {
         )
     }
 
-    @Test def goodStatements() = {
+    @Test def goodStatements(): Unit = {
         shouldSucceed(
             """
               | main contract C {
@@ -130,7 +130,7 @@ class ParserTests extends JUnitSuite {
         )
     }
 
-    @Test def badStatements() = {
+    @Test def badStatements(): Unit = {
         shouldFail("""main contract C { state S { transaction t() {
               | new;
               | }}}""".stripMargin)
@@ -139,7 +139,7 @@ class ParserTests extends JUnitSuite {
               | }}}""".stripMargin)
     }
 
-    @Test def goodFuncArgs() = {
+    @Test def goodFuncArgs(): Unit = {
         shouldSucceed(
             """
               | main contract C {
@@ -161,7 +161,7 @@ class ParserTests extends JUnitSuite {
         )
     }
 
-    @Test def badFuncArgs() = {
+    @Test def badFuncArgs(): Unit = {
         shouldFail("""main contract C { state S {
               | transaction t(x) { return x; }
               | }}""".stripMargin)
@@ -176,7 +176,7 @@ class ParserTests extends JUnitSuite {
               | }}}""".stripMargin)
     }
 
-    @Test def transitions() = {
+    @Test def transitions(): Unit = {
         shouldSucceed(
             """ main contract C { state S {
               | }
@@ -216,7 +216,7 @@ class ParserTests extends JUnitSuite {
 //    }
 
     //test token ordering in transaction parsing
-    @Test def transactionTests() = {
+    @Test def transactionTests(): Unit = {
         shouldSucceedFile("resources/tests/parser_tests/ValidTransactions.obs")
         shouldFail("resources/tests/parser_tests/BadTransactionOrdering.obs")
         shouldSucceedFile("resources/tests/parser_tests/AvailableInRepeats.obs")
@@ -224,23 +224,23 @@ class ParserTests extends JUnitSuite {
         shouldFail("resources/tests/parser_tests/BadTransactionOptions.obs")
     }
 
-    @Test def invocationSpec() = {
+    @Test def invocationSpec(): Unit = {
         shouldSucceedFile("resources/tests/parser_tests/InvokableSpec.obs")
     }
 
-    @Test def emptyBody() = {
+    @Test def emptyBody(): Unit = {
         shouldSucceedFile("resources/tests/parser_tests/EmptyBody.obs")
     }
 
-    @Test def stateInitialization() = {
+    @Test def stateInitialization(): Unit = {
         shouldSucceedFile("resources/tests/parser_tests/StateInitialization.obs")
     }
 
-    @Test def unclosedContract() = {
+    @Test def unclosedContract(): Unit = {
         shouldFailFile("resources/tests/parser_tests/UnclosedContract.obs")
     }
 
-    @Test def FSMs() = {
+    @Test def FSMs(): Unit = {
         shouldSucceedFile("resources/tests/parser_tests/FSMs.obs")
     }
 
@@ -265,21 +265,21 @@ class ParserTests extends JUnitSuite {
         )
     }
 
-    @Test def parseModOperator() = {
+    @Test def parseModOperator(): Unit = {
         shouldSucceed(
             """
               | main contract C { transaction f(int y) { int x = 1 % y; } }
             """.stripMargin)
     }
 
-    @Test def parseContractImplements() = {
+    @Test def parseContractImplements(): Unit = {
         shouldSucceed(
             """
               | contract C implements I {}
             """.stripMargin)
     }
 
-    @Test def parseContractImplementsParams() = {
+    @Test def parseContractImplementsParams(): Unit = {
         // This won't compile, but should parse
         shouldSucceed(
             """
@@ -287,59 +287,66 @@ class ParserTests extends JUnitSuite {
             """.stripMargin)
     }
 
-    @Test def parseContractWithParams() = {
+    @Test def parseContractWithParams(): Unit = {
         shouldSucceed(
             """
               | contract C[T] {}
             """.stripMargin)
     }
 
-    @Test def parseContractWithParamsState() = {
+    @Test def parseContractWithParamsState(): Unit = {
         shouldSucceed(
             """
               | contract C[T@s] {}
             """.stripMargin)
     }
 
-    @Test def parseContractWithParamsWithBound() = {
+    @Test def parseContractWithParamsWithBound(): Unit = {
         shouldSucceed(
             """
               | contract C[T implements I] {}
             """.stripMargin)
     }
 
-    @Test def parseContractWithParamsStateWithBound() = {
+    @Test def parseContractWithParamsStateWithBound(): Unit = {
         shouldSucceed(
             """
               | contract C[T@s implements I@Owned] {}
             """.stripMargin)
     }
 
-    @Test def parseContractWithParamsWithBoundParams() = {
+    @Test def parseContractWithParamsWithBoundParams(): Unit = {
         shouldSucceed(
             """
               | contract C[T implements I[T]] {}
             """.stripMargin)
     }
 
-    @Test def parseContractWithParamsStateWithBoundParams() = {
+    @Test def parseContractWithParamsStateWithBoundParams(): Unit = {
         shouldSucceed(
             """
               | contract C[T@s implements I[T]@Owned] {}
             """.stripMargin)
     }
 
-    @Test def parseContractParamsAndImplements() = {
+    @Test def parseContractParamsAndImplements(): Unit = {
         shouldSucceed(
             """
               | contract C[T] implements I {}
             """.stripMargin)
     }
 
-    @Test def parseContractParamsWithBoundAndImplements() = {
+    @Test def parseContractParamsWithBoundAndImplements(): Unit = {
         shouldSucceed(
             """
               | contract C[T@s implements I1[T]@Owned] implements I2[T] {}
+            """.stripMargin)
+    }
+
+    @Test def parseConstructionWithParams(): Unit = {
+        shouldSucceed(
+            """
+              | contract C { transaction f () { new C[int](); } }
             """.stripMargin)
     }
 }

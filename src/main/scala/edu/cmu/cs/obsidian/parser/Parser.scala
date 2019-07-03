@@ -390,10 +390,14 @@ object Parser extends Parsers {
         }
 
         val parseNew = {
-            NewT() ~! parseId ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
-                // TODO GENERIC: The gen params are Nil for now, but will be inferred later...
-                //  if this is working. Should also let the programmer specify the arguments manually.
-                case _new ~ name ~ _ ~ args ~ _ => Construction(ContractType(name._1, Nil), args, false).setLoc(_new)
+            NewT() ~! parseId ~! opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ LParenT() ~! parseArgList ~! RParenT() ^^ {
+                case _new ~ name ~ typeParamsOpt ~ _ ~ args ~ _ =>
+                    val typeParams = typeParamsOpt match {
+                        case Some(_ ~ params ~ _) => params
+                        case None => Nil
+                    }
+
+                    Construction(ContractType(name._1, typeParams), args, false).setLoc(_new)
             }
         }
 
@@ -517,7 +521,7 @@ object Parser extends Parsers {
     }
 
 
-    private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
+    private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String): Parser[Transaction] = {
         // TODO GENERIC: Add generic parameters here (and also to interfaces)
         parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
           opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
@@ -538,12 +542,12 @@ object Parser extends Parsers {
                 }
 
                 val finalType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName, Nil), Shared(), false)
+                    case None => ContractReferenceType(ContractType(contractName, params), Shared(), false)
                     case Some(v) => v.typOut
                 }
 
                 val thisType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName, Nil), Shared(), false)
+                    case None => ContractReferenceType(ContractType(contractName, params), Shared(), false)
                     case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType]
 
                 }
@@ -588,8 +592,10 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseDeclInContract(isInterface:Boolean, sourcePath: String)(contractName: String):  Parser[Declaration] = {
-        parseFieldDecl | parseStateDecl | parseConstructor | parseContractDecl(sourcePath) | parseTransDecl(isInterface)(contractName)
+    private def parseDeclInContract(params: List[GenericType], isInterface:Boolean,
+                                    sourcePath: String)(contractName: String):  Parser[Declaration] = {
+        parseFieldDecl | parseStateDecl | parseConstructor | parseContractDecl(sourcePath) |
+            parseTransDecl(params, isInterface)(contractName)
     }
 
     private def parseContractModifier = {
@@ -643,7 +649,7 @@ object Parser extends Parsers {
                 val bound = implements.map(_._2)
                 val gVar = GenericVar(assetMod.isDefined, varId._1, stateVar)
 
-                GenericType(gVar, bound)
+                GenericType(gVar, bound.getOrElse(GenericBoundPerm("Top", Nil, Unowned())))
         }
     }
 
@@ -663,10 +669,18 @@ object Parser extends Parsers {
             case mod ~ ct ~ identifier ~ impl =>
                 val isInterface = ct == InterfaceT()
 
-                // TODO GENERIC: Actually make use of the generic parameters, probably want to include these in the contract definition
-                val name = identifier._1._1
+                val (name, params) = identifier match {
+                    case id ~ optParams =>
+                        (id._1, optParams.map(_._1._2).getOrElse(List()))
+                }
 
-                LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface, srcPath)(name)) ~! RBraceT() ^^ {
+                val implementBound = impl match {
+                    case Some(_ ~ bound) => bound
+                    // TODO GENERIC: Consolidate all these references to Top
+                    case None => GenericBoundPerm("Top", Nil, Unowned())
+                }
+
+                LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name)) ~! RBraceT() ^^ {
                 case _ ~ contents ~ _ =>
                     // Make sure there's only one transition diagram.
                     val separateTransitions = contents.filter({
@@ -691,7 +705,7 @@ object Parser extends Parsers {
                         case _ => false
                     }).map(_.asInstanceOf[Declaration])
 
-                    ObsidianContractImpl(mod.toSet, name, decls, transitions, isInterface, srcPath).setLoc(ct)
+                    ObsidianContractImpl(mod.toSet, name, params, implementBound, decls, transitions, isInterface, srcPath).setLoc(ct)
             }
         }
     }

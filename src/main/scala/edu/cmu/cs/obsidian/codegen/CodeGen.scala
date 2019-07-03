@@ -2134,21 +2134,21 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     translationContext: TranslationContext,
                     aContract: Contract): Unit = {
         declaration match {
-            case (f: Field) =>
+            case f: Field =>
                 translateFieldDecl(f, newClass)
-            case (t: Transaction) =>
+            case t: Transaction =>
                 translateTransDecl(t, newClass, translationContext)
                 if (aContract.isMain) {
                     mainTransactions.add(t)
                 }
-            case (s@State(_, _, _)) => aContract match {
+            case s: State => aContract match {
               case obsContract: ObsidianContractImpl => translateStateDecl(s, obsContract, newClass, translationContext)
               case javaContract: JavaFFIContractImpl => ()
             }
 
-            case (c@ObsidianContractImpl(_, _, _,_, _, _)) => translateInnerContract(c, newClass, translationContext)
+            case c: ObsidianContractImpl => translateInnerContract(c, newClass, translationContext)
 
-            case (c@JavaFFIContractImpl(_,_,_,_,_)) => ()
+            case c: JavaFFIContractImpl => ()
 
             case t: TypeDecl =>
                 assert(false, "TODO")
@@ -2342,6 +2342,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, isFFIInvocation)
             case Invocation(recipient, name, args, isFFIInvocation) =>
                 addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext, isFFIInvocation)
+
+            // TODO GENERIC: Handle the type params
             case Construction(contractType, args, isFFIInvocation) =>
                 val contractRefType = ContractReferenceType(contractType, Owned(), false)
                 val resolvedType = resolveType(contractRefType, table)

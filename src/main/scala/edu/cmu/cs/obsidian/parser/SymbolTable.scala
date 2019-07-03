@@ -92,6 +92,35 @@ class ContractTable(
         val contract: Contract,
         symbolTable: SymbolTable,
         parentContract: Option[ContractTable]) extends DeclarationTable {
+
+    // TODO GENERIC: Is this the right approach for subtituting type parameters?
+    /**
+      * Constructs a new contract table with the current contract updated to
+      * @param typeArgs
+      * @return
+      */
+    def substitute(typeArgs: Seq[ObsidianType]): ContractTable = {
+        val newContract = contract match {
+            case obsCon: ObsidianContractImpl =>
+                obsCon.substitute(obsCon.params, typeArgs)
+
+            // TODO GENERIC: Handle the FFI somehow
+            case javacon : JavaFFIContractImpl =>
+                // If it's empty we're not actually trying to substitute anything
+                if (typeArgs.nonEmpty) {
+                    assert(false, "Cannot substitute into java ffi contract")
+                }
+
+                javacon
+        }
+
+        // TODO GENERIC: Should the symbolTable be appropriately updated?
+        // TODO GENERIC: Maybe we shouldn't do it like this, and instead just make the lookup functions
+        //  take the type parameters and redo the substitution
+
+        new ContractTable(newContract, symbolTable, parentContract)
+    }
+
     assert (contract != null)
 
     def this(astNodeRaw: Contract, symbolTable: SymbolTable) =
@@ -105,19 +134,34 @@ class ContractTable(
 
     val allFields: Set[Field] = fieldLookup.values.toSet
 
+    def lookupTypeVar(varName: String): Option[ObsidianType] = contractType.typeArgs.find {
+        case np: NonPrimitiveType =>
+            np match {
+                case GenericType(gVar, bound) => gVar.varName == varName
+                case _ => false
+            }
+
+        case _ => false
+    }
+
     // We know we are in one of the given states. Which fields are available?
-    def allFieldsAvailableInStates(stateNames: Set[String]) = {
+    def allFieldsAvailableInStates(stateNames: Set[String]): Set[Field] = {
         allFields.filter((f: Field) => f.availableIn.isEmpty || stateNames.subsetOf(f.availableIn.get))
     }
 
-    // TODO GENERIC: should this be nil? Probably not, and should probably come from the contract's generic parameters
-    def contractType = ContractType(name, Nil)
+    def contractType: ContractType =
+        contract match {
+            case ObsidianContractImpl(modifiers, name, params, implementBound, declarations, transitions, isInterface, sp) =>
+                ContractType(name, params)
+            case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
+                ContractType(name, Nil)
+        }
 
     def possibleStatesFor(typ: NonPrimitiveType): Set[String] =
         typ match {
             case ContractReferenceType(contractType, permission, isRemote) =>
                 lookupContract(contractType.contractName).map(_.possibleStates).getOrElse(Set())
-            case InterfaceContractType(name, simpleType) => possibleStatesFor(simpleType)
+            case FFIInterfaceContractType(name, simpleType) => possibleStatesFor(simpleType)
             case StateType(contractName, stateNames, isRemote) => stateNames
             case g: GenericType => g.lookupInterface(this).get.possibleStates
         }
@@ -146,18 +190,15 @@ class ContractTable(
      * 3) [name] refers to a contract declared in an import of this program.
      */
     def lookupContract(name: String): Option[ContractTable] = {
-        val localLookupResult =
-            if (name == this.name) Some(this) else
-                (symbolTable.contract(name), childContract(name)) match {
-                    case (_, Some(ct)) => Some(ct)
-                    case (Some(ct), _) => Some(ct)
-                    case _ => None
-                }
-        if (localLookupResult.isDefined) {
-            localLookupResult
-        } // otherwise nothing was found
-        else None
-
+        if (name == this.name) {
+            Some(this)
+        } else {
+            (symbolTable.contract(name), childContract(name)) match {
+                case (_, Some(ct)) => Some(ct)
+                case (Some(ct), _) => Some(ct)
+                case _ => None
+            }
+        }
     }
 
     def lookupField(name: String): Option[Field] = fieldLookup.get(name)

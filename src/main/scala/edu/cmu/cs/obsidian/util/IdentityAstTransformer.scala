@@ -17,7 +17,7 @@ class IdentityAstTransformer {
 
     def transformProgram(table: SymbolTable): (SymbolTable, Seq[ErrorRecord]) = {
         var errorRecords = List.empty[ErrorRecord]
-        var contracts = List.empty[Contract]
+        var contracts = List[Contract](ObsidianContractImpl(Set(), "Top", Nil, GenericBoundPerm("Top", Nil, Unowned()), Nil, None, isInterface = true, ""))
         assert(table.ast.imports.isEmpty, "Imports should be empty after processing.")
 
 
@@ -26,6 +26,7 @@ class IdentityAstTransformer {
             errorRecords = errorRecords ++ errors
             contracts = contracts :+ newContract
         }
+
 
         val newProgram = Program(Seq.empty, contracts).setLoc(table.ast)
 
@@ -76,6 +77,8 @@ class IdentityAstTransformer {
                     ObsidianContractImpl(
                         oldContract.modifiers,
                         oldContract.name,
+                        oldContract.params,
+                        oldContract.implementBound,
                         newDecls,
                         oldContract.transitions,
                         oldContract.isInterface,
@@ -160,6 +163,8 @@ class IdentityAstTransformer {
                 i.copy(args = i.args.map(eArg => transformExpression(eArg))).setLoc(i)
             case i: Invocation =>
                 i.copy(recipient = transformExpression(i.recipient), args = i.args.map(eArg => transformExpression(eArg))).setLoc(i)
+
+            // TODO GENERIC: Probably handle type params here?
             case c: Construction =>
                 c.copy(args = c.args.map(eArg => transformExpression(eArg))).setLoc(c)
             case d@Disown(e) =>

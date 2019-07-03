@@ -747,4 +747,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def assetStateTrackingOwnedOkay(): Unit = {
         runTest("resources/tests/type_checker_tests/AssetStateTrackingOkay.obs", Nil)
     }
+
+    @Test def okayBasicGenerics(): Unit = {
+        runTest("resources/tests/type_checker_tests/BasicGenerics.obs", Nil)
+    }
 }
