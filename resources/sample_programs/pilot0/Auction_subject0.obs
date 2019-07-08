@@ -1,0 +1,174 @@
+/*
+
+The following program simulates an English auction; there are multiple Bidders 
+who each make a Bid for a single Item being sold by a Seller. The Seller pays the
+Auction house a small Fee before the Item is auctioned off. If the Item is not sold,
+the Seller will get this fee back, otherwise, it will be kept by the Auction house.
+The highest Bidder will receive the Item for the price of the highest Bid.
+
+*/
+
+/*
+Below is the Bidder contract, which represents a bidder in our Auction.
+Answer all the TODO statements below.
+
+TODO: What state is a Bidder in at: (answer below)
+    1. The beginning of the createBid function? - Bidding state
+    2. The end of the createBid function?  - Bidding state
+    3. The beginning of the won function? - Bidding state
+    4. The end of the won function? - WonItem state
+*/
+
+contract Bidder {
+    string name; //Name of Bidder
+    int bidAmount; //The amount the Bidder is willing to bid
+    int balance; //THe total money owned by the Bidder
+
+    state WonItem {
+        Item@Owned item;
+    }
+    state Bidding;
+
+    Bidder@Owned(string n, int m, int b) {
+        bidAmount = b;
+        name = n;
+        balance = m;
+        -> Bidding;
+    }
+
+    transaction createBid(Bidder@Bidding this) returns Bid@Owned {
+        //5. TODO: Finish this transaction.
+        //Create a new bid with the bid amount given for this Bidder. Be sure to update all necessary values.
+        Bid result = new Bid(this.bidAmount);
+        return result;
+    }
+
+    transaction getBidAmount(Bidder@Owned this) returns int {
+        return bidAmount;
+    }
+
+    transaction getName(Bidder@Owned this) returns string {
+        return name;
+    }
+
+    transaction won(Bidder@Bidding >> WonItem this, Item@Owned >> Unowned i) {
+        -> WonItem(item = i);
+    }
+
+    transaction returnBidMoney(Bidder@Owned this, Bid@Owned bid) {
+        balance = balance + bid.getAmount();
+    }
+}
+
+/*
+Below are the Seller, Item, Fee, and Bid contracts. Refer to these (as well as the Bidder contract above) to complete
+the rest of the Auction exercise.
+*/
+contract Seller {
+    Item@Owned item;
+    Fee@Owned fee;
+    state SoldItem {
+        Bid@Owned bid;
+    }
+    state Unsold;
+
+    Seller@Owned() {
+        item = new Item();
+        fee = new Fee();
+        -> Unsold;
+    }
+
+    transaction receiveBid(Seller@Unsold >> SoldItem this, Bid@Owned >> Unowned b) {
+        -> SoldItem(bid = b);
+    }
+
+    transaction getBackFee(Seller@Unsold this, Fee@Owned >> Unowned f) {
+        fee = f;
+    }
+}
+
+contract Item {
+
+}
+
+contract Fee {
+
+}
+
+contract Bid {
+    int amount;
+
+    state Open;
+    state Stale;
+
+    Bid@Owned(int num) {
+        amount = num;
+        ->Open;
+    }
+
+    transaction getAmount(Bid@Owned this) returns int {
+        return amount;
+    }
+
+    transaction bidSurpassed(Bid@Open >> Stale this) {
+        -> Stale;
+    }
+}
+
+
+/*
+In the Auction contract below, do all the TODO statements.
+*/
+
+main contract Auction {
+
+    Bidder@Owned maxBidder;
+    Seller@Owned seller;
+
+    state Open {
+        Item@Owned item;
+        Bid@Owned bid;
+        Fee@Owned fee;
+    }
+    state BiddingDone {
+        Item@Owned it;
+        Bid@Owned finalBid;
+    }
+    state Closed;
+
+    Auction@Owned(Item@Owned >> Unowned i, Fee@Owned >> Unowned f) {
+        maxBidder = new Bidder("none",0, 0);
+        seller = new Seller();
+        -> Open(item = i, bid = new Bid(-1), fee = f);
+    }
+
+    transaction makeBid(Auction@Open this, Bidder@Owned >> Unowned bidder) {
+        if (bidder.getBidAmount() > bid.getAmount()) {
+            //6. TODO: write what goes in this if-statement. Be sure to update all necessary values.
+       //    bidder.balance = bidder.balance - bidder.getBidAmount();
+            this.maxBidder = bidder;
+
+        }
+    }
+
+    //7. TODO: fill in the state transition for the parameters in the function below
+
+    transaction finishBidding(Auction@Open >> BiddingDone this) {
+        if (bid.getAmount() <= 0) {
+            if (seller in Unsold) {
+                seller.getBackFee(fee);
+            }
+        }
+        -> BiddingDone(it = item, finalBid = bid);
+    }
+    
+
+    transaction giveItem(Auction@BiddingDone >> Closed this) {
+        maxBidder.won(it);
+        if (seller in Unsold) {
+            seller.receiveBid(finalBid);
+        }
+        -> Closed;
+    }
+    
+}
