@@ -496,7 +496,7 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
         Possibility.fromBoolean(gVar.isAsset)
 
     // TODO GENERIC: what to do here??
-    override def genericParams: Seq[ObsidianType] = ???
+    override def genericParams: Seq[ObsidianType] = Nil
 
     // TODO GENERIC: Is there more substitution that needs to be done here or is this sufficient
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {

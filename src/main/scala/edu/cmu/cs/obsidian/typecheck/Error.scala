@@ -118,7 +118,8 @@ case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extend
             s"No transaction or function with name '$name' was found in interface '$cName'"
         case StateType(cName, sNames, _) =>
             s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"
-
+        case GenericType(gVar, bound) =>
+            s"No transaction or function with name '$name' was found in generic type $gVar implementing $bound."
     }
 }
 case class StateUndefinedError(cName: String, sName: String) extends Error {
@@ -398,4 +399,15 @@ case class MissingTransactionImplError(contractName: String, interfaceName: Stri
                                        transactionName: String) extends Error {
     val msg: String =
         s"Missing transaction $transactionName from interface $interfaceName in contract $contractName."
+}
+
+case class GenericParameterListError(paramsLength: Int, actualLength: Int) extends Error {
+    val msg: String =
+        s"Expected $paramsLength generic parameters but got $actualLength parameters"
+}
+
+case class GenericParameterError(param: GenericType, actualArg: ObsidianType) extends Error {
+    val msg: String =
+        s"Argument $actualArg is not compatible with generic parameter $param"
+
 }

@@ -777,4 +777,16 @@ class TypeCheckerTests extends JUnitSuite {
             (MissingTransactionImplError("NoImplSwitch", "Switch", "turnOff"), 29) ::
                 Nil)
     }
+
+    @Test def genericsInterfaceImplementsBound(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericInterfaceBounds.obs",
+            (MethodUndefinedError(GenericType(GenericVar(isAsset = false,"T",None), GenericBoundPerm("Top",List(),Owned())),"validate"), 29) ::
+            (ArgumentSubtypingError("store", "a",
+                StateType(ContractType("NoImplValidatable", Nil), "Invalid", isRemote = false),
+                StateType(ContractType("DummyValidatable", Nil), "Invalid", isRemote = false)), 67) ::
+            (GenericParameterError(GenericType(GenericVar(isAsset = false,"A",None),
+                GenericBoundPerm("Validatable",List(),Unowned())),
+                ContractReferenceType(ContractType("NoImplValidatable", Nil), Inferred(), isRemote = false)), 73) ::
+            Nil)
+    }
 }

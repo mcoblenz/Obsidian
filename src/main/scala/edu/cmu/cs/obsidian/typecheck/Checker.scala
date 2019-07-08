@@ -293,16 +293,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         case np: NonPrimitiveType => np match {
             case c: ContractReferenceType =>
                 table.lookupTypeVar(c.contractName)
-                    .map(typeBound(table))
+                    .map(typeBound(table)(_).withPermission(c.permission))
                     .getOrElse(c)
             case s: StateType =>
                 table.lookupTypeVar(s.contractName)
-                    .map(typeBound(table))
+                    .map(typeBound(table)(_).withStates(s.stateNames))
                     .getOrElse(s)
 
             case i: FFIInterfaceContractType => i
 
-            case GenericType(gVar, bound) => ContractReferenceType(bound.contractType, bound.permission, isRemote = false)
+            case GenericType(gVar, bound) =>
+                bound match {
+                    // TODO GENERIC: How to handle this remote thing
+                    case GenericBoundPerm(interfaceName, interfaceParams, permission) =>
+                        ContractReferenceType(bound.contractType, permission, isRemote = false)
+                    case GenericBoundStates(interfaceName, interfaceParams, states) =>
+                        StateType(bound.contractType, states, isRemote = false)
+                }
         }
 
         case BottomType() => BottomType()
@@ -435,6 +442,19 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     //-------------------------------------------------------------------------
     // Checking definitions for language constructs begins here
+
+    def substituteOk(table: ContractTable, ast: AST, params: Seq[GenericType], typeArgs: Seq[ObsidianType]): Unit = {
+        // TODO GENERIC: Will have to update this for when we do inference for the constructor parameters
+        if (params.length != typeArgs.length) {
+            logError(ast, GenericParameterListError(params.length, typeArgs.length))
+        }
+
+        for ((param, actualArg) <- params.zip(typeArgs)) {
+            if (isSubtype(table, actualArg, param, false).isDefined) {
+                logError(ast, GenericParameterError(param, actualArg))
+            }
+        }
+    }
 
     private def inferAndCheckExpr(decl: InvokableDeclaration,
                                   context: Context,
@@ -725,7 +745,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, args)
                  (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv))
 
-             case Construction(contractType, args: Seq[Expression], isFFIInvocation) =>
+             case c@Construction(contractType, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(contractType.contractName)
                  val isFFIInv = tableLookup match {
                      case None => false
@@ -744,7 +764,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     logError(e, InterfaceInstantiationError(contractType.contractName))
                  }
 
-                 // TODO GENERIC: Somewhere in the substitution, we want to make sure that the substitutions we're making are actually valid
+                 tableLookup.get.contract match {
+                     case obsCon: ObsidianContractImpl =>
+                         substituteOk(tableLookup.get, c, obsCon.params, contractType.typeArgs)
+                     case javaCon: JavaFFIContractImpl => ()
+                 }
+
                  val ctTableOfConstructed = tableLookup.get.substitute(contractType.typeArgs)
 
                  val constrSpecs = ctTableOfConstructed

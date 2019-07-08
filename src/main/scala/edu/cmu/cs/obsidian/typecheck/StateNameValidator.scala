@@ -44,7 +44,23 @@ object StateNameValidator extends IdentityAstTransformer {
                     lexicallyInsideOf.contract match {
                         case ObsidianContractImpl(modifiers, name, params, implementBound, declarations, transitions, isInterface, sp) =>
                             params.find(p => p.gVar.varName == np.contractName) match {
-                                case Some(genericType) => (genericType.withPermission(np.permission), List())
+                                case Some(genericType) =>
+                                    val stateNames = np match {
+                                        case StateType(contractType, states, isRemote) => Some(states)
+                                        case GenericType(gVar, bound) => bound match {
+                                            case GenericBoundStates(interfaceName, interfaceParams, states) => Some(states)
+                                            case GenericBoundPerm(interfaceName, interfaceParams, permission) => None
+                                        }
+                                        case _ => None
+                                    }
+
+                                    // TODO GENERIC: Factor out this sort of thing to like a copy permission/state thing
+                                    stateNames match {
+                                        case Some(states) =>
+                                            (genericType.withStates(states), List())
+                                        case None =>
+                                            (genericType.withPermission(np.permission), List())
+                                    }
                                 case None =>
                                     (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                             }
