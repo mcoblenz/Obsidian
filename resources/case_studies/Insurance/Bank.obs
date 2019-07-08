@@ -1,4 +1,4 @@
-import "resources/case_studies/Insurance/Money.obs"
+import "Money.obs"
 
 main asset contract Bank {
     Money@Owned mon;
@@ -20,5 +20,4 @@ main asset contract Bank {
     }
 
 }
-
 

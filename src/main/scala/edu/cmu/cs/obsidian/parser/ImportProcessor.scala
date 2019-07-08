@@ -1,8 +1,10 @@
 package edu.cmu.cs.obsidian.parser
 
-import java.nio.file.{Files, Paths}
+import java.io.{FileInputStream, InputStream}
+import java.nio.file.{FileSystems, Files, Path, Paths}
 
-import edu.cmu.cs.obsidian.typecheck.{DuplicateContractError, ErrorRecord, ImportError}
+import edu.cmu.cs.obsidian.Main
+import edu.cmu.cs.obsidian.typecheck.{ErrorRecord, ImportError}
 
 import scala.collection.mutable
 import scala.util.parsing.input.Position
@@ -12,11 +14,50 @@ object ImportProcessor {
 
     class ImportException (val message : String) extends Exception {}
 
+    def resolvePathAndInputStream(path: Path, fileName: String): Option[(String, InputStream)] = {
+        val filePath = path.resolve(fileName)
+        if (Files.exists(filePath)) {
+            Some((filePath.toAbsolutePath.toString, new FileInputStream(filePath.toFile)))
+        } else {
+            None
+        }
+    }
+
+    private def relativePath(importingFile: String, fileName: String): Option[(String, InputStream)] =
+        resolvePathAndInputStream(Paths.get(importingFile).toAbsolutePath.getParent, fileName)
+
+    private def compilerPath(fileName: String): Option[(String, InputStream)] =
+        resolvePathAndInputStream(Main.compilerPath(), fileName)
+
+    def standardLibraryPath(fileName: String): Option[(String, InputStream)] = {
+        val classLoader = Thread.currentThread().getContextClassLoader
+        val resourcePath = "stdlib/" + fileName
+        val resolvedUrl = classLoader.getResource(resourcePath)
+
+        if (resolvedUrl != null) {
+            val inputStream = classLoader.getResourceAsStream(resourcePath)
+            Some((resolvedUrl.toString, inputStream))
+        } else {
+            None
+        }
+    }
+
+    private def searchPaths(importingFile: String, fileName: String): Option[(String, InputStream)] = {
+        val searchFs = List(relativePath(importingFile, _: String), standardLibraryPath(_), compilerPath(_))
+        for (searchF <- searchFs) {
+            searchF(fileName) match {
+                case Some(x) => return Some(x)
+                case None => ()
+            }
+        }
+
+        None
+    }
+
     def processImports(inFile: String, ast: Program): (Program, Seq[ErrorRecord]) = {
         if (filesAlreadyProcessed.contains(inFile)) {
             (ast, Seq.empty)
-        }
-        else {
+        } else {
             filesAlreadyProcessed.add(inFile)
 
             var allContracts = ast.contracts
@@ -38,28 +79,28 @@ object ImportProcessor {
     }
 
     def processImport(importPath: String, seenFiles: mutable.HashSet[String], importPos: Position, importFilename: String) : Either[ErrorRecord, Seq[Contract]] = {
-        if (Files.exists(Paths.get(importPath))) {
-            val importedProgram = Parser.parseFileAtPath(importPath, printTokens = false)
+        searchPaths(importFilename, importPath) match {
+            case Some((resolvedImportPath, inputStream)) => {
+                if (!seenFiles.contains(resolvedImportPath)) {
+                    val importedProgram = Parser.parseFileAtPath(resolvedImportPath, inputStream, printTokens = false)
 
-            var contracts = filterTags(importedProgram.contracts)
+                    var contracts = filterTags(importedProgram.contracts)
 
-            seenFiles.add(importPath)
+                    seenFiles.add(resolvedImportPath)
 
-            importedProgram.imports.foreach(i => {
-                if (!seenFiles.contains(i.name)) {
-                    val cs = processImport(i.name, seenFiles, i.loc, importPath)
-
-                    cs match {
-                        case Left(err) => return Left(err)
-                        case Right(c) => contracts = c ++ contracts
-
-                    }
+                    importedProgram.imports.foreach(i => {
+                        processImport(i.name, seenFiles, i.loc, resolvedImportPath) match {
+                            case Left(err) => return Left(err)
+                            case Right(c) => contracts = c ++ contracts
+                        }
+                    })
+                    Right(contracts)
+                } else {
+                    Right(Nil)
                 }
-            })
-            Right(contracts)
-        }
-        else {
-            Left(ErrorRecord(ImportError(s"Unable to read file: $importPath"), importPos, importFilename))
+            }
+            case None =>
+                Left(ErrorRecord(ImportError(s"Unable to read file: $importPath"), importPos, importFilename))
         }
     }
 

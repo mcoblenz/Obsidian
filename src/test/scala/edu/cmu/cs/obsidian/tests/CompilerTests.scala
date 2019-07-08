@@ -9,10 +9,9 @@ import org.scalatest.junit.JUnitSuite
 import scala.sys.process._
 
 class CompilerTests extends JUnitSuite {
-
-  def testContract(contractName : String) = {
+  def testContract(contractName: String, contractPath: String, args: Array[String]): Int = {
     var result = true
-    val inputArgs: Array[String] = Array(s"--output-path", s"obs_output/", s"resources/tests/compilerTests/$contractName.obs")
+    val inputArgs: Array[String] = Array(s"--output-path", s"obs_output/", contractPath) ++ args
     result = Main.compileProgram(inputArgs)
     assertTrue(result)
     val gradleCmd = s"gradle compileJava -b obs_output/$contractName/build.gradle"
@@ -21,6 +20,9 @@ class CompilerTests extends JUnitSuite {
     val deleteCmd = s"rm -rf obs_output/$contractName"
     deleteCmd.!
   }
+
+  def testContract(contractName: String): Int =
+    testContract(contractName, s"resources/tests/compilerTests/$contractName.obs", Array())
 
   @Test def multipleConstructors(): Unit = {
       testContract("MultipleConstructors")
@@ -72,5 +74,13 @@ class CompilerTests extends JUnitSuite {
 
   @Test def multipleConstructorGroup(): Unit = {
     testContract(contractName = "MultipleConstructorGroup")
+  }
+
+  @Test def insuranceCaseStudy(): Unit = {
+    testContract("Insurer", "resources/case_studies/Insurance/Insurer.obs", Array())
+  }
+
+  @Test def stubExceptions(): Unit = {
+    testContract("StubExceptions")
   }
 }

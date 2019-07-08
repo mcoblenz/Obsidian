@@ -380,8 +380,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         }
 
         val meth: JMethod = newClass.method(JMod.PUBLIC, javaRetType, transaction.name)
+        addTransactionExceptions(meth, translationContext)
         meth._throws(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
-
 
         var argExpressions: List[IJExpression] = Nil
         /* add args */

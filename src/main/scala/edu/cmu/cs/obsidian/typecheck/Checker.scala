@@ -352,8 +352,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         }
                     p1 match {
                         case Owned() => typeForMismatchedPermissions
-                        case Unowned() => if (p2 == Shared()) Some(t2) else typeForMismatchedPermissions
-                        case Shared() => if (p2 == Unowned()) Some(t1) else typeForMismatchedPermissions
+                        case Unowned() => if (p2 == Shared()) Some(t1) else typeForMismatchedPermissions
+                        case Shared() => if (p2 == Unowned()) Some(t2) else typeForMismatchedPermissions
                         case Inferred() => assert(false, "Inferred types should be removed"); None
                     }
                 }

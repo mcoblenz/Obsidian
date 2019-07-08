@@ -16,14 +16,14 @@ See http://obsidian-lang.com.
 1. Install nodejs (https://nodejs.org/en/).
 2. Install typescript (`npm install -g typescript`).
 3. Install VSCode (https://code.visualstudio.com).
-4. Copy the obs-vscode-extension directory into ~/.vscode/extensions. 
+4. Copy the obs-vscode-extension directory into ~/.vscode/extensions.
 5. `cd ~/.vscode/extensions/obs-vscode-extension` and run `tsc` to build the extension.
-6. Use VSCode to edit Obsidian files. 
+6. Use VSCode to edit Obsidian files.
 
 ###### Running the compiler from VSCode
 1. Make sure the bin directory of the Obsidian codebase is in your $PATH.
 2. Open a .obs file (Obsidian source code; you can start with a demo project in `resources/demos`).
-3. Use the Obsidian: Compile File command. On the Mac, you can find this by typing ⌘-Shift-P and typing "Obsidian". 
+3. Use the Obsidian: Compile File command. On the Mac, you can find this by typing ⌘-Shift-P and typing "Obsidian".
 
 ###### Running the compiler from the command line
 1. To run the compiler, run `bin/obsidianc foo.obs`, where foo.obs is the path to the Obsidian file you want to compile. The file should include a main contract but can reference other files via `import`.
@@ -60,9 +60,15 @@ This command uses the same path to the chaincode that you originally uploaded, s
 	`PATH_TO_OBS_CODE.obs`
 6. Run the program
 7. A folder named after the input class will be generated at the root of the directory containing the structure needed for Fabric deployment.
-	
+
 ###### Runtime .jar generation (for those working on Obsidian itself)
 If changes are made to the Obsidian_Runtime code, a new .jar has to be generated and published since the Fabric chaincode relies on it.
 To do so, go to the Obsidian_Runtime folder and run `gradle publish`.
 Then, push the modified .jar to the Git master branch, and it will be available online at `http://obsidian-lang.com/repository`
+
+###### Compiler Configuration
+
+**Environment Variables:**
+
+- `OBSIDIAN_COMPILER_DIR`: The root directory of the compiler repository. Needed to be able to locate some compiler resources.
 

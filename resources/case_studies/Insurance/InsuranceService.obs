@@ -1,9 +1,9 @@
-import "resources/case_studies/Insurance/Insurer.obs"
-import "resources/case_studies/Insurance/WeatherRecord.obs"
-import "resources/case_studies/Insurance/Signature.obs"
-import "resources/case_studies/Insurance/PolicyRecord.obs"
-import "resources/case_studies/Insurance/PendingPolicyMap.obs"
-import "resources/case_studies/Insurance/ActivePolicyMap.obs"
+import "Insurer.obs"
+import "WeatherRecord.obs"
+import "Signature.obs"
+import "PolicyRecord.obs"
+import "PendingPolicyMap.obs"
+import "ActivePolicyMap.obs"
 
 
 main asset contract InsuranceService {

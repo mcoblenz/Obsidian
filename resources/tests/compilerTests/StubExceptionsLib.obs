@@ -1,0 +1,8 @@
+contract C {
+    transaction f(C@Unowned other) {}
+
+    transaction g() {
+        f(new C());
+    }
+}
+
