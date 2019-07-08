@@ -1,0 +1,48 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Assets</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h2><strong>Part 3: Assets</strong></h2>
+
+<p>Some owning references are to things that should not be accidentally lost. To prevent accidental loss, we can declare contracts 
+    with the keyword <code>asset</code>. Let's do this for <code>Money</code>:</p>
+
+<pre>
+<code>
+asset contract Money {
+}
+</code>
+</pre>
+
+<p>Now, if we accidentally lose track of an owning reference to a <code>Money</code> object (by letting it go out of scope without transferring ownership to somewhere else, such as a field), the compiler will give an error:
+
+<pre>
+<code>
+transaction test() {
+    Money m = ...; [m@Owned]; // OK, m is Owned here
+    // ERROR: cannot drop reference to owned asset m
+}
+</code>
+</pre>
+
+We can fix this by (for example) returning m, assigning it to an owning field, or passing it as an argument to an appropriate transaction. For example:
+
+<pre>
+<code>
+transaction test() returns Money@Owned {
+    Money m = ...; [m@Owned]; // OK, m is Owned here
+    return m; // gives ownership of m to the caller of test()
+}
+</code>
+</pre>
+
+<p>Note that non-owning references to <code>Money</code> are not restricted; the compiler gives no errors when they go out of scope.</p>
+
+
+</body></html>

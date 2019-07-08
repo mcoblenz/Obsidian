@@ -1,31 +1,42 @@
 <!DOCTYPE HTML>
 <html lang="en">
 <head>
-    <title>Part 1: Ownership and Assets</title>
+    <title>Ownership: Part 1</title>
     <meta charset="utf-8"  />
     <link rel="stylesheet" href="../stylesheet.css"/>
     <link href="../prism.css" rel="stylesheet" />
 </head>
 <body class="language-obsidian">
 <script src="../prism.js"></script>
-<h2><strong>Part 1: Ownership and Assets</strong></h2>
+<h2><strong>Part 1: Ownership</strong></h2>
  <!-- local variables never include annotatations. Params and fields always do. -->
-<p>Our new programming language is object-oriented. It includes <em>contracts</em> (analagous to classes), which can have <em>fields</em>.  In addition, of the many <strong>variables</strong> or <strong>fields</strong> that reference objects, <strong>one</strong> of them can own the object. For example:</p>
+<p>Our new programming language is object-oriented. It includes <em>contracts</em>, which are like classes, which can have <em>fields</em> 
+    and <em>transactions</em>, which are analogous to functions. 
+    In addition, of the many <strong>variables</strong> or <strong>fields</strong> that reference objects, exactly <strong>one</strong> of them 
+    can own the object, as seen in diagram <strong>(a)</strong> below. An object can have any number of Unowned references, and, if the object is not Owned, 
+    it can have any number of Shared references (shown in <strong>(b)</strong> below).
+</p>
 
+<img src="ownership-diagram.png" alt="Ownership" style="width:1000px;height:400px;"> </img>
+
+<p> Here is an example of a contract (a <code>Wallet</code>) with an object (in this case a <code>Money</code>) that has one <code>Owned</code> reference: </p>
 <pre>
 <code>
 contract Money {
 }
 
 <strong>contract</strong> Wallet {
-    Money@Owned m; // @Owned indicates that m owns the object it refers to
+    Money@Owned m; // @Owned indicates that the reference m owns the object it refers to
+    
+    transaction spendMoney() {
+        ...
+    }
 }
 </code>
 </pre>
 
-<p>The compiler tracks ownership of each variable every time the variable is used. This information is part of the <em>type</em> of the variable. For example, the type of <code>m</code> is <code>Money@Owned</code>. Information about ownership is NOT available at runtime; it is only available during compilation.</p>
 
-<p>If a reference does not own the object it refers to, then there are two possibilities. </p>
+<p>The compiler tracks ownership of each variable every time the variable is used. This information is part of the <em>type</em> of the variable. For example, the type of <code>m</code> is <code>Money@Owned</code>. Information about ownership is NOT available at runtime; it is only available during compilation.</p>
 
 <ul>
     <li>If a reference is the only one that holds ownership, then it is <code>Owned</code>.</li>
@@ -33,44 +44,9 @@ contract Money {
     <li>If a reference is NOT the owning one, but there might be another owning reference, then the reference is <code>Unowned</code>.</li>
 </ul>
 
-<h2><strong>Assets</strong></h2>
-
-<p>One benefit of tracking ownership is preventing accidental loss of valuable objects, such as money. To prevent this type of loss, we can declare classes with the keyword <code>asset</code>. Let's do this for <code>Money</code>:</p>
-
-<pre>
-<code>
-asset contract Money {
-}
-</code>
-</pre>
-
-<p>Now, if we accidentally lose track of an owning reference to a <code>Money</code> object (by letting it go out of scope without transferring ownership to somewhere else, such as a field), the compiler will give an error:
-
-<pre>
-<code>
-transaction test() {
-    Money@Owned m = ...; // OK, m is Owned here
-    // ERROR: cannot drop reference to owned asset m
-}
-</code>
-</pre>
-
-We can fix this by (for example) returning m, assigning it to an owning field, or passing it as an argument to an appropriate method. For example:
-
-<pre>
-<code>
-transaction test() returns Money@Owned {
-    Money@Owned m = ...; // OK, m is Owned here
-    return m; // gives ownership of m to the caller of test()
-}
-</code>
-</pre>
-
-<p>Note that non-owning references to <code>Money</code> are not restricted; the compiler gives no errors when they go out of scope.</p>
-
 <h3>Method return types</h3>
 <p>
-When methods return objects, the return types can be annotated. For example:
+When transactions return objects, the types must be annotated in the function header. For example:
 <pre>
 <code>
 transaction withdraw() returns Money@Owned {
@@ -78,11 +54,10 @@ transaction withdraw() returns Money@Owned {
 }
 </code>
 </pre>
-If the return type is unannotated, then <code>@Unowned</code> is assumed.
 </p>
 
 <h3>Method parameters</h3>
-<p>When a reference is passed to a method as an argument, the method's declaration specifies initial and final ownership with <code>>></code>. For example:</p>
+<p>When a reference is passed to a transaction as an argument, the transaction's declaration specifies initial and final ownership with <code>>></code>. For example:</p>
 
 <pre>
 <code>
@@ -97,114 +72,27 @@ transaction testSpend(Money@Owned >> Unowned m) {
 </code>
 </pre>
 
-<p>If a method expects an argument that is <code>Unowned</code>, this means that the method cannot take ownership. As a result, it is safe to pass an <code>Owned</code> reference as an argument to a method that expects an <code>Unowned</code> argument. After the method returns, the caller still holds ownership.</p>
+<p>If a transaction expects an argument that is <code>Unowned</code>, this means that the transaction cannot take ownership. As a result, it is safe to pass an <code>Owned</code> reference as an argument to a transaction that expects an <code>Unowned</code> argument. After the transaction returns, the caller still holds ownership.</p>
 
-<p>If a method parameter lacks >>, then ownership will not change. For example, <code>transaction test(Money@Owned m)</code> is equivalent to <code>transaction test(Money@Owned >> Owned m)</code>. <code>transaction foo(Money@Unowned m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that method.
+<p>If a transaction parameter lacks >>, then ownership will not change. For example, <code>transaction test(Money@Owned m)</code> is equivalent to <code>transaction test(Money@Owned >> Owned m)</code>. <code>transaction foo(Money@Unowned m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that transaction.
 
-<p>If a method parameter lacks an annotation, then <code>@Unowned</code> is assumed.
-
-<h3>Assignment</h3>
-<p>Assignment (<code>=</code>) transfers ownership when the variables on both sides are owning references. That is, the variable on the left becomes the <strong>new</strong> owner, and the variable on the right loses ownership. For example:</p>
-
-<pre>
-<code>
-Money@Owned m = ...;
-Money@Owned newMoney = m;
-// Now m is of type Money@Unowned, not Money@Owned. 
-
-Money@Unowned n = newMoney; // Ownership is still with newMoney because n is Unowned
-</code>
-</pre>
-
-<h3>Invoking methods</h3>
-<p> The compiler checks each invocation to make sure it is permitted according to the ownership of the method arguments. For example:</p>
-
-<pre>
-<code>
-transaction spend(Money@Owned >> Unowned m) {
-	// implementation not shown
-};
-transaction print(Money@Unowned m) {
-    // implementation not shown
-}
-
-transaction test() {
-	Money@Owned m = ...
-	print(m);
-	spend(m);
-	spend(m); // COMPILE ERROR: spend() requires Owned input, but m is Unowned here
-}
-</code>
-</pre>
-
-<h3>Local variables</h3>
-Local variables are declared just like other variables, including type information. For example:
-<pre>
-<code>
-transaction withdraw() returns Money@Owned {
-    // body not shown
-}
-
-transaction test() {
-    Money@Owned m = withdraw();
-    spend(m);
-}
-</code>
-</pre>
-
-<h3>Getting rid of ownership</h3>
-<p>If ownership is no longer desired, <code>disown</code> can be used to relinquish ownership. For example:</p>
-<pre>
-<code>
-contract Money {
-    int amount;
+    <h3>Method receivers (<code>this</code>)</h3>
+    <p>Sometimes the ownership of <code>this</code> needs to change in a transaction. That fact can be specified by adding <code>this</code> as the first argument in the transaction declaration. For example:</p>
     
-    transaction merge(Money@Owned >> Unowned mergeFrom) {
-        amount += mergeFrom.amount;
-        disown mergeFrom; // We absorbed the value of mergeFrom, so the owner doesn't own it anymore.
+    <pre>
+    <code>
+    contract Money {
+        transaction discard(Money@Owned >> Unowned this) {
+            disown this;
+        }
     }
-}
-</code>
-</pre>
-
-<h3>Method receivers (<code>this</code>)</h3>
-<p>Sometimes the ownership of <code>this</code> needs to change in a method. That fact can be specified by adding <code>this</code> as the first argument in the method declaration. For example:</p>
-
-<pre>
-<code>
-contract Money {
-    transaction discard(Money@Owned >> Unowned this) {
-        disown this;
+    
+    contract Wallet {
+        transaction throwAwayMoney(Money @ Owned >> Unowned money) {
+            money.discard(); // 'this' argument is implicit; do not include it in transaction call.
+        }
     }
-}
-
-contract Wallet {
-    transaction throwAwayMoney(Money @ Owned >> Unowned money) {
-        money.discard(); // 'this' argument is implicit; do not include it in method call.
-    }
-}
-</code>
-</pre>
-
-<h3>Fields</h3>
-<p><strong>Field declarations</strong>&nbsp;MUST include ownership specifications. These mean that&nbsp;at the END of each method, the state of the object the field references MUST match the annotation on the field. For example:</p>
-<br>
-<pre>
-<code>
-contract Wallet {
-	Money@Owned money; // Note that this annotation is on a field declaration!
-	
-	// exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
-	transaction exchange(Money@Owned >> Unowned otherMoney) returns Money@Owned {
-        Money@Owned temporaryMoney = money; // OK temporarily...
-        money = otherMoney; // as long as money@Owned is restored by the end of the method.
-        return temporaryMoney;
-	}
-}
-</code>
-</pre>
-
-
-
+    </code>
+    </pre>
 
 </body></html>
