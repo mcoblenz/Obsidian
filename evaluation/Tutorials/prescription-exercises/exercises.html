@@ -31,26 +31,33 @@ This system is intended to reflect the following rule on prescriptions:
 <p> The code in the file <code>Prescription.obs</code>contains several tasks, each labeled <code> // TODO TASK #: ... </code>.
 You do not have to do the tasks in any particular order, but they are numbered by anticipated difficulty, with lower numbers being less time consuming. </p>
 
-<p> Below are the declarations of contracts and transactions that are useful for managing collections of PharmacyPrescriptionRecords. </p>
+<p> Below are the declarations of contracts and transactions that are useful for managing collections of PharmacyPrescriptionRecords. The full code can be found in Collections.obs in the same directory as the main file (Prescription.obs).</p>
 
 <pre>
 <code>
 contract MaybeRecord {
+    asset state Something {
+        PharmacyPrescriptionRecord@HasFills record;
+    }
+
     state Nothing;
-    asset state Just;
 
     MaybeRecord@Nothing();
-
-    transaction just(MaybeRecord@Nothing >> Just this, PharmacyPrescriptionRecord@HasFills >> Unowned newRecord);
+    MaybeRecord@Something(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord);
 
     transaction getRecord(MaybeRecord@Just >> Nothing this) returns PharmacyPrescriptionRecord@HasFills;
 }
 
 contract PharmacyPrescriptionRecordList {
     state Nil;
-    asset state Cons;
+    asset state Cons {
+        PharmacyPrescriptionRecord@HasFills record;
+        PharmacyPrescriptionRecordList@Shared next;
+    }
 
     PharmacyPrescriptionRecordList@Nil();
+    PharmacyPrescriptionRecordList@Cons(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
+                                        PharmacyPrescriptionRecordList@Shared tail);
 
     transaction prependIfNotEmpty(PharmacyPrescriptionRecord@Owned >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared;
 
