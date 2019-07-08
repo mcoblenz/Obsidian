@@ -342,6 +342,14 @@ case class Transaction(name: String,
             ObsidianType.requireNonPrimitive(thisFinalType.substitute(genericParams, actualParams)),
             initialFieldTypes.mapValues(_.substitute(genericParams, actualParams)),
             finalFieldTypes.mapValues(_.substitute(genericParams, actualParams)))
+
+    def declarationStr: String =
+        retType match {
+            case Some(typ) =>
+                s"transaction $name(${args.mkString(", ")}) returns $typ;"
+            case None =>
+                s"transaction $name(${args.mkString(", ")});"
+        }
 }
 
 case class FSMEdge (fromState: Identifier, toState: Identifier) extends AST;
@@ -374,6 +382,9 @@ sealed abstract class Contract(name: String, val sourcePath: String) extends Dec
     val isAsset = modifiers.contains(IsAsset())
     val isMain = modifiers.contains(IsMain())
     val isImport = modifiers.contains(IsImport())
+
+    def isInterface: Boolean
+    def bound: GenericBound
 }
 
 case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
@@ -391,6 +402,8 @@ case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
             transitions,
             isInterface, // TODO GENERIC: Should this ever be called for an interface?
             sp)
+
+    override def bound: GenericBound = implementBound
 }
 
 /* FFI contract for Java */
@@ -404,6 +417,8 @@ case class JavaFFIContractImpl(name: String,
 
     // TODO GENERIC: Maybe this should actually do something
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): JavaFFIContractImpl = this
+    override def bound: GenericBound = GenericBoundPerm("Top", Nil, Unowned())
+    override def isInterface: Boolean = false
 }
 
 

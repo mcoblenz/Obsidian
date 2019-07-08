@@ -1,0 +1,55 @@
+interface Switch {
+    state On;
+    state Off;
+
+    transaction turnOn(Switch@Off >> On this);
+    transaction turnOff(Switch@On >> Off this);
+}
+
+contract LightSwitch implements Switch {
+    state On;
+    state Off;
+
+    LightSwitch@Off() {
+        ->Off;
+    }
+
+    // This type intentionally does not exactly match the type on the interface
+    transaction turnOn(LightSwitch@Owned >> On this) {
+        ->On;
+    }
+
+    // This type intentionally does not exactly match the type on the interface
+    transaction turnOff(LightSwitch@Owned >> Off this) {
+        ->Off;
+    }
+}
+
+// This should have errors
+contract NoImplSwitch implements Switch {}
+
+main contract C {
+    transaction f() {
+        Switch s = new LightSwitch();
+        s.turnOn(); [s@On];
+        s.turnOff(); [s@Off];
+
+        // Should fail, because we have an s@Off already here
+        s.turnOff();
+    }
+
+    transaction g() {
+        LightSwitch s = new LightSwitch();
+        s.turnOn(); [s@On];
+        s.turnOff(); [s@Off];
+
+        // This on the other hand is fine, because LightSwitch#turnOff only needs an @Owned
+        s.turnOff();
+    }
+
+    transaction badConstruction() {
+        // Not allowed---cannot instantiate an interface
+        Switch s = new Switch();
+    }
+}
+

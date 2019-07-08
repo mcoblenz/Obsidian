@@ -274,7 +274,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val c2Table = globalTable.contractLookup(c2)
 
         (c1Table.contract, c2Table.contract) match {
-            case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) => obs1 == obs2
+            case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) =>
+                if (!obs1.isInterface && obs2.isInterface) {
+                    obs1.implementBound.interfaceName == obs2.name
+                } else {
+                    obs1 == obs2
+                }
             case (jvcon1: JavaFFIContractImpl, jvcon2: JavaFFIContractImpl) => jvcon1 == jvcon2
             case (obs: ObsidianContractImpl, jvcon: JavaFFIContractImpl) => false
             case (jvcon: JavaFFIContractImpl, obs:ObsidianContractImpl) => obs.name == jvcon.interface
@@ -284,11 +289,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def typeBound(table: ContractTable): ObsidianType => ObsidianType = {
         case prim: PrimitiveType => prim
 
+        // TODO GENERIC: There's some repetition that could be factored out here
         case np: NonPrimitiveType => np match {
             case c: ContractReferenceType =>
-                table.lookupTypeVar(c.contractName).map(typeBound(table)).getOrElse(c)
+                table.lookupTypeVar(c.contractName)
+                    .map(typeBound(table))
+                    .getOrElse(c)
             case s: StateType =>
-                table.lookupTypeVar(s.contractName).map(typeBound(table)).getOrElse(s)
+                table.lookupTypeVar(s.contractName)
+                    .map(typeBound(table))
+                    .getOrElse(s)
 
             case i: FFIInterfaceContractType => i
 
@@ -314,7 +324,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
                         contractIsSubtype(c1.contractName, c2.contractName) && ss1.subsetOf(ss2)
                     case (StateType(c, ss1, _), ContractReferenceType(c2, c2p, _)) =>
-                        c2 == c
+                        contractIsSubtype(c.contractName, c2.contractName)
                     case _ => false
                 }
                 if (!mainSubtype) {
@@ -730,6 +740,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      return (BottomType(), context, e)
                  }
 
+                 if (tableLookup.get.contract.isInterface) {
+                    logError(e, InterfaceInstantiationError(contractType.contractName))
+                 }
+
+                 // TODO GENERIC: Somewhere in the substitution, we want to make sure that the substitutions we're making are actually valid
                  val ctTableOfConstructed = tableLookup.get.substitute(contractType.typeArgs)
 
                  val constrSpecs = ctTableOfConstructed
@@ -1200,7 +1215,9 @@ private def checkStatement(
                     if (variableNPType.isOwned && variableNPType.isAssetReference(context.contractTable) != No()) {
                         logError(s, OverwrittenOwnershipError(x))
                     }
-                    if (exprNPType.contractName != variableNPType.contractName) {
+
+                    // TODO GENERIC: Probably shouldn't just swallow this error
+                    if (isSubtype(context.contractTable, exprNPType, variableNPType, isThis = false).isDefined) {
                         logError(s, InconsistentContractTypeError(variableNPType.contractName, exprNPType.contractName))
                         contextWithAssignmentUpdate
                     }
@@ -1246,13 +1263,25 @@ private def checkStatement(
                             case None =>
                                 logError(s, ContractUndefinedError(declaredContractName))
                                 BottomType()
-                            case Some(_) =>
+                            case Some(table) =>
                                 exprType match {
                                     case exprNonPrimitiveType: NonPrimitiveType =>
-                                        if (exprNonPrimitiveType.contractName == declaredContractName) {
-                                            exprType
-                                        }
-                                        else {
+                                        // TODO GENERIC: We probably shouldn't swallow this error
+                                        if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
+                                            // We only want the permission/states from the expr, not the whole thing
+                                            val tempTyp = np.withPermission(exprNonPrimitiveType.permission)
+                                            exprNonPrimitiveType match {
+                                                case stateType: StateType => tempTyp.withStates(stateType.stateNames)
+                                                case GenericType(gVar, bound) => bound match {
+                                                    case GenericBoundPerm(interfaceName, interfaceParams, permission) =>
+                                                        tempTyp
+                                                    case GenericBoundStates(interfaceName, interfaceParams, stateNames) =>
+                                                        tempTyp.withStates(stateNames)
+                                                }
+                                                case _ => tempTyp
+                                            }
+                                        } else {
+                                            // TODO GENERIC: Why is this a separate error type? Shouldn't we just the subtyping error again?
                                             logError(s, InconsistentContractTypeError(declaredContractName, exprNonPrimitiveType.contractName))
                                             np // Just go with the declaration
                                         }
@@ -1269,7 +1298,7 @@ private def checkStatement(
                         np.permission match {
                             case Inferred() => resolvedType
                             case _ =>
-                                logError(s, (InvalidLocalVariablePermissionDeclarationError()))
+                                logError(s, InvalidLocalVariablePermissionDeclarationError())
                                 BottomType()
                         }
                     case BottomType() => BottomType()
@@ -1838,7 +1867,6 @@ private def checkStatement(
     private def checkTransactionInState(tx: Transaction,
                                         lexicallyInsideOf: DeclarationTable,
                                         initContext: Context): Transaction = {
-
         var context = initContext
 
         for (arg <- tx.args) {
@@ -1865,7 +1893,6 @@ private def checkStatement(
         }
 
         // TODO: make the permission depend on the transaction's specification
-        checkIsSubtype(context.contractTable, tx, outputContext("this"), expectedType)
 
         // Check that the arguments meet the correct specification afterwards
         for (arg <- tx.args) {
@@ -1883,6 +1910,12 @@ private def checkStatement(
 
         lexicallyInsideOf.contract match {
             case impl: ObsidianContractImpl =>
+                // Only need to check the output context type on this if we're actually implementing the interface
+                // (otherwise, with no body, it will always default to not typechecking correctly)
+                if (!impl.isInterface) {
+                    checkIsSubtype(context.contractTable, tx, outputContext("this"), expectedType)
+                }
+
                 // Don't need to check interface methods to make sure they return
                 if (!hasReturnStatement(tx, tx.body) && !impl.isInterface && tx.retType.isDefined) {
                     val ast =
@@ -2161,7 +2194,7 @@ private def checkStatement(
     }
 
     private def checkConstructors(constructors: Seq[Constructor], contract: ObsidianContractImpl, table: ContractTable): Unit = {
-        if (constructors.isEmpty && table.stateLookup.nonEmpty) {
+        if (constructors.isEmpty && table.stateLookup.nonEmpty && !contract.isInterface) {
             logError(contract, NoConstructorError(contract.name))
         }
 
@@ -2240,12 +2273,101 @@ private def checkStatement(
         }
     }
 
+    def checkArgSubtype(table: ContractTable, ast: AST, arg1: VariableDeclWithSpec, arg2: VariableDeclWithSpec): Unit = {
+        checkIsSubtype(table, ast, arg2.typIn, arg1.typIn)
+        checkIsSubtype(table, ast, arg1.typOut, arg2.typOut)
+    }
+
+    // TODO GENERIC: Handle parameters to the interface when consider the method types for interfaceTx
+    // TODO GENERIC: Should we have some override keyword for method/state implementing
+    def implementOk(table: ContractTable, tx: Transaction, interfaceTx: Transaction): Unit = {
+        if (tx.args.length != interfaceTx.args.length) {
+            logError(tx, MethodImplArgsError(tx.name, tx.args, interfaceTx.args))
+        }
+
+        for ((txArg, implArg) <- tx.args.zip(interfaceTx.args)) {
+            checkArgSubtype(table, tx, implArg, txArg)
+        }
+
+        (tx.retType, interfaceTx.retType) match {
+            case (Some(txRet), Some(interfaceRet)) => checkIsSubtype(table, tx, txRet, interfaceRet)
+            case (None, None) => ()
+            case _ =>
+                logError(tx, MethodImplReturnTypeError(tx.name, tx.retType, interfaceTx.retType))
+        }
+    }
+
+    def implementOk(table: ContractTable, contract: Contract, interfaceName: String,
+                    declarations: Seq[Declaration], boundDecls: Seq[Declaration]): Unit = {
+        // TODO GENERIC: Ensure that asset states are properly implemented
+        var toImplStates = boundDecls.flatMap {
+            case State(name, fields, isAsset) => name :: Nil
+            case _ => Nil
+        }.toSet
+
+        var toImplTransactions = boundDecls.flatMap {
+            case declaration: InvokableDeclaration =>
+                declaration match {
+                    case Constructor(name, args, resultType, body) =>
+                        logError(declaration, InterfaceConstructorError())
+                        Nil
+                    case transaction: Transaction => transaction :: Nil
+                }
+
+            case _ => Nil
+        }.toSet
+
+        for (decl <- declarations) {
+            decl match {
+                case State(name, fields, isAsset) =>
+                    toImplStates = toImplStates.filter(_ != name)
+
+                case declaration: InvokableDeclaration => declaration match {
+                    case transaction: Transaction =>
+                        toImplTransactions.find(_.name == transaction.name).foreach(implementOk(table, transaction, _))
+                        // Remove the transaction from the list of things we need to implement
+                        toImplTransactions = toImplTransactions.filter(_.name != transaction.name)
+                    case constructor: Constructor => ()
+                }
+
+                // TODO GENERIC: I don't think these are actually allowed?
+                case _ => ()
+            }
+        }
+
+        // TODO GENERIC: Show errors for the things we forgot to implement here
+        for (stateName <- toImplStates) {
+            logError(contract, MissingStateImplError(contract.name, interfaceName, stateName))
+        }
+
+        for (transaction <- toImplTransactions) {
+            logError(contract, MissingTransactionImplError(contract.name, interfaceName, transaction.name))
+        }
+    }
+
     private def checkContract(contract: Contract): Contract = {
         currentContractSourcePath = contract.sourcePath
 
         contract match {
             case obsContract : ObsidianContractImpl =>
                 val table = globalTable.contractLookup(obsContract.name)
+
+                if (!obsContract.isInterface) {
+                    val boundDecls = globalTable.contract(obsContract.bound.interfaceName) match {
+                        case Some(interface) => interface.contract match {
+                            case impl: ObsidianContractImpl => impl.declarations
+                            case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
+                                // TODO GENERIC: This should never happen
+                                assert(false, "Cannot implement a JavaFFIContract"); Nil
+                        }
+                        case None =>
+                            logError(obsContract, InterfaceNotFoundError(obsContract.name, obsContract.bound.interfaceName))
+                            Nil
+                    }
+
+                    implementOk(table, obsContract, obsContract.bound.interfaceName, obsContract.declarations, boundDecls)
+                }
+
                 val newDecls = obsContract.declarations.map(checkDeclaration(table))
 
                 checkConstructors(table.constructors, obsContract, table)

@@ -764,4 +764,17 @@ class TypeCheckerTests extends JUnitSuite {
                 GenericType(GenericVar(false,"T",None),GenericBoundPerm("Top",List(),Owned()))), 12) ::
             Nil)
     }
+
+    @Test def genericsInterfaceBasicSwitch(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericInterfaceSwitch.obs",
+            (InterfaceInstantiationError("Switch"), 52) ::
+            (ReceiverTypeIncompatibleError("turnOff",
+                 StateType(ContractType("Switch", Nil), "Off", isRemote = false),
+                 StateType(ContractType("Switch", Nil), "On", isRemote = false)), 38) ::
+            (MissingStateImplError("NoImplSwitch", "Switch", "On"), 29) ::
+            (MissingStateImplError("NoImplSwitch", "Switch", "Off"), 29) ::
+            (MissingTransactionImplError("NoImplSwitch", "Switch", "turnOn"), 29) ::
+            (MissingTransactionImplError("NoImplSwitch", "Switch", "turnOff"), 29) ::
+                Nil)
+    }
 }

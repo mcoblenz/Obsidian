@@ -356,3 +356,46 @@ case class ConstructorAnnotationMissingError(contractName: String) extends Error
     val msg: String = s"Missing a permission on the result type of a constructor of $contractName " +
                       s"(e.g., $contractName@Owned, $contractName@State, where State is a valid state for $contractName)."
 }
+
+case class InterfaceInstantiationError(contractName: String) extends Error {
+    val msg: String = s"Cannot instantiate interface $contractName."
+}
+
+case class InterfaceNotFoundError(contractName: String, interfaceName: String) extends Error {
+    val msg: String = s"Cannot find the interface $interfaceName that $contractName implements."
+}
+
+// TODO GENERIC: Should we allow this?
+case class InterfaceConstructorError() extends Error {
+    val msg: String = "Interfaces are not allowed to contain constructors."
+}
+
+case class MethodImplArgsError(transName: String,
+                               actualList: Seq[VariableDeclWithSpec],
+                               expectedList: Seq[VariableDeclWithSpec]) extends Error {
+    val msg: String = s"Transaction $transName implements a transaction, but the argument lists are incompatible:\n " +
+                      s"Actual: $actualList\n" +
+                      s"Expected: $expectedList"
+}
+
+case class MethodImplReturnTypeError(transName: String,
+                                     retType: Option[ObsidianType],
+                                     interfaceRetType: Option[ObsidianType]) extends Error {
+    val msg: String =
+        if (retType.isDefined) {
+            s"Transaction $transName returns ${retType.get}, but the transaction it implements has no return type."
+        } else {
+            s"Transaction $transName has no return type, but the transaction it implements returns ${interfaceRetType.get}."
+        }
+}
+
+case class MissingStateImplError(contractName: String, interfaceName: String, stateName: String) extends Error {
+    val msg: String =
+        s"Missing state $stateName from interface $interfaceName in contract $contractName."
+}
+
+case class MissingTransactionImplError(contractName: String, interfaceName: String,
+                                       transactionName: String) extends Error {
+    val msg: String =
+        s"Missing transaction $transactionName from interface $interfaceName in contract $contractName."
+}
