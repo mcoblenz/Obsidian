@@ -73,7 +73,7 @@ main contract Pharmacy {
         // The prescription list can only contain records in HasFills, so we remove the record, as we need to decrement the fills counter.
 		MaybeRecord maybeRecord = prescriptionList.removeIfExists(prescription);
 
-        // TODO TASK 3: Fill in the rest of this transaction. You will need to call the doFill transaction in this class on the appropriate PharmacyPrescriptionRecord.
+        // TODO TASK 3: Fill in the rest of this transaction. You will need to call the doFill transaction in this class (Pharmacy) on the appropriate PharmacyPrescriptionRecord.
         //              Be sure to record that the prescription has been filled.
 	}
 
@@ -82,16 +82,16 @@ main contract Pharmacy {
 	}
 }
 
-/* contract Patient { */
-/* 	string name; */
+contract Patient {
+	string name;
 
-/*     transaction depositPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) { */
-/*         pharmacy.depositPrescription(prescription); */
-/*     } */
+    transaction depositPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) {
+        pharmacy.depositPrescription(prescription);
+    }
 
-/* 	// Assume that this prescription is for this patient; no separate checking is needed. */
-/* 	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Unowned prescription) { */
-/* 		pharmacy.fillPrescription(prescription); */
-/* 	} */
-/* } */
+	// Assume that this prescription is for this patient; no separate checking is needed.
+	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Unowned prescription) {
+		pharmacy.fillPrescription(prescription);
+	}
+}
 
