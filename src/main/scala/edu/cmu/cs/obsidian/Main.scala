@@ -201,7 +201,20 @@ object Main {
 
             //copy the content of the fabric/java/ folder into a folder with the class name
             //have to add the trailing separator to avoid copying the java directory too
+            
             val fabricPath = compilerPath().resolve("fabric").resolve("java")
+            
+            // var compilerDir = System.getenv("TRAVIS_BUILD_DIR")
+            // if (compilerDir == null) {
+            //     // TODO: package up the compiler as a jar file and use a path relative to that
+            //     // Requiring the working dir to be the compiler's directory is inconvenient.
+            //     compilerDir = System.getenv("OBSIDIAN_COMPILER_DIR")
+            //     if (compilerDir == null) {
+            //         compilerDir = Paths.get("").toAbsolutePath().toString
+            //     }
+            // }
+            // val fabricPath = Paths.get(compilerDir, "fabric", "java")
+            
             val buildPath = fabricPath.resolve("build.gradle")
             val settingsPath = fabricPath.resolve("settings.gradle")
             val srcPath = fabricPath.resolve("src")
