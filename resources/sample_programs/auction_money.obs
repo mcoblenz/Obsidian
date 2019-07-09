@@ -1,0 +1,162 @@
+//English Auction
+
+asset contract Bidder {
+    string name;
+    Money@Owned money;
+    ItemList@Owned inventory; // can add infinite items to inventory
+
+    Bidder@Owned(string n, int m) {
+        name = n;
+        money = new Money(m);
+        inventory = new ItemList();
+    }
+
+    transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {
+        Bid bid = new Bid(bidAmount);
+        money.setAmount(money.getAmount() - bidAmount);
+        return bid;
+    }
+
+    transaction getName(Bidder@Unowned this) returns string {
+        return name;
+    }
+
+    transaction won(Bidder@Unowned this, Item@Owned >> Unowned i) {
+        inventory.append(i);
+    }
+
+    transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
+        money.setAmount(money.getAmount() + bid.getAmount());
+        disown bid;
+    }
+}
+
+asset contract Seller {
+    Item@Owned item;
+    state SoldItem {
+        Bid@Owned bid;
+    }
+    state Unsold;
+
+    Seller@Unsold() {
+        item = new Item();
+        -> Unsold;
+    }
+
+    transaction receiveBid(Seller@Unsold >> SoldItem this, Bid@Owned >> Unowned b) {
+        -> SoldItem(bid = b);
+    }
+}
+
+contract Item {
+
+}
+
+contract ItemList {
+    state Empty;
+    state HasItems {
+        Item@Owned item;
+        ItemList@Owned next;
+    }
+
+    ItemList@Empty() {
+        ->Empty;
+    }
+
+    transaction append(ItemList@Owned this, Item@Owned >> Unowned it) {
+        ItemList ilist = new ItemList();
+        -> HasItems(item = it, next = ilist);
+    }
+}
+
+asset contract Money {
+    int amount;
+
+    Money@Owned(int num) {
+        amount = num;
+    }
+
+    transaction getAmount(Money@Owned this) returns int {
+        return amount;
+    }
+
+    transaction setAmount(Money@Owned this, int num) {
+        amount = amount - num;
+    }
+}
+
+asset contract Bid {
+    Money@Owned money;
+
+    state Open;
+    state Stale;
+
+    Bid@Open(int num) {
+        money = new Money(num);
+        ->Open;
+    }
+
+    transaction getAmount(Bid@Owned this) returns int {
+        return money.getAmount();
+    }
+
+    transaction makeStale(Bid@Open >> Stale this) {
+        -> Stale;
+    }
+}
+
+
+main asset contract Auction {
+
+    Bidder@Unowned maxBidder;
+    Seller@Unsold seller;
+    Item@Owned item available in Open, BiddingDone;
+
+    state Open {
+        Bid@Owned bid;
+    }
+    state BiddingDone {
+        Bid@Owned finalBid;
+    }
+    
+    state Closed;
+
+
+    Auction@Owned(Item@Owned >> Unowned i) {
+        maxBidder = new Bidder("none", 0);
+        seller = new Seller();
+        -> Open(item = i, bid = new Bid(-1));
+    }
+
+    transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
+        if (newBid.getAmount() > bid.getAmount()) {
+            setCurrentBid(newBid);
+            Bidder tempBidder = maxBidder;
+            maxBidder = bidder;
+        }
+        else {
+            returnBidMoney(newBid, bidder);
+        }
+    }
+
+    transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
+        Bid tempBid = bid;
+        returnBidMoney(tempBid, maxBidder);
+        bid = b;
+    }
+
+    transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
+        bidder.receiveBidMoney(b);
+    }
+
+    transaction finishBidding(Auction@Open >> BiddingDone this) {
+        -> BiddingDone(item = item, finalBid = bid);
+    }
+
+    transaction giveItem(Auction@BiddingDone >> Closed this) {
+        maxBidder.won(item);
+        seller.receiveBid(finalBid);
+        -> Closed;
+    }
+
+}
