@@ -92,7 +92,7 @@ object Parser extends Parsers {
     }
 
     private def parseNonPrimitive: Parser[NonPrimitiveType] = {
-        opt(RemoteT()) ~ parseId ~ opt(LBracketT() ~ rep(parseType) ~ RBracketT()) ~ opt(AtT() ~! parseIdAlternatives) ^^ {
+        opt(RemoteT()) ~ parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ opt(AtT() ~! parseIdAlternatives) ^^ {
             case remote ~ id ~ genericParams ~ permissionToken => {
                 val isRemote = remote.isDefined
                 val actualGenerics = genericParams.map {
@@ -620,9 +620,9 @@ object Parser extends Parsers {
     }
 
     private def parseGenericImplements = {
-        parseId ~ opt(LBracketT() ~ repsep(parseId, CommaT()) ~ RBracketT()) ~ opt(AtT() ~ parseIdAlternatives) ^^ {
+        parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ opt(AtT() ~ parseIdAlternatives) ^^ {
             case name ~ optParams ~ permission =>
-                val params = optParams.map(_._1._2).getOrElse(List()).map(_._1)
+                val params = optParams.map(_._1._2).getOrElse(List())
 
                 val perm = GenericBoundPerm(name._1, params, _: Permission)
                 val states = GenericBoundStates(name._1, params, _: Set[String])

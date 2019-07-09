@@ -269,16 +269,27 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* Subtyping definitions */
 
     /* method to check if contract is actually implementing an interface */
-    private def contractIsSubtype(c1: String, c2: String): Boolean = {
-        val c1Table = globalTable.contractLookup(c1)
-        val c2Table = globalTable.contractLookup(c2)
+    private def contractIsSubtype(table: ContractTable, c1: ContractType, c2: ContractType, isThis: Boolean): Boolean = {
+        // Everything is a subtype of Top
+        // TODO GENERIC: Get rid of this constant/special casing...
+        if (c2.contractName == "Top") {
+            return true
+        }
+
+        val c1Table = globalTable.contractLookup(c1.contractName)
+        val c2Table = globalTable.contractLookup(c2.contractName)
 
         (c1Table.contract, c2Table.contract) match {
             case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) =>
                 if (!obs1.isInterface && obs2.isInterface) {
-                    obs1.implementBound.interfaceName == obs2.name
+                    val interfaceMatches = obs1.implementBound.interfaceName == obs2.name
+                    val argChecks = for ((c1Arg, c2Arg) <- c1.typeArgs.zip(c2.typeArgs)) yield {
+                        isSubtype(table, c1Arg, c2Arg, isThis).isEmpty
+                    }
+
+                    interfaceMatches && argChecks.forall(b => b)
                 } else {
-                    obs1 == obs2
+                   obs1 == obs2
                 }
             case (jvcon1: JavaFFIContractImpl, jvcon2: JavaFFIContractImpl) => jvcon1 == jvcon2
             case (obs: ObsidianContractImpl, jvcon: JavaFFIContractImpl) => false
@@ -327,11 +338,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 (np1, np2) match {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
-                        contractIsSubtype(c1.contractName, c2.contractName) && isSubpermission(c1p, c2p)
+                        contractIsSubtype(table, c1, c2, isThis) && isSubpermission(c1p, c2p)
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
-                        contractIsSubtype(c1.contractName, c2.contractName) && ss1.subsetOf(ss2)
-                    case (StateType(c, ss1, _), ContractReferenceType(c2, c2p, _)) =>
-                        contractIsSubtype(c.contractName, c2.contractName)
+                        contractIsSubtype(table, c1, c2, isThis) && ss1.subsetOf(ss2)
+                    case (StateType(c1, ss1, _), ContractReferenceType(c2, c2p, _)) =>
+                        contractIsSubtype(table, c1, c2, isThis)
                     case _ => false
                 }
 
@@ -450,6 +461,25 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     //-------------------------------------------------------------------------
     // Checking definitions for language constructs begins here
 
+    def checkGenericArgLength(table: ContractTable, ast: AST, actualArg: ObsidianType): Unit = {
+        actualArg match {
+            case np: NonPrimitiveType =>
+                table.lookupContract(np.contractName) match {
+                    case Some(t) =>
+                        t.contract match {
+                            case obsCon: ObsidianContractImpl =>
+                                if (obsCon.params.length != np.genericParams.length) {
+                                    logError(ast, GenericParameterListError(obsCon.params.length, np.genericParams.length))
+                                }
+                            case javaCon: JavaFFIContractImpl => ()
+                        }
+                    // This will be an error somewhere else
+                    case None => ()
+                }
+            case _ => ()
+        }
+    }
+
     def substituteOk(table: ContractTable, ast: AST, params: Seq[GenericType], typeArgs: Seq[ObsidianType]): Unit = {
         // TODO GENERIC: Will have to update this for when we do inference for the constructor parameters
         if (params.length != typeArgs.length) {
@@ -457,6 +487,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         for ((param, actualArg) <- params.zip(typeArgs)) {
+            checkGenericArgLength(table, ast, actualArg)
+
             if (isSubtype(table, actualArg, param, isThis = false).isDefined) {
                 logError(ast, GenericParameterError(param, actualArg))
             }
@@ -2395,7 +2427,7 @@ private def checkStatement(
                 if (!obsContract.isInterface) {
                     val boundDecls = globalTable.contract(obsContract.bound.interfaceName) match {
                         case Some(interface) => interface.contract match {
-                            case impl: ObsidianContractImpl => impl.declarations
+                            case impl: ObsidianContractImpl => impl.substitute(impl.params, obsContract.bound.interfaceParams).declarations
                             case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
                                 // TODO GENERIC: This should never happen
                                 assert(false, "Cannot implement a JavaFFIContract"); Nil

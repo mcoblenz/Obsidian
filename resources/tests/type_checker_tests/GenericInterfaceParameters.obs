@@ -1,12 +1,36 @@
 interface Consumer[X] {
-    transaction consume(X@Owned >> Unowned x);
+    transaction consume(Consumer@Unowned this, X@Owned >> Unowned x);
 }
 
 contract NopConsumer[T] implements Consumer[T] {
-    transaction consume(T@Owned >> Unowned t) {}
+    transaction consume(NopConsumer@Unowned this, T@Owned >> Unowned t) {}
 }
 
 contract A {}
+
+contract Store[T] {
+    T@Owned t;
+
+    Store@Owned(T@Owned >> Unowned t) {
+        this.t = t;
+    }
+
+    transaction peek() returns T@Unowned {
+        return t;
+    }
+}
+
+contract Foo[T implements Consumer[U], U] implements Consumer[U] {
+    T@Owned t;
+
+    Foo@Owned(T@Owned >> Unowned t) {
+        this.t = t;
+    }
+
+    transaction consume(U@Owned >> Unowned u) {
+        t.consume(u);
+    }
+}
 
 main contract C {
     transaction f() {
@@ -15,10 +39,46 @@ main contract C {
     }
 
     transaction g() {
-        Consumer[A] consumer = new Consumer[A]();
+        Consumer[A] consumer = new NopConsumer[A]();
         consumer.consume(new A());
     }
-}
 
-// TODO: Test passing interface as type parameter/with subtyping
+    transaction h() {
+        Store[Consumer[int]] s = makeStore();
+        s.peek().consume(42);
+        s.peek().consume("test"); // This should fail
+    }
+
+    // To test some inter-transaction interaction
+    transaction makeStore() returns Store[Consumer[int]]@Owned {
+        return new Store[Consumer[int]](new NopConsumer[int]());
+    }
+
+    transaction makeStoreBad() returns Store[Consumer[int]]@Owned {
+        // Error: This is the wrong kind of consumer (consumes strings, not ints)
+        return new Store[Consumer[int]](new NopConsumer[string]());
+    }
+
+    transaction useFoo() {
+        Foo[NopConsumer[int], int] f = new Foo[NopConsumer[int], int](new NopConsumer[int]());
+        f.consume(-1231);
+        f.consume(new A()); // error, wrong type
+    }
+
+    transaction badUseFoo() {
+        // Error, A does not implement Consumer[int]
+        Foo[A, int] f = new Foo[A, int](new A());
+
+        // Error, NopConsumer[string] consumes string, not int
+        Foo[NopConsumer[string], int] f = new Foo[NopConsumer[string], int](new NopConsumer[string]());
+
+        // Error, NopConsumer has kind * => *, not *
+        Foo[NopConsumer, A] f = new Foo[NopConsumer, A](new NopConsumer());
+    }
+
+    transaction makeStoreSubtype() {
+        // Should be fine, even though Consumer[A] != NopConsumer[A], because NopConsumer[A] <: Consumer[A]
+        Store[Consumer[A]] s = new Store[NopConsumer[A]](new NopConsumer[A]());
+    }
+}
 

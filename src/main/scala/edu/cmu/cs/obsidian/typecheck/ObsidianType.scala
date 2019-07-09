@@ -49,10 +49,9 @@ case class ContractReferenceType(override val contractType: ContractType,
                                  override val isRemote: Boolean) extends NonPrimitiveType {
     override def toString: String =
         if (permission == Inferred()) {
-            contractName
-        }
-        else {
-            contractName + "@" + permission
+            s"$contractType"
+        } else {
+            s"$contractType@$permission"
         }
 
     val contractName: String = contractType.contractName
@@ -138,8 +137,8 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
 
     private def orOfStates: String = stateNames.mkString(" | ")
 
-    override def toString: String = contractName + "@" +
-        (if (stateNames.size > 1) "(" + orOfStates + ")" else orOfStates)
+    override def toString: String =
+        s"$contractType@${if (stateNames.size > 1) s"($orOfStates)" else orOfStates}"
 
     override val permission = Owned()
 
@@ -259,7 +258,8 @@ object ObsidianType {
         // TODO GENERIC: Is this actually the right approach. What if the name conflicts? Should we just substitute anyway or warn?
         var idx = genericParams.indexWhere(p => p.gVar.varName == contractName)
 
-        if (idx >= 0) {
+        // If idx is too large, then we will get an error elsewhere
+        if (idx >= 0 && idx < actualParams.length) {
             Some(actualParams(idx))
         } else {
             None
@@ -410,6 +410,7 @@ sealed trait GenericBound {
     def withPermission(permission: Permission): GenericBound
 
     def interfaceName: String
+    def interfaceParams: Seq[ObsidianType]
     def permission: Permission
     def residualType(mode: OwnershipConsumptionMode): GenericBound
 
@@ -420,7 +421,7 @@ sealed trait GenericBound {
     def referenceType: ObsidianType = ContractReferenceType(contractType, permission, isRemote = false)
 }
 
-case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[String], permission: Permission) extends GenericBound {
+case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[ObsidianType], permission: Permission) extends GenericBound {
     override def residualType(mode: OwnershipConsumptionMode): GenericBound = {
         if (permission == Owned()) {
             val newPermission =
@@ -444,7 +445,7 @@ case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[String],
 }
 
 // TODO GENERIC: Should these params be strings or actual types?
-case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[String], states: Set[String]) extends GenericBound {
+case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[ObsidianType], states: Set[String]) extends GenericBound {
     override def permission: Permission = Owned()
 
     override def residualType(mode: OwnershipConsumptionMode): GenericBound =
@@ -502,7 +503,8 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {
         val idx = genericParams.indexWhere(_.gVar.varName == this.gVar.varName)
 
-        if (idx >= 0) {
+        // if idx is greater, we'll get an error elsewhere
+        if (idx >= 0 && idx < actualParams.length) {
             bound match {
                 case GenericBoundPerm(interfaceName, interfaceParams, perm) =>
                     actualParams(idx).withPermission(perm)

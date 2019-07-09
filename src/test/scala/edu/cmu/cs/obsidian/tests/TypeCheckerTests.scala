@@ -791,6 +791,23 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def genericsInterfaceWithParameters(): Unit = {
-        runTest("resources/tests/type_checker_tests/GenericInterfaceParameters.obs", Nil)
+        runTest("resources/tests/type_checker_tests/GenericInterfaceParameters.obs",
+            (ArgumentSubtypingError("consume", "x", StringType(), IntType()), 49) ::
+            (ArgumentSubtypingError("Store", "t",
+                ContractReferenceType(ContractType("NopConsumer", List(StringType())), Owned(), isRemote = false),
+                ContractReferenceType(ContractType("Consumer", List(IntType())), Owned(), isRemote = false)), 59) ::
+            (ArgumentSubtypingError("consume", "u",
+                ContractReferenceType(ContractType("A", Nil), Owned(), isRemote = false),
+                IntType()), 65) ::
+            (GenericParameterError(
+                GenericType(GenericVar(isAsset = false, "T", None),
+                    GenericBoundPerm("Consumer", List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false)), Unowned())),
+                ContractReferenceType(ContractType("A", Nil), Inferred(), isRemote = false)
+            ), 70) ::
+
+            // Intentionally duplicated error: one for the type in the generic, one for the actual construction
+            (GenericParameterListError(1, 0), 76) ::
+            (GenericParameterListError(1, 0), 76) ::
+            Nil)
     }
 }

@@ -42,14 +42,14 @@ object StateNameValidator extends IdentityAstTransformer {
 
                 case None =>
                     lexicallyInsideOf.contract match {
-                        case ObsidianContractImpl(modifiers, name, params, implementBound, declarations, transitions, isInterface, sp) =>
-                            params.find(p => p.gVar.varName == np.contractName) match {
+                        case impl: ObsidianContractImpl =>
+                            impl.params.find(p => p.gVar.varName == np.contractName) match {
                                 case Some(genericType) =>
                                     val stateNames = np match {
                                         case StateType(contractType, states, isRemote) => Some(states)
                                         case GenericType(gVar, bound) => bound match {
-                                            case GenericBoundStates(interfaceName, interfaceParams, states) => Some(states)
-                                            case GenericBoundPerm(interfaceName, interfaceParams, permission) => None
+                                            case GenericBoundStates(_, _, states) => Some(states)
+                                            case _: GenericBoundPerm => None
                                         }
                                         case _ => None
                                     }
@@ -65,7 +65,7 @@ object StateNameValidator extends IdentityAstTransformer {
                                     (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                             }
 
-                        case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
+                        case _: JavaFFIContractImpl =>
                             // TODO GENERIC: how to handle interaction between java and obsidian generics?
                             (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                     }
