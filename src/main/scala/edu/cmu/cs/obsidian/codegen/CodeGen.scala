@@ -1,15 +1,13 @@
 package edu.cmu.cs.obsidian.codegen
 
+
 import CodeGen._
-import edu.cmu.cs.obsidian.parser._
 import com.helger.jcodemodel._
-import edu.cmu.cs.obsidian.parser
-import edu.cmu.cs.obsidian.parser.Parser.Identifier
-import edu.cmu.cs.obsidian.util._
+import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck._
 
+import scala.collection.JavaConverters._
 import scala.collection.{mutable, _}
-import collection.JavaConverters._
 
 
 trait Target {
@@ -2325,9 +2323,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
             case NotEquals(e1, e2) =>
                 recurse(e1).invoke("equals").arg(recurse(e2)).not()
             case Dereference(e1, f) => recurse(e1).ref(f) /* TODO : do we ever need this? */
-            case LocalInvocation(name, args) =>
+
+            // TODO GENERIC: Handle these params
+            case LocalInvocation(name, params, args) =>
                 if (name == "sqrt" && args.length == 1) {
-                    val arg0 = recurse(args(0))
+                    val arg0 = recurse(args.head)
                     val doubleResult = model.ref("java.lang.Math").staticInvoke("sqrt").arg(arg0.invoke("doubleValue"))
                     val intResult = JExpr.cast(model.ref("int"), doubleResult)
                     val stringResult = model.ref("Integer").staticInvoke("toString").arg(intResult)
@@ -2338,9 +2338,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, false)
                 }
             /* TODO : this shouldn't be an extra case */
-            case Invocation(This(), name, args, isFFIInvocation) =>
+            // TODO GENERIC: Handle these params
+            case Invocation(This(), params, name, args, isFFIInvocation) =>
                 addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, isFFIInvocation)
-            case Invocation(recipient, name, args, isFFIInvocation) =>
+            // TODO GENERIC: Handle these params
+            case Invocation(recipient, params, name, args, isFFIInvocation) =>
                 addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext, isFFIInvocation)
 
             // TODO GENERIC: Handle the type params
@@ -2765,15 +2767,18 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     translateBody(jIf._else(), s2, translationContext, localContext)
                 }
 
-            case LocalInvocation(methName, args) =>
+            // TODO GENERIC: Handle these parameters
+            case LocalInvocation(methName, params, args) =>
                 body.add(addArgs(translationContext.invokeTransaction(methName),
                         args, translationContext, localContext, false))
             /* TODO : it's bad that this is a special case */
-            case Invocation(This(), methName, args, isFFIInvocation) =>
+            // TODO GENERIC: Handle these parameters
+            case Invocation(This(), params, methName, args, isFFIInvocation) =>
                 body.add(addArgs(translationContext.invokeTransaction(methName),
                         args, translationContext, localContext, isFFIInvocation))
 
-            case Invocation(e, methName, args, isFFIInvocation) =>
+            // TODO GENERIC: Handle these parameters
+            case Invocation(e, params, methName, args, isFFIInvocation) =>
                 addArgs(body.invoke(translateExpr(e, translationContext, localContext), methName),
                         args, translationContext, localContext, isFFIInvocation)
             case StaticAssert(e, l) => () // Nothing to do

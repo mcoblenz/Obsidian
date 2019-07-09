@@ -528,7 +528,7 @@ object Parser extends Parsers {
     }
 
 
-    private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String): Parser[Transaction] = {
+    private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String, contractParams: List[GenericType]): Parser[Transaction] = {
         // TODO GENERIC: Add generic parameters here (and also to interfaces)
         parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~!
             opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
@@ -555,14 +555,13 @@ object Parser extends Parsers {
                 }
 
                 val finalType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName, params), Shared(), false)
-                    case Some(v) => v.typOut
+                    case None => ContractReferenceType(ContractType(contractName, contractParams), Shared(), false)
+                    case Some(v) => v.typOut.withParams(contractParams)
                 }
 
                 val thisType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName, params), Shared(), false)
-                    case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType]
-
+                    case None => ContractReferenceType(ContractType(contractName, contractParams), Shared(), false)
+                    case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType].withParams(contractParams)
                 }
 
                 val initialFieldTypes = privateMethodFieldTypes match {
@@ -606,9 +605,9 @@ object Parser extends Parsers {
     }
 
     private def parseDeclInContract(params: List[GenericType], isInterface:Boolean,
-                                    sourcePath: String)(contractName: String):  Parser[Declaration] = {
+                                    sourcePath: String)(contractName: String, contractParams: List[GenericType]):  Parser[Declaration] = {
         parseFieldDecl | parseStateDecl | parseConstructor | parseContractDecl(sourcePath) |
-            parseTransDecl(params, isInterface)(contractName)
+            parseTransDecl(params, isInterface)(contractName, contractParams)
     }
 
     private def parseContractModifier = {
@@ -696,7 +695,7 @@ object Parser extends Parsers {
                     case None => GenericBoundPerm("Top", Nil, Unowned())
                 }
 
-                LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name._1)) ~! RBraceT() ^^ {
+                LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name._1, params)) ~! RBraceT() ^^ {
                 case _ ~ contents ~ _ =>
                     // Make sure there's only one transition diagram.
                     val separateTransitions = contents.filter({

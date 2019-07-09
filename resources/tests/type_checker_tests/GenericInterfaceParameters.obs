@@ -27,7 +27,7 @@ contract Foo[T implements Consumer[U], U] implements Consumer[U] {
         this.t = t;
     }
 
-    transaction consume(U@Owned >> Unowned u) {
+    transaction consume(Foo@Unowned this, U@Owned >> Unowned u) {
         t.consume(u);
     }
 }

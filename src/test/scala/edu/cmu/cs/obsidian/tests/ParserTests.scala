@@ -363,4 +363,11 @@ class ParserTests extends JUnitSuite {
               | contract C { transaction f() { x.g[int](2); testing[string, K](); } }
             """.stripMargin)
     }
+
+    @Test def parseGenericStateVariables(): Unit = {
+        shouldSucceed(
+            """
+              | contract C[X@s] { transaction f(X@s >> Unowned x) {} }
+            """.stripMargin)
+    }
 }

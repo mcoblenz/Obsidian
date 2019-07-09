@@ -817,4 +817,15 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def genericsTransactionParams(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsTransactionParams.obs", Nil)
     }
+
+    @Test def genericsStateVariables(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericsStateVariables.obs",
+            (ReceiverTypeIncompatibleError("getX",
+                StateType(ContractType("A", Nil), "S2", isRemote = false),
+                StateType(ContractType("A", Nil), "S1", isRemote = false)), 61) ::
+            (ReceiverTypeIncompatibleError("getX",
+                ContractReferenceType(ContractType("A", Nil), Unowned(), isRemote = false),
+                StateType(ContractType("A", Nil), "S1", isRemote = false)), 67) ::
+                Nil)
+    }
 }

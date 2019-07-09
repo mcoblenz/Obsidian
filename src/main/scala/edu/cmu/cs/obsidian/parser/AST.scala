@@ -5,6 +5,8 @@ import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.{EndsInState, Identifier}
 import edu.cmu.cs.obsidian.typecheck._
 
+import scala.collection.GenTraversableOnce
+
 trait HasLocation {
     var loc: Position = NoPosition
     def setLoc(t: Token): this.type = { loc = t.pos; this }
@@ -118,7 +120,6 @@ case class Multiply(e1: Expression, e2: Expression) extends Expression {
 }
 case class Mod(e1: Expression, e2: Expression) extends Expression {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Mod =
-    // TODO GENERIC: Will also need to handle the state substitution at some point
         Mod(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
             .setLoc(this)
 }
@@ -234,14 +235,11 @@ case class ReturnExpr(e: Expression) extends Statement {
 // We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
 case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]], thisPermission: Permission) extends Statement {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Transition = {
-        // TODO GENERIC: We may need to do some substitute/lookup here for the state variables
         def doSubstitute: ((ReferenceIdentifier, Expression)) => (ReferenceIdentifier, Expression) = {
             case (id, expr) => (id, expr.substitute(genericParams, actualParams))
         }
 
-        // TODO GENERIC: May have to do something here for the permission substitution
-        Transition(newStateName, updates.map(_.map(doSubstitute)), thisPermission)
-            .setLoc(this)
+        Transition(newStateName, updates.map(_.map(doSubstitute)), thisPermission).setLoc(this)
     }
 }
 case class Assignment(assignTo: Expression, e: Expression) extends Statement {
@@ -266,14 +264,39 @@ case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement])
             s2.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
 }
-// TODO GENERIC: will need to handle state variables here
 case class IfInState(e: Expression, state: Identifier, s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): IfInState =
-        IfInState(e.substitute(genericParams, actualParams),
-            state,
-            s1.map(_.substitute(genericParams, actualParams)),
-            s2.map(_.substitute(genericParams, actualParams)))
-            .setLoc(this)
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Statement = {
+        ObsidianType.stateSubstitutions(genericParams, actualParams).get(state._1) match {
+            case Some(permOrState) => permOrState match {
+                    case Left(perm) =>
+                        // TODO GENERIC: We should be able to figure out what branch this takes at compile time,
+                        //  and therefore resolve the branch correctly. It's probably not right to always take the true branch?
+                        // This can be None in the case that the state variable resolves to a permission.
+                        // In this case, we don't need to do a dynamic state check, because it's not a state.
+
+                        // Put s1 in both so compiler knows it will always happen.
+                        // Further we transform it to a static assert and an assignment to make sure that the substitution works, and
+                        // that the computation still gets run, in case the side effects are important
+                        // TODO GENERIC: Make sure we run the expression somehow (would do assignment, but then we need to know the type
+                        val body = StaticAssert(e, (perm.toString, state._2) :: Nil).setLoc(this) +: s1
+                        IfThenElse(TrueLiteral(), body, body)
+
+                    case Right(states) =>
+                        IfInState(e.substitute(genericParams, actualParams),
+                            (states.head, state._2),
+                            s1.map(_.substitute(genericParams, actualParams)),
+                            s2.map(_.substitute(genericParams, actualParams)))
+                            .setLoc(this)
+                }
+
+            case None =>
+                IfInState(e.substitute(genericParams, actualParams),
+                    state,
+                    s1.map(_.substitute(genericParams, actualParams)),
+                    s2.map(_.substitute(genericParams, actualParams)))
+                    .setLoc(this)
+        }
+    }
 }
 case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): TryCatch =
@@ -287,17 +310,47 @@ case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement {
             .setLoc(this)
 }
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST {
-    // TODO GENERIC: will need to handle state variables here
-    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): SwitchCase =
-        SwitchCase(stateName, body.map(_.substitute(genericParams, actualParams)))
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): SwitchCase = {
+        val newStateName = ObsidianType.stateSubstitutions(genericParams, actualParams).get(stateName) match {
+            case Some(permOrState) => permOrState match {
+                case Right(states) =>
+                    if (states.size > 1) {
+                        // TODO GENERIC: Clean this up (log error, or...?) Should probably actually generate multiple cases for this one
+                        assert(false, s"Bad subsitutition: $states for $stateName. Reason: Can only substitute a single state here")
+                        stateName
+                    } else {
+                        states.head
+                    }
+                case Left(perm) =>
+                    // TODO GENERIC: Improve this. Should probably either delete the case or just compile anyway, since the case will never be hit
+                    assert(false, s"Bad substitution: Cannot substitute a permission ($perm) for a state in a switch case.")
+                    stateName
+            }
+            case None => stateName
+        }
+
+        SwitchCase(newStateName, body.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
+    }
 }
 
-// TODO GENERIC: Will need to handle state variables here
 case class StaticAssert(expr: Expression, statesOrPermissions: Seq[Identifier]) extends Statement {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StaticAssert =
-        StaticAssert(expr.substitute(genericParams, actualParams), statesOrPermissions)
-            .setLoc(this)
+    def transform(stateMap: Map[String, Either[Permission, Set[String]]],
+                  identifier: Identifier): Seq[Identifier] =
+        stateMap.get(identifier._1) match {
+            case Some(permOrState) => permOrState match {
+                case Left(perm) => (perm.toString, identifier._2) :: Nil
+                case Right(states) => states.map((_, identifier._2)).toSeq
+            }
+            case None => identifier :: Nil
+        }
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StaticAssert = {
+        val stateMap = ObsidianType.stateSubstitutions(genericParams, actualParams)
+
+        StaticAssert(expr.substitute(genericParams, actualParams),
+            statesOrPermissions.flatMap(transform(stateMap, _))).setLoc(this)
+    }
 }
 
 /* Declarations */
