@@ -808,6 +808,10 @@ class TypeCheckerTests extends JUnitSuite {
                 GenericType(GenericVar(isAsset = false,"T",None),
                     GenericBoundPerm("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false)), Unowned())),
                 ContractReferenceType(ContractType("NopConsumer", List(StringType())), Inferred(), isRemote = false)), 73) ::
+            (GenericParameterError(
+                GenericType(GenericVar(isAsset = false,"T",None),
+                    GenericBoundPerm("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false)), Unowned())),
+                ContractReferenceType(ContractType("NopConsumer", List()), Inferred(), isRemote = false)), 76) ::
             // Intentionally duplicated error: one for the type in the generic, one for the actual construction
             (GenericParameterListError(1, 0), 76) ::
             (GenericParameterListError(1, 0), 76) ::
