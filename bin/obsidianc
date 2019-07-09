@@ -20,6 +20,3 @@ fi
 
 java -jar "$obsidian_jar" $@
 
-
-#java -jar "$bin_dirtarget/scala-2.12/obsidianc.jar "$@"
-

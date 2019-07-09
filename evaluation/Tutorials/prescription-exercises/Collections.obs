@@ -1,5 +1,5 @@
 contract MaybeRecord {
-    asset state Just {
+    asset state Something {
         PharmacyPrescriptionRecord@HasFills record;
     }
 
@@ -9,11 +9,11 @@ contract MaybeRecord {
         ->Nothing;
     }
 
-    transaction just(MaybeRecord@Nothing >> Just this, PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) {
-        ->Just(record = newRecord);
+    MaybeRecord@Something(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) {
+        ->Something(record = newRecord);
     }
 
-    transaction getRecord(MaybeRecord@Just >> Nothing this) returns PharmacyPrescriptionRecord@HasFills {
+    transaction getRecord(MaybeRecord@Something >> Nothing this) returns PharmacyPrescriptionRecord@HasFills {
         PharmacyPrescriptionRecord result = record;
         ->Nothing;
         return result;
@@ -31,9 +31,8 @@ contract PharmacyPrescriptionRecordList {
         ->Nil;
     }
 
-    transaction cons(PharmacyPrescriptionRecordList@Nil >> Cons this,
-                     PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
-                     PharmacyPrescriptionRecordList@Shared tail) {
+    PharmacyPrescriptionRecordList@Cons(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
+                                        PharmacyPrescriptionRecordList@Shared tail) {
         ->Cons(record = newRecord, next = tail);
     }
 
@@ -72,9 +71,7 @@ contract PharmacyPrescriptionRecordList {
                     ->Cons(record = next.getRecord(), next = newNext);
                 }
 
-                MaybeRecord maybeRecord = new MaybeRecord();
-                maybeRecord.just(oldRecord);
-                return maybeRecord;
+                return new MaybeRecord(oldRecord);
             } else {
                 return next.removeIfExists(prescription);
             }
