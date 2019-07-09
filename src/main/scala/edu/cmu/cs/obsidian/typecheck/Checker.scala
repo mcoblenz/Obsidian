@@ -486,10 +486,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             logError(ast, GenericParameterListError(params.length, typeArgs.length))
         }
 
-        for ((param, actualArg) <- params.zip(typeArgs)) {
+        for (((param, idx), actualArg) <- params.zipWithIndex.zip(typeArgs)) {
             checkGenericArgLength(table, ast, actualArg)
 
-            if (isSubtype(table, actualArg, param, isThis = false).isDefined) {
+            // Here we want to do the substitution before we check, for example, in the following case:
+            // Foo[T implements Consumer[U], U]
+            val otherParams = params.take(idx) ++ params.drop(idx + 1)
+            val otherArgs = typeArgs.take(idx) ++ typeArgs.drop(idx + 1)
+            val substitutedParam = param.substitute(otherParams, otherArgs)
+
+            if (isSubtype(table, actualArg, substitutedParam, isThis = false).isDefined) {
                 logError(ast, GenericParameterError(param, actualArg))
             }
         }

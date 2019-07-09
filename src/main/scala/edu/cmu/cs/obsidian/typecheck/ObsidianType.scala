@@ -406,6 +406,8 @@ case class FFIInterfaceContractType(name: String, simpleType: NonPrimitiveType) 
 }
 
 sealed trait GenericBound {
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound
+
     def withStates(stateNames: Set[String]): GenericBound
     def withPermission(permission: Permission): GenericBound
 
@@ -414,8 +416,7 @@ sealed trait GenericBound {
     def permission: Permission
     def residualType(mode: OwnershipConsumptionMode): GenericBound
 
-    // TODO GENERIC: This shouldn't be nil
-    def contractType: ContractType = ContractType(interfaceName, Nil)
+    def contractType: ContractType = ContractType(interfaceName, interfaceParams)
 
     // TODO GENERIC: Should isRemote be false or should it be part of the bound?
     def referenceType: ObsidianType = ContractReferenceType(contractType, permission, isRemote = false)
@@ -442,6 +443,9 @@ case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[Obsidian
 
     override def withStates(stateNames: Set[String]): GenericBound =
         GenericBoundStates(interfaceName, interfaceParams, stateNames)
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound =
+        this.copy(interfaceParams = interfaceParams.map(_.substitute(genericParams, actualParams)))
 }
 
 // TODO GENERIC: Should these params be strings or actual types?
@@ -472,6 +476,9 @@ case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[Obsidi
         }
 
     override def withStates(stateNames: Set[String]): GenericBound = copy(states = stateNames)
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound =
+        this.copy(interfaceParams = interfaceParams.map(_.substitute(genericParams, actualParams)))
 }
 
 case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[String])
@@ -496,6 +503,8 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
     override def isAssetReference(contextContractTable: ContractTable): Possibility =
         Possibility.fromBoolean(gVar.isAsset)
 
+    override def contractType: ContractType = bound.contractType
+
     // TODO GENERIC: what to do here??
     override def genericParams: Seq[ObsidianType] = Nil
 
@@ -512,7 +521,7 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
                     actualParams(idx).withStates(states)
             }
         } else {
-            this
+            this.copy(bound = bound.substitute(genericParams, actualParams))
         }
     }
 
