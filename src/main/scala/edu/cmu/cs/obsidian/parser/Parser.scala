@@ -347,29 +347,36 @@ object Parser extends Parsers {
         accept("string literal", partialFunction)
     }
 
+    private def parseTypeList: Parser[Seq[ObsidianType]] =
+        opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ^^ {
+            case Some(_ ~ params ~ _) => params
+            case None => List()
+        }
+
     private def parseExprBottom: Parser[Expression] = {
         def parseLocalInv = {
-            parseId ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
-                case name ~ _ ~ args ~ _ => LocalInvocation(name._1, args).setLoc(name)
+            parseId ~ parseTypeList ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
+                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, params, args).setLoc(name)
             }
         }
 
         /* avoids left recursion by parsing from the dot, e.g. ".f(a)", not "x.f(a)" */
-        type DotExpr = Either[Identifier, (Identifier, Seq[Expression])]
+        type DotExpr = Either[Identifier, (Identifier, Seq[ObsidianType], Seq[Expression])]
 
         def foldDotExpr(e: Expression, dots: Seq[DotExpr]): Expression = {
             dots.foldLeft(e)(
                 (e: Expression, inv: DotExpr) => inv match {
                     case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
-                    case Right((funcName, args)) => Invocation(e, funcName._1, args, false).setLoc(funcName)
+                    case Right((funcName, params, args)) => Invocation(e, params, funcName._1, args, false).setLoc(funcName)
                 }
             )
         }
 
         def parseDots: Parser[Expression => Expression] = {
-            val parseOne: Parser[DotExpr] = DotT() ~! parseId ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
-                case _ ~ name ~ Some(_ ~ args ~ _) => Right((name, args))
-                case _ ~ name ~ None => Left(name)
+            val parseOne: Parser[DotExpr] = DotT() ~! parseId ~
+                parseTypeList ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
+                case _ ~ name ~ params ~ Some(_ ~ args ~ _) => Right((name, params, args))
+                case _ ~ name ~ params ~ None => Left(name)
             }
 
             rep(parseOne) ^^ ((lst: Seq[DotExpr]) => (e: Expression) => foldDotExpr(e, lst))
@@ -523,12 +530,18 @@ object Parser extends Parsers {
 
     private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String): Parser[Transaction] = {
         // TODO GENERIC: Add generic parameters here (and also to interfaces)
-        parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
-          opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
-            case opts ~ privateMethodFieldTypes ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
+        parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~!
+            opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
+            opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
+            case opts ~ privateMethodFieldTypes ~ t ~ name ~ paramsOpt ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
+                }
+
+                val params = paramsOpt match {
+                    case Some(_ ~ ps ~ _) => ps
+                    case None => Nil
                 }
 
                 val (thisArg, filteredArgs) = args.headOption match {
@@ -562,7 +575,7 @@ object Parser extends Parsers {
                     case Some(_ ~ argDefList ~ _) => argDefList.map((v: VariableDeclWithSpec) => (v.varName, v.typOut))
                 }
 
-                Transaction(nameString, filteredArgs, returns,
+                Transaction(nameString, params, filteredArgs, returns,
                     ensures, body, opts.isStatic, opts.isPrivate,
                     thisType, finalType.asInstanceOf[NonPrimitiveType],
                     initialFieldTypes.toMap, finalFieldTypes.toMap).setLoc(t)
@@ -661,7 +674,13 @@ object Parser extends Parsers {
     }
 
     private def parseGenericId = {
-        parseId ~ opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT())
+        parseId ~! opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ^^ {
+            case id ~ optParams =>
+                optParams match {
+                    case Some(_ ~ params ~ _) =>  (id, params)
+                    case None => (id, List())
+                }
+        }
     }
 
     private def parseContractDecl(srcPath: String) = {
@@ -669,10 +688,7 @@ object Parser extends Parsers {
             case mod ~ ct ~ identifier ~ impl =>
                 val isInterface = ct == InterfaceT()
 
-                val (name, params) = identifier match {
-                    case id ~ optParams =>
-                        (id._1, optParams.map(_._1._2).getOrElse(List()))
-                }
+                val (name, params) = identifier
 
                 val implementBound = impl match {
                     case Some(_ ~ bound) => bound
@@ -680,7 +696,7 @@ object Parser extends Parsers {
                     case None => GenericBoundPerm("Top", Nil, Unowned())
                 }
 
-                LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name)) ~! RBraceT() ^^ {
+                LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name._1)) ~! RBraceT() ^^ {
                 case _ ~ contents ~ _ =>
                     // Make sure there's only one transition diagram.
                     val separateTransitions = contents.filter({
@@ -705,7 +721,7 @@ object Parser extends Parsers {
                         case _ => false
                     }).map(_.asInstanceOf[Declaration])
 
-                    ObsidianContractImpl(mod.toSet, name, params, implementBound, decls, transitions, isInterface, srcPath).setLoc(ct)
+                    ObsidianContractImpl(mod.toSet, name._1, params, implementBound, decls, transitions, isInterface, srcPath).setLoc(ct)
             }
         }
     }

@@ -1,0 +1,48 @@
+interface Func[X, Y] {
+    transaction apply(Func@Owned this, X@Unowned x) returns Y@Unowned;
+}
+
+contract Identity[X] implements Func[X, X] {
+    transaction apply(Identity@Owned this, X@Unowned x) returns X@Unowned {
+        return x;
+    }
+}
+
+contract Constant[Y, X] implements Func[X, Y] {
+    Y@Unowned y;
+
+    Constant@Owned(Y@Unowned y) {
+        this.y = y;
+    }
+
+    transaction apply(Constant@Owned this, X@Unowned x) returns Y@Unowned {
+        return y;
+    }
+}
+
+contract Store[X] {
+    X@Unowned x;
+
+    Store@Owned(X@Unowned x) {
+        this.x = x;
+    }
+
+    transaction get() returns X@Unowned {
+        return x;
+    }
+
+    transaction map[Y](Func[X,Y]@Owned f) returns Store[Y]@Owned {
+        return new Store[Y](f.apply(x));
+    }
+}
+
+main contract Main {
+    transaction f() returns Store[string]@Owned {
+        return new Store[string]("test").map[string](new Identity[string]());
+    }
+
+    transaction g() returns int {
+        return new Store[string]("test5").map[int](new Constant[int, string](180)).get();
+    }
+}
+

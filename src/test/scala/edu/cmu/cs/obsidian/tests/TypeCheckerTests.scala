@@ -813,4 +813,8 @@ class TypeCheckerTests extends JUnitSuite {
             (GenericParameterListError(1, 0), 76) ::
             Nil)
     }
+
+    @Test def genericsTransactionParams(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericsTransactionParams.obs", Nil)
+    }
 }

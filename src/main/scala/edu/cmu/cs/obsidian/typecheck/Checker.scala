@@ -283,7 +283,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) =>
                 if (!obs1.isInterface && obs2.isInterface) {
                     val interfaceMatches = obs1.implementBound.interfaceName == obs2.name
-                    val argChecks = for ((c1Arg, c2Arg) <- c1.typeArgs.zip(c2.typeArgs)) yield {
+
+                    val subsParams = obs1.implementBound.substitute(obs1.params, c1.typeArgs).interfaceParams
+                    val argChecks = for ((c1Arg, c2Arg) <- subsParams.zip(c2.typeArgs)) yield {
                         isSubtype(table, c1Arg, c2Arg, isThis).isEmpty
                     }
 
@@ -532,9 +534,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 context: Context,
                 name: String,
                 receiver: Expression,
+                params: Seq[ObsidianType],
                 args: Seq[Expression]): (ObsidianType, Context, Boolean, Expression, Seq[Expression]) = {
             val (receiverType, contextAfterReceiver, receiverPrime) = inferAndCheckExpr(decl, context, receiver, NoOwnershipConsumption())
-
 
             // Terrible special case just for now. TODO: remove this.
             if (name == "sqrt" && args.length == 1) {
@@ -566,7 +568,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
 
 
-            val foundTransaction = contextAfterReceiver.lookupTransactionInType(receiverType)(name)
+            val foundTransaction =
+                contextAfterReceiver.lookupTransactionInType(receiverType)(name)
+                .map(t => t.substitute(t.params, params))
 
             val invokable: InvokableDeclaration = foundTransaction match {
                 case None =>
@@ -781,14 +785,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          (BottomType(), newContext, newExpr)
                  }
 
-             case LocalInvocation(name, args: Seq[Expression]) =>
-                 val (typ, con, _, _, newArgs) = handleInvocation(context, name, This(), args)
+             case LocalInvocation(name, params, args: Seq[Expression]) =>
+                 val (typ, con, _, _, newArgs) = handleInvocation(context, name, This(), params, args)
                  //This may need correction.
-                 (typ, con, LocalInvocation(name, newArgs))
+                 (typ, con, LocalInvocation(name, params, newArgs))
 
-             case Invocation(receiver: Expression, name, args: Seq[Expression], isFFIInvocation) =>
-                 val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, args)
-                 (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv))
+             case Invocation(receiver: Expression, params, name, args: Seq[Expression], isFFIInvocation) =>
+                 val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, params, args)
+                 (typ, con, Invocation(newReceiver, params, name, newArgs, isFFIInv))
 
              case c@Construction(contractType, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(contractType.contractName)
@@ -2339,7 +2343,10 @@ private def checkStatement(
 
     private def checkDeclaration(table: ContractTable)(decl: Declaration): Declaration = {
         decl match {
-            case t: Transaction => checkTransaction(t, table)
+            case t: Transaction =>
+                // When checking the body, just make sure that the generic parameters are properly
+                // recognized as being parameters (e.g., for subtype checking)
+                checkTransaction(t.substitute(t.params, t.params), table)
             case s: State => checkState(table, s)
             case f: Field => {
                 checkContractFieldRepeats(f, table.contract)

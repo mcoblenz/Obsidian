@@ -356,4 +356,11 @@ class ParserTests extends JUnitSuite {
               | interface I { state A; transaction f() returns int; }
             """.stripMargin)
     }
+
+    @Test def parseTransactionParameters(): Unit = {
+        shouldSucceed(
+            """
+              | contract C { transaction f() { x.g[int](2); testing[string, K](); } }
+            """.stripMargin)
+    }
 }

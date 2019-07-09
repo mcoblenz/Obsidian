@@ -166,19 +166,24 @@ case class Dereference(e: Expression, f: String) extends Expression {
         Dereference(e.substitute(genericParams, actualParams), f).setLoc(this)
 }
 
-case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression {
+case class LocalInvocation(name: String, params: Seq[ObsidianType], args: Seq[Expression]) extends Expression {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LocalInvocation =
-        LocalInvocation(name, args.map(_.substitute(genericParams, actualParams)))
+        LocalInvocation(name,
+            params.map(_.substitute(genericParams, actualParams)),
+            args.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
 }
-case class Invocation(recipient: Expression, name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
+case class Invocation(recipient: Expression, params: Seq[ObsidianType],
+                      name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     override def toString: String = {
         val argString = args.mkString(",")
         s"$recipient.$name($argString)"
     }
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Invocation =
-        Invocation(recipient.substitute(genericParams, actualParams), name,
+        Invocation(recipient.substitute(genericParams, actualParams),
+            params.map(_.substitute(genericParams, actualParams)),
+            name,
             args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
             .setLoc(this)
 }
@@ -347,6 +352,7 @@ case class Constructor(name: String,
 
 // TODO GENERICS: Add generic parameters on transactions
 case class Transaction(name: String,
+                       params: Seq[GenericType],
                        args: Seq[VariableDeclWithSpec],
                        retType: Option[ObsidianType],
                        ensures: Seq[Ensures],
@@ -367,6 +373,7 @@ case class Transaction(name: String,
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Transaction =
         Transaction(name,
+            params,
             args.map(_.substitute(genericParams, actualParams)),
             retType.map(_.substitute(genericParams, actualParams)),
             // TODO GENERIC: Seems like this doesn't do anything, but just in case
