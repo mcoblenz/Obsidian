@@ -473,7 +473,7 @@ case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[String
     override def withStates(stateNames: Set[String]): GenericBound = copy(states = stateNames)
 }
 
-case class GenericVar(isAsset: Boolean, varName: String, stringVar: Option[String])
+case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[String])
 
 case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimitiveType {
     // TODO GENERIC: How should these be implemented

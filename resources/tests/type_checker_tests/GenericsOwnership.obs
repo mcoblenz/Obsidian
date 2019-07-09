@@ -1,7 +1,7 @@
 contract A[T] {
     T@Owned x;
 
-    A[T]@Owned(T@Owned >> Unowned x) {
+    A@Owned(T@Owned >> Unowned x) {
         this.x = x;
     }
 

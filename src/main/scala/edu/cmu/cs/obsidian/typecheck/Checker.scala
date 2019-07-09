@@ -318,14 +318,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* true iff [t1 <: t2] */
     private def isSubtype(table: ContractTable, t1: ObsidianType, t2: ObsidianType, isThis: Boolean): Option[Error] = {
         // TODO GENERIC: How to handle implementing this stuff for substituting parameters for generics? Should make it explicit first, then worry about all this
-        (typeBound(table)(t1), typeBound(table)(t2)) match {
-            case (BottomType(), _) => None
-            case (_, BottomType()) => None
-            case (IntType(), IntType()) => None
-            case (BoolType(), BoolType()) => None
-            case (StringType(), StringType()) => None
+        val isSubtypeRes = (typeBound(table)(t1), typeBound(table)(t2)) match {
+            case (BottomType(), _) => true
+            case (_, BottomType()) => true
+            case (IntType(), IntType()) => true
+            case (BoolType(), BoolType()) => true
+            case (StringType(), StringType()) => true
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
-                val mainSubtype: Boolean = (np1, np2) match {
+                (np1, np2) match {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
                         contractIsSubtype(c1.contractName, c2.contractName) && isSubpermission(c1p, c2p)
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
@@ -334,12 +334,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         contractIsSubtype(c.contractName, c2.contractName)
                     case _ => false
                 }
-                if (!mainSubtype) {
-                    Some(SubtypingError(t1, t2, isThis))
-                }
-                // TODO: make sure this is unnecessary: else if (!modifierSubtype) Some(OwnershipSubtypingError(t1, t2))
-                else None
-            case _ => Some(SubtypingError(t1, t2, isThis))
+
+            // TODO GENERIC: Get rid of these special cases for top
+            case (p: PrimitiveType, np: NonPrimitiveType) =>
+                np.contractName == "Top"
+
+            case _ => false
+        }
+
+        if (isSubtypeRes) {
+            None
+        } else {
+            Some(SubtypingError(t1, t2, isThis))
         }
     }
 
@@ -359,10 +365,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     // TODO GENERIC: We also need to handle the bounds here, though the permissions aren't really set up for it,
     //  and so we will need to pass in the context here
     private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
+        // TODO GENERIC: How should we treat inferred here?
         p1 match {
             case Owned() => true
-            case Unowned() => p2 == Unowned()
-            case Shared() => (p2 == Shared()) || (p2 == Unowned())
+            case Unowned() => (p2 == Unowned()) || (p2 == Inferred())
+            case Shared() => (p2 == Shared()) || (p2 == Unowned()) || (p2 == Inferred())
 
             // TODO GENERIC: This used to be false...why?
             case Inferred() => true
@@ -450,7 +457,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         for ((param, actualArg) <- params.zip(typeArgs)) {
-            if (isSubtype(table, actualArg, param, false).isDefined) {
+            if (isSubtype(table, actualArg, param, isThis = false).isDefined) {
                 logError(ast, GenericParameterError(param, actualArg))
             }
         }
@@ -780,8 +787,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  val (exprList, simpleType, contextPrime) = result match {
                      // Even if the args didn't check, we can still output a type
-                     case None => (Nil, ContractReferenceType(ctTableOfConstructed.contractType, Owned(), false), context)
-                     case Some((newExprSequence, cntxt, constr)) => (newExprSequence, constr.asInstanceOf[Constructor].resultType, cntxt)
+                     case None => (Nil, ContractReferenceType(contractType, Owned(), false), context)
+                     case Some((newExprSequence, cntxt, constr)) =>
+                         val outTyp = constr.asInstanceOf[Constructor].resultType match {
+                             case ContractReferenceType(_, permission, isRemote) =>
+                                 ContractReferenceType(contractType, permission, isRemote)
+                             case StateType(_, stateNames, isRemote) =>
+                                 StateType(contractType, stateNames, isRemote)
+                             case t => t
+                         }
+                         (newExprSequence, outTyp, cntxt)
                  }
 
                  // TODO GENERIC: Will want to infer generic type parameters here
@@ -1241,8 +1256,8 @@ private def checkStatement(
                         logError(s, OverwrittenOwnershipError(x))
                     }
 
-                    // TODO GENERIC: Probably shouldn't just swallow this error
-                    if (isSubtype(context.contractTable, exprNPType, variableNPType, isThis = false).isDefined) {
+                    // This should be just on the contract name, since assignment is allowed to change permission
+                    if (exprNPType.contractName != variableNPType.contractName) {
                         logError(s, InconsistentContractTypeError(variableNPType.contractName, exprNPType.contractName))
                         contextWithAssignmentUpdate
                     }

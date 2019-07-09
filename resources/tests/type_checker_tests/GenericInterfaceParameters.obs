@@ -1,0 +1,24 @@
+interface Consumer[X] {
+    transaction consume(X@Owned >> Unowned x);
+}
+
+contract NopConsumer[T] implements Consumer[T] {
+    transaction consume(T@Owned >> Unowned t) {}
+}
+
+contract A {}
+
+main contract C {
+    transaction f() {
+        NopConsumer[int] nopConsumer = new NopConsumer[int]();
+        nopConsumer.consume(2);
+    }
+
+    transaction g() {
+        Consumer[A] consumer = new Consumer[A]();
+        consumer.consume(new A());
+    }
+}
+
+// TODO: Test passing interface as type parameter/with subtyping
+

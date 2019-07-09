@@ -1,7 +1,7 @@
 contract A[T] {
     T@Unowned x;
 
-    A[T]@Owned(T@Unowned x) {
+    A@Owned(T@Unowned x) {
         this.x = x;
     }
 
@@ -14,6 +14,7 @@ main contract C {
     transaction f() returns string {
         A[int] a = new A[int](1);
 
+        // This should be an error, because a.f() : int, not string
         return a.f();
     }
 }

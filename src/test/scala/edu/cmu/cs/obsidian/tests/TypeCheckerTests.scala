@@ -754,14 +754,14 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def genericsMismatchIntString(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsIntStringMismatch.obs",
-            (SubtypingError(IntType(), StringType(), false), 17) :: Nil)
+            (SubtypingError(IntType(), StringType(), isThis = false), 18) :: Nil)
     }
 
     @Test def genericsOwnership(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsOwnership.obs",
             (InvalidInconsistentFieldType("x",
-                GenericType(GenericVar(false,"T",None),GenericBoundPerm("Top",List(),Unowned())),
-                GenericType(GenericVar(false,"T",None),GenericBoundPerm("Top",List(),Owned()))), 12) ::
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm("Top",List(),Unowned())),
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm("Top",List(),Owned()))), 12) ::
             Nil)
     }
 
@@ -788,5 +788,9 @@ class TypeCheckerTests extends JUnitSuite {
                 GenericBoundPerm("Validatable",List(),Unowned())),
                 ContractReferenceType(ContractType("NoImplValidatable", Nil), Inferred(), isRemote = false)), 73) ::
             Nil)
+    }
+
+    @Test def genericsInterfaceWithParameters(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericInterfaceParameters.obs", Nil)
     }
 }
