@@ -394,7 +394,6 @@ case class Constructor(name: String,
     val thisFinalType: ObsidianType = resultType
     val isStatic: Boolean = false
 
-    // TODO GENERIC: Should probably give an error when we need to (e.g., when substitution is not appropriate)
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Constructor = {
         Constructor(name, args.map(_.substitute(genericParams, actualParams)),
             ObsidianType.requireNonPrimitive(resultType.substitute(genericParams, actualParams)),
@@ -403,7 +402,6 @@ case class Constructor(name: String,
     }
 }
 
-// TODO GENERICS: Add generic parameters on transactions
 case class Transaction(name: String,
                        params: Seq[GenericType],
                        args: Seq[VariableDeclWithSpec],
@@ -494,12 +492,11 @@ case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
                     sp: String) extends Contract (name, sp) {
     val tag: DeclarationTag = ContractDeclTag
 
-    // TODO GENERIC: Should we remove the generic parameters, now that we've substituted for them?
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianContractImpl =
         ObsidianContractImpl(modifiers, name, params, implementBound,
             declarations.map(_.substitute(genericParams, actualParams)),
             transitions,
-            isInterface, // TODO GENERIC: Should this ever be called for an interface?
+            isInterface,
             sp).setLoc(this)
 
     override def bound: GenericBound = implementBound

@@ -300,8 +300,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def typeBound(table: ContractTable): ObsidianType => ObsidianType = {
-        case prim: PrimitiveType => prim
-
         // TODO GENERIC: There's some repetition that could be factored out here
         case np: NonPrimitiveType => np match {
             case c: ContractReferenceType =>
@@ -325,7 +323,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
         }
 
-        case BottomType() => BottomType()
+        case t => t
     }
 
     /* true iff [t1 <: t2] */
@@ -375,8 +373,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
 
     // returns true iff [p1 <: p2]
-    // TODO GENERIC: We also need to handle the bounds here, though the permissions aren't really set up for it,
-    //  and so we will need to pass in the context here
     private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
         // TODO GENERIC: How should we treat inferred here?
         p1 match {
@@ -496,6 +492,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val otherParams = params.take(idx) ++ params.drop(idx + 1)
             val otherArgs = typeArgs.take(idx) ++ typeArgs.drop(idx + 1)
             val substitutedParam = param.substitute(otherParams, otherArgs)
+
+            if (actualArg.isAssetReference(table) != No() && substitutedParam.isAssetReference(table) == No()) {
+                logError(ast, GenericParameterAssetError(param.gVar.varName, actualArg.baseTypeName))
+            }
 
             if (isSubtype(table, actualArg, substitutedParam, isThis = false).isDefined) {
                 logError(ast, GenericParameterError(param, actualArg))
@@ -627,7 +627,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val contextAfterPrivateInvocation = updateFieldsForPrivateInvocation(contextPrime, foundTransaction.get)
 
             (resultType, contextAfterPrivateInvocation, isFFIInvocation, receiverPrime, exprSequence)
-
         }
 
          e match {
@@ -1348,7 +1347,6 @@ private def checkStatement(
                             case Some(table) =>
                                 exprType match {
                                     case exprNonPrimitiveType: NonPrimitiveType =>
-                                        // TODO GENERIC: We probably shouldn't swallow this error
                                         if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
                                             // We only want the permission/states from the expr, not the whole thing
                                             val tempTyp = np.withPermission(exprNonPrimitiveType.permission)
@@ -1363,7 +1361,6 @@ private def checkStatement(
                                                 case _ => tempTyp
                                             }
                                         } else {
-                                            // TODO GENERIC: Why is this a separate error type? Shouldn't we just the subtyping error again?
                                             logError(s, InconsistentContractTypeError(declaredContractName, exprNonPrimitiveType.contractName))
                                             np // Just go with the declaration
                                         }

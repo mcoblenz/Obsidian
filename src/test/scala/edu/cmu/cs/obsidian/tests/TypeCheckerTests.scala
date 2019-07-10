@@ -832,4 +832,15 @@ class TypeCheckerTests extends JUnitSuite {
                 StateType(ContractType("A", Nil), "S1", isRemote = false)), 67) ::
                 Nil)
     }
+
+    @Test def genericsAssets(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericsAssets.obs",
+            (UnusedOwnershipError("x"), 35) ::
+            (GenericParameterAssetError("X", "C"), 53) ::
+            (ReceiverTypeIncompatibleError("go",
+                GenericType(GenericVar(isAsset = false, "X", Some("s")),
+                    GenericBoundPerm("Go", List(), Unowned())),
+                ContractReferenceType(ContractType("Go", Nil), Owned(), isRemote = false)), 45) ::
+                Nil)
+    }
 }

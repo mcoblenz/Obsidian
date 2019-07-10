@@ -409,5 +409,9 @@ case class GenericParameterListError(paramsLength: Int, actualLength: Int) exten
 case class GenericParameterError(param: GenericType, actualArg: ObsidianType) extends Error {
     val msg: String =
         s"Argument $actualArg is not compatible with generic parameter $param"
+}
 
+case class GenericParameterAssetError(paramName: String, argTypeName: String) extends Error {
+    val msg: String =
+        s"Argument type $argTypeName is an asset, but the type parameter $paramName is not allowed to be an asset. Add the 'asset' modifier to $paramName to allow the parameter to be an asset."
 }

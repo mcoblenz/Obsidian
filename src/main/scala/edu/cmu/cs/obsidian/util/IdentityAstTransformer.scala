@@ -162,7 +162,6 @@ class IdentityAstTransformer {
             case i: Invocation =>
                 i.copy(recipient = transformExpression(i.recipient), args = i.args.map(eArg => transformExpression(eArg))).setLoc(i)
 
-            // TODO GENERIC: Probably handle type params here?
             case c: Construction =>
                 c.copy(args = c.args.map(eArg => transformExpression(eArg))).setLoc(c)
             case d@Disown(e) =>

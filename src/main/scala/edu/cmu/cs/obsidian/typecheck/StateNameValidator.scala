@@ -45,22 +45,20 @@ object StateNameValidator extends IdentityAstTransformer {
                         case impl: ObsidianContractImpl =>
                             impl.params.find(p => p.gVar.varName == np.contractName) match {
                                 case Some(genericType) =>
-                                    val stateNames = np match {
-                                        case StateType(contractType, states, isRemote) => Some(states)
-                                        case GenericType(gVar, bound) => bound match {
-                                            case GenericBoundStates(_, _, states) => Some(states)
-                                            case _: GenericBoundPerm => None
-                                        }
-                                        case _ => None
+                                    val newGenericType = np match {
+                                        case StateType(contractType, states, isRemote) =>
+                                            // If any of these states is the variable, then the actual bound should be the bound on the generic variable
+                                            if (states.exists(genericType.gVar.permissionVar.contains(_))) {
+                                                genericType
+                                            } else {
+                                                genericType.withStates(states)
+                                            }
+                                        case GenericType(gVar, bound) => genericType
+                                        case _ => genericType.withPermission(np.permission)
                                     }
 
                                     // TODO GENERIC: Factor out this sort of thing to like a copy permission/state thing
-                                    stateNames match {
-                                        case Some(states) =>
-                                            (genericType.withStates(states), List())
-                                        case None =>
-                                            (genericType.withPermission(np.permission), List())
-                                    }
+                                    (newGenericType, List())
                                 case None =>
                                     (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                             }
