@@ -19,7 +19,7 @@ main contract C {
         return new A[int](1).f();
     }
 
-    transaction h() returns A[A[int]]@Unowned {
+    transaction h() returns A[int]@Unowned {
         return new A[A[int]](new A[int](1)).f();
     }
 }

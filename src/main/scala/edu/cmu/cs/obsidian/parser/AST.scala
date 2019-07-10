@@ -474,6 +474,8 @@ case class Import(name: String) extends AST
 
 /* Layer */
 sealed abstract class Contract(name: String, val sourcePath: String) extends Declaration {
+    def params: Seq[GenericType]
+
     def declarations: Seq[Declaration]
     def modifiers: Set[ContractModifier] = Set.empty
     val isAsset = modifiers.contains(IsAsset())
@@ -515,6 +517,9 @@ case class JavaFFIContractImpl(name: String,
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): JavaFFIContractImpl = this
     override def bound: GenericBound = GenericBoundPerm("Top", Nil, Unowned())
     override def isInterface: Boolean = false
+
+    // TODO GENERIC: Maybe do something here
+    override def params: Seq[GenericType] = Nil
 }
 
 

@@ -33,7 +33,7 @@ import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
 
-public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
+public abstract class HyperledgerChaincodeBase<T> extends ChaincodeBase implements ObsidianSerialized<T> {
     SerializationState serializationState;
 
     public HyperledgerChaincodeBase() {
@@ -298,7 +298,6 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     }
 
     // Must be overridden in generated class.
-    public abstract Set<ObsidianSerialized> __resetModified(Set<ObsidianSerialized> checked) throws InvalidProtocolBufferException;
     public abstract String __getGUID();
     public abstract byte[] run(SerializationState st, String transactionName, byte[][] args)
             throws InvalidProtocolBufferException, ReentrancyException,

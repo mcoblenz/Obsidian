@@ -348,6 +348,8 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     val contractName: String
 
+    def codeGenName: String = contractName
+
     def withParams(contractParams: List[GenericType]): NonPrimitiveType
 
     override def isOwned: Boolean = permission == Owned()
@@ -480,7 +482,7 @@ sealed trait GenericBound {
     def contractType: ContractType = ContractType(interfaceName, interfaceParams)
 
     // TODO GENERIC: Should isRemote be false or should it be part of the bound?
-    def referenceType: ObsidianType = ContractReferenceType(contractType, permission, isRemote = false)
+    def referenceType: ObsidianType// = ContractReferenceType(contractType, permission, isRemote = false)
 }
 
 case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[ObsidianType], permission: Permission) extends GenericBound {
@@ -509,6 +511,8 @@ case class GenericBoundPerm(interfaceName: String, interfaceParams: Seq[Obsidian
         this.copy(interfaceParams = interfaceParams.map(_.substitute(genericParams, actualParams)))
 
     override def permissionOrState: Either[Permission, Set[String]] = Left(permission)
+
+    override def referenceType: ObsidianType = ContractReferenceType(contractType, permission, isRemote = false)
 }
 
 case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[ObsidianType], states: Set[String]) extends GenericBound {
@@ -539,6 +543,8 @@ case class GenericBoundStates(interfaceName: String, interfaceParams: Seq[Obsidi
         this.copy(interfaceParams = interfaceParams.map(_.substitute(genericParams, actualParams)))
 
     override def permissionOrState: Either[Permission, Set[String]] = Right(states)
+
+    override def referenceType: ObsidianType = StateType(contractType, states, isRemote = false)
 }
 
 case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[String]) {
@@ -604,4 +610,6 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
 
     // TODO GENERIC: Is there something more that should happen here?
     override def withParams(contractParams: List[GenericType]): NonPrimitiveType = this
+
+    override def codeGenName: String = gVar.varName
 }

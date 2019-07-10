@@ -1,0 +1,28 @@
+contract A[T] {
+    T@Unowned x;
+
+    A@Owned(T@Unowned x) {
+        this.x = x;
+    }
+
+    transaction f() returns T@Unowned {
+        return x;
+    }
+}
+
+contract C {}
+
+main contract BasicGenerics {
+    transaction f() returns A[C]@Owned {
+        return new A[C](new C());
+    }
+
+    transaction g() returns C@Unowned {
+        return new A[C](new C()).f();
+    }
+
+    transaction h() returns A[C]@Unowned {
+        return new A[A[C]](new A[C](new C())).f();
+    }
+}
+
