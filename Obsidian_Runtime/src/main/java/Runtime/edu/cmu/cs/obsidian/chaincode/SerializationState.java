@@ -17,8 +17,6 @@ import java.util.HashSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-
-
 public class SerializationState {
     private Map<String, ObsidianSerialized> guidMap;
 

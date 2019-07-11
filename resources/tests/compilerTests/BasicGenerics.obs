@@ -10,19 +10,29 @@ contract A[T] {
     }
 }
 
-contract C {}
+contract C {
+    int val;
+
+    C@Owned(int val) {
+        this.val = val;
+    }
+
+    transaction getVal(C@Unowned this) returns int {
+        return val;
+    }
+}
 
 main contract BasicGenerics {
     transaction f() returns A[C]@Owned {
-        return new A[C](new C());
+        return new A[C](new C(1));
     }
 
     transaction g() returns C@Unowned {
-        return new A[C](new C()).f();
+        return new A[C](new C(2)).f();
     }
 
     transaction h() returns A[C]@Unowned {
-        return new A[A[C]](new A[C](new C())).f();
+        return new A[A[C]](new A[C](new C(3))).f();
     }
 }
 

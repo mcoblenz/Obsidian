@@ -26,6 +26,10 @@ object ProtobufGen {
     }
 
 
+    def genericParams(aContract: Contract): List[ProtobufDeclaration] =
+        // TODO GENERIC: factor out this string constant
+        aContract.params.map(p => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__generic" + p.gVar.varName)).toList
+
     // Contracts translate to messages.
     private def translateContract(aContract: Contract): ProtobufDeclaration = {
         // We only care about the fields. The actual code is irrelevant.
@@ -45,17 +49,18 @@ object ProtobufGen {
             }
         )
 
-        val declsWithGUID = ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") :: decls
+        val declsWithGUID =
+            ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") :: genericParams(aContract) ++ decls
 
-        val contractMessage = if (stateNames.length > 0) {
+        val contractMessage = if (stateNames.nonEmpty) {
             val oneOfOptions = stateNames.map((stateName: String) =>
                 (ObjectType(stateName), "state" + stateName))
             val stateDecl = ProtobufOneOf("state", oneOfOptions)
 
-            new ProtobufMessage(stateDecl::declsWithGUID, aContract.name)
+            ProtobufMessage(stateDecl :: declsWithGUID, aContract.name)
         }
         else {
-            new ProtobufMessage(declsWithGUID, aContract.name)
+            ProtobufMessage(declsWithGUID, aContract.name)
         }
 
         val contractOrGUIDFields : List[(FieldType, String)] = List[(FieldType, String)]((ObjectType(aContract.name), "obj"),
