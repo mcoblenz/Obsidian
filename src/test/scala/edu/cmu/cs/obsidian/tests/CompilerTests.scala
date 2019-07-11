@@ -87,4 +87,8 @@ class CompilerTests extends JUnitSuite {
     @Test def basicGenerics(): Unit = {
         testContract("BasicGenerics")
     }
+
+    @Test def interfaces(): Unit = {
+        testContract("InterfaceTest")
+    }
 }

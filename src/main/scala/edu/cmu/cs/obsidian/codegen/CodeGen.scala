@@ -619,28 +619,30 @@ class CodeGen (val target: Target, table: SymbolTable) {
                                           protobufOuterClassNames: Map[String, String],
                                           generateStub: Boolean
                                       ): TranslationContext = {
+        var stateLookup = new immutable.TreeMap[String, StateContext]()
 
         val (stateDeclarations, stateEnumOption, stateEnumField) = generateStateEnumAndFields(aContract, newClass, false)
 
-        /* setup state lookup table */
-        var stateLookup = new immutable.TreeMap[String, StateContext]()
-        for (s <- stateDeclarations) {
+        if (!aContract.isInterface) {
+            /* setup state lookup table */
+            for (s <- stateDeclarations) {
 
-            /* declare the inner class */
-            val innerClass = newClass._class(innerClassName(s.name))
+                /* declare the inner class */
+                val innerClass = newClass._class(innerClassName(s.name))
 
-            /* declare the inner class field */
-            val innerClassField = newClass.field(JMod.PRIVATE, innerClass, innerClassFieldName(s.name))
+                /* declare the inner class field */
+                val innerClassField = newClass.field(JMod.PRIVATE, innerClass, innerClassFieldName(s.name))
 
-            val context =
-                StateContext(
-                    astState = s,
-                    enumVal = stateEnumOption.get.enumConstant(s.name),
-                    innerClass = innerClass,
-                    innerClassField = innerClassField
-                )
+                val context =
+                    StateContext(
+                        astState = s,
+                        enumVal = stateEnumOption.get.enumConstant(s.name),
+                        innerClass = innerClass,
+                        innerClassField = innerClassField
+                    )
 
-            stateLookup = stateLookup.insert(s.name, context)
+                stateLookup = stateLookup.insert(s.name, context)
+            }
         }
 
         /* setup tx/fun/field lookup tables */
@@ -662,8 +664,9 @@ class CodeGen (val target: Target, table: SymbolTable) {
         )
 
         /* i.e. if this contract defines any type states */
-        if (translationContext.stateEnumClass.isDefined)
+        if (translationContext.stateEnumClass.isDefined && !aContract.isInterface) {
             generateStateHelpers(newClass, translationContext)
+        }
 
         translationContext
     }
@@ -692,53 +695,55 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 stateEnum.enumConstant(name)
             }
 
-            /* setup the state field and the [getState] method */
-            stateEnumField = Some(newClass.field(JMod.PRIVATE, stateEnum, stateField))
+            if (!aContract.isInterface) {
+                /* setup the state field and the [getState] method */
+                stateEnumField = Some(newClass.field(JMod.PRIVATE, stateEnum, stateField))
 
-            val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
-            stateMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
-            stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
+                val stateMeth = newClass.method(JMod.PUBLIC, stateEnum, getStateMeth)
+                stateMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+                stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
 
-            stateMeth.body()
-                ._if(JExpr.ref(serializationParamName).neNull())
-                ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
+                stateMeth.body()
+                    ._if(JExpr.ref(serializationParamName).neNull())
+                    ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
 
-            if (!isStub) {
-                stateMeth.body()._return(JExpr.ref(stateField))
-            } else {
-                stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
-                val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("String"))
-                val newArrayExpr = JExpr._new(objectArrayType)
-                val argArray = stateMeth.body().decl(objectArrayType, "argArray", newArrayExpr)
+                if (!isStub) {
+                    stateMeth.body()._return(JExpr.ref(stateField))
+                } else {
+                    stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
+                    val objectArrayType = newClass.owner().ref("java.util.ArrayList").narrow(newClass.owner().ref("String"))
+                    val newArrayExpr = JExpr._new(objectArrayType)
+                    val argArray = stateMeth.body().decl(objectArrayType, "argArray", newArrayExpr)
 
-                //connectionManager.doTransaction(transaction.name, args)
-                val tryBlock = stateMeth.body()._try()
+                    //connectionManager.doTransaction(transaction.name, args)
+                    val tryBlock = stateMeth.body()._try()
 
-                val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
-                doTransactionInvocation.arg(getStateMeth)
-                doTransactionInvocation.arg(argArray)
-                doTransactionInvocation.arg(JExpr.invoke("__getGUID"))
-                doTransactionInvocation.arg(true)
+                    val doTransactionInvocation = JExpr.invoke(JExpr.ref("connectionManager"), "doTransaction")
+                    doTransactionInvocation.arg(getStateMeth)
+                    doTransactionInvocation.arg(argArray)
+                    doTransactionInvocation.arg(JExpr.invoke("__getGUID"))
+                    doTransactionInvocation.arg(true)
 
-                // return result
-                val marshalledResultDecl = tryBlock.body().decl(newClass.owner().ref("byte[]"), "marshalledResult", doTransactionInvocation)
+                    // return result
+                    val marshalledResultDecl = tryBlock.body().decl(newClass.owner().ref("byte[]"), "marshalledResult", doTransactionInvocation)
 
-                val stringClass = model.ref("java.lang.String")
-                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                val enumString = tryBlock.body().decl(stringClass, "enumString", JExpr._new(stringClass).arg(marshalledResultDecl).arg(charset)).invoke("trim")
+                    val stringClass = model.ref("java.lang.String")
+                    val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+                    val enumString = tryBlock.body().decl(stringClass, "enumString", JExpr._new(stringClass).arg(marshalledResultDecl).arg(charset)).invoke("trim")
 
-                val errorBlock = new JBlock()
+                    val errorBlock = new JBlock()
 
-                tryBlock.body()._return(stateEnum.staticInvoke("valueOf").arg(enumString))
+                    tryBlock.body()._return(stateEnum.staticInvoke("valueOf").arg(enumString))
 
-                val ioExceptionCatchBlock = tryBlock._catch(model.directClass("java.io.IOException"))
-                ioExceptionCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+                    val ioExceptionCatchBlock = tryBlock._catch(model.directClass("java.io.IOException"))
+                    ioExceptionCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
 
-                val failedCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException"))
-                failedCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+                    val failedCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException"))
+                    failedCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
 
-                val bugCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionBugException"))
-                bugCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+                    val bugCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionBugException"))
+                    bugCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+                }
             }
         }
 
@@ -2279,7 +2284,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     mainTransactions.add(t)
                 }
             case s: State => aContract match {
-              case obsContract: ObsidianContractImpl => translateStateDecl(s, obsContract, newClass, translationContext)
+              case obsContract: ObsidianContractImpl =>
+                  if (!newClass.isInterface) {
+                      translateStateDecl(s, obsContract, newClass, translationContext)
+                  }
               case javaContract: JavaFFIContractImpl => ()
             }
 
