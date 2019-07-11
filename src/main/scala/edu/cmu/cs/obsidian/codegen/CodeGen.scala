@@ -1868,6 +1868,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             protobufClassName + ".newBuilder();")
         val builderVariable = JExpr.ref("builder")
 
+
         val declarations = state.fields
 
         for (f <- declarations if f.isInstanceOf[Field]) {
@@ -1903,6 +1904,12 @@ class CodeGen (val target: Target, table: SymbolTable) {
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
         archiveBody.invoke(builderVariable, "setGuid").arg(inClass.fields().get("__guid"))
+
+        // Archive the type variables
+        for (param <- contract.params) {
+            archiveBody.invoke(builderVariable, "setGeneric" + param.gVar.varName)
+                .arg(JExpr.ref("__generic" + param.gVar.varName))
+        }
 
         val declarations = contract.declarations
 
