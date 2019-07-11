@@ -27,8 +27,8 @@ main contract BasicGenerics {
         return new A[C](new C(1));
     }
 
-    transaction g() returns C@Unowned {
-        return new A[C](new C(2)).f();
+    transaction g() returns int {
+        return new A[C](new C(2)).f().getVal();
     }
 
     transaction h() returns A[C]@Unowned {
