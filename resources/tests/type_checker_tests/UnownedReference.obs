@@ -28,17 +28,17 @@ contract UsesC {
     }
 
     transaction t2() {
-        C cOwned = new C();
-        needsShared(cOwned);
-        [cOwned @ Shared];
-        needsUnowned(cOwned);
-        [cOwned @ Shared];
+        C c = new C();
+        needsShared(c);
+        [c @ Shared];
+        needsUnowned(c);
+        [c @ Unowned];
 
         CWithState cS1 = new CWithState();
         needsSharedWithState(cS1);
         [cS1 @ Shared];
         needsUnownedWithState(cS1);
-        [cS1 @ Shared];
+        [cS1 @ Unowned];
     }
 
     transaction needsUnowned(C@Unowned cUnowned) {

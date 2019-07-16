@@ -142,7 +142,7 @@ object Parser extends Parsers {
             }
             def isDefinedAt(x: (ObsidianType, ObsidianType) ~ Identifier): Boolean = {
                 x match {
-                    case ((typIn, typOut) ~ name) =>
+                    case ((typIn, typOut) ~ name) => true
                         if (name._1 == "this") {
                             typIn match {
                                 case n: NonPrimitiveType => n.contractName == contractName

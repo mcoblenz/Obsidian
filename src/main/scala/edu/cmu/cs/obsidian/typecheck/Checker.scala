@@ -515,7 +515,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
-                        updateReceiverTypeInContext(receiver, receiverType, t, contextAfterArgs)
+                        updateArgTypeInContext(receiver, receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
                     case _ => contextAfterArgs
                 }
 
@@ -684,11 +684,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case LocalInvocation(name, args: Seq[Expression]) =>
                  val (typ, con, _, _, newArgs) = handleInvocation(context, name, This(), args)
                  //This may need correction.
-                 (typ, con, LocalInvocation(name, newArgs))
+                 (typ, con, LocalInvocation(name, newArgs).setLoc(e))
 
              case Invocation(receiver: Expression, name, args: Seq[Expression], isFFIInvocation) =>
                  val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, args)
-                 (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv))
+                 (typ, con, Invocation(newReceiver, name, newArgs, isFFIInv).setLoc(e))
 
              case Construction(name, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(name)
@@ -1013,6 +1013,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val specInputType = spec(i).typIn
                 val specOutputType = spec(i).typOut
 
+                val nameToUpdate = arg match {
+                    case ReferenceIdentifier(x) => Some(x)
+                    case This() => Some("this")
+                    case _ => None
+                }
+
                 val transferOwnership: Boolean =
                     specInputType match {
                         case np: NonPrimitiveType =>
@@ -1028,14 +1034,24 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         consumptionModeForType(specInputType)
                     }
 
-                val (argType, contextAfterArg, e) = inferAndCheckExpr(decl, contextAfterArgs, arg, ownershipConsumptionMode)
+                val (argType, contextAfterArg, e) = inferAndCheckExpr(decl, contextAfterArgs, arg, NoOwnershipConsumption())
 
+                val contextAfterOwnershipTransfer = specInputType match {
+                    case npSpecInputType: NonPrimitiveType =>
+                        specOutputType match {
+                            case npSpecOutputType: NonPrimitiveType => updateArgTypeInContext(e, argType, npSpecInputType, npSpecOutputType, contextAfterArg)
+                            case _ => // There should have been a prior error about a bogus type declaration.
+                                contextAfterArg
+                        }
+
+                    case _ => contextAfterArg
+                }
                 if (isSubtype(argType, specInputType, false).isDefined) {
                     val err = ArgumentSubtypingError(decl.name, spec(i).varName, argType, specInputType)
                     errList = (ast, err)::errList
                 }
 
-                contextAfterArgs = contextAfterArg
+                contextAfterArgs = contextAfterOwnershipTransfer
                 expressionList = (expressionList :+ e)
             }
 
@@ -1073,52 +1089,64 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         finalContext
     }
 
-    // updates the type of an identifier in the context based on the transaction invoked on it
-    private def updateReceiverTypeInContext(receiver: Expression,
-                                            receiverType: ObsidianType,
-                                            invokable: Transaction,
-                                            context: Context): Context = {
+    private def updateArgumentTypeInInvocation(
+                                               passedType: NonPrimitiveType,
+                                               initialType: NonPrimitiveType,
+                                               finalType: NonPrimitiveType,
+                                               referenceIdentifier: String,
+                                               context: Context): Context = {
+        if (passedType.permission == Owned() && initialType.permission == Unowned()) {
+            context
+        }
+        else {
+            if (context.get(referenceIdentifier).isDefined) {
+                // This was a local variable.
+                context.updated(referenceIdentifier, finalType)
+            }
+            else {
+                // This was a field or a static invocation. If it was a field, update the field's type.
+                val currentFieldType = context.lookupCurrentFieldTypeInThis(referenceIdentifier)
 
-        val nameToUpdate = receiver match {
+                if (currentFieldType.isDefined && currentFieldType.get != finalType) {
+                    context.updatedThisFieldType(referenceIdentifier, finalType)
+                }
+                else {
+                    // No need to update anything for static invocations.
+                    context
+                }
+            }
+        }
+
+    }
+
+    // updates the type of an identifier in the context based on the transaction invoked on it
+    private def updateArgTypeInContext(arg: Expression,
+                                       argType: ObsidianType,
+                                       declaredInitialType: NonPrimitiveType,
+                                       declaredFinalType: NonPrimitiveType,
+                                       context: Context): Context = {
+        val nameToUpdate = arg match {
             case ReferenceIdentifier(x) => Some(x)
             case This() => Some("this")
-            case _ => None
+            case _ =>
+                // If the argument isn't bound to a variable but owns an asset, and this call is not going to consume ownership, then error.
+                if (argType.isOwned && argType.isAssetReference(context.contractTable) != No() &&
+                    (declaredFinalType.isOwned || !declaredInitialType.isOwned))
+                {
+                    logError(arg, UnusedExpressionArgumentOwnershipError(arg))
+                }
+                None
         }
 
-        val contextPrime = nameToUpdate match {
-            case None => context
-            case Some(x) =>
-                receiverType match {
-                    case typ: NonPrimitiveType => {
-                        val newType = invokable.thisFinalType
-                        if (newType.permission == Unowned()) {
-                            // The transaction promised not to change the state of the receiver.
-                            context
-                        }
-                        else {
-                            if (context.get(x).isDefined) {
-                                // This was a local variable.
-                                context.updated(x, newType)
-                            }
-                            else {
-                                // This was a field or a static invocation. If it was a field, update the field's type.
-                                val currentFieldType = context.lookupCurrentFieldTypeInThis(x)
-
-                                if (currentFieldType.isDefined && currentFieldType.get != newType) {
-                                    context.updatedThisFieldType(x, newType)
-                                }
-                                else {
-                                    // No need to update anything for static invocations.
-                                    context
-                                }
-                            }
-                        }
-                    }
+        nameToUpdate match {
+            case Some(name) =>
+                argType match {
+                    case npArgType: NonPrimitiveType => updateArgumentTypeInInvocation(npArgType, declaredInitialType, declaredFinalType, name, context)
                     case _ => context
                 }
+            case None => context
         }
-    contextPrime
-}
+    }
 
 private def checkStatement(
                                   decl: InvokableDeclaration,
