@@ -1,16 +1,17 @@
 <!DOCTYPE HTML>
 <html lang="en">
 <head>
-    <title>Part 2: States</title>
+    <title>Part 4: States</title>
     <meta charset="utf-8"  />
     <link rel="stylesheet" href="../stylesheet.css"/>
     <link href="../prism.css" rel="stylesheet" />
 </head>
 <body class="language-obsidian">
 <script src="../prism.js"></script>
-<h2>Part 4: States</h2>
+<h1>Part 4: States</h1>
 
-<p>In our new programming language, contracts can define <em>states</em>. For example, a <code>LightSwitch</code> is always either <code>Off</code> or <code>On</code> (never both):</p>
+<p>In our new programming language, contracts can define <em>states</em>. For example, a <code>LightSwitch</code> is always 
+  either <code>Off</code> or <code>On</code> (never both):</p>
 
 <pre>
 <code>
@@ -29,11 +30,34 @@ contract LightSwitch {
       int brightness;
     }
     state Off;
+
+    int switchLocation available in On, Off;
 }
 </code>
 </pre>
-<p>In the example above, <code>brightness</code> can only be accessed and used when a <code>LightSwitch</code> is in the <code>On</code> state.</p>
+<p>In the example above, <code>brightness</code> can only be accessed and used when a <code>LightSwitch</code> is in the <code>On</code> state.
+    On the other hand, <code>switchLocation</code> can be accessed and used in both <code>On</code> and <code>Off</code>, but couldn't be 
+    accessed in any other states if they existed.</p>
 
+<br/>
+<br/>
+<h2>States and Assets</h2>
+<p> States can also be declared as <code>asset</code>s, which means the contract is an asset (see Part 3) only when in that state.
+    For example, see an alternate definition of <code>LightSwitch</code> below, in which a <code>LightSwitch</code> is an  <code>asset</code> only
+    when it is turned <code>On</code>. </p>
+
+    <pre>
+    <code>
+    contract LightSwitch {
+      asset state On;
+      state Off;
+    }
+    </code>
+    </pre>
+        
+<br/>
+<br/>
+<h2> The <code>-></code> Operator</h2>
 <p>Methods, including constructors, can change the state of <code>this</code> with the <code>-></code> operator:</p>
 
 <pre>
@@ -64,7 +88,28 @@ contract LightSwitch {
 </code>
 </pre>
 
-<p>Each object can have one reference that statically specifies what state the object is in. For example, <code>LightSwitch@On</code> is the type of a variable that refers to a switch that is in <code>On</code> state.</p> Note that this is an extension of <em>ownership</em>: like ownership, one reference is special. The compiler keeps track of the possible states an object can be in and makes sure that the specifications are observed. For example:
+If a state has fields (like the <code>On</code> state in the definition of a <code>LightSwitch</code> with <code>brightness</code>), then we can
+transition to that state as follows:
+
+<pre>
+<code>
+
+  transaction turnOn(LightSwitch@Off >> On this, int b) // turnOn() can only be called on objects that are in Off state.
+  {
+    ->On (brightness = b);
+  }
+
+</code>
+</pre>
+
+<br/>
+<br/>
+<h2>States and Ownership</h2>
+<p>Each object can have one reference that statically specifies what state the object is in. For example, 
+  <code>LightSwitch@On</code> is the type of a variable that refers to a switch that is in <code>On</code> state.
+</p> 
+  Note that this is an extension of <em>ownership</em>: like ownership, one reference is special. The compiler keeps track 
+  of the possible states an object can be in and makes sure that the specifications are observed. For example:
 
 <pre>
 <code>
@@ -86,11 +131,18 @@ transaction foo() {
 </code>
 </pre>
 
+<strong> Note that there is never a need to specify both <em>ownership</em> and <em>state</em> at the same time; 
+      if a field is in any state, it must be Owned, and if Unowned, the field cannot have a state. </strong>
 
-<h3>Optional compiler checks</h3>
+<br/>
+<br/>
+<br/>
+<h2>Optional compiler checks</h2>
 <p>As before, the programmer can use <code>[]</code> statements to check state information at compile time. For example, <code>[s@Off];</code> will cause a compiler error if <code>s</code> does not refer to an object in <code>Off</code> state.</p>
 
-<h3>Unowned references</h3>
+<br/>
+<br/>
+<h2>Unowned references</h2>
 When there may be an owner of an object, other references cannot be used to modify the state.  These other references are annotated <code>Unowned</code>. For example:
 
 <pre>
@@ -101,7 +153,9 @@ transaction foo(LightSwitch@Unowned s) {
 </code>
 </pre>
 
-<h3>Shared references</h3>
+<br/>
+<br/>
+<h2>Shared references</h2>
 If there is no owner of an object, then all references to the object are annotated <code>Shared</code>. These references can be used to change the state of the referenced object, but invoking transactions that can only be called in some states requires a runtime check. For example:
 
 <pre>
@@ -114,7 +168,10 @@ transaction test1(LightSwitch@Shared s) {
 
 In the above situation, the programmer might need to check the state dynamically with <code>if...in</code>.
 
-<h3>Testing states with <code>in</code></h3>
+<br/>
+<br/>
+<br/>
+<h2>Testing states with <code>in</code></h2>
 <pre>
 <code>
 transaction test2(LightSwitch@Shared s) {
@@ -128,7 +185,8 @@ transaction test2(LightSwitch@Shared s) {
 
 <p>Within the scope of the <code>if...in</code> block, the compiler requires that if there <string>is</strong> an owner of the object referenced by <code>s</code>, then the owner's state specification is never violated. If it is, then the program is terminated; it is up to the programmer to make sure the body of the <code>if in</code> block does not change the state inappropriately.</p>
 
-<h3>Implicit casts</h3>
+<br/>
+<h2>Implicit casts</h2>
 <p>When a <code>Shared</code> reference is needed, an <code>Owned</code> suffices as long as the reference is NOT to an asset. For example, an <code>Owned</code> reference can be passed as an argument to a transaction that expects a <code>Shared</code> reference to a non-resource object. However, the caller is left with a <code>Shared</code> reference.</p>
 
 <p>When an <code>Unowned</code> reference is needed, any reference suffices, and the caller is left with their original kind of reference.</p>

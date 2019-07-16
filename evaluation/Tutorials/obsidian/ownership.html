@@ -1,20 +1,21 @@
 <!DOCTYPE HTML>
 <html lang="en">
 <head>
-    <title>Ownership: Part 1</title>
+    <title>Part 1: Ownership</title>
     <meta charset="utf-8"  />
     <link rel="stylesheet" href="../stylesheet.css"/>
     <link href="../prism.css" rel="stylesheet" />
 </head>
 <body class="language-obsidian">
 <script src="../prism.js"></script>
-<h2><strong>Part 1: Ownership</strong></h2>
+<h1><strong>Part 1: Ownership</strong></h1>
  <!-- local variables never include annotatations. Params and fields always do. -->
 <p>Our new programming language is object-oriented. It includes <em>contracts</em>, which are like classes, which can have <em>fields</em> 
     and <em>transactions</em>, which are analogous to functions. 
     In addition, of the many <strong>variables</strong> or <strong>fields</strong> that reference objects, exactly <strong>one</strong> of them 
     can own the object, as seen in diagram <strong>(a)</strong> below. An object can have any number of Unowned references, and, if the object is not Owned, 
-    it can have any number of Shared references (shown in <strong>(b)</strong> below).
+    it can have any number of Shared references (shown in <strong>(b)</strong> below). An object with Shared references can also have Unowned references,
+    but not Owned ones.
 </p>
 
 <img src="ownership-diagram.png" alt="Ownership" style="width:1000px;height:400px;"> </img>
