@@ -164,14 +164,11 @@ case class Context(table: DeclarationTable,
     }
 
     def lookupCurrentFieldTypeInThis(fieldName: String): Option[ObsidianType] = {
-        lookupCurrentFieldTypeInType(thisType)(fieldName)
-    }
-
-    def lookupCurrentFieldTypeInType(typ: ObsidianType)(fieldName: String): Option[ObsidianType] = {
+        // Always check the overrides to see if a recent assignment has occurred before looking at the declared types.
         thisFieldTypes.get(fieldName) match {
-            case Some(typ) => Some(typ)
+            case Some(typInThis) => Some(typInThis)
             case None =>
-                doLookup((declTable: DeclarationTable) => declTable.lookupField(fieldName), typ) match {
+                doLookup((declTable: DeclarationTable) => declTable.lookupField(fieldName), thisType) match {
                 case None => None
                 case Some(field) => Some(field.typ)
             }
@@ -488,12 +485,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 logError(e, ReceiverTypeIncompatibleError(name, receiverType, invokable.thisType))
             }
 
-            // Check field types for private invocations
+            // Check field type preconditions for overrides in private invocations
             for ((fieldName, requiredInitialFieldType) <- foundTransaction.get.initialFieldTypes) {
                 val currentFieldType = context.lookupCurrentFieldTypeInThis(fieldName)
                 currentFieldType match {
                    case None => ()
-                   case Some(cft) => if(isSubtype(cft, requiredInitialFieldType, receiver.isInstanceOf[This]).isDefined) {
+                   case Some(cft) => if(isSubtype(cft, requiredInitialFieldType, receiver.isInstanceOf[This]).isDefined ||
+                                        (cft.isOwned != requiredInitialFieldType.isOwned && !cft.isBottom)) {
                        logError(e, FieldSubtypingError(fieldName, cft, requiredInitialFieldType))
                    }
                 }
@@ -848,7 +846,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def checkFieldTypeConsistency(context: Context, tx: Transaction): Unit = {
+
+    private def checkFieldTypeConsistencyAfterTransaction(context: Context, tx: Transaction): Unit = {
         // First check fields that may be of inconsistent type with their declarations to make sure they match
         // either the declarations or the specified final types.
         for ((field, typ) <- context.thisFieldTypes) {
@@ -871,7 +870,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case None =>
                     assert(false, "Bug: invalid field in field type context")
                 case Some(declaredFieldType) =>
-                    if (isSubtype(typ, declaredFieldType, false).isDefined) {
+                    if (isSubtype(typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
                         logError(tx, InvalidInconsistentFieldType(field, typ, declaredFieldType))
                     }
             }
@@ -1880,7 +1879,7 @@ private def checkStatement(
         }
 
         // Check to make sure all the field types are consistent with their declarations.
-        checkFieldTypeConsistency(outputContext, tx)
+        checkFieldTypeConsistencyAfterTransaction(outputContext, tx)
 
         // todo: check that every declared variable is initialized before use
         tx.copy(body = newStatements)
