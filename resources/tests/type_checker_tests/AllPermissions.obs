@@ -1,0 +1,72 @@
+main asset contract AllPermissions {
+    AllPermissions @ Owned () {
+    }
+
+    transaction t1(AllPermissions @ Owned this) {}
+
+    transaction t2(AllPermissions @ Shared this) {}
+
+    transaction t3(AllPermissions @ Unowned this) {}
+
+    transaction t4(AllPermissions @ Owned >> Shared this) {}
+
+    transaction t5(AllPermissions @ Owned >> Unowned this) {}
+
+    transaction t6(AllPermissions @ Shared >> Owned this) {
+        // Error; no way to make this typecheck.
+    }
+
+    transaction t7(AllPermissions @ Shared >> Unowned this) {}
+
+    transaction t8(AllPermissions @ Unowned >> Owned this) {
+        // Error; no way to make this typecheck.
+    }
+    
+    transaction t9(AllPermissions @ Unowned >> Shared this) {
+        // Error; no way to make this typecheck.
+    }
+
+    transaction passOwned() {
+        AllPermissions x1 = new AllPermissions();
+        [x1 @ Owned];
+        x1.t1();
+        [x1 @ Owned];
+        disown x1;
+
+        AllPermissions x2 = new AllPermissions();
+        x2.t2(); // Error: losing ownership of an asset!
+        [x2 @ Shared];
+
+        AllPermissions x3 = new AllPermissions();
+        x3.t3();
+        [x3 @ Owned]; // Special exception!
+        disown x3;
+
+        AllPermissions x4 = new AllPermissions();
+        x4.t4();
+        [x4 @ Shared];
+
+        AllPermissions x5 = new AllPermissions();
+        x5.t5();
+        [x5 @ Unowned];
+
+        AllPermissions x6 = new AllPermissions();
+        x6.t6();
+        [x6 @ Owned];
+        disown x6;
+
+        AllPermissions x7 = new AllPermissions();
+        x7.t7(); // Error: losing ownership of an asset!
+        [x7 @ Unowned];
+
+        AllPermissions x8 = new AllPermissions();
+        x8.t8();
+        [x8 @ Owned];
+        disown x8;
+
+        AllPermissions x9 = new AllPermissions();
+        x9.t9();
+        [x9 @ Owned]; // Special exception!
+        disown x9;
+    }
+}

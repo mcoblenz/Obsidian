@@ -765,4 +765,17 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil)), 65) ::
                 Nil))
     }
+
+    @Test def allPermissions(): Unit = {
+        runTest("resources/tests/type_checker_tests/AllPermissions.obs",
+            ((SubtypingError(ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                ContractReferenceType(ContractType("AllPermissions"), Owned(), false), false), 15) ::
+                (SubtypingError(ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false), false), 21) ::
+                (SubtypingError(ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false), false), 25) ::
+                (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x2")), 37) ::
+                (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x7")), 59) ::
+                Nil))
+    }
 }
