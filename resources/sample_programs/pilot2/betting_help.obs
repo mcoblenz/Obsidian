@@ -1,0 +1,41 @@
+import "resources/sample_programs/pilot2/betting_utils.obs"
+import "resources/sample_programs/pilot2/games.obs"
+
+
+main asset contract Casino {
+
+    Game@Start game;
+    Money@Owned money;
+    PredictionList@Shared predictions;
+    BettorList@Shared bettors;
+
+    state AcceptingBets;
+    state PlayingGame;
+    state GivePayout {
+        string winner;
+    };
+
+    Casino@Owned() {
+        //TODO
+    }
+
+    transaction makeBet(Casino@AcceptingBets this, Bettor@Unowned b, Money@Owned >> Unowned m, string predictedWinner) {
+        //TODO
+    }
+
+    transaction closeBetting(Casino@AcceptingBets >> PlayingGame this) {
+        //TODO
+    }
+
+    transaction playGame(Casino@PlayingGame >> GivePayout this) {
+        //TODO
+    }
+
+    transaction returnMoney(Casino@GivePayout this, Bettor@Unowned b) {
+        //TODO
+    }
+
+    transaction resetBetting() {
+        //TODO
+    }
+}

@@ -1,0 +1,26 @@
+import "resources/sample_programs/pilot2/betting_utils.obs"
+import "resources/sample_programs/pilot2/games.obs"
+
+
+main asset contract Casino {
+
+    Game@Start game;
+    Money@Owned money;
+    PredictionList@Shared predictions;
+    BettorList@Shared bettors;
+    //TODO: Add your code here. A simple outline is given below as a guide for code to include.
+
+
+
+    //Add states/additional fields here
+
+
+    //1. Bettors make Predictions and put down money
+
+
+    //2. Game is played & winner calculated
+
+
+    //3. Bettors collect winnings if they predicted correctly
+
+}

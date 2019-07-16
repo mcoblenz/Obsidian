@@ -1,0 +1,354 @@
+// import "resources/sample_programs/betting_utils.obs"
+
+asset contract Money {
+    int amount;
+
+    Money@Owned(int amt) {
+        amount = amt;
+    }
+
+    transaction addMoney(Money@Owned this, Money@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    transaction getAmount(Money@Owned this) returns int {
+        return amount;
+    }
+
+    transaction getSomeMoney(Money@Owned this, int amt) returns Money@Owned {
+        if (amt > amount) {
+            revert "Can't split out more money than is available in a given Money object.";
+        } else {
+            amount = amount - amt;
+            return new Money(amt);
+        }
+    }
+}
+
+contract Prediction {
+    string predictedWinner;
+    int bettorId;
+    int betAmount;
+
+    Prediction@Owned(int id, string predWin, int amount) {
+        bettorId = id;
+        predictedWinner = predWin;
+        betAmount = amount;
+    }
+
+    transaction getPrediction(Prediction@Unowned this) returns string {
+        return predictedWinner;
+    }
+    
+    transaction getBettorId(Prediction@Unowned this) returns int {
+        return bettorId;
+    }
+
+    transaction getBetAmount(Prediction@Unowned this) returns int {
+        return betAmount;
+    }
+}
+
+contract PredictionList {
+    state Empty;
+    state HasItems {
+        PredictionList@Shared next;
+        Prediction@Unowned pred;
+    }
+
+    PredictionList@Empty() {
+        ->Empty;
+    }
+
+    transaction getNext(PredictionList@HasItems this) returns PredictionList@Shared {
+        return next;
+    }
+
+    transaction getValue(PredictionList@HasItems this) returns Prediction@Unowned {
+        return pred;
+    }
+
+    transaction append(Prediction@Unowned p) {
+        
+        if (this in Empty) {
+            PredictionList pList = new PredictionList();
+            -> HasItems(pred = p, next = pList);
+        }
+        else {
+            next.append(p);
+        }
+    }
+
+    transaction pop_back(PredictionList@HasItems >> (Empty | HasItems) this) returns Prediction@Unowned {
+        if (next in Empty) {           
+            Prediction temp = pred;           
+            disown next;
+            ->Empty;
+            return temp;
+        }
+        else {
+            pop_back();
+        }
+        revert; //should never get here
+    }
+
+    transaction popSpecific(int givenId) returns Prediction@Unowned {
+        if (this in HasItems) {
+            if (pred.getBettorId() == givenId) {
+                Prediction temp = pred; 
+                if (next in Empty) {                   
+                    disown next;
+                    ->Empty;
+                }
+                else {
+                    Prediction newP = next.getValue();
+                    PredictionList pList = next.getNext();
+                    -> HasItems(pred = newP, next = pList);
+                }
+                return temp;
+            }
+            else {
+                return next.popSpecific(givenId);
+            }
+        }
+        else {
+            revert("No bettors in list");
+        }
+    }
+
+    transaction contains(int id) returns bool {
+        if (this in HasItems) {
+            if (pred.getBettorId() == id) {
+                return true;
+            }
+            else {
+                return next.contains(id);
+            }
+        }
+        else {
+            return false;
+        }
+    }
+}
+
+asset contract Bettor {
+    Money@Owned money;
+    int id;
+
+    Bettor@Owned(int i) {
+        money = new Money(100);
+        id = i;
+    }
+
+    transaction getID(Bettor@Unowned this) returns int {
+        return id;
+    }
+    
+    transaction withdrawMoney(int amount) returns Money@Owned {
+        Money m = money.getSomeMoney(amount);
+        return m;
+    }
+
+    transaction receiveMoney(Bettor@Unowned this, Money@Owned >> Unowned m) {
+        money.addMoney(m);
+    }
+}
+
+contract BettorList {
+    state Empty;
+    state HasItems {
+        BettorList@Shared next;
+        Bettor@Unowned b;
+    }
+
+    BettorList@Empty() {
+        ->Empty;
+    }
+
+    transaction getNext(BettorList@HasItems this) returns BettorList@Shared {
+        return next;
+    }
+
+    transaction getValue(BettorList@HasItems this) returns Bettor@Unowned {
+        return b;
+    }
+
+    transaction append(Bettor@Unowned newB) {
+        
+        if (this in Empty) {
+            BettorList bList = new BettorList();
+            -> HasItems(b = newB, next = bList);
+        }
+        else {
+            next.append(newB);
+        }
+    }
+
+    transaction popBack(BettorList@HasItems >> (Empty | HasItems) this) returns Bettor@Unowned {
+        if (next in Empty) {           
+            Bettor temp = b;           
+            disown next;
+            ->Empty;
+            return temp;
+        }
+        else {
+            popBack();
+        }
+        revert; //Should never get here
+    }
+
+    transaction popSpecific(int givenId) returns Bettor@Unowned {
+        if (this in HasItems) {
+            if (b.getID() == givenId) {
+                Bettor temp = b; 
+                if (next in Empty) {                   
+                    disown next;
+                    ->Empty;
+                }
+                else {
+                    Bettor newB = next.getValue();
+                    BettorList bList = next.getNext();
+                    -> HasItems(b = newB, next = bList);
+                }
+                return temp;
+            }
+            else {
+                return next.popSpecific(givenId);
+            }
+        }
+        else {
+            revert("No bettors in list");
+        }
+    }
+
+    transaction contains(int id) returns bool {
+        if (this in HasItems) {
+            if (b.getID() == id) {
+                return true;
+            }
+            else {
+                return next.contains(id);
+            }
+        }
+        else {
+            return false;
+        }
+    }
+}
+
+asset contract BookMaker {
+    Money@Owned money;
+    PredictionList@Shared predictions;
+    BettorList@Shared bettors;
+
+    BookMaker@Owned() {
+        money = new Money(1000);
+        predictions = new PredictionList();
+        bettors = new BettorList();
+    }
+
+    transaction receiveBet(BookMaker@Owned this, Bettor@Unowned bettor, Money@Owned >> Unowned m, string pred) {
+        int betAmount = m.getAmount();
+        money.addMoney(m);
+        Prediction p = new Prediction(bettor.getID(), pred, betAmount);
+        predictions.append(p);
+        bettors.append(bettor);
+    }
+
+    transaction giveBackMoney(BookMaker@Owned this, Bettor@Unowned bettor, string winner) {
+        int bettorID = bettor.getID();
+        try {
+            Bettor temp = bettors.popSpecific(bettorID); //This will fail if the bettor has not made a bet
+        }
+        catch {
+            revert "Bettor has not made a bet";
+        }
+        Prediction p = predictions.popSpecific(bettorID);
+        if (p.getPrediction() == winner) {
+            int amountToReturn = p.getBetAmount() * 2;
+            Money m = money.getSomeMoney(amountToReturn);
+            bettor.receiveMoney(m);
+
+        }
+        //If prediction wrong, no money returned
+
+    }
+
+}
+
+
+
+contract Player {
+    string move;
+
+    Player@Owned() {
+        move = "none";
+    }
+
+    transaction getMove(Player@Owned >> Owned this) returns string {
+        return move;
+    }
+
+    transaction setMove(Player@Owned >> Owned this, string newMove) {
+        move = newMove;
+    }
+}
+
+contract Game {
+    Player@Owned p1;
+    Player@Owned p2;
+    //...
+
+    Game@Owned() {
+        p1 = new Player();
+        p2 = new Player();
+        //...
+    }
+
+    transaction play(Game@Owned this) returns string {
+        //...
+        return "";
+    }
+
+}
+
+main asset contract Casino {
+
+    BookMaker@Owned bookie;
+    Game@Owned game;
+
+    state AcceptingBets;
+    state PlayingGame;
+    state GivePayout {
+        string winner;
+    };
+
+    Casino@Owned() {
+        bookie = new BookMaker();
+        game = new Game();
+        -> AcceptingBets;
+    }
+
+    transaction makeBet(Casino@AcceptingBets this, Bettor@Unowned b, Money@Owned >> Unowned m, string predictedWinner) {
+        bookie.receiveBet(b, m, predictedWinner);
+    }
+
+    transaction closeBetting(Casino@AcceptingBets >> PlayingGame this) {
+        -> PlayingGame;
+    }
+
+    //This function will be different for every game
+    transaction playGame(Casino@PlayingGame >> GivePayout this) {
+        string win = game.play();
+        -> GivePayout(winner = win);
+    }
+
+    transaction returnMoney(Casino@GivePayout this, Bettor@Unowned b) {
+        bookie.giveBackMoney(b, winner);
+    }
+
+    transaction resetBetting() {
+        -> AcceptingBets;
+    }
+}

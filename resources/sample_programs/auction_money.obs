@@ -11,9 +11,9 @@ asset contract Bidder {
         inventory = new ItemList();
     }
 
-    transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {
-        Bid bid = new Bid(bidAmount);
-        money.setAmount(money.getAmount() - bidAmount);
+    transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {  
+        Money m = money.getSomeMoney(bidAmount);
+        Bid bid = new Bid(m);
         return bid;
     }
 
@@ -26,25 +26,32 @@ asset contract Bidder {
     }
 
     transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
-        money.setAmount(money.getAmount() + bid.getAmount());
+        money.addMoney(bid.getMoney());
         disown bid;
     }
 }
 
 asset contract Seller {
-    Item@Owned item;
-    state SoldItem {
+    state Sold {
         Bid@Owned bid;
     }
-    state Unsold;
+    state Unsold {
+        Item@Owned item;
+    };
+    state InAuction;
 
     Seller@Unsold() {
-        item = new Item();
-        -> Unsold;
+        -> Unsold(item = new Item());
     }
 
-    transaction receiveBid(Seller@Unsold >> SoldItem this, Bid@Owned >> Unowned b) {
-        -> SoldItem(bid = b);
+    transaction giveItem(Seller@Unsold >> InAuction this) returns Item@Owned {
+        Item temp = item;
+        -> InAuction;
+        return temp;
+    }
+
+    transaction receiveBid(Seller@Unsold >> Sold this, Bid@Owned >> Unowned b) {
+        -> Sold(bid = b);
     }
 }
 
@@ -72,16 +79,26 @@ contract ItemList {
 asset contract Money {
     int amount;
 
-    Money@Owned(int num) {
-        amount = num;
+    Money@Owned(int amt) {
+        amount = amt;
     }
 
-    transaction getAmount(Money@Owned this) returns int {
+    transaction addMoney(Money this, Money@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    transaction getAmount(Money this) returns int {
         return amount;
     }
 
-    transaction setAmount(Money@Owned this, int num) {
-        amount = amount - num;
+    transaction getSomeMoney(Money this, int amt) returns Money@Owned {
+        if (amt > amount) {
+            revert "Can't split out more money than is available in a given Money object.";
+        } else {
+            amount = amount - amt;
+            return new Money(amt);
+        }
     }
 }
 
@@ -91,17 +108,19 @@ asset contract Bid {
     state Open;
     state Stale;
 
-    Bid@Open(int num) {
-        money = new Money(num);
+    Bid@Open(Money@Owned >> Unowned m) {
+        money = m;
         ->Open;
+    }
+
+    transaction getMoney(Bid@Owned this) returns Money@Owned {
+        Money temp = new Money(money.getAmount());
+        -> Stale;
+        return temp;
     }
 
     transaction getAmount(Bid@Owned this) returns int {
         return money.getAmount();
-    }
-
-    transaction makeStale(Bid@Open >> Stale this) {
-        -> Stale;
     }
 }
 
@@ -121,11 +140,10 @@ main asset contract Auction {
     
     state Closed;
 
-
-    Auction@Owned(Item@Owned >> Unowned i) {
+    Auction@Owned() {
         maxBidder = new Bidder("none", 0);
         seller = new Seller();
-        -> Open(item = i, bid = new Bid(-1));
+        -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
     }
 
     transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
@@ -158,5 +176,4 @@ main asset contract Auction {
         seller.receiveBid(finalBid);
         -> Closed;
     }
-
 }

@@ -1,0 +1,193 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Gambling</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h2>Gambling</h2>
+
+<p>
+    A good friend of yours, who owns a casino, has asked you for help in keeping track of bets on the various games that are played
+    in the gambling house. Being a computer scientist, you decide to write a program that will help your friend
+    keep track of bets made by spectators of a game. 
+    
+</p>
+
+<p>
+    Your friend had someone else start this task before, and wants you to use their code (which you can assume is implemented correctly) to help 
+    you write yours. More detailed instructions from your friend are given below, as well as the helper contract and transaction declarations 
+    (full implementations can be viewed in the <code>betting_utils.obs</code> file).
+    
+</p>
+
+<h3>Instructions</h3>
+<p>
+    At a high level, you will need to write your gambling program such that <code>Bettor</code>s will make bets (they put down some 
+    <code>Money</code> and make a <code>Prediction</code>
+    for a winner), a game is played, and afterward, <code>Money</code> is given to the <code>Bettor</code>s who bet correctly.
+
+    <br/><br/>
+    Note that the logic of the game itself doesn't matter in this exercise (an
+    example is given to you in the contracts <code>Game</code> and <code>Player</code> in the file <code>games.obs</code>); the only important thing to note is the <code>play()</code>
+    transaction, which begins and plays the game, and <code>calculateWinner()</code>, which returns the winner of the game. You can assume 
+    every game has these transactions implemented.
+    <br/><br/>
+
+    Implement the <code>Casino</code> contract however you would like following this overview.
+    The following requirements must be met:
+    <ul>
+        <li> If a <code>Bettor</code> predicts the winner correctly, the <code>Bettor</code> gets <b>twice</b> the money they put down. 
+            For example, if <code>Bettor</code> b puts down $5 on the correct winner, they should receive $10 after the game is played. </li>
+        <li> If the <code>Bettor</code> predicted incorrectly, they lose the money they originally bet; they get nothing back.</li>
+        <li> Bets should not be able to be made during or after a game.</li>
+        <li> Similarly, <code>Money</code> should not be distributed back to <code>Bettor</code>s until after a game is played.</li>
+        <li> In addition, individual <code>Bettor</code>s should collect winnings after the game. If a <code>Bettor</code> who 
+            accurately predicted the winner of a game does not collect their money before the next game, this money is kept by 
+            the <code>Casino</code>. </li>
+        <li>You should call the <code>play()</code> transaction of the <code>Game</code> given to you from within <code>Casino</code> to 
+            start a game after bets are taken. </li>
+        <li> A <code>Bettor</code> can only bet once per game; if the <code>Bettor</code> bets more than once, their original bet 
+            should be replaced by the new one. </li>
+    </ul>
+
+    <br/>
+    <b>Assumptions that can be made:</b>
+    <ul>
+        <li> <code>Bettor</code>s do not need to be registered; you can assume each <code>Bettor</code> already has some unique 
+            identifier in the <code>id</code> field.</li>
+        <li> You can assume the <code>Casino</code> will always have enough money to pay <code>Bettor</code>s.</li>
+    </ul>
+
+    <br/>
+    Start by writing an outline of the contract, including any additional fields, states, and transaction declarations. Then fill in the transactions
+    to implement the program.
+    Below is a diagram that describes a sequence of possible interactions between the objects described over the course of <b>one game</b>. 
+    You may use this diagram to help structure your code.
+</p>
+
+<img src="CasinoSequence.png" alt="Casino" > </img>
+
+<br/>
+<h3>Helper Code Declarations</h3>
+
+<pre>
+    <code>
+        //Represents the money being traded in this program
+        asset contract Money {
+            int amount; //Amount that this Money object holds
+
+            //Constructor
+            Money@Owned(int amt);
+
+            //Add additional Money
+            transaction addMoney(Money@Owned this, Money@Owned >> Unowned m);
+
+            //Returns the amount of this Money
+            transaction getAmount(Money@Owned this) returns int;
+
+            //Use some amount of this Money
+            transaction getSomeMoney(Money@Owned this, int amt) returns Money@Owned;
+        }
+    </code>
+
+    <code>
+        //Represents the bet prediction of a Bettor
+        contract Prediction {
+            string predictedWinner; //the Bettor's prediction of the winner
+            int bettorId; //the id of the Bettor that made this Prediction
+            int betAmount; //the amount of money the Bettor bet on this Prediction
+
+            //Constructor
+            Prediction@Owned(int id, string predWin, int amount);
+
+            //Returns the predictedWinner
+            transaction getPrediction(Prediction@Unowned this) returns string;
+            
+            //Returns the bettorId
+            transaction getBettorId(Prediction@Unowned this) returns int;
+
+            //Returns the betAmount
+            transaction getBetAmount(Prediction@Unowned this) returns int;
+        }
+        </code>
+
+        <code>
+        //Represents a collection of Predictions
+        contract PredictionList {
+            state Empty;
+            state HasItems {
+                PredictionList@Shared next;
+                Prediction@Unowned pred;
+            }
+
+            //Constructor
+            PredictionList@Empty();
+
+            //Add a new Prediction to the end of the list
+            transaction append(Prediction@Unowned p);
+
+            //remove a Prediction from the end of the list and return that Prediction
+            transaction popBack(PredictionList@HasItems >> (Empty | HasItems) this) returns Prediction@Unowned;
+
+            //remove a Prediction with a given BettorID, and return that Prediction
+            transaction popSpecific(int givenId) returns Prediction@Unowned;
+
+            //returns true if a Prediction with BettorID id is in the list
+            transaction contains(int id) returns bool;
+        }
+        </code>
+
+        <code>
+        //Represents a person betting on a game
+        asset contract Bettor {
+            Money@Owned money; //Total Money the Bettor owns
+            int id; //Bettor ID (unique to every Bettor)
+
+            //Constructor
+            Bettor@Owned(int bettorId);
+
+            //Returns the Bettor ID
+            transaction getID(Bettor@Unowned this) returns int;
+            
+            //Take some Money out of the Bettor's total money
+            transaction withdrawMoney(Bettor@Owned this, int amount) returns Money@Owned;
+
+            //Adds Money to the Bettor's total money
+            transaction receiveMoney(Bettor@Unowned this, Money@Owned >> Unowned m);
+        }
+    </code>
+
+    <code>
+        //Represents a collection of Bettors
+        contract BettorList {
+            state Empty;
+            state HasItems {
+                BettorList@Shared next;
+                Bettor@Unowned b;
+            }
+
+            //Constructor
+            BettorList@Empty();
+
+            //Add a new Bettor to the end of the list
+            transaction append(Bettor@Unowned newB);
+
+            //remove a Bettor from the end of the list and return that Bettor
+            transaction popBack(BettorList@HasItems >> (Empty | HasItems) this) returns Bettor@Unowned;
+
+            //remove a Bettor with a given BettorID, and return that Bettor
+            transaction popSpecific(int givenId) returns Bettor@Unowned;
+
+            //returns true if a Bettor with BettorID id is in the list
+            transaction contains(int id) returns bool;
+        }
+    </code>
+</pre>
+
+
+</body>
+</html>
