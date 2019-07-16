@@ -747,4 +747,22 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def assetStateTrackingOwnedOkay(): Unit = {
         runTest("resources/tests/type_checker_tests/AssetStateTrackingOkay.obs", Nil)
     }
+
+    @Test def fieldOwnership(): Unit = {
+        runTest("resources/tests/type_checker_tests/FieldOwnershipDiscrepancy.obs",
+            (InvalidInconsistentFieldType("c",
+                ContractReferenceType(ContractType("C"), Owned(), false),
+                ContractReferenceType(ContractType("C"), Unowned(), false))
+            , 8) :: Nil)
+    }
+
+    @Test def permissionPassing(): Unit = {
+        runTest("resources/tests/type_checker_tests/PermissionPassing.obs",
+            ((ReceiverTypeIncompatibleError("t5",
+                ContractReferenceType(ContractType("PermissionPassing"), Unowned(), false),
+                ContractReferenceType(ContractType("PermissionPassing"), Owned(), false)), 47) ::
+                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil)), 58) ::
+                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil)), 65) ::
+                Nil))
+    }
 }

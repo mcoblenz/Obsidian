@@ -1,0 +1,11 @@
+contract C {
+    C@Owned() {}
+}
+
+main contract FieldOwnershipDiscrepancy {
+    C@Unowned c;
+
+    transaction t() {
+        c = new C();
+    }
+}
