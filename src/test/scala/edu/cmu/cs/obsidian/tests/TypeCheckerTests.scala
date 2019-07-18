@@ -765,4 +765,45 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil)), 65) ::
                 Nil))
     }
+
+    @Test def allPermissions(): Unit = {
+        runTest("resources/tests/type_checker_tests/AllPermissions.obs",
+            ((SubtypingError(ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                ContractReferenceType(ContractType("AllPermissions"), Owned(), false), false), 19) ::
+                (SubtypingError(ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false), false), 25) ::
+                (SubtypingError(ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false), false), 29) ::
+                (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x2")), 41) ::
+                (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x7")), 63) ::
+                (ReceiverTypeIncompatibleError("t1",
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 81) ::
+                (ReceiverTypeIncompatibleError("t4",
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 96) ::
+                (ReceiverTypeIncompatibleError("t5",
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 101) ::
+                (ReceiverTypeIncompatibleError("t1",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 130) ::
+                (ReceiverTypeIncompatibleError("t2",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false)), 135) ::
+                (ReceiverTypeIncompatibleError("t4",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 144) ::
+                (ReceiverTypeIncompatibleError("t5",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 148) ::
+                (ReceiverTypeIncompatibleError("t6",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false)), 152) ::
+                (ReceiverTypeIncompatibleError("t7",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false)), 158) ::
+                (UnusedOwnershipError("this"), 172) ::
+                Nil))
+    }
 }

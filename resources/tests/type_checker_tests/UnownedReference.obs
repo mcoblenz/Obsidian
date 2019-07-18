@@ -32,13 +32,13 @@ contract UsesC {
         needsShared(c);
         [c @ Shared];
         needsUnowned(c);
-        [c @ Unowned];
+        [c @ Shared];
 
         CWithState cS1 = new CWithState();
         needsSharedWithState(cS1);
         [cS1 @ Shared];
         needsUnownedWithState(cS1);
-        [cS1 @ Unowned];
+        [cS1 @ Shared];
     }
 
     transaction needsUnowned(C@Unowned cUnowned) {

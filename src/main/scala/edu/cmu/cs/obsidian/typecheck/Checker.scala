@@ -1089,16 +1089,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         finalContext
     }
 
-    private def updateArgumentTypeInInvocation(
+    private def updateArgumentTypeInInvocation(arg: Expression,
                                                passedType: NonPrimitiveType,
                                                initialType: NonPrimitiveType,
                                                finalType: NonPrimitiveType,
                                                referenceIdentifier: String,
                                                context: Context): Context = {
-        if (passedType.permission == Owned() && initialType.permission == Unowned()) {
+        if ((passedType.isOwned || passedType.permission == Shared()) && initialType.permission == Unowned()) {
+            // Special exception: passing owned to Unowned or to Shared does not lose ownership.
             context
         }
         else {
+            if (passedType.isOwned && initialType.permission == Shared() && !finalType.isOwned &&
+                passedType.isAssetReference(context.contractTable) != No()) {
+                // Special case: passing an owned reference to a Shared >> Unowned arg will make the arg Unowned but also lose ownership!
+                logError(arg, UnusedExpressionArgumentOwnershipError(arg))
+            }
+
             if (context.get(referenceIdentifier).isDefined) {
                 // This was a local variable.
                 context.updated(referenceIdentifier, finalType)
@@ -1141,7 +1148,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         nameToUpdate match {
             case Some(name) =>
                 argType match {
-                    case npArgType: NonPrimitiveType => updateArgumentTypeInInvocation(npArgType, declaredInitialType, declaredFinalType, name, context)
+                    case npArgType: NonPrimitiveType => updateArgumentTypeInInvocation(arg, npArgType, declaredInitialType, declaredFinalType, name, context)
                     case _ => context
                 }
             case None => context
@@ -1900,7 +1907,14 @@ private def checkStatement(
                     // Every arg whose output type is owned should be owned at the end.
                     val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
                     val ownedArgNames = ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
-                    checkForUnusedOwnershipErrors(tx, outputContext, Set("this") ++ ownedArgNames)
+                    val ownedIdentifiers =
+                        if (tx.thisFinalType.isOwned) {
+                            ownedArgNames ++ Set("this")
+                        }
+                        else {
+                            ownedArgNames
+                        }
+                    checkForUnusedOwnershipErrors(tx, outputContext, ownedIdentifiers.toSet)
                 }
 
             case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) => ()
