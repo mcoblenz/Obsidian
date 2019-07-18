@@ -69,4 +69,99 @@ main asset contract AllPermissions {
         [x9 @ Owned]; // Special exception!
         disown x9;
     }
+
+    transaction passShared() {
+        AllPermissions x1 = new AllPermissions();
+        x1.t4();
+        [x1 @ Shared];
+        x1.t1(); // ERROR
+        disown x1;
+
+        AllPermissions x2 = new AllPermissions();
+        x2.t4();
+        x2.t2();
+        [x2 @ Shared];
+
+        AllPermissions x3 = new AllPermissions();
+        x3.t4();
+        x3.t3(); // Special exception!
+        [x3 @ Shared];
+
+        AllPermissions x4 = new AllPermissions();
+        x4.t4();
+        x4.t4(); // ERROR
+        [x4 @ Shared];
+
+        AllPermissions x5 = new AllPermissions();
+        x5.t4();
+        x5.t5(); // ERROR
+        [x5 @ Unowned];
+
+        AllPermissions x6 = new AllPermissions();
+        x6.t4();
+        x6.t6();
+        [x6 @ Owned];
+        disown x6;
+
+        AllPermissions x7 = new AllPermissions();
+        x7.t4();
+        x7.t7();
+        [x7 @ Unowned];
+
+        AllPermissions x8 = new AllPermissions();
+        x8.t4();
+        x8.t8(); // Special exception!
+        [x8 @ Shared];
+
+        AllPermissions x9 = new AllPermissions();
+        x9.t4();
+        x9.t9();
+        [x9 @ Shared];
+    }
+
+    transaction passUnowned() {
+        AllPermissions x1 = new AllPermissions();
+        x1.t5();
+        [x1 @ Unowned];
+        x1.t1(); // ERROR
+        disown x1;
+
+        AllPermissions x2 = new AllPermissions();
+        x2.t5();
+        x2.t2(); // ERROR
+
+        AllPermissions x3 = new AllPermissions();
+        x3.t5();
+        x3.t3(); 
+        [x3 @ Unowned];
+
+        AllPermissions x4 = new AllPermissions();
+        x4.t5();
+        x4.t4(); // ERROR
+
+        AllPermissions x5 = new AllPermissions();
+        x5.t5();
+        x5.t5(); // ERROR
+
+        AllPermissions x6 = new AllPermissions();
+        x6.t5();
+        x6.t6(); // ERROR
+        [x6 @ Owned];
+        disown x6;
+
+        AllPermissions x7 = new AllPermissions();
+        x7.t5();
+        x7.t7(); // ERROR
+
+        AllPermissions x8 = new AllPermissions();
+        x8.t5();
+        x8.t8();
+        [x8 @ Owned];
+        disown x8;
+
+        AllPermissions x9 = new AllPermissions();
+        x9.t5();
+        x9.t9();
+        [x9 @ Shared];
+    }
 }

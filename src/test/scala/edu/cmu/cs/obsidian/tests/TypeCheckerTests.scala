@@ -776,6 +776,33 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("AllPermissions"), Shared(), false), false), 25) ::
                 (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x2")), 37) ::
                 (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x7")), 59) ::
+                (ReceiverTypeIncompatibleError("t1",
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 77) ::
+                (ReceiverTypeIncompatibleError("t4",
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 92) ::
+                (ReceiverTypeIncompatibleError("t5",
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 97) ::
+                (ReceiverTypeIncompatibleError("t1",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 126) ::
+                (ReceiverTypeIncompatibleError("t2",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false)), 131) ::
+                (ReceiverTypeIncompatibleError("t4",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 140) ::
+                (ReceiverTypeIncompatibleError("t5",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Owned(), false)), 144) ::
+                (ReceiverTypeIncompatibleError("t6",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false)), 148) ::
+                (ReceiverTypeIncompatibleError("t7",
+                    ContractReferenceType(ContractType("AllPermissions"), Unowned(), false),
+                    ContractReferenceType(ContractType("AllPermissions"), Shared(), false)), 154) ::
                 Nil))
     }
 }

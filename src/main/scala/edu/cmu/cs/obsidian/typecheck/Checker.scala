@@ -1095,7 +1095,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                finalType: NonPrimitiveType,
                                                referenceIdentifier: String,
                                                context: Context): Context = {
-        if (passedType.isOwned && initialType.permission == Unowned()) {
+        if ((passedType.isOwned || passedType.permission == Shared()) && initialType.permission == Unowned()) {
+            // Special exception: passing owned to Unowned or to Shared does not lose ownership.
             context
         }
         else {
