@@ -101,9 +101,7 @@ case class VariableDeclWithInit(typ: ObsidianType, varName: String, e: Expressio
 
 case class VariableDeclWithSpec(typIn: ObsidianType, typOut: ObsidianType, varName: String) extends Statement
  {
-     override def toString: String = {
-         varName
-     }
+     override def toString: String = varName
  }
 case class Return() extends Statement
 case class ReturnExpr(e: Expression) extends Statement

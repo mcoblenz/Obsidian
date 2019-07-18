@@ -8,9 +8,13 @@ main asset contract AllPermissions {
 
     transaction t3(AllPermissions @ Unowned this) {}
 
-    transaction t4(AllPermissions @ Owned >> Shared this) {}
+    transaction t4(AllPermissions @ Owned >> Shared this) {
+        disown this;
+    }
 
-    transaction t5(AllPermissions @ Owned >> Unowned this) {}
+    transaction t5(AllPermissions @ Owned >> Unowned this) {
+        disown this;
+    }
 
     transaction t6(AllPermissions @ Shared >> Owned this) {
         // Error; no way to make this typecheck.
@@ -163,5 +167,9 @@ main asset contract AllPermissions {
         x9.t5();
         x9.t9();
         [x9 @ Shared];
+    }
+
+    transaction loseOwnership(AllPermissions @ Owned >> Shared this) {
+        // Error: losing Owned reference to 'this'.
     }
 }

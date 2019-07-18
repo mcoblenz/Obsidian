@@ -1907,7 +1907,14 @@ private def checkStatement(
                     // Every arg whose output type is owned should be owned at the end.
                     val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
                     val ownedArgNames = ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
-                    checkForUnusedOwnershipErrors(tx, outputContext, Set("this") ++ ownedArgNames)
+                    val ownedIdentifiers =
+                        if (tx.thisFinalType.isOwned) {
+                            ownedArgNames ++ Set("this")
+                        }
+                        else {
+                            ownedArgNames
+                        }
+                    checkForUnusedOwnershipErrors(tx, outputContext, ownedIdentifiers.toSet)
                 }
 
             case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) => ()
