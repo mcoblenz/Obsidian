@@ -12,7 +12,8 @@ contract Maybe[X@s] {
         ->Just(val = _val);
     }
 
-    transaction peek(Maybe@Just this) returns X@Unowned {
+    // TODO: This should give an error because s might be Owned
+    transaction peek(Maybe@Just this) returns X@s {
         return val;
     }
 

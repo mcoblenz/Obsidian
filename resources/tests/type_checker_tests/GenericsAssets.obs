@@ -12,13 +12,13 @@ contract AssetIdentity[asset X@s] {
     }
 }
 
-interface Go {
+interface Go[Y] {
     state A;
 
-    transaction go(Go@Owned >> A this);
+    transaction go(Go[Y]@Owned >> A this);
 }
 
-contract D implements Go {
+contract D implements Go[C@Owned] {
     state A;
 
     D@A() {
@@ -30,7 +30,17 @@ contract D implements Go {
     }
 }
 
-contract BadAssetManager[asset X@s implements Go@Owned] {
+/* contract BadAssetManager[(asset X implements Go[C@Owned]) @ (s <: Owned)] { */
+/* contract BadAssetManager[asset X@s */
+/*                          where X implements Go[C@Owned] */
+/*                          where s is Owned] { */
+/* contract BadAssetManager[asset X@s */
+/*                          where X implements Go[C@Owned] */
+/*                             where C implements Foo */
+/*                          where s is Owned] { */
+/* contract BadAssetManager[C@s implements Go[D@t], D@t implements Go[C@s]] */
+
+contract BadAssetManager[asset X@s implements Go[C@Owned]@Owned] {
     // error, because x could be an owned asset
     transaction drop(X@s >> Unowned x) {}
 

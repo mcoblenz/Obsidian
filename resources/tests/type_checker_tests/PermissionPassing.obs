@@ -1,0 +1,67 @@
+contract C {
+    C @ Owned () {
+    }
+}
+
+contract D {
+    state S1;
+    state S2;
+
+    D @ S1 () {
+        -> S1;
+    }
+
+    transaction toS2(D @ S1 >> S2 this) {
+        -> S2;
+    }
+}
+
+main asset contract PermissionPassing {
+    PermissionPassing@Owned () {}
+
+    transaction t1(C @ Shared >> Unowned c) {
+    }
+
+    transaction t2() {
+        C c = new C();
+        t1(c);
+        [c @ Unowned];
+    }
+
+    transaction t3 (D @ S1 >> S2 d) {
+        d.toS2();
+    }
+
+    transaction t4 () {
+        D d = new D();
+        t3(d);
+        [d @ S2];
+    }
+
+    transaction t5(PermissionPassing @ Owned >> Unowned this) {
+        disown this;
+    }
+
+    transaction callt5(PermissionPassing @ Owned >> Unowned this) {
+        t5();
+        t5(); // Should error b/c we don't have ownership of 'this' anymore
+    }
+
+    transaction returnOwnedAsset() returns PermissionPassing @ Owned {
+        return new PermissionPassing();
+    }
+
+    transaction takeUnowned(PermissionPassing @ Unowned p) {
+    }
+
+    transaction callReturnOwnedAsset() {
+        takeUnowned(returnOwnedAsset()); // Should error: losing an asset!
+    }
+
+    transaction takeShared(PermissionPassing @ Shared p) {
+    }
+
+    transaction passOwnedToShared() {
+        takeShared(returnOwnedAsset()); // Should error: losing an asset!
+    }
+}

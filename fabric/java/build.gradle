@@ -15,7 +15,9 @@ sourceCompatibility = 1.8
 
 repositories {
     maven {
-        url 'http://obsidian-lang.com/repository'
+        // TODO UNDO THIS. Just for testing changes to standard library
+        // url 'http://obsidian-lang.com/repository'
+        url '/home/roei/ObsidianGenericsImpl/docs/repository'
     }
     mavenCentral()
 }

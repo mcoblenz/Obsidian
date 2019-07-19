@@ -173,13 +173,12 @@ case class LocalInvocation(name: String, params: Seq[ObsidianType], args: Seq[Ex
             params.map(_.substitute(genericParams, actualParams)),
             args.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
+
+    override def toString: String = s"$name(${args.mkString(",")})"
 }
 case class Invocation(recipient: Expression, params: Seq[ObsidianType],
                       name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
-    override def toString: String = {
-        val argString = args.mkString(",")
-        s"$recipient.$name($argString)"
-    }
+    override def toString: String = s"$recipient.$name(${args.mkString(",")})"
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Invocation =
         Invocation(recipient.substitute(genericParams, actualParams),
@@ -221,6 +220,7 @@ case class VariableDeclWithSpec(typIn: ObsidianType, typOut: ObsidianType, varNa
         VariableDeclWithSpec(typIn.substitute(genericParams, actualParams),
             typOut.substitute(genericParams, actualParams), varName)
             .setLoc(this)
+    override def toString: String = varName
 }
 
 case class Return() extends Statement {

@@ -590,12 +590,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 logError(e, ReceiverTypeIncompatibleError(name, receiverType, invokable.thisType))
             }
 
-            // Check field types for private invocations
+            // Check field type preconditions for overrides in private invocations
             for ((fieldName, requiredInitialFieldType) <- foundTransaction.get.initialFieldTypes) {
                 val currentFieldType = context.lookupCurrentFieldTypeInThis(fieldName)
                 currentFieldType match {
                    case None => ()
-                   case Some(cft) => if(isSubtype(context.contractTable, cft, requiredInitialFieldType, receiver.isInstanceOf[This]).isDefined) {
+                   case Some(cft) => if(isSubtype(context.contractTable, cft, requiredInitialFieldType, receiver.isInstanceOf[This]).isDefined ||
+                                        (cft.isOwned != requiredInitialFieldType.isOwned && !cft.isBottom)) {
                        logError(e, FieldSubtypingError(fieldName, cft, requiredInitialFieldType))
                    }
                 }
@@ -619,7 +620,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
-                        updateReceiverTypeInContext(receiver, receiverType, t, contextAfterArgs)
+                        updateArgTypeInContext(receiver, receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
                     case _ => contextAfterArgs
                 }
 
@@ -787,11 +788,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case LocalInvocation(name, params, args: Seq[Expression]) =>
                  val (typ, con, _, _, newArgs) = handleInvocation(context, name, This(), params, args)
                  //This may need correction.
-                 (typ, con, LocalInvocation(name, params, newArgs))
+                 (typ, con, LocalInvocation(name, params, newArgs).setLoc(e))
 
              case Invocation(receiver: Expression, params, name, args: Seq[Expression], isFFIInvocation) =>
                  val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, params, args)
-                 (typ, con, Invocation(newReceiver, params, name, newArgs, isFFIInv))
+                 (typ, con, Invocation(newReceiver, params, name, newArgs, isFFIInv).setLoc(e))
 
              case c@Construction(contractType, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(contractType.contractName)
@@ -968,7 +969,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    private def checkFieldTypeConsistency(context: Context, tx: Transaction): Unit = {
+
+    private def checkFieldTypeConsistencyAfterTransaction(context: Context, tx: Transaction): Unit = {
         // First check fields that may be of inconsistent type with their declarations to make sure they match
         // either the declarations or the specified final types.
         for ((field, typ) <- context.thisFieldTypes) {
@@ -991,7 +993,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case None =>
                     assert(false, "Bug: invalid field in field type context")
                 case Some(declaredFieldType) =>
-                    if (isSubtype(context.contractTable, typ, declaredFieldType, false).isDefined) {
+                    if (isSubtype(context.contractTable, typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
                         logError(tx, InvalidInconsistentFieldType(field, typ, declaredFieldType))
                     }
             }
@@ -1134,6 +1136,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val specInputType = spec(i).typIn
                 val specOutputType = spec(i).typOut
 
+                val nameToUpdate = arg match {
+                    case ReferenceIdentifier(x) => Some(x)
+                    case This() => Some("this")
+                    case _ => None
+                }
+
                 val transferOwnership: Boolean =
                     specInputType match {
                         case np: NonPrimitiveType =>
@@ -1149,14 +1157,24 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         consumptionModeForType(specInputType)
                     }
 
-                val (argType, contextAfterArg, e) = inferAndCheckExpr(decl, contextAfterArgs, arg, ownershipConsumptionMode)
+                val (argType, contextAfterArg, e) = inferAndCheckExpr(decl, contextAfterArgs, arg, NoOwnershipConsumption())
 
+                val contextAfterOwnershipTransfer = specInputType match {
+                    case npSpecInputType: NonPrimitiveType =>
+                        specOutputType match {
+                            case npSpecOutputType: NonPrimitiveType => updateArgTypeInContext(e, argType, npSpecInputType, npSpecOutputType, contextAfterArg)
+                            case _ => // There should have been a prior error about a bogus type declaration.
+                                contextAfterArg
+                        }
+
+                    case _ => contextAfterArg
+                }
                 if (isSubtype(context.contractTable, argType, specInputType, false).isDefined) {
                     val err = ArgumentSubtypingError(decl.name, spec(i).varName, argType, specInputType)
                     errList = (ast, err)::errList
                 }
 
-                contextAfterArgs = contextAfterArg
+                contextAfterArgs = contextAfterOwnershipTransfer
                 expressionList = expressionList :+ e
             }
 
@@ -1194,52 +1212,71 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         finalContext
     }
 
-    // updates the type of an identifier in the context based on the transaction invoked on it
-    private def updateReceiverTypeInContext(receiver: Expression,
-                                            receiverType: ObsidianType,
-                                            invokable: Transaction,
-                                            context: Context): Context = {
+    private def updateArgumentTypeInInvocation(arg: Expression,
+                                               passedType: NonPrimitiveType,
+                                               initialType: NonPrimitiveType,
+                                               finalType: NonPrimitiveType,
+                                               referenceIdentifier: String,
+                                               context: Context): Context = {
+        if ((passedType.isOwned || passedType.permission == Shared()) && initialType.permission == Unowned()) {
+            // Special exception: passing owned to Unowned or to Shared does not lose ownership.
+            context
+        }
+        else {
+            if (passedType.isOwned && initialType.permission == Shared() && !finalType.isOwned &&
+                passedType.isAssetReference(context.contractTable) != No()) {
+                // Special case: passing an owned reference to a Shared >> Unowned arg will make the arg Unowned but also lose ownership!
+                logError(arg, UnusedExpressionArgumentOwnershipError(arg))
+            }
 
-        val nameToUpdate = receiver match {
+            if (context.get(referenceIdentifier).isDefined) {
+                // This was a local variable.
+                context.updated(referenceIdentifier, finalType)
+            }
+            else {
+                // This was a field or a static invocation. If it was a field, update the field's type.
+                val currentFieldType = context.lookupCurrentFieldTypeInThis(referenceIdentifier)
+
+                if (currentFieldType.isDefined && currentFieldType.get != finalType) {
+                    context.updatedThisFieldType(referenceIdentifier, finalType)
+                }
+                else {
+                    // No need to update anything for static invocations.
+                    context
+                }
+            }
+        }
+
+    }
+
+    // updates the type of an identifier in the context based on the transaction invoked on it
+    private def updateArgTypeInContext(arg: Expression,
+                                       argType: ObsidianType,
+                                       declaredInitialType: NonPrimitiveType,
+                                       declaredFinalType: NonPrimitiveType,
+                                       context: Context): Context = {
+        val nameToUpdate = arg match {
             case ReferenceIdentifier(x) => Some(x)
             case This() => Some("this")
-            case _ => None
+            case _ =>
+                // If the argument isn't bound to a variable but owns an asset, and this call is not going to consume ownership, then error.
+                if (argType.isOwned && argType.isAssetReference(context.contractTable) != No() &&
+                    (declaredFinalType.isOwned || !declaredInitialType.isOwned))
+                {
+                    logError(arg, UnusedExpressionArgumentOwnershipError(arg))
+                }
+                None
         }
 
-        val contextPrime = nameToUpdate match {
-            case None => context
-            case Some(x) =>
-                receiverType match {
-                    case typ: NonPrimitiveType => {
-                        val newType = invokable.thisFinalType
-                        if (newType.permission == Unowned()) {
-                            // The transaction promised not to change the state of the receiver.
-                            context
-                        }
-                        else {
-                            if (context.get(x).isDefined) {
-                                // This was a local variable.
-                                context.updated(x, newType)
-                            }
-                            else {
-                                // This was a field or a static invocation. If it was a field, update the field's type.
-                                val currentFieldType = context.lookupCurrentFieldTypeInThis(x)
-
-                                if (currentFieldType.isDefined && currentFieldType.get != newType) {
-                                    context.updatedThisFieldType(x, newType)
-                                }
-                                else {
-                                    // No need to update anything for static invocations.
-                                    context
-                                }
-                            }
-                        }
-                    }
+        nameToUpdate match {
+            case Some(name) =>
+                argType match {
+                    case npArgType: NonPrimitiveType => updateArgumentTypeInInvocation(arg, npArgType, declaredInitialType, declaredFinalType, name, context)
                     case _ => context
                 }
+            case None => context
         }
-    contextPrime
-}
+    }
 
 private def checkStatement(
                                   decl: InvokableDeclaration,
@@ -2009,14 +2046,21 @@ private def checkStatement(
                     // Every arg whose output type is owned should be owned at the end.
                     val ownedArgs = tx.args.filter((arg: VariableDeclWithSpec) => arg.typOut.isOwned)
                     val ownedArgNames = ownedArgs.map((arg: VariableDeclWithSpec) => arg.varName)
-                    checkForUnusedOwnershipErrors(tx, outputContext, Set("this") ++ ownedArgNames)
+                    val ownedIdentifiers =
+                        if (tx.thisFinalType.isOwned) {
+                            ownedArgNames ++ Set("this")
+                        }
+                        else {
+                            ownedArgNames
+                        }
+                    checkForUnusedOwnershipErrors(tx, outputContext, ownedIdentifiers.toSet)
                 }
 
             case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) => ()
         }
 
         // Check to make sure all the field types are consistent with their declarations.
-        checkFieldTypeConsistency(outputContext, tx)
+        checkFieldTypeConsistencyAfterTransaction(outputContext, tx)
 
         // todo: check that every declared variable is initialized before use
         tx.copy(body = newStatements)

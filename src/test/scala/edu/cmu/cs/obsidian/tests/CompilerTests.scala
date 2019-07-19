@@ -91,4 +91,12 @@ class CompilerTests extends JUnitSuite {
     @Test def interfaces(): Unit = {
         testContract("InterfaceTest")
     }
+
+    @Test def genericInterfaceParamsBasic(): Unit = {
+        testContract("GenericInterfaceParamsBasic")
+    }
+
+    @Test def genericInterfaceParams(): Unit = {
+        testContract("GenericInterfaceParams")
+    }
 }

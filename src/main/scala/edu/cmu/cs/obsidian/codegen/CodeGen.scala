@@ -1092,25 +1092,49 @@ class CodeGen (val target: Target, table: SymbolTable) {
             resolveType(bound.referenceType, table)
         }
 
+    def implementBound(translationContext: TranslationContext, bound: GenericBound): AbstractJClass =
+    // TODO GENERIC: get rid of special casing
+        if (bound.interfaceName == "Top") {
+            if (translationContext.contract.isInterface) {
+                obsidianSerializedClass(translationContext.contractClass.typeParams().last)
+            } else {
+                obsidianSerializedClass(translationContext)
+            }
+        } else {
+            resolveType(bound.referenceType, table).boxify()
+                .narrow(model.ref(translationContext.getProtobufClassName(translationContext.contract)))
+        }
+
     def obsidianSerialized: AbstractJClass =
         model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized") // .narrow(classOf[Object])
 
     def obsidianSerializedClass(translationContext: TranslationContext): AbstractJClass = {
         val archiveType = model.directClass(translationContext.getProtobufClassName(translationContext.contract))
-        obsidianSerialized.narrow(archiveType)
+        obsidianSerializedClass(archiveType)
     }
+
+    def obsidianSerializedClass(archiveType: AbstractJType): AbstractJClass = obsidianSerialized.narrow(archiveType)
 
     private def translateContract(
                     aContract: Contract,
                     newClass: JDefinedClass,
                     translationContext: TranslationContext) = {
+        for (param <- aContract.params) {
+            // boxify should never change things for us, since we don't use the primitive ints anyway
+            newClass.generify(param.gVar.varName, boundClass(param.bound).boxify())
+        }
+
+        if (aContract.isInterface) {
+            newClass.generify("ObsidianSerializedVar")
+        }
+
         target match {
             case Client(mainContract, _) =>
                 if (aContract != mainContract) {
-                    newClass._implements(obsidianSerializedClass(translationContext))
+                    newClass._implements(implementBound(translationContext, aContract.bound))
                 }
             case Server(_, _) =>
-                newClass._implements(obsidianSerializedClass(translationContext))
+                newClass._implements(implementBound(translationContext, aContract.bound))
         }
 
 //        aContract match {
@@ -1124,10 +1148,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
             generateLazySerializationCode(aContract, newClass, translationContext)
 
             for (param <- aContract.params) {
-                val bound = boundClass(param.bound)
-                // boxify should never change things for us, since we don't use the primitive ints anyway
-                newClass.generify(param.gVar.varName, bound.boxify())
-
                 newClass.field(JMod.PRIVATE, model.directClass("java.lang.String"), "__generic" + param.gVar.varName)
             }
         }
@@ -2453,13 +2473,13 @@ class CodeGen (val target: Target, table: SymbolTable) {
     def narrowWith(invocation: JInvocation, typeArgs: Seq[ObsidianType]): JInvocation =
         typeArgs.foldLeft(invocation)((inv, typeArg) => inv.narrow(resolveType(typeArg, table).boxify()))
 
-    def fullyQualifiedName(typ: ObsidianType): String = {
+    def fullyQualifiedName(translationContext: TranslationContext, typ: ObsidianType): IJExpression = {
         val resolvedType = resolveType(typ, table).erasure()
 
-        model.packages().asScala.flatMap(_.classes().asScala)
+        JExpr.lit(model.packages().asScala.flatMap(_.classes().asScala)
             .find(_.name() == resolvedType.name())
             .map(_.fullName())
-            .getOrElse(resolvedType.fullName())
+            .getOrElse(resolvedType.fullName()))
     }
 
     /* returns an expr because exprs are built bottom-up (unlike everything else) */
@@ -2509,22 +2529,25 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     JExpr._new(model.parseType("java.math.BigInteger")).arg(stringResult)
                 }
                 else {
-                    addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, false)
+                    val invocation = addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, false)
+                    narrowWith(invocation, params)
                 }
             /* TODO : this shouldn't be an extra case */
             // TODO GENERIC: Handle these params
             case Invocation(This(), params, name, args, isFFIInvocation) =>
-                addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, isFFIInvocation)
+                val invocation = addArgs(translationContext.invokeTransaction(name), args, translationContext, localContext, isFFIInvocation)
+                narrowWith(invocation, params)
             // TODO GENERIC: Handle these params
             case Invocation(recipient, params, name, args, isFFIInvocation) =>
-                addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext, isFFIInvocation)
+                val invocation = addArgs(JExpr.invoke(recurse(recipient), name), args, translationContext, localContext, isFFIInvocation)
+                narrowWith(invocation, params)
 
             // TODO GENERIC: Handle the type params
             case Construction(contractType, args, isFFIInvocation) =>
                 val contractRefType = ContractReferenceType(contractType, Owned(), false)
                 val resolvedType = resolveType(contractRefType, table)
 
-                val classArgNames = contractType.typeArgs.map(typ => JExpr.lit(fullyQualifiedName(typ)))
+                val classArgNames = contractType.typeArgs.map(typ => fullyQualifiedName(translationContext, typ))
 
                 val newInstance = addArgs(JExpr._new(resolvedType), args, translationContext, localContext, isFFIInvocation)
 
@@ -2663,6 +2686,18 @@ class CodeGen (val target: Target, table: SymbolTable) {
             (arg.varName, meth.param(resolveType(arg.typIn, table), arg.varName))
         )
 
+        val argList: Seq[(String, JVar)] =
+        // We need to pass the ChaincodeStub to methods so that the objects can
+        // restore themselves from the blockchain if need be.
+            (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
+
+        for (param <- tx.params) {
+            // boxify should never change things for us, since we don't use the primitive ints anyway
+            meth.generify(param.gVar.varName, boundClass(param.bound).boxify())
+
+            meth.param(model.directClass("java.lang.String"), "__generic" + param.gVar.varName)
+        }
+
         if (!newClass.isInterface) {
             /* ensure the object is loaded before trying to do anything.
              * (even checking the state!) */
@@ -2701,11 +2736,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
             /* otherwise, we set the flag to true */
             jIf._else().assign(isInsideInvocationFlag(), JExpr.lit(true))
-
-            val argList: Seq[(String, JVar)] =
-            // We need to pass the ChaincodeStub to methods so that the objects can
-            // restore themselves from the blockchain if need be.
-                (serializationParamName, meth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)) +: jArgs
 
             /* construct the local context from this list */
             val localContext: immutable.Map[String, JVar] = argList.toMap
