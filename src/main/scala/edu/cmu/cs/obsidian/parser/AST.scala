@@ -79,7 +79,12 @@ case class Dereference(e: Expression, f: String) extends Expression {
     }
 }
 
-case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression
+case class LocalInvocation(name: String, args: Seq[Expression]) extends Expression {
+    override def toString: String = {
+        val argString = args.mkString(",")
+        s"$name($argString)"
+    }
+}
 case class Invocation(recipient: Expression, name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     override def toString: String = {
         val argString = args.mkString(",")
@@ -95,7 +100,9 @@ case class VariableDecl(typ: ObsidianType, varName: String) extends Statement
 case class VariableDeclWithInit(typ: ObsidianType, varName: String, e: Expression) extends Statement
 
 case class VariableDeclWithSpec(typIn: ObsidianType, typOut: ObsidianType, varName: String) extends Statement
-
+ {
+     override def toString: String = varName
+ }
 case class Return() extends Statement
 case class ReturnExpr(e: Expression) extends Statement
 

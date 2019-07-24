@@ -177,6 +177,10 @@ case class UnusedExpressionOwnershipError(e: Expression) extends Error {
     val msg: String = s"Expression '$e' holds ownership, but is unused at the end of its scope."
 }
 
+case class UnusedExpressionArgumentOwnershipError(e: Expression) extends Error {
+    val msg: String = s"Expression '$e' holds ownership, but is passed as an argument to a transaction that did not consume ownership."
+}
+
 case class PotentiallyUnusedOwnershipError(name: String) extends Error {
     val msg: String = s"Variable '$name' holds ownership, but may be unused at the end of its scope."
 }
