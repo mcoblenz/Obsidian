@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.chaincode;
 import java.util.Set;
 import com.google.protobuf.InvalidProtocolBufferException;
 
-public interface ObsidianSerialized<T> {
+public interface ObsidianSerialized {
     String __getGUID();
     Set<ObsidianSerialized> __resetModified(Set<ObsidianSerialized> checked) throws InvalidProtocolBufferException;
     byte[] __archiveBytes() throws InvalidProtocolBufferException;
@@ -19,7 +19,7 @@ public interface ObsidianSerialized<T> {
                 WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException,
                 IllegalOwnershipConsumptionException, StateLockException;
 
-    public void initFromArchive(T archive, SerializationState __st) throws com.google.protobuf.InvalidProtocolBufferException;
+    public void initFromArchive(Object archive, SerializationState __st) throws com.google.protobuf.InvalidProtocolBufferException;
 
     public void flush();
     public abstract boolean methodReceiverIsOwnedAtBeginning(String transactionName);

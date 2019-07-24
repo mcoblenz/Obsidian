@@ -17,7 +17,10 @@ repositories {
     maven {
         // TODO UNDO THIS. Just for testing changes to standard library
         // url 'http://obsidian-lang.com/repository'
-        url '/home/roei/ObsidianGenericsImpl/docs/repository'
+        url 'http://reedoei.com/files/repository'
+    }
+    maven {
+        url 'https://repository.mulesoft.org/nexus/content/repositories/public/'
     }
     jcenter()
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }

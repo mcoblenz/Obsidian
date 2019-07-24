@@ -33,7 +33,7 @@ import edu.cmu.cs.obsidian.chaincode.ObsidianSerialized;
 import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
 
-public abstract class HyperledgerChaincodeBase<T> extends ChaincodeBase implements ObsidianSerialized<T> {
+public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
     SerializationState serializationState;
 
     public HyperledgerChaincodeBase() {
