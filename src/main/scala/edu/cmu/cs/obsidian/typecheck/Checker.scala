@@ -282,9 +282,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         (c1Table.contract, c2Table.contract) match {
             case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) =>
                 if (!obs1.isInterface && obs2.isInterface) {
-                    val interfaceMatches = obs1.implementBound.interfaceName == obs2.name
+                    val interfaceMatches = obs1.bound.contractName == obs2.name
 
-                    val subsParams = obs1.implementBound.substitute(obs1.params, c1.typeArgs).interfaceParams
+                    val subsParams = obs1.bound.substitute(obs1.params, c1.typeArgs).typeArgs
                     val argChecks = for ((c1Arg, c2Arg) <- subsParams.zip(c2.typeArgs)) yield {
                         isSubtype(table, c1Arg, c2Arg, isThis).isEmpty
                     }
@@ -304,11 +304,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         case np: NonPrimitiveType => np match {
             case c: ContractReferenceType =>
                 table.lookupTypeVar(c.contractName)
-                    .map(typeBound(table)(_).withPermission(c.permission))
+                    .map(typeBound(table)(_).withTypeState(c.permission))
                     .getOrElse(c)
             case s: StateType =>
                 table.lookupTypeVar(s.contractName)
-                    .map(typeBound(table)(_).withStates(s.stateNames))
+                    .map(typeBound(table)(_).withTypeState(States(s.stateNames)))
                     .getOrElse(s)
 
             case i: FFIInterfaceContractType => i
@@ -316,10 +316,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case GenericType(gVar, bound) =>
                 bound match {
                     // TODO GENERIC: How to handle this remote thing
-                    case GenericBoundPerm(interfaceName, interfaceParams, permission) =>
-                        ContractReferenceType(bound.contractType, permission, isRemote = false)
-                    case GenericBoundStates(interfaceName, interfaceParams, states) =>
-                        StateType(bound.contractType, states, isRemote = false)
+                    case GenericBoundPerm(interfaceType, permission) =>
+                        ContractReferenceType(interfaceType, permission, isRemote = false)
+                    case GenericBoundStates(interfaceType, states) =>
+                        StateType(interfaceType, states, isRemote = false)
                 }
         }
 
@@ -1385,15 +1385,16 @@ private def checkStatement(
                                 exprType match {
                                     case exprNonPrimitiveType: NonPrimitiveType =>
                                         if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
+                                            // TODO GENERIC: See if this case be cleaned up
                                             // We only want the permission/states from the expr, not the whole thing
-                                            val tempTyp = np.withPermission(exprNonPrimitiveType.permission)
+                                            val tempTyp = np.withTypeState(exprNonPrimitiveType.permission)
                                             exprNonPrimitiveType match {
-                                                case stateType: StateType => tempTyp.withStates(stateType.stateNames)
+                                                case stateType: StateType => tempTyp.withTypeState(States(stateType.stateNames))
                                                 case GenericType(gVar, bound) => bound match {
-                                                    case GenericBoundPerm(interfaceName, interfaceParams, permission) =>
+                                                    case perm: GenericBoundPerm =>
                                                         tempTyp
-                                                    case GenericBoundStates(interfaceName, interfaceParams, stateNames) =>
-                                                        tempTyp.withStates(stateNames)
+                                                    case states: GenericBoundStates =>
+                                                        tempTyp.withTypeState(States(states.states))
                                                 }
                                                 case _ => tempTyp
                                             }
@@ -2479,19 +2480,19 @@ private def checkStatement(
                 val table = globalTable.contractLookup(obsContract.name)
 
                 if (!obsContract.isInterface) {
-                    val boundDecls = globalTable.contract(obsContract.bound.interfaceName) match {
+                    val boundDecls = globalTable.contract(obsContract.bound.contractName) match {
                         case Some(interface) => interface.contract match {
-                            case impl: ObsidianContractImpl => impl.substitute(impl.params, obsContract.bound.interfaceParams).declarations
+                            case impl: ObsidianContractImpl => impl.substitute(impl.params, obsContract.bound.typeArgs).declarations
                             case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
                                 // TODO GENERIC: This should never happen
                                 assert(false, "Cannot implement a JavaFFIContract"); Nil
                         }
                         case None =>
-                            logError(obsContract, InterfaceNotFoundError(obsContract.name, obsContract.bound.interfaceName))
+                            logError(obsContract, InterfaceNotFoundError(obsContract.name, obsContract.bound.contractName))
                             Nil
                     }
 
-                    implementOk(table, obsContract, obsContract.bound.interfaceName, obsContract.declarations, boundDecls)
+                    implementOk(table, obsContract, obsContract.bound.contractName, obsContract.declarations, boundDecls)
                 }
 
                 val newDecls = obsContract.declarations.map(checkDeclaration(table))

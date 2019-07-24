@@ -51,10 +51,10 @@ object StateNameValidator extends IdentityAstTransformer {
                                             if (states.exists(genericType.gVar.permissionVar.contains(_))) {
                                                 genericType
                                             } else {
-                                                genericType.withStates(states)
+                                                genericType.withTypeState(States(states))
                                             }
                                         case GenericType(gVar, bound) => genericType
-                                        case _ => genericType.withPermission(np.permission)
+                                        case _ => genericType.withTypeState(np.permission)
                                     }
 
                                     // TODO GENERIC: Factor out this sort of thing to like a copy permission/state thing

@@ -112,8 +112,7 @@ object ImportProcessor {
         contracts.map {
             case c: ObsidianContractImpl =>
                 val newMods = c.modifiers - IsMain() + IsImport()
-                val newC = ObsidianContractImpl(newMods, c.name, c.params, c.implementBound, c.declarations, c.transitions, c.isInterface, c.sourcePath).setLoc(c)
-                newC
+                ObsidianContractImpl(newMods, c.name, c.params, c.bound, c.declarations, c.transitions, c.isInterface, c.sourcePath).setLoc(c)
             case c: JavaFFIContractImpl => c
         }
     }

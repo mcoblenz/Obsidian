@@ -304,28 +304,28 @@ class ParserTests extends JUnitSuite {
     @Test def parseContractWithParamsWithBound(): Unit = {
         shouldSucceed(
             """
-              | contract C[T implements I] {}
+              | contract C[T where T implements I] {}
             """.stripMargin)
     }
 
     @Test def parseContractWithParamsStateWithBound(): Unit = {
         shouldSucceed(
             """
-              | contract C[T@s implements I@Owned] {}
+              | contract C[T@s where T implements I where s is Owned] {}
             """.stripMargin)
     }
 
     @Test def parseContractWithParamsWithBoundParams(): Unit = {
         shouldSucceed(
             """
-              | contract C[T implements I[T]] {}
+              | contract C[T where T implements I[T]] {}
             """.stripMargin)
     }
 
     @Test def parseContractWithParamsStateWithBoundParams(): Unit = {
         shouldSucceed(
             """
-              | contract C[T@s implements I[T]@Owned] {}
+              | contract C[T where T implements I[T] where s is Owned] {}
             """.stripMargin)
     }
 
@@ -339,7 +339,7 @@ class ParserTests extends JUnitSuite {
     @Test def parseContractParamsWithBoundAndImplements(): Unit = {
         shouldSucceed(
             """
-              | contract C[T@s implements I1[T]@Owned] implements I2[T] {}
+              | contract C[T where T implements I1[T] where s is Owned] implements I2[T] {}
             """.stripMargin)
     }
 

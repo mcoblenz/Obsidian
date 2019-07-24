@@ -5,7 +5,7 @@ interface Validatable {
     transaction validate(Validatable@Invalid >> (Valid | Invalid) this);
 }
 
-contract C[A implements Validatable] {
+contract C[A where A implements Validatable] {
     state Empty;
     state Full {
         A@Valid val;

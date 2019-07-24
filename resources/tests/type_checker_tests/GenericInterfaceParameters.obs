@@ -20,7 +20,7 @@ contract Store[T] {
     }
 }
 
-contract Foo[T implements Consumer[U], U] implements Consumer[U] {
+contract Foo[T where T implements Consumer[U], U] implements Consumer[U] {
     T@Owned t;
 
     Foo@Owned(T@Owned >> Unowned t) {

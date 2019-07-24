@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.parser
 
 import java.io.{InputStream, StringWriter}
 
-import edu.cmu.cs.obsidian.lexer
+import edu.cmu.cs.obsidian.{lexer, parser}
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.typecheck._
 import org.apache.commons.io.IOUtils
@@ -528,7 +528,7 @@ object Parser extends Parsers {
     }
 
 
-    private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String, contractParams: List[GenericType]): Parser[Transaction] = {
+    private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String, contractParams: Seq[GenericType]): Parser[Transaction] = {
         // TODO GENERIC: Add generic parameters here (and also to interfaces)
         parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~!
             opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
@@ -554,8 +554,10 @@ object Parser extends Parsers {
                         }
                 }
 
+                val thisContractType = ContractType(contractName, contractParams)
+
                 val finalType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName, contractParams), Shared(), false)
+                    case None => ContractReferenceType(thisContractType, Shared(), false)
                     case Some(v) => v.typOut.withParams(contractParams)
                 }
 
@@ -631,37 +633,54 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseGenericImplements = {
-        parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ opt(AtT() ~ parseIdAlternatives) ^^ {
-            case name ~ optParams ~ permission =>
+    private def parseContractType = {
+        parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ^^ {
+            case name ~ optParams =>
                 val params = optParams.map(_._1._2).getOrElse(List())
+                ContractType(name._1, params)
+        }
+    }
 
-                val perm = GenericBoundPerm(name._1, params, _: Permission)
-                val states = GenericBoundStates(name._1, params, _: Set[String])
+    private def parseWhereImplements: Parser[ContractType] = {
+        WhereT() ~ parseId ~ ImplementsT() ~ parseType ^^ {
+            case _ ~ typeVar ~ _ ~ typeBound => typeBound match {
+                case np: NonPrimitiveType => np.contractType
 
-                permission match {
-                    case Some(_ ~ permissions) =>
-                        if (permissions.length == 1) {
-                            resolvePermission(permissions.head._1) match {
-                                case Some(value) => perm(value)
-                                case None => states(Set(permissions.head._1))
-                            }
-                        } else {
-                            states(permissions.map(_._1).toSet)
-                        }
-                    case None => perm(Unowned())
+                // TODO GENERIC: Use a proper parser error message
+                case _ => assert(false, "Contract cannot implement primitive type."); null
+            }
+        }
+    }
+
+    private def parseWhereSubperm: Parser[Either[Permission, Set[String]]] = {
+        WhereT() ~ parseId ~ IsT() ~ parseIdAlternatives ^^ {
+            case _ ~ permVar ~ _ ~ permBound =>
+                if (permBound.length == 1) {
+                    resolvePermission(permBound.head._1) match {
+                        case Some(perm) => Left(perm)
+                        case None => Right(permBound.map(_._1).toSet)
+                    }
+                } else {
+                    Right(permBound.map(_._1).toSet)
                 }
         }
     }
 
     private def genericParam = {
-        opt(AssetT()) ~ parseId ~ opt(AtT() ~ parseId) ~ opt(ImplementsT() ~ parseGenericImplements) ^^ {
-            case assetMod ~ varId ~ stateVarId ~ implements =>
+        opt(AssetT()) ~ parseId ~ opt(AtT() ~ parseId) ~ opt(parseWhereImplements) ~ opt(parseWhereSubperm) ^^ {
+            case assetMod ~ varId ~ stateVarId ~ implements ~ subpermBound =>
                 val stateVar = stateVarId.map(_._2._1)
-                val bound = implements.map(_._2)
+
+                val contractBound = implements.getOrElse(ContractType("Top", Nil))
+                val varBound = subpermBound.getOrElse(Left(Unowned()))
                 val gVar = GenericVar(assetMod.isDefined, varId._1, stateVar)
 
-                GenericType(gVar, bound.getOrElse(GenericBoundPerm("Top", Nil, Unowned())))
+                // TODO GENERIC: Ensure that the "wheres" only refer to this variable
+
+                varBound match {
+                    case Left(perm) => GenericType(gVar, GenericBoundPerm(contractBound, perm))
+                    case Right(states) => GenericType(gVar, GenericBoundStates(contractBound, states))
+                }
         }
     }
 
@@ -683,7 +702,7 @@ object Parser extends Parsers {
     }
 
     private def parseContractDecl(srcPath: String) = {
-        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseGenericId ~ opt(ImplementsT() ~ parseGenericImplements) >> {
+        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseGenericId ~ opt(ImplementsT() ~ parseContractType) >> {
             case mod ~ ct ~ identifier ~ impl =>
                 val isInterface = ct == InterfaceT()
 
@@ -692,7 +711,7 @@ object Parser extends Parsers {
                 val implementBound = impl match {
                     case Some(_ ~ bound) => bound
                     // TODO GENERIC: Consolidate all these references to Top
-                    case None => GenericBoundPerm("Top", Nil, Unowned())
+                    case None => ContractType("Top", Nil)
                 }
 
                 LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name._1, params)) ~! RBraceT() ^^ {

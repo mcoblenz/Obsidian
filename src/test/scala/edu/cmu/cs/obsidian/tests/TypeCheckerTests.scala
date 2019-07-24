@@ -760,8 +760,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def genericsOwnership(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsOwnership.obs",
             (InvalidInconsistentFieldType("x",
-                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm("Top",List(),Unowned())),
-                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm("Top",List(),Owned()))), 12) ::
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(ContractType("Top",Nil), Unowned())),
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(ContractType("Top",Nil),Owned()))), 12) ::
             Nil)
     }
 
@@ -780,12 +780,12 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def genericsInterfaceImplementsBound(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericInterfaceBounds.obs",
-            (MethodUndefinedError(GenericType(GenericVar(isAsset = false,"T",None), GenericBoundPerm("Top",List(),Owned())),"validate"), 29) ::
+            (MethodUndefinedError(GenericType(GenericVar(isAsset = false,"T",None), GenericBoundPerm(ContractType("Top",Nil),Owned())),"validate"), 29) ::
             (ArgumentSubtypingError("store", "a",
                 StateType(ContractType("NoImplValidatable", Nil), "Invalid", isRemote = false),
                 StateType(ContractType("DummyValidatable", Nil), "Invalid", isRemote = false)), 67) ::
             (GenericParameterError(GenericType(GenericVar(isAsset = false,"A",None),
-                GenericBoundPerm("Validatable",List(),Unowned())),
+                GenericBoundPerm(ContractType("Validatable",Nil),Unowned())),
                 ContractReferenceType(ContractType("NoImplValidatable", Nil), Inferred(), isRemote = false)), 73) ::
             Nil)
     }
@@ -801,16 +801,16 @@ class TypeCheckerTests extends JUnitSuite {
                 IntType()), 65) ::
             (GenericParameterError(
                 GenericType(GenericVar(isAsset = false, "T", None),
-                    GenericBoundPerm("Consumer", List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false)), Unowned())),
+                    GenericBoundPerm(ContractType("Consumer", List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false))), Unowned())),
                 ContractReferenceType(ContractType("A", Nil), Inferred(), isRemote = false)
             ), 70) ::
             (GenericParameterError(
                 GenericType(GenericVar(isAsset = false,"T",None),
-                    GenericBoundPerm("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false)), Unowned())),
+                    GenericBoundPerm(ContractType("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false))), Unowned())),
                 ContractReferenceType(ContractType("NopConsumer", List(StringType())), Inferred(), isRemote = false)), 73) ::
             (GenericParameterError(
                 GenericType(GenericVar(isAsset = false,"T",None),
-                    GenericBoundPerm("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false)), Unowned())),
+                    GenericBoundPerm(ContractType("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false))), Unowned())),
                 ContractReferenceType(ContractType("NopConsumer", List()), Inferred(), isRemote = false)), 76) ::
             // Intentionally duplicated error: one for the type in the generic, one for the actual construction
             (GenericParameterListError(1, 0), 76) ::
@@ -824,23 +824,27 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def genericsStateVariables(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsStateVariables.obs",
+            (InvalidInconsistentFieldType("val",
+                GenericType(GenericVar(isAsset = false,"X",None),GenericBoundPerm(ContractType("Top", Nil),Unowned())),
+                GenericType(GenericVar(isAsset = false,"X",Some("s")),GenericBoundPerm(ContractType("Top",Nil),Unowned()))), 16) ::
             (ReceiverTypeIncompatibleError("getX",
                 StateType(ContractType("A", Nil), "S2", isRemote = false),
-                StateType(ContractType("A", Nil), "S1", isRemote = false)), 62) ::
+                StateType(ContractType("A", Nil), "S1", isRemote = false)), 66) ::
             (ReceiverTypeIncompatibleError("getX",
                 ContractReferenceType(ContractType("A", Nil), Unowned(), isRemote = false),
-                StateType(ContractType("A", Nil), "S1", isRemote = false)), 68) ::
+                StateType(ContractType("A", Nil), "S1", isRemote = false)), 72) ::
                 Nil)
     }
 
     @Test def genericsAssets(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsAssets.obs",
-            (UnusedOwnershipError("x"), 45) ::
-                (GenericParameterAssetError("X", "C"), 63) ::
-                (ReceiverTypeIncompatibleError("go",
-                    GenericType(GenericVar(isAsset = false, "X", Some("s")),
-                        GenericBoundPerm("Go", List(), Unowned())),
-                    ContractReferenceType(ContractType("Go", Nil), Owned(), isRemote = false)), 55) ::
+            (UnusedOwnershipError("x"), 37) ::
+            (UnusedOwnershipError("val"), 48) ::
+            (GenericParameterAssetError("X", "C"), 63) ::
+            (ReceiverTypeIncompatibleError("go",
+                GenericType(GenericVar(isAsset = false, "X", Some("s")),
+                    GenericBoundPerm(ContractType("Go", Nil), Unowned())),
+                ContractReferenceType(ContractType("Go", Nil), Owned(), isRemote = false)), 55) ::
                 Nil)
     }
 

@@ -17,7 +17,7 @@ class IdentityAstTransformer {
 
     def transformProgram(table: SymbolTable): (SymbolTable, Seq[ErrorRecord]) = {
         var errorRecords = List.empty[ErrorRecord]
-        var contracts = List[Contract](ObsidianContractImpl(Set(), "Top", Nil, GenericBoundPerm("Top", Nil, Unowned()), Nil, None, isInterface = true, ""))
+        var contracts = List[Contract](ObsidianContractImpl(Set(), "Top", Nil, ContractType("Top", Nil), Nil, None, isInterface = true, ""))
         assert(table.ast.imports.isEmpty, "Imports should be empty after processing.")
 
         for ((contractName, contractTable) <- table.contractLookup) {
@@ -76,7 +76,7 @@ class IdentityAstTransformer {
                         oldContract.modifiers,
                         oldContract.name,
                         oldContract.params,
-                        oldContract.implementBound,
+                        oldContract.bound,
                         newDecls,
                         oldContract.transitions,
                         oldContract.isInterface,

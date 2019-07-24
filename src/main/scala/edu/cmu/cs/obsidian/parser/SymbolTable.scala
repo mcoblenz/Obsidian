@@ -70,8 +70,7 @@ class StateTable(
                 if (found.isDefined) {
                     val availableIn = found.get.availableIn
                     if (availableIn.isDefined) {
-                        val availableInCurrentState = availableIn.get.exists(p => p == name)
-                        if (availableInCurrentState) found else None
+                        if (availableIn.get.contains(name)) found else None
                     }
                     else found // The field is available in all states.
                 }
@@ -183,6 +182,9 @@ class ContractTable(
     def ast: AST = contract
 
     def name: String = this.contract.name
+
+    def lookupContract(contractType: ContractType): Option[ContractTable] =
+        lookupContract(contractType.contractName).map(_.substitute(contractType.typeArgs))
 
     /* resolves a contract from the point of view of this contract. Three cases:
      * 1) [name] refers to a global contract and it's in the symbol table

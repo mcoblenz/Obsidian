@@ -268,25 +268,18 @@ case class IfInState(e: Expression, state: Identifier, s1: Seq[Statement], s2: S
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Statement = {
         ObsidianType.stateSubstitutions(genericParams, actualParams).get(state._1) match {
             case Some(permOrState) => permOrState match {
-                    case Left(perm) =>
-                        // TODO GENERIC: We should be able to figure out what branch this takes at compile time,
-                        //  and therefore resolve the branch correctly. It's probably not right to always take the true branch?
-                        // This can be None in the case that the state variable resolves to a permission.
-                        // In this case, we don't need to do a dynamic state check, because it's not a state.
+                    case perm: Permission =>
+                        assert(false); null // TODO GENERIC: Update this to do what we end up doing in the paper
 
-                        // Put s1 in both so compiler knows it will always happen.
-                        // Further we transform it to a static assert and an assignment to make sure that the substitution works, and
-                        // that the computation still gets run, in case the side effects are important
-                        // TODO GENERIC: Make sure we run the expression somehow (would do assignment, but then we need to know the type
-                        val body = StaticAssert(e, (perm.toString, state._2) :: Nil).setLoc(this) +: s1
-                        IfThenElse(TrueLiteral(), body, body)
-
-                    case Right(states) =>
+                    case States(states) =>
                         IfInState(e.substitute(genericParams, actualParams),
                             (states.head, state._2),
                             s1.map(_.substitute(genericParams, actualParams)),
                             s2.map(_.substitute(genericParams, actualParams)))
                             .setLoc(this)
+
+                    // TODO GENERIC: HANDLE THIS CASE
+                    case PermVar(varName) => assert(false); null
                 }
 
             case None =>
@@ -313,7 +306,7 @@ case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST {
     def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): SwitchCase = {
         val newStateName = ObsidianType.stateSubstitutions(genericParams, actualParams).get(stateName) match {
             case Some(permOrState) => permOrState match {
-                case Right(states) =>
+                case States(states) =>
                     if (states.size > 1) {
                         // TODO GENERIC: Clean this up (log error, or...?) Should probably actually generate multiple cases for this one
                         assert(false, s"Bad subsitutition: $states for $stateName. Reason: Can only substitute a single state here")
@@ -321,7 +314,11 @@ case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST {
                     } else {
                         states.head
                     }
-                case Left(perm) =>
+                case PermVar(varName) =>
+                    // TODO GENERIC: Improve this. Should probably either delete the case or just compile anyway, since the case will never be hit
+                    assert(false, s"Bad substitution: Cannot substitute a perm var ($varName) for a state in a switch case.")
+                    stateName
+                case perm: Permission =>
                     // TODO GENERIC: Improve this. Should probably either delete the case or just compile anyway, since the case will never be hit
                     assert(false, s"Bad substitution: Cannot substitute a permission ($perm) for a state in a switch case.")
                     stateName
@@ -335,13 +332,18 @@ case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST {
 }
 
 case class StaticAssert(expr: Expression, statesOrPermissions: Seq[Identifier]) extends Statement {
-    def transform(stateMap: Map[String, Either[Permission, Set[String]]],
+    def transform(stateMap: Map[String, TypeState],
                   identifier: Identifier): Seq[Identifier] =
+    // TODO GENERIC: handle everything correctly...
         stateMap.get(identifier._1) match {
             case Some(permOrState) => permOrState match {
-                case Left(perm) => (perm.toString, identifier._2) :: Nil
-                case Right(states) => states.map((_, identifier._2)).toSeq
+                case States(states) => states.map((_, identifier._2)).toSeq
+                case perm: Permission => (perm.toString, identifier._2) :: Nil
+
+                // TODO GENERIC: I think?
+                case PermVar(varName) => assert(false, "There should be no permission variables left"); null
             }
+
             case None => identifier :: Nil
         }
 
@@ -483,11 +485,11 @@ sealed abstract class Contract(name: String, val sourcePath: String) extends Dec
     val isImport = modifiers.contains(IsImport())
 
     def isInterface: Boolean
-    def bound: GenericBound
+    def bound: ContractType
 }
 
 case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
-                    name: String, params: Seq[GenericType], implementBound: GenericBound,
+                    name: String, params: Seq[GenericType], bound: ContractType,
                     override val declarations: Seq[Declaration],
                     transitions: Option[Transitions],
                     isInterface: Boolean,
@@ -495,13 +497,11 @@ case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
     val tag: DeclarationTag = ContractDeclTag
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianContractImpl =
-        ObsidianContractImpl(modifiers, name, params, implementBound,
+        ObsidianContractImpl(modifiers, name, params, bound,
             declarations.map(_.substitute(genericParams, actualParams)),
             transitions,
             isInterface,
             sp).setLoc(this)
-
-    override def bound: GenericBound = implementBound
 }
 
 /* FFI contract for Java */
@@ -515,7 +515,8 @@ case class JavaFFIContractImpl(name: String,
 
     // TODO GENERIC: Maybe this should actually do something
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): JavaFFIContractImpl = this
-    override def bound: GenericBound = GenericBoundPerm("Top", Nil, Unowned())
+    // TODO GENERIC: Is this the right bound?
+    override def bound: ContractType = ContractType(interface, Nil)
     override def isInterface: Boolean = false
 
     // TODO GENERIC: Maybe do something here

@@ -12,13 +12,13 @@ contract AssetIdentity[asset X@s] {
     }
 }
 
-interface Go[Y] {
+interface Go {
     state A;
 
-    transaction go(Go[Y]@Owned >> A this);
+    transaction go(Go@Owned >> A this);
 }
 
-contract D implements Go[C@Owned] {
+contract D implements Go {
     state A;
 
     D@A() {
@@ -30,17 +30,9 @@ contract D implements Go[C@Owned] {
     }
 }
 
-/* contract BadAssetManager[(asset X implements Go[C@Owned]) @ (s <: Owned)] { */
-/* contract BadAssetManager[asset X@s */
-/*                          where X implements Go[C@Owned] */
-/*                          where s is Owned] { */
-/* contract BadAssetManager[asset X@s */
-/*                          where X implements Go[C@Owned] */
-/*                             where C implements Foo */
-/*                          where s is Owned] { */
-/* contract BadAssetManager[C@s implements Go[D@t], D@t implements Go[C@s]] */
-
-contract BadAssetManager[asset X@s implements Go[C@Owned]@Owned] {
+contract BadAssetManager[asset X@s
+                         where X implements Go
+                         where s is Owned] {
     // error, because x could be an owned asset
     transaction drop(X@s >> Unowned x) {}
 
@@ -50,7 +42,15 @@ contract BadAssetManager[asset X@s implements Go[C@Owned]@Owned] {
     }
 }
 
-contract BadBound[X@s implements Go@Unowned] {
+contract BadAssetManager2[asset X@s
+                          where X implements Go] {
+    // error, because x could be an owned asset
+    transaction drop(X@s >> Unowned val) {}
+}
+
+contract BadBound[X@s
+                  where X implements Go
+                  where s is Unowned] {
     transaction boundTest(X@s >> Unowned x) returns X@A {
         x.go(); // error, we don't know that x is owned
         return x;

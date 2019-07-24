@@ -1086,22 +1086,24 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     def boundClass(bound: GenericBound): AbstractJType =
         // TODO GENERIC: get rid of special casing
-        if (bound.interfaceName == "Top") {
+        if (bound.interfaceType.contractName == "Top") {
             model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized")
         } else {
             resolveType(bound.referenceType, table)
         }
 
-    def implementBound(translationContext: TranslationContext, bound: GenericBound): AbstractJClass =
+    def implementBound(translationContext: TranslationContext, bound: ContractType): AbstractJClass =
     // TODO GENERIC: get rid of special casing
-        if (bound.interfaceName == "Top") {
+        if (bound.contractName == "Top") {
             if (translationContext.contract.isInterface) {
                 obsidianSerializedClass(translationContext.contractClass.typeParams().last)
             } else {
                 obsidianSerializedClass(translationContext)
             }
         } else {
-            resolveType(bound.referenceType, table).boxify()
+            // We can put any permission for referenceType, since we only need to get the translated name
+            val referenceType = ContractReferenceType(bound, Unowned(), isRemote = false)
+            resolveType(referenceType, table).boxify()
                 .narrow(model.ref(translationContext.getProtobufClassName(translationContext.contract)))
         }
 
