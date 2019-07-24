@@ -1,0 +1,17 @@
+import "resources/sample_programs/pilot2/betting_utils.obs"
+import "resources/sample_programs/pilot2/games.obs"
+
+
+main asset contract Casino {
+
+    Money@Owned money;
+    GameRecordList@Shared gamerecords;
+
+    Casino@Owned() {
+        money = new Money(100000);
+        gamerecords = new GameRecordList();
+    }
+    //TODO: Add your code here.
+
+
+}

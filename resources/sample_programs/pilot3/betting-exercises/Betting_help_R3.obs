@@ -1,0 +1,22 @@
+import "resources/sample_programs/pilot2/betting_utils.obs"
+import "resources/sample_programs/pilot2/games.obs"
+
+
+main asset contract Casino {
+
+    Money@Owned money;
+    GameRecordList@Shared gamerecords;
+
+    Casino@Owned() {
+        money = new Money(100000);
+        gamerecords = new GameRecordList();
+    }
+
+    transaction makeBet(Casino@Owned this, Bettor@Unowned b, Money@Owned >> Unowned m, Player@Unowned predictedWinner, Game@Unowned g) {
+
+    }
+
+    transaction returnMoney(Casino@Owned this, Bettor@Unowned b, Game@Owned g) {
+        
+    }
+}
