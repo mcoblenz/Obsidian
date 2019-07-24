@@ -56,6 +56,10 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
     override def topPermissionType: NonPrimitiveType = this.copy(permission = Unowned()).setLoc(this)
 
     override def remoteType: NonPrimitiveType = ContractReferenceType(contractType, permission, true)
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
+        this.copy(permission = otherType.permission).setLoc(this)
+
 }
 
 
@@ -137,6 +141,9 @@ case class StateType(contractName: String, stateNames: Set[String], override val
     }
 
     override def remoteType: NonPrimitiveType = StateType(contractName, stateNames, true)
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType) = otherType
+
 }
 
 object StateType {
@@ -192,28 +199,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     override def baseTypeName: String = contractName
 
-    //    override def toString: String = {
-    //        val modifiersString = modifiers.map(m => m.toString).mkString(" ")
-    //
-    //        if (modifiers.size > 0) {
-    //            modifiersString + " " + t.toString
-    //        }
-    //        else {
-    //            t.toString
-    //        }
-    //    }
-
-    //    override def equals(other: Any): Boolean = {
-    //        other match {
-    //            case NonPrimitiveType(typ, mod) => typ == t && mod == modifiers
-    //            case _ => false
-    //        }
-    //    }
-    //    override def hashCode(): Int = t.hashCode()
-    //    val residualType: ObsidianType = if (modifiers.contains(IsOwned()))
-    //        NonPrimitiveType(t, modifiers - IsOwned() + IsReadOnlyState())
-    //    else this
-
     def topPermissionType = this
 
     override def isAssetReference(contextContractTable: ContractTable): Possibility = {
@@ -231,6 +216,8 @@ sealed trait NonPrimitiveType extends ObsidianType {
     }
 
     def remoteType: NonPrimitiveType
+
+    def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType
 }
 
 
@@ -264,4 +251,7 @@ case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) ext
     override val contractName: String = name
     override val permission: Permission = simpleType.permission
     override def remoteType: NonPrimitiveType = this
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType) =
+        InterfaceContractType(name, simpleType.typeByMatchingPermission(otherType))
 }

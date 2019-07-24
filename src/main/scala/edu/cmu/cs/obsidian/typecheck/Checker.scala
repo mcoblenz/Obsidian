@@ -1108,14 +1108,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             if (context.get(referenceIdentifier).isDefined) {
                 // This was a local variable.
-                context.updated(referenceIdentifier, finalType)
+                context.updated(referenceIdentifier, passedType.typeByMatchingPermission(finalType))
             }
             else {
                 // This was a field or a static invocation. If it was a field, update the field's type.
                 val currentFieldType = context.lookupCurrentFieldTypeInThis(referenceIdentifier)
 
                 if (currentFieldType.isDefined && currentFieldType.get != finalType) {
-                    context.updatedThisFieldType(referenceIdentifier, finalType)
+                    context.updatedThisFieldType(referenceIdentifier, passedType.typeByMatchingPermission(finalType))
                 }
                 else {
                     // No need to update anything for static invocations.
@@ -1288,7 +1288,7 @@ private def checkStatement(
                         typ
                 }
 
-                (contextPrime.updated(name, declaredType), VariableDeclWithInit(exprType, name, ePrime))
+                (contextPrime.updated(name, declaredType), VariableDeclWithInit(typ, name, ePrime))
 
             case Return() =>
                 decl match {
