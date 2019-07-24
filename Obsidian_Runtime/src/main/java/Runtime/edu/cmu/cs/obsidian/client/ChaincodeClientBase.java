@@ -20,7 +20,8 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
             edu.cmu.cs.obsidian.chaincode.InvalidStateException,
             edu.cmu.cs.obsidian.chaincode.ReentrancyException,
             edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException,
-            edu.cmu.cs.obsidian.chaincode.StateLockException;
+            edu.cmu.cs.obsidian.chaincode.StateLockException,
+            edu.cmu.cs.obsidian.chaincode.BadArgumentException;
 
     public void delegatedMain(String args[]) {
 
