@@ -19,6 +19,9 @@ repositories {
         // url 'http://obsidian-lang.com/repository'
         url '/home/roei/ObsidianGenericsImpl/docs/repository'
     }
+    jcenter()
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+    maven { url 'https://jitpack.io' }
     mavenCentral()
 }
 
