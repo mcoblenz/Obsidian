@@ -1,46 +1,47 @@
 
 contract Player {
-    string move;
-
     Player@Owned() {
-        move = "none";
-    }
-
-    transaction getMove(Player@Owned >> Owned this) returns string {
-        return move;
-    }
-
-    transaction setMove(Player@Owned >> Owned this, string newMove) {
-        move = newMove;
     }
 }
 
+contract Move {
+
+}
+
 contract Game {
-    Player@Owned p1;
-    Player@Owned p2;
-    //...
+
+    //Assume a two player game
+
+    Player@Unowned player1;
+    Player@Unowned player2;
 
     state Start;
     state Playing;
     state FinishedPlaying;
 
-    Game@Start() {
-        p1 = new Player();
-        p2 = new Player();
-        //...
+    Game@Start(Player@Unowned p1, Player@Unowned p2) {
+        player1 = p1;
+        player2 = p2;
         -> Start;
     }
 
-    transaction play(Game@Start >> Playing this) {
-        //...
+    transaction startPlaying(Game@Start >> Playing this) {
         -> Playing;
     }
 
-    //Returns the winner of the game
-    transaction calculateWinner(Game@Playing >> FinishedPlaying this) returns string {
+    transaction makeMove(Game@Playing this, Player@Unowned player, Move move) {
+        //Records player's move...
         //...
+    }
+
+    transaction finishPlaying(Game@Playing >> FinishedPlaying this) {
         -> FinishedPlaying;
-        return "";
+    }
+
+    //Returns the winner of the game
+    transaction calculateWinner(Game@FinishedPlaying this) returns Player@Unowned {
+        //...
+        return player1; //Always returns Player 1 for now
     }
 
 }

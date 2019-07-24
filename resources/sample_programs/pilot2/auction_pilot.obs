@@ -64,7 +64,7 @@ Uncomment the code and answer all the TODO statements below.
 //     }
 
 //     transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {  
-//         Money m = money.getSomeMoney(bidAmount);
+//         Money m = money.splitMoney(bidAmount);
 //         //4. TODO: Finish this transaction by creating a new bid with the given bidAmount.
 
 //     }
@@ -78,7 +78,7 @@ Uncomment the code and answer all the TODO statements below.
 //     }
 
 //     transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
-//         money.addMoney(bid.getMoney());
+//         money.mergeMoney(bid.getMoney());
 //         disown bid;
 //     }
 // }
@@ -140,16 +140,16 @@ asset contract Money {
         amount = amt;
     }
 
-    transaction addMoney(Money this, Money@Owned >> Unowned m) {
+    transaction mergeMoney(Money@Owned this, Money@Owned >> Unowned m) {
          amount = amount + m.getAmount();
          disown m;
     }
 
-    transaction getAmount(Money this) returns int {
+    transaction getAmount(Money@Unowned this) returns int {
         return amount;
     }
 
-    transaction getSomeMoney(Money this, int amt) returns Money@Owned {
+    transaction splitMoney(Money@Owned this, int amt) returns Money@Owned {
         if (amt > amount) {
             revert "Can't split out more money than is available in a given Money object.";
         } else {
