@@ -7,7 +7,7 @@ asset contract Coin {
 asset contract Coins {
     // Currently implemented as a bottomless void for convenience.
 
-    transaction deposit(Coin @ Owned >> Unowned c) {
+    transaction deposit(Coins @ Unowned this, Coin @ Owned >> Unowned c) {
         disown c;
     }
 }

@@ -686,11 +686,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
             stateMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
             stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
 
-            stateMeth.body()
-                ._if(JExpr.ref(serializationParamName).neNull())
-                ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
-
             if (!isStub) {
+                stateMeth.body()
+                    ._if(JExpr.ref(serializationParamName).neNull())
+                    ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
+
                 stateMeth.body()._return(JExpr.ref(stateField))
             } else {
                 stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
@@ -1608,6 +1608,9 @@ class CodeGen (val target: Target, table: SymbolTable) {
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
 
         val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
                                                                   .asInstanceOf[Option[Transaction]]
