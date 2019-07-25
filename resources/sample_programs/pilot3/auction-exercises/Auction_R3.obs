@@ -15,9 +15,9 @@ Please answer the questions below.
 
 
 TODO: What state is a Bid in at:
-    1. First instantiation? ______________________
-    2. The beginning of the bidSurpassed transaction? _____________________
-    3. The end of the bidSurpassed transaction? ________________________
+    1. First instantiation? Open
+    2. The beginning of the bidSurpassed transaction? Open
+    3. The end of the bidSurpassed transaction? Stale
 */
 
 asset contract Bid {
@@ -52,36 +52,36 @@ Below is the Bidder contract, which represents a bidder in our Auction.
 Uncomment the code and answer all the TODO statements below.
 */
 
-// asset contract Bidder {
-//     string name; //Bidder's name
-//     Money@Owned money; //The total money owned by the bidder
-//     ItemList@Owned inventory; // can add infinite items to inventory
+asset contract Bidder {
+    string name; //Bidder's name
+    Money@Owned money; //The total money owned by the bidder
+    ItemList@Owned inventory; // can add infinite items to inventory
 
-//     Bidder@Owned(string n, int m) {
-//         name = n;
-//         money = new Money(m);
-//         inventory = new ItemList();
-//     }
+    Bidder@Owned(string n, int m) {
+        name = n;
+        money = new Money(m);
+        inventory = new ItemList();
+    }
 
-//     transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {  
-//         Money m = money.splitMoney(bidAmount);
-//         //4. TODO: Finish this transaction by creating a new bid with the given bidAmount.
+    transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {  
+        Money m = money.splitMoney(bidAmount);
+        //4. TODO: Finish this transaction by creating a new bid with the given bidAmount.
+        return new Bid(m);
+    }
 
-//     }
+    transaction getName(Bidder@Unowned this) returns string {
+        return name;
+    }
 
-//     transaction getName(Bidder@Unowned this) returns string {
-//         return name;
-//     }
+    transaction won(Bidder@Unowned this, Item@Owned >> Unowned i) {
+        inventory.append(i);
+    }
 
-//     transaction won(Bidder@Unowned this, Item@Owned >> Unowned i) {
-//         inventory.append(i);
-//     }
-
-//     transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
-//         money.mergeMoney(bid.getMoney());
-//         disown bid;
-//     }
-// }
+    transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
+        money.mergeMoney(bid.getMoney());
+        disown bid;
+    }
+}
 
 /*
 Below are the Seller, Item, ItemList, and Money contracts. Refer to these (as well as the Bid and Bidder contracts above) to complete
@@ -164,54 +164,62 @@ In the Auction contract below, uncomment the code and finish all the TODO statem
 */
 
 main asset contract Auction {
-    // Bidder@Unowned maxBidder;
-    // Seller@Unsold seller;
-    // Item@Owned item available in Open, BiddingDone;
+    Bidder@Unowned maxBidder;
+    Seller@Unsold seller;
+    Item@Owned item available in Open, BiddingDone;
 
-    // state Open {
-    //     Bid@Owned bid;
-    // }
-    // state BiddingDone {
-    //     Bid@Owned finalBid;
-    // }
+    state Open {
+        Bid@Owned bid;
+    }
+    state BiddingDone {
+        Bid@Owned finalBid;
+    }
     
-    // state Closed;
+    state Closed;
 
-    // Auction@Owned() {
-    //     maxBidder = new Bidder("none", 0);
-    //     seller = new Seller();
-    //     -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
-    // }
+    Auction@Owned() {
+        maxBidder = new Bidder("none", 0);
+        seller = new Seller();
+        -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
+    }
 
-    // transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
-    //     if (newBid.getAmount() > bid.getAmount()) {
-    //         setCurrentBid(newBid);
-    //         Bidder tempBidder = maxBidder;
-    //         maxBidder = bidder;
-    //     }
-    //     else {
-    //         //5. TODO: return the new bid money to the bidder. Refer to the above contracts as needed.
-    //     }
-    // }
+    transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
+        if (newBid.getAmount() > bid.getAmount()) {
+            setCurrentBid(newBid);
+            Bidder tempBidder = maxBidder;
+            maxBidder = bidder;
+        }
+        else {
+            //5. TODO: return the new bid money to the bidder. Refer to the above contracts as needed.
+            bidder.receiveBidMoney(newBid);
+        }
+    }
 
-    // transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
-    //     //6. TODO: set the current bid to the new bid b. You may call any other transactions as needed.
-    // }
+    transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
+        //6. TODO: set the current bid to the new bid b. You may call any other transactions as needed.
+        if (bid in Open) {
+            bid.bidSurpassed();
+            maxBidder.receiveBidMoney(bid);
+        } else {
+            disown bid;
+        }
+        -> Open(item = item, bid = b);
+    }
 
-    // transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
-    //     bidder.receiveBidMoney(b);
-    // }
+    transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
+        bidder.receiveBidMoney(b);
+    }
 
-    // transaction finishBidding(Auction@Open >> BiddingDone this) {
-    //     -> BiddingDone(item = item, finalBid = bid);
-    // }
+    transaction finishBidding(Auction@Open >> BiddingDone this) {
+        -> BiddingDone(item = item, finalBid = bid);
+    }
 
-    // /* 7. TODO: Assuming this transaction should be called after the "finishBidding" transaction,
-    //             finish the transaction declaration below. */
-    // transaction giveItem(/* Fill this in */ this) {
-    //     maxBidder.won(item);
-    //     seller.receiveBid(finalBid);
-    //     -> Closed;
-    // }
+    /* 7. TODO: Assuming this transaction should be called after the "finishBidding" transaction,
+                finish the transaction declaration below. */
+    transaction giveItem(Auction@BiddingDone >> Closed this) {
+        maxBidder.won(item);
+        seller.receiveBid(finalBid);
+        -> Closed;
+    }
 
 }

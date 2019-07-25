@@ -1,0 +1,34 @@
+
+//Write a constructor for the Money object shown above so that it accepts an integer as a parameter and sets "amount" to that integer value. 
+
+contract Money {
+    int amount;
+
+    Money@Owned(int amt) {
+        amount = amt;
+    }
+    //TODO: write your constructor here
+
+    transaction getAmount() returns int {
+        return amount;
+    }
+}
+
+main contract Wallet {
+    Money@Owned m;
+
+    Wallet@Owned() {
+        m = new Money(0); //TODO: you will have to change this once you make your new constructor
+    }
+
+    transaction spendMoney() {
+        //...
+    }
+
+    transaction receiveMoney(Money@Owned >> Unowned mon) returns Money@Owned {
+        Money temp = m;
+        m = mon;
+        return temp;
+    }
+
+}

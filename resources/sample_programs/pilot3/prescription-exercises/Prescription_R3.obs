@@ -43,14 +43,14 @@ asset contract PharmacyPrescriptionRecord {
     }
 
     // TODO TASK 2: Fill in the type signature of this transaction.
-    // transaction consumeRefill(/* YOUR CODE HERE */ this) {
-    //     if (fillsLeft > 1) {
-    //         fillsLeft = fillsLeft - 1;
-    //     } else {
-    //         disown prescription;
-    //         ->Empty;
-    //     }
-    // }
+    transaction consumeRefill(PharmacyPrescriptionRecord@HasFills >> (HasFills | Empty) this) {
+        if (fillsLeft > 1) {
+            fillsLeft = fillsLeft - 1;
+        } else {
+            disown prescription;
+            ->Empty;
+        }
+    }
 }
 
 /* A Pharmacy keeps a record of all the prescriptions that patients have submitted as well as how many times each prescription has been filled.
@@ -61,7 +61,7 @@ main contract Pharmacy {
 
 	// Must be called before the patient can fill a new prescription.
     // TODO TASK 1: Fill in the type signature of this transaction.
-	transaction depositPrescription(/* YOUR CODE HERE */ prescription) {
+	transaction depositPrescription(Prescription@Owned >> Unowned prescription) {
 		if (prescriptionList.contains(prescription)) {
             revert "PrescriptionAlreadyDepositedException";
 		}
@@ -75,6 +75,12 @@ main contract Pharmacy {
 
         // TODO TASK 3: Fill in the rest of this transaction. You will need to call the doFill transaction in this class (Pharmacy) on the appropriate PharmacyPrescriptionRecord.
         //              Be sure to record that the prescription has been filled.
+        
+        if (maybeRecord in Something) {
+            [maybeRecord@Something];
+            doFill(maybeRecord.getRecord());
+            maybeRecord.getRecord().consumeRefill();
+        }
 	}
 
 	private transaction doFill(PharmacyPrescriptionRecord@HasFills record) {
