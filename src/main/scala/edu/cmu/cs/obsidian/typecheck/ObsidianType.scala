@@ -95,8 +95,8 @@ case class ContractReferenceType(override val contractType: ContractType,
         case permission: Permission => this.copy(permission = permission)
     }
 
-    override def withParams(contractParams: Seq[ObsidianType]): ContractReferenceType =
-        this.copy(contractType = ContractType(contractName, contractParams))
+    override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType =
+        copy(contractType = contractType.copy(typeArgs = contractParams))
 }
 
 
@@ -245,6 +245,7 @@ object StateType {
 
 /* Invariant for permissioned types: any path that occurs in the type makes "this" explicit */
 sealed trait ObsidianType extends HasLocation {
+    def typeParams: Seq[ObsidianType]
     def withParams(contractParams: Seq[ObsidianType]): ObsidianType
 
     def typeState: TypeState
@@ -323,6 +324,7 @@ sealed trait PrimitiveType extends ObsidianType {
     // All primitive types are treated as owned
     override def typeState: TypeState = Owned()
 
+    override def typeParams: Seq[ObsidianType] = Nil
     override def withParams(contractParams: Seq[ObsidianType]): ObsidianType = this
 }
 
@@ -339,6 +341,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     def codeGenName: String = contractName
 
+    override def typeParams: Seq[ObsidianType] = contractType.typeArgs
     def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType
 
     override def isOwned: Boolean = permission == Owned()
@@ -417,6 +420,7 @@ case class BottomType() extends ObsidianType {
     override def withParams(contractParams: Seq[ObsidianType]): ObsidianType = this
     override def typeState: TypeState = Unowned() // Doesn't really matter for bottom
     override def withTypeState(ts: TypeState): ObsidianType = BottomType()
+    override def typeParams: Seq[ObsidianType] = Nil
 }
 
 // TODO GENERIC: Does this need to be extended for generics?

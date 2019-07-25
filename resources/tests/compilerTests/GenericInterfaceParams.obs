@@ -60,9 +60,9 @@ contract StringContainer {
     }
 }
 
-main contract GenericIntContainererfaceParams {
-    transaction f() returns Store[string]@Owned {
-        return new Store[StringContainer](new StringContainer("test")).map[StringContainer](new Identity[StringContainer]());
+main contract GenericInterfaceParams {
+    transaction f() returns string {
+        return new Store[StringContainer](new StringContainer("test")).map[StringContainer](new Identity[StringContainer]()).get().getVal();
     }
 
     transaction g() returns int {
