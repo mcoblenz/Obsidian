@@ -28,6 +28,7 @@ verifyResult() {
 parseParameters() {
   # If there is no argument left, no function name is specified
   # exit
+
   if [ "$#" = 0 ]; then
     exit 1
   fi
@@ -41,9 +42,9 @@ parseParameters() {
         if [ "$#" -lt 4 ]; then break; fi
         # Interpret the NEXT arguments as a TYPE followed by a GUID.
         shift
-        TYPE=$1
+        TYPE="$1"
         shift
-        GUID=$1
+        GUID="$1"
         ENCODED_GUID=$(echo -n "guid: \"${GUID}\"" | protoc --encode=$TYPE --proto_path=$PROTO_PATH ${PROTO_PATH}${CC_NAME}OuterClass.proto)
         BASE64_GUID=$(echo -n "$ENCODED_GUID" | openssl base64)
         PARAMS="$PARAMS\"$BASE64_GUID\","
@@ -58,9 +59,9 @@ parseParameters() {
   if [ "$1" = "-g" ]; then
         # Interpret the NEXT arguments as a TYPE followed by a GUID.
         shift
-        TYPE=$1
+        TYPE="$1"
         shift
-        GUID=$1
+        GUID="$1"
         ENCODED_GUID=$(echo -n "guid: \"${GUID}\"" | protoc --encode=$TYPE --proto_path=$PROTO_PATH ${PROTO_PATH}${CC_NAME}OuterClass.proto)
         BASE64_GUID=$(echo -n "$ENCODED_GUID" | openssl base64)
         PARAMS="$PARAMS\"$BASE64_GUID\""
@@ -82,12 +83,13 @@ while getopts ":q" opt; do
    esac
 done
 
-parseParameters $@
-res=$?
-verifyResult $res "Invoke transaction failed on channel '$CHANNEL_NAME' due to uneven number of peer and org parameters
+parseParameters "$@"
+res="$?"
+
+verifyResult "$res" "Invoke transaction failed on channel '$CHANNEL_NAME' due to uneven number of peer and org parameters
 or lack of function name"
 if [ $isQuiet -eq 1 ]; then
-  peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
+  peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls "$CORE_PEER_TLS_ENABLED" --cafile "$ORDERER_CA" -C "$CHANNEL_NAME" -n mycc $HARD_PEER_CONN_PARMS -c "$PARAMS" >&log.txt
   res=$?
   if [ $res -ne 0 ]; then
     cat log.txt | sed -nr 's/^.*?message:\"(.*)\".*$/\1/p'
@@ -97,7 +99,7 @@ if [ $isQuiet -eq 1 ]; then
   fi
 else
   set -x
-  peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc $HARD_PEER_CONN_PARMS -c $PARAMS >&log.txt
+  peer chaincode invoke --waitForEvent -o orderer.example.com:7050 --tls "$CORE_PEER_TLS_ENABLED" --cafile "$ORDERER_CA" -C "$CHANNEL_NAME" -n mycc $HARD_PEER_CONN_PARMS -c "$PARAMS" >&log.txt
   res=$?
   set +x
   cat log.txt
