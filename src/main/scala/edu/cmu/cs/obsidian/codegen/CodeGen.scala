@@ -77,7 +77,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             case None => txName
         }
     }
-    
+
     /* based on the result of [getStateMeth], this nulls out the appropriate state field
      * so that the old state can be garbage-collected after a transition */
     private final val deleteOldStateName = "__oldStateToNull"
@@ -2585,7 +2585,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     ifStateLocked._then()._throw(exception)
                 }
 
-
+                /* nullify old state inner class field */
+                body.invoke(deleteOldStateName)
 
                 /* construct a new instance of the inner contract */
                 val newStateContext = translationContext.states(newStateName)
@@ -2603,10 +2604,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     case None =>
                         // Fields should have been initialized individually, via S1::foo = bar.
                 }
-
-
-                /* nullify old state inner class field */
-                body.invoke(deleteOldStateName)
 
                 /* change the enum to reflect the new state */
                 body.assign(JExpr.ref(stateField), translationContext.getEnum(newStateName))
