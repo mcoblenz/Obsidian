@@ -1,0 +1,62 @@
+interface Consumer[X] {
+    transaction consume(Consumer@Unowned this, X@Owned >> Unowned x);
+}
+
+contract NopConsumer[T] implements Consumer[T] {
+    transaction consume(NopConsumer@Unowned this, T@Owned >> Unowned t) {}
+}
+
+contract A {}
+
+contract Store[T] {
+    T@Owned t;
+
+    Store@Owned(T@Owned >> Unowned t) {
+        this.t = t;
+    }
+
+    transaction peek() returns T@Unowned {
+        return t;
+    }
+}
+
+contract Foo[T where T implements Consumer[U], U] implements Consumer[U] {
+    T@Owned t;
+
+    Foo@Owned(T@Owned >> Unowned t) {
+        this.t = t;
+    }
+
+    transaction consume(Foo@Unowned this, U@Owned >> Unowned u) {
+        t.consume(u);
+    }
+}
+
+main contract GenericInterfaceParamsBasic {
+    transaction f() {
+        Consumer[A] consumer = new NopConsumer[A]();
+        consumer.consume(new A());
+    }
+
+    transaction g() {
+        Store[Consumer[A]] s = makeStore();
+        s.peek().consume(new A());
+    }
+
+    // To test some inter-transaction interaction
+    private transaction makeStore() returns Store[Consumer[A]]@Owned {
+        return new Store[Consumer[A]](new NopConsumer[A]());
+    }
+
+    transaction useFoo() {
+        A a = new A(); // Noted, due to flush entries bug, this MUST be up here
+        Foo[NopConsumer[A], A] f = new Foo[NopConsumer[A], A](new NopConsumer[A]());
+        f.consume(a);
+    }
+
+    transaction makeStoreSubtype() {
+        // Should be fine, even though Consumer[A] != NopConsumer[A], because NopConsumer[A] <: Consumer[A]
+        Store[Consumer[A]] s = new Store[NopConsumer[A]](new NopConsumer[A]());
+    }
+}
+

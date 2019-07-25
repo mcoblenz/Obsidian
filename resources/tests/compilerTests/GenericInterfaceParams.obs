@@ -1,0 +1,73 @@
+interface Func[X, Y] {
+    transaction apply(Func@Owned this, X@Unowned x) returns Y@Unowned;
+}
+
+contract Identity[X] implements Func[X, X] {
+    transaction apply(Identity@Owned this, X@Unowned x) returns X@Unowned {
+        return x;
+    }
+}
+
+contract Constant[Y, X] implements Func[X, Y] {
+    Y@Unowned y;
+
+    Constant@Owned(Y@Unowned y) {
+        this.y = y;
+    }
+
+    transaction apply(Constant@Owned this, X@Unowned x) returns Y@Unowned {
+        return y;
+    }
+}
+
+contract Store[X] {
+    X@Unowned x;
+
+    Store@Owned(X@Unowned x) {
+        this.x = x;
+    }
+
+    transaction get() returns X@Unowned {
+        return x;
+    }
+
+    transaction map[Y](Func[X,Y]@Owned f) returns Store[Y]@Owned {
+        return new Store[Y](f.apply(x));
+    }
+}
+
+contract IntContainer {
+    int val;
+
+    IntContainer@Owned(int val) {
+        this.val = val;
+    }
+
+    transaction getVal(IntContainer@Unowned this) returns int {
+        return val;
+    }
+}
+
+contract StringContainer {
+    string val;
+
+    StringContainer@Owned(string val) {
+        this.val = val;
+    }
+
+    transaction getVal(StringContainer@Unowned this) returns string {
+        return val;
+    }
+}
+
+main contract GenericIntContainererfaceParams {
+    transaction f() returns Store[string]@Owned {
+        return new Store[StringContainer](new StringContainer("test")).map[StringContainer](new Identity[StringContainer]());
+    }
+
+    transaction g() returns int {
+        // A bit of mess with all these type parameters/containers
+        return new Store[StringContainer](new StringContainer("test5")).map[IntContainer](new Constant[IntContainer, StringContainer](new IntContainer(180))).get().getVal();
+    }
+}
+

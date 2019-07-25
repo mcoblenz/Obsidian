@@ -70,20 +70,24 @@ class IdentityAstTransformer {
 
                 newDecls = newDecls.reverse
 
+                val (newTypeArgs, allTypeErrors) =
+                    obsContract.bound.typeArgs.map(transformType(table, cTable, emptyContext, _, obsContract.loc)).unzip
+                val newBound = obsContract.bound.copy(typeArgs = newTypeArgs)
+
                 val oldContract = obsContract
                 val newContract =
                     ObsidianContractImpl(
                         oldContract.modifiers,
                         oldContract.name,
                         oldContract.params,
-                        oldContract.bound,
+                        newBound,
                         newDecls,
                         oldContract.transitions,
                         oldContract.isInterface,
                         oldContract.sourcePath
                     ).setLoc(obsContract)
 
-                (newContract, errors.reverse)
+                (newContract, errors.reverse ++ allTypeErrors.flatten.toList)
 
             case ffiContract: JavaFFIContractImpl =>
                 (ffiContract, Nil)
