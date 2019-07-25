@@ -77,10 +77,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             case None => txName
         }
     }
-
-    /* This method dynamically checks type state and copies the value of conserved fields
-     * (i.e. defined in both states) from one state to another */
-    private final val conserveFieldsName = "__conserveFields"
+    
     /* based on the result of [getStateMeth], this nulls out the appropriate state field
      * so that the old state can be garbage-collected after a transition */
     private final val deleteOldStateName = "__oldStateToNull"
@@ -890,32 +887,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     private def generateStateHelpers(newClass: JDefinedClass,
                                      translationContext: TranslationContext): Unit = {
-        /* method to take care of conserved fields during a state transition
-         * Invariant for use: [getStateMeth] returns the current state, the new state is passed
-         * as an argument. The new state's inner class field must be non-null. */
-        val conserveMeth = newClass.method(JMod.PRIVATE, model.VOID, conserveFieldsName)
-        conserveMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
-        val nextState = conserveMeth.param(translationContext.stateEnumClass.get, "nextState")
-        val conserveBody = conserveMeth.body()
-        /* match on the current state */
-        for (stFrom <- translationContext.states.values) {
-            val thisStateBody = conserveBody._if(
-                    invokeGetState(JExpr._this(), false).eq(stFrom.enumVal))
-                ._then()
-            /* match on the target state */
-            for (stTo <- translationContext.states.values if stTo != stFrom) {
-                val assignBody = thisStateBody._if(
-                        nextState.eq(stTo.enumVal))
-                    ._then()
-                val (fromName, toName) = (stFrom.astState.name, stTo.astState.name)
-                for (f <- translationContext.conservedFields(fromName, toName)) {
-                    /* assign the field to the new state from the old */
-                    assignBody.assign(stTo.innerClassField.ref(f.name),
-                                        stFrom.innerClassField.ref(f.name))
-                }
-            }
-        }
-
         /* method to null out old state
          * Invariant for use: [getStateMeth] returns the current state; this will be the state
          * whose inner class field this method nullifies. */
@@ -2633,9 +2604,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
                         // Fields should have been initialized individually, via S1::foo = bar.
                 }
 
-
-                /* assign conserved fields (implicit to programmer) */
-                body.invoke(conserveFieldsName).arg(newStateContext.enumVal)
 
                 /* nullify old state inner class field */
                 body.invoke(deleteOldStateName)
