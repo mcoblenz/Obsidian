@@ -21,7 +21,9 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
             edu.cmu.cs.obsidian.chaincode.ReentrancyException,
             edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException,
             edu.cmu.cs.obsidian.chaincode.StateLockException,
-            edu.cmu.cs.obsidian.chaincode.BadArgumentException;
+            edu.cmu.cs.obsidian.chaincode.BadArgumentException,
+            edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException,
+            edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException;
 
     public void delegatedMain(String args[]) {
 
@@ -35,6 +37,7 @@ public abstract class ChaincodeClientBase extends ChaincodeClientStub {
             System.exit(1);
         } catch (ChaincodeClientAbortTransactionException e) {
             System.err.println("Transaction aborted: " + e);
+            e.printStackTrace();
         } catch (edu.cmu.cs.obsidian.chaincode.ReentrancyException e) {
             System.err.println("Error: Reentrant call made");
         } catch (edu.cmu.cs.obsidian.chaincode.BadTransactionException e) {

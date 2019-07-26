@@ -49,7 +49,7 @@ case class Context(table: DeclarationTable,
             underlyingVariableMap,
             isThrown,
             Set.empty,
-            Set.empty,
+            localFieldsInitialized,
             Map.empty,
             valVariables)
 
@@ -1472,7 +1472,15 @@ private def checkStatement(
                         oldType
                     }
 
-                (contextPrime.updated("this", newSimpleType).updatedAfterTransition(), Transition(newStateName, newUpdatesOption, context.thisType.permission).setLoc(s))
+                // Any initialization checking that will happen later can assume all the state fields have been initialized.
+                var contextAfterTransition = contextPrime.updated("this", newSimpleType).updatedAfterTransition()
+                if (updates.isDefined) {
+                    for (update <- updates.get) {
+                        contextAfterTransition = contextAfterTransition.updatedWithFieldInitialization(update._1.name)
+                    }
+                }
+
+                (contextAfterTransition, Transition(newStateName, newUpdatesOption, context.thisType.permission).setLoc(s))
 
             case Assignment(ReferenceIdentifier(x), e: Expression) =>
                 if (context.valVariables.contains(x)) {
@@ -2122,6 +2130,8 @@ private def checkStatement(
 
         val (outputContext, newBody) = checkStatementSequence(constr, initContext, constr.body)
 
+
+
         // Check that all the states the constructor can end in are valid, named states
         constr.resultType match {
             case StateType(_, states, _) => {
@@ -2165,10 +2175,10 @@ private def checkStatement(
         }
 
         // If there are states, we'll check to make sure the transitions initialize all fields.
-        // But if there are no states, we have to check separately.
-        if (!hasStates && !outputContext.isThrown) {
+        // But we need to check contract fields separately.
+        if (!outputContext.isThrown) {
             for (field <- table.allFields) {
-                if (!outputContext.localFieldsInitialized.contains(field.name)) {
+                if (field.availableIn.isEmpty && !outputContext.localFieldsInitialized.contains(field.name)) {
                     logError(constr, UninitializedFieldError(field.name))
                 }
             }

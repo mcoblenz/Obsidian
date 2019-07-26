@@ -9,6 +9,7 @@ import java.util.Base64;
 import java.util.StringJoiner;
 import org.apache.commons.io.IOUtils;
 
+
 /**
  * Created by mcoblenz on 4/3/17.
  */
@@ -56,9 +57,13 @@ public class ChaincodeClientConnectionManager {
 
         int exitValue = process.exitValue();
         if (exitValue != 0) {
+            System.err.println("Error invoking remote transaction: " + output);
+            System.err.println("invocation parameters were: " + cmdArgs);
+            System.err.println("Exit code was: " + exitValue);
+
             throw new ChaincodeClientTransactionFailedException(output);
         }
 
-        return output.getBytes();
+        return output.trim().getBytes();
     }
 }
