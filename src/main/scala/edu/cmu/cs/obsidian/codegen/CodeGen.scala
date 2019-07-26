@@ -138,8 +138,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         /* match on c to check which type of contract it is */
         for ((con, newClass) <- program.contracts.zip(classes)) {
-            // TODO GENERIC: generate code for interfaces (issue #117)
-
             (con, newClass) match {
                 case (obsCon: ObsidianContractImpl, Some(newClass)) => {
                     val translationContext = makeTranslationContext(obsCon, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
@@ -254,9 +252,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
     private def unmarshallExprExpectingUUIDObjects(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock): IJExpression = {
         typ match {
             case IntType() =>
-                val stringClass = model.ref("java.lang.String")
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                val stringRepresentation = JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
+                val stringRepresentation = JExpr._new(javaString()).arg(marshalledExpr).arg(charset)
                 val newInt = JExpr._new(model.parseType("java.math.BigInteger"))
                 newInt.arg(stringRepresentation)
                 newInt
@@ -816,10 +813,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
         }
     }
 
-    // TODO GENERIC: Refactor this
-    def setType: JNarrowedClass = model.directClass("java.util.Set").narrow(obsidianSerialized)
-    def hashSetType: JNarrowedClass = model.directClass("java.util.HashSet").narrow(obsidianSerialized)
-
     private def generateResetModifiedMethod(aContract: Contract,
                                            newClass: JDefinedClass,
                                             translationContext: TranslationContext): Unit= {
@@ -827,15 +820,15 @@ class CodeGen (val target: Target, table: SymbolTable) {
          * in order to actually instantiate it */
 
         // __resetModified collects the set of modified fields and resets the set of modified fields.
-        val getModifiedMeth = newClass.method(JMod.PUBLIC, setType, "__resetModified")
+        val getModifiedMeth = newClass.method(JMod.PUBLIC, obsidianSerializedSet, "__resetModified")
         getModifiedMeth._throws(model.directClass("com.google.protobuf.InvalidProtocolBufferException"))
         // add a list of things we've already checked so we don't get stuck in loops
-        getModifiedMeth.param(setType, "checked")
+        getModifiedMeth.param(obsidianSerializedSet, "checked")
         val modBody = getModifiedMeth.body()
 
         modBody.invoke(JExpr.ref("checked"), "add").arg(JExpr._this())
 
-        val returnSet = modBody.decl(setType, "result", JExpr._new(hashSetType))
+        val returnSet = modBody.decl(obsidianSerializedSet, "result", JExpr._new(obsidianSerializedHashSet))
 
         // If we're not loaded, we can't have been modified, and we definitely shouldn't look
         // at our own fields, because that will break everything.
@@ -951,13 +944,13 @@ class CodeGen (val target: Target, table: SymbolTable) {
         newDispatcher.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
 
         aContract.params.foreach(p => {
-            val paramName = "__generic" + p.gVar.varName
+            val paramName = genericParamName(p)
             newDispatcher.param(model.directClass("java.lang.String"), paramName)
             newDispatcher.body().assign(JExpr.refthis(paramName), JExpr.ref(paramName))
 
             p.gVar.permissionVar match {
                 case Some(pVar) =>
-                    val permParamName = "__genericPerm" + pVar
+                    val permParamName = genericPermParamName(pVar)
                     newDispatcher.param(stringHashSet(), permParamName)
                     newDispatcher.body().assign(JExpr.refthis(permParamName), JExpr.ref(permParamName))
                 case None => ()
@@ -1050,17 +1043,17 @@ class CodeGen (val target: Target, table: SymbolTable) {
             invocation.arg(JExpr.ref(arg.varName))
         }
 
-        constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        constructor.param(serializationStateType(), serializationParamName)
         invocation.arg(JExpr.ref(serializationParamName))
 
         aContract.params.foreach(p => {
-            constructor.param(model.directClass("java.lang.String"), "__generic" + p.gVar.varName)
-            invocation.arg(JExpr.ref("__generic" + p.gVar.varName))
+            constructor.param(javaString(0), genericParamName(p))
+            invocation.arg(refGenericParam(p))
 
             p.gVar.permissionVar match {
                 case Some(pVar) =>
-                    constructor.param(stringHashSet(), "__genericPerm" + pVar)
-                    invocation.arg(JExpr.ref("__genericPerm" + pVar))
+                    constructor.param(stringHashSet(), genericPermParamName(pVar))
+                    invocation.arg(refGenericPermParam(pVar))
                 case None => ()
             }
         })
@@ -1075,7 +1068,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
     def boundClass(self: JTypeVar, bound: GenericBound): AbstractJClass =
         // TODO GENERIC: get rid of special casing
         if (bound.interfaceType.contractName == "Top") {
-            model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized")
+            obsidianSerialized
         } else {
             resolveType(bound.referenceType, table, Some(self)).boxify()
         }
@@ -1084,41 +1077,29 @@ class CodeGen (val target: Target, table: SymbolTable) {
     // TODO GENERIC: get rid of special casing
         if (bound.contractName == "Top") {
             obsidianSerialized
-//            if (translationContext.contract.isInterface) {
-//                obsidianSerializedClass(translationContextObject.contractClass.typeParams().last)
-//            } else {
-//                obsidianSerializedClass(translationContext)
-//            }
         } else {
             // We can put any permission for referenceType, since we only need to get the translated name
             val referenceType = ContractReferenceType(bound, Unowned(), isRemote = false)
             resolveType(referenceType, table, Some(model.ref(translationContext.getProtobufClassName(translationContext.contract)))).boxify()
         }
 
-    def obsidianSerialized: AbstractJClass =
-        model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized") // .narrow(classOf[Object])
-
-    def obsidianSerializedClass(translationContext: TranslationContext): AbstractJClass = {
-        val archiveType = model.directClass(translationContext.getProtobufClassName(translationContext.contract))
-        obsidianSerializedClass(archiveType)
-    }
-
-    def obsidianSerializedClass(archiveType: AbstractJType): AbstractJClass = obsidianSerialized.narrow(archiveType)
-
     def generify(target: IJGenerifiable, param: GenericType): Unit = {
         val typeVar = target.generify(param.gVar.varName)
         target.typeParams().last.bound(boundClass(typeVar, param.bound))
     }
 
-    // TODO GENERIC: Consolidate these and the other hashset/set/map type generators
+    def obsidianSerialized: AbstractJClass =
+        model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianSerialized")
+
+    def setType(): AbstractJClass = model.directClass("java.util.Set")
+    def hashSetType(): AbstractJClass = model.directClass("java.util.HashSet")
+
     def javaString(): AbstractJClass = model.directClass("java.lang.String")
-    def stringHashSet(): AbstractJClass = model.directClass("java.util.HashSet").narrow(javaString())
+    def stringHashSet(): AbstractJClass = hashSetType().narrow(javaString())
     def serializationStateType(): AbstractJClass = model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState")
 
-    def permVarMapName: String = "__permVars"
-    def permVarMap(): IJExpression = JExpr.ref(permVarMapName)
-    def permVarMapType(): AbstractJClass =
-        model.directClass("java.util.HashMap").narrow(javaString(), stringHashSet())
+    def obsidianSerializedSet: JNarrowedClass = setType().narrow(obsidianSerialized)
+    def obsidianSerializedHashSet: JNarrowedClass = hashSetType().narrow(obsidianSerialized)
 
     def isPerm(e: IJExpression, p: Permission): IJExpression =
         JExpr.lit(p.toString).invoke("equals").arg(e)
@@ -1141,12 +1122,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     def generatePermVarDefinitions(translationContext: TranslationContext, aContract: Contract, newClass: JDefinedClass): Unit = {
         // TODO GENERIC: Refactor this method into several methods
-
-        // TODO GENERIC: We need to archive these
         for (param <- aContract.params) {
             param.gVar.permissionVar match {
                 case Some(permVarName) =>
-                    newClass.field(JMod.PRIVATE, stringHashSet(), "__genericPerm" + permVarName)
+                    newClass.field(JMod.PRIVATE, stringHashSet(), genericPermParamName(permVarName))
                 case None => ()
             }
         }
@@ -1208,7 +1187,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             generateLazySerializationCode(aContract, newClass, translationContext)
 
             for (param <- aContract.params) {
-                newClass.field(JMod.PRIVATE, model.directClass("java.lang.String"), "__generic" + param.gVar.varName)
+                newClass.field(JMod.PRIVATE, javaString, genericParamName(param))
             }
         }
 
@@ -1255,9 +1234,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
     // boolean methodReceiverIsOwnedAtBeginning(String methodName);
     // boolean methodReceiverIsOwnedAtEnd(String methodName);
     private def generateReceiverOwnershipMethod(contract: Contract, newClass: JDefinedClass): Unit = {
-        val hashSetType = model.ref("java.util.HashSet").narrow(model.ref("java.lang.String"))
-        val beginningField = newClass.field(JMod.STATIC, hashSetType, "transactionsWithOwnedReceiversAtBeginning")
-        val endField = newClass.field(JMod.STATIC, hashSetType, "transactionsWithOwnedReceiversAtEnd")
+        val beginningField = newClass.field(JMod.STATIC, stringHashSet(), "transactionsWithOwnedReceiversAtBeginning")
+        val endField = newClass.field(JMod.STATIC, stringHashSet(), "transactionsWithOwnedReceiversAtEnd")
 
 
         val beginMethod = newClass.method(JMod.PUBLIC, model.BOOLEAN, "methodReceiverIsOwnedAtBeginning")
@@ -1269,11 +1247,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         val beginBody = beginMethod.body()
         val beginInitTest = beginBody._if(beginningField.eq(JExpr._null()))
-        beginInitTest._then().assign(beginningField, JExpr._new(hashSetType))
+        beginInitTest._then().assign(beginningField, JExpr._new(stringHashSet()))
 
         val endBody = endMethod.body()
         val endInitTest = endBody._if(endField.eq(JExpr._null()))
-        endInitTest._then().assign(endField, JExpr._new(hashSetType))
+        endInitTest._then().assign(endField, JExpr._new(stringHashSet()))
 
         for (decl <- contract.declarations) {
             decl match {
@@ -1464,7 +1442,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 types.length + idx + offset)
 
             // Do this so we have access for later (e.g., if fields need these class names)
-            initMeth.body().assign(JExpr.ref("__generic" + param.gVar.varName), deserializedArg)
+            initMeth.body().assign(refGenericParam(param), deserializedArg)
 
             val permVar = param.gVar.permissionVar match {
                 case Some(pVar) =>
@@ -1472,14 +1450,14 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     val newStr = JExpr._new(javaString())
                         .arg(runArgs.component(types.length + idx + offset + 1))
                         .arg(charset)
-                    initMeth.body().assign(JExpr.ref("__genericPerm" + pVar),
+                    initMeth.body().assign(refGenericPermParam(pVar),
                         setOf(Seq(newStr)))
                     offset += 1
-                    Seq(JExpr.ref("__genericPerm" + pVar))
+                    Seq(refGenericPermParam(pVar))
                 case None => Nil
             }
 
-            Seq(JExpr.ref("__generic" + param.gVar.varName)) ++ permVar
+            Seq(refGenericParam(param)) ++ permVar
         }
 
         var runArgsIndex = 0
@@ -1653,9 +1631,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     runArgNumber += 1
                 }
 
-                // TODO GENERIC: Clean this up...
                 // Load the generic arg parameters
-                var txTypeParamNames: List[IJExpression] = tx.params.map(param => {
+                val txTypeParamNames: List[IJExpression] = tx.params.map(param => {
                     val runArg = runArgs.component(JExpr.lit(runArgNumber))
 
                     val errorBlock = new JBlock()
@@ -1663,9 +1640,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                         unmarshallExprExpectingFullObjects(translationContext, enoughArgs, runArg,
                             StringType(), StringType(), errorBlock, runArgNumber)
 
-                    val newTypeArg: JVar = enoughArgs.decl(
-                        model.directClass("java.lang.String"),
-                        "__generic" + param.gVar.varName,
+                    val newTypeArg: JVar = enoughArgs.decl(javaString(),
+                        genericParamName(param),
                         transactionArgExpr
                     )
 
@@ -2059,14 +2035,14 @@ class CodeGen (val target: Target, table: SymbolTable) {
         // Archive the type variables
         for (param <- contract.params) {
             archiveBody.invoke(builderVariable, "setGeneric" + param.gVar.varName)
-                .arg(JExpr.ref("__generic" + param.gVar.varName))
+                .arg(refGenericParam(param))
 
             param.gVar.permissionVar match {
                 case Some(pVar) =>
                     archiveBody.invoke(builderVariable, "setGenericPerm" + pVar)
                         .arg(javaString().staticInvoke("join")
                                 .arg(JExpr.lit(","))
-                                .arg(JExpr.ref("__genericPerm" + pVar)))
+                                .arg(refGenericPermParam(pVar)))
                 case None => ()
             }
         }
@@ -2152,15 +2128,14 @@ class CodeGen (val target: Target, table: SymbolTable) {
     def withArgs(invocation: JInvocation, constructorParams: Seq[IJExpression]): JInvocation =
         constructorParams.foldLeft(invocation)((inv, param) => inv.arg(param))
 
-    // TODO GENERIC: Clean this up
-    def reflectionInvoke(receiver: IJExpression, name: String, paramTypes: Seq[IJExpression]): JInvocation = {
-        withArgs(receiver.invoke("getClass").invoke("getMethod").arg(name), paramTypes).invoke("invoke").arg(receiver)
-    }
+    def getMethodAndInvoke(classExpr: IJExpression, name: String, paramTypes: Seq[IJExpression]): JInvocation =
+        withArgs(classExpr.invoke("getMethod").arg(name), paramTypes).invoke("invoke")
 
-    def reflectionStaticInvoke(className: IJExpression, name: String, paramTypes: Seq[IJExpression]): JInvocation = {
-        withArgs(classForNameMeth.arg(className).invoke("getMethod").arg(name), paramTypes)
-            .invoke("invoke").arg(JExpr._null())
-    }
+    def reflectionInvoke(receiver: IJExpression, name: String, paramTypes: Seq[IJExpression]): JInvocation =
+        getMethodAndInvoke(receiver.invoke("getClass"), name, paramTypes).arg(receiver)
+
+    def reflectionStaticInvoke(className: IJExpression, name: String, paramTypes: Seq[IJExpression]): JInvocation =
+        getMethodAndInvoke(classForNameMeth.arg(className), name, paramTypes).arg(JExpr._null())
 
     def reflectionExceptions: Seq[AbstractJClass] =
         List(model.directClass(classOf[NoSuchMethodException].getCanonicalName),
@@ -2221,11 +2196,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                         constructorParams, JExpr.ref("__generic" + np.codeGenName))
                     archive.invoke("getObj")
                 } else if (isInterface) {
-                    val classNameVar = block.decl(model.directClass("java.lang.String"), "className",
+                    val classNameVar = block.decl(javaString(), "className",
                         archive.invoke("getObj").invoke("getImplementingClassName"))
-                    val classArchiveNameVar = block.decl(model.directClass("java.lang.String"), "classArchiveName",
+                    val classArchiveNameVar = block.decl(javaString(), "classArchiveName",
                         archive.invoke("getObj").invoke("getImplementingClassArchiveName"))
-                    val archiveDataVar = block.decl(model.directClass("java.lang.String"), "archiveData",
+                    val archiveDataVar = block.decl(javaString(0), "archiveData",
                         archive.invoke("getObj").invoke("getImplementingClassData"))
 
                     reflectionConstruct(block, assignTo, default, resolveType(typ, table).boxify(),
@@ -2290,7 +2265,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 // using said GUID.
                 constructNew(translationContext, field.typ, inContract, archive,
                     checkForObj._else(), fieldVar, fieldVar,
-                    List(model.ref("java.lang.String").dotclass()),
+                    List(javaString().dotclass()),
                     List(JExpr.ref(javaFieldName + "ID")))
 
                 // We also need to put this thing in the map of loaded objects,
@@ -2449,16 +2424,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
         // Load generic variables
 
         for (param <- contract.params) {
-            fromArchiveBody.assign(JExpr.ref("__generic" + param.gVar.varName),
-                archive.invoke("getGeneric" + param.gVar.varName))
+            fromArchiveBody.assign(refGenericParam(param), archive.invoke("getGeneric" + param.gVar.varName))
             param.gVar.permissionVar match {
                 case Some(pVar) =>
-                    // TODO GENERIC: Clean up this mess
-                    fromArchiveBody.assign(JExpr.ref("__genericPerm" + pVar),
-                        JExpr._new(stringHashSet())
-                            .arg(model.directClass("java.util.Arrays").staticInvoke("asList").arg(
-                                    archive.invoke("getGenericPerm" + pVar)
-                                    .invoke("split").arg(JExpr.lit(",")))))
+                    val states = archive.invoke("getGenericPerm" + pVar).invoke("split").arg(JExpr.lit(","))
+                    fromArchiveBody.assign(refGenericPermParam(pVar), setOf(Seq(states)))
                 case None => ()
             }
         }
@@ -2480,6 +2450,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
             val javaFieldVar = newClass.fields().get(field.name)
             generateFieldInitializer(field, javaFieldVar, cond._then(), archive, translationContext, contract)
         }
+    }
+
+    private def refGenericParam(param: GenericType) = {
+        JExpr.ref(genericParamName(param))
     }
 
     private def translateDeclaration(
@@ -2556,15 +2530,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     resType
                 } else {
                     narrowWith(resType.boxify(), n.genericParams)
-//                    if (isInterface) {
-//                        if (interfaceParam.isDefined) {
-//                            withParams.narrow(interfaceParam.get)
-//                        } else {
-//                            withParams.narrow(obsidianSerialized)
-//                        }
-//                    } else {
-//                        withParams
-//                    }
                 }
             }
             case _ => model.VOID // TODO: translate PDTs
@@ -2670,10 +2635,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
 //                        typeArgs: Seq[ObsidianType]): Seq[IJExpression] = {
 //    }
 
-    def arrayAsList(): JInvocation = model.directClass("java.util.Arrays").staticInvoke("asList")
+    def arraysAsList(): JInvocation = model.directClass("java.util.Arrays").staticInvoke("asList")
 
     def setOf(e: Seq[IJExpression]): IJExpression =
-        JExpr._new(stringHashSet()).arg(withArgs(arrayAsList(), e))
+        JExpr._new(stringHashSet()).arg(withArgs(arraysAsList(), e))
 
     def makeGenericArgs(translationContext: TranslationContext, genericParams: Seq[GenericType],
                         typeArgs: Seq[ObsidianType]): Seq[IJExpression] = {
@@ -2856,12 +2821,12 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         // Handle the generic parameters:
         aContract.params.foreach(p => {
-            val param = meth.param(model.directClass("java.lang.String"), "__generic" + p.gVar.varName)
-            body.assign(JExpr.refthis("__generic" + p.gVar.varName), param)
+            val param = meth.param(javaString, genericParamName(p))
+            body.assign(JExpr.refthis(genericParamName(p)), param)
             p.gVar.permissionVar match {
                 case Some(pVar) =>
-                    val permParam = meth.param(stringHashSet(), "__genericPerm" + pVar)
-                    body.assign(JExpr.refthis("__genericPerm" + pVar), permParam)
+                    val permParam = meth.param(stringHashSet(), genericPermParamName(pVar))
+                    body.assign(JExpr.refthis(genericPermParamName(pVar)), permParam)
 
                 case None => ()
             }
@@ -2903,20 +2868,28 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         /* add args to method and collect them in a list */
 
-        constructor.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
+        constructor.param(serializationStateType(), serializationParamName)
         invocation.arg(JExpr.ref(serializationParamName))
 
         aContract.params.foreach(p => {
-            constructor.param(model.directClass("java.lang.String"), "__generic" + p.gVar.varName)
-            invocation.arg(JExpr.ref("__generic" + p.gVar.varName))
+            constructor.param(javaString(), genericParamName(p))
+            invocation.arg(refGenericParam(p))
 
             p.gVar.permissionVar match {
                 case Some(pVar) =>
-                    constructor.param(stringHashSet(), "__genericPerm" + pVar)
-                    invocation.arg(JExpr.ref("__genericPerm" + pVar))
+                    constructor.param(stringHashSet(), genericPermParamName(pVar))
+                    invocation.arg(refGenericPermParam(pVar))
                 case None => ()
             }
         })
+    }
+
+    private def refGenericPermParam(pVar: String) = {
+        JExpr.ref(genericPermParamName(pVar))
+    }
+
+    private def genericParamName(p: GenericType) = {
+        "__generic" + p.gVar.varName
     }
 
     private def dynamicStateCheck(tx: Transaction, body: JBlock, expr: IJExpression, typ: ObsidianType): Unit = {
@@ -2970,11 +2943,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         for (param <- tx.params) {
             generify(meth, param)
-            meth.param(model.directClass("java.lang.String"), "__generic" + param.gVar.varName)
+            meth.param(model.directClass("java.lang.String"), genericParamName(param))
 
             param.gVar.permissionVar match {
                 case Some(pVar) =>
-                    meth.param(stringHashSet(), "__genericPerm" + pVar)
+                    meth.param(stringHashSet(), genericPermParamName(pVar))
                 case None => ()
             }
         }
@@ -3036,6 +3009,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     /* these methods make shadowing possible */
 
+    private def genericPermParamName(pVar: String) = {
+        "__genericPerm" + pVar
+    }
+
     private def dereferenceVariable(name: String,
                                     translationContext: TranslationContext,
                                     localContext: Map[String, JVar]): IJExpression = {
@@ -3091,7 +3068,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             JExpr.invoke(JExpr._this(), "__stateTest")
                 .arg(JExpr.lit(ePerm.toString))
                 .arg(JExpr._this().invoke("__lookupState").arg(jEx).arg(JExpr.ref(serializationParamName)))
-                .arg(JExpr.ref("__genericPerm" + varName))
+                .arg(refGenericPermParam(varName))
         case permission: Permission =>
             // This shouldn't happen, as writing a permission test is an error
             assert(false, "Concrete permission testing not allowed.")

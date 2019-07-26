@@ -151,7 +151,6 @@ case class Context(table: DeclarationTable,
         lookupCurrentFieldTypeInType(thisType)(fieldName)
     }
 
-    // TODO GENERIC: Redo all of these lookup functions with the type parameters
     def lookupCurrentFieldTypeInType(typ: ObsidianType)(fieldName: String): Option[ObsidianType] = {
         thisFieldTypes.get(fieldName).orElse(lookupDeclaredFieldTypeInType(typ)(fieldName))
     }
@@ -325,7 +324,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case GenericType(gVar, bound) =>
                 bound match {
-                    // TODO GENERIC: How to handle this remote thing
                     case GenericBoundPerm(interfaceType, permission) =>
                         ContractReferenceType(interfaceType, permission, isRemote = false)
                     case GenericBoundStates(interfaceType, states) =>
@@ -338,7 +336,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     /* true iff [t1 <: t2] */
     private def isSubtype(table: ContractTable, t1: ObsidianType, t2: ObsidianType, isThis: Boolean): Option[Error] = {
-        // TODO GENERIC: How to handle implementing this stuff for substituting parameters for generics? Should make it explicit first, then worry about all this
         val isSubtypeRes = (typeBound(table)(t1), typeBound(table)(t2)) match {
             case (BottomType(), _) => true
             case (_, BottomType()) => true
@@ -357,8 +354,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
             // TODO GENERIC: Get rid of these special cases for top
-            case (p: PrimitiveType, np: NonPrimitiveType) =>
-                np.contractName == "Top"
+            case (p: PrimitiveType, np: NonPrimitiveType) => np.contractName == "Top"
 
             case _ => false
         }
@@ -384,13 +380,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     // returns true iff [p1 <: p2]
     private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
-        // TODO GENERIC: How should we treat inferred here?
         p1 match {
             case Owned() => true
             case Unowned() => (p2 == Unowned()) || (p2 == Inferred())
             case Shared() => (p2 == Shared()) || (p2 == Unowned()) || (p2 == Inferred())
-
-            // TODO GENERIC: This used to be false...why?
             case Inferred() => true
         }
     }
@@ -452,7 +445,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 //  but there probably be some merging/checking to make sure merging is okay
                 Some(StateType(ct, unionStates, false))
 
-            // TODO GENERIC: Make sure there is right
+            // TODO GENERIC: Make sure this is right
             case (g1@GenericType(gVar1, gBound1), g2@GenericType(gVar2, gBound2)) =>
                 if (gVar1.permissionVar.isDefined && gVar2.permissionVar.isDefined) {
                     Some(t1)
@@ -1642,7 +1635,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType =
                     if (oldType.isOwned) {
-                        // TODO GENERIC: Could probably reduce all this contractName/contractType duplication
                         StateType(thisTable.contractType, newStateName, false)
                     }
                     else {
@@ -1843,13 +1835,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                         np.permission,
                                                         contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                                 case permission: Permission =>
-                                                    // TODO GENERIC: Should probably give an error regardless
-                                                    //  since this should never actually come up during typechecking I think
-                                                    if (isSubpermission(Shared(), permission)) {
-                                                        (contextPrime, np.permission, contextPrime)
-                                                    } else {
-                                                        assert(false); null // TODO GENERIC: Probably give some error here?
-                                                    }
+                                                    assert(false); null // TODO GENERIC: Give some error here?
                                                 case permVar: PermVar =>
                                                     val newType = np.withTypeState(permVar)
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
@@ -2529,7 +2515,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkIsSubtype(table, ast, arg1.typOut, arg2.typOut)
     }
 
-    // TODO GENERIC: Handle parameters to the interface when consider the method types for interfaceTx
     // TODO GENERIC: Should we have some override keyword for method/state implementing
     def implementOk(table: ContractTable, tx: Transaction, interfaceTx: Transaction): Unit = {
         if (tx.args.length != interfaceTx.args.length) {
@@ -2581,12 +2566,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case constructor: Constructor => ()
                 }
 
-                // TODO GENERIC: I don't think these are actually allowed?
                 case _ => ()
             }
         }
 
-        // TODO GENERIC: Show errors for the things we forgot to implement here
         for (stateName <- toImplStates) {
             logError(contract, MissingStateImplError(contract.name, interfaceName, stateName))
         }
@@ -2608,7 +2591,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         case Some(interface) => interface.contract match {
                             case impl: ObsidianContractImpl => impl.substitute(impl.params, obsContract.bound.typeArgs).declarations
                             case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
-                                // TODO GENERIC: This should never happen
+                                // TODO GENERIC: This should never happen, log a real error though
                                 assert(false, "Cannot implement a JavaFFIContract"); Nil
                         }
                         case None =>
