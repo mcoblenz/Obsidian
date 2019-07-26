@@ -1047,7 +1047,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
         invocation.arg(JExpr.ref(serializationParamName))
 
         aContract.params.foreach(p => {
-            constructor.param(javaString(0), genericParamName(p))
+            constructor.param(javaString, genericParamName(p))
             invocation.arg(refGenericParam(p))
 
             p.gVar.permissionVar match {
@@ -2200,7 +2200,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                         archive.invoke("getObj").invoke("getImplementingClassName"))
                     val classArchiveNameVar = block.decl(javaString(), "classArchiveName",
                         archive.invoke("getObj").invoke("getImplementingClassArchiveName"))
-                    val archiveDataVar = block.decl(javaString(0), "archiveData",
+                    val archiveDataVar = block.decl(javaString, "archiveData",
                         archive.invoke("getObj").invoke("getImplementingClassData"))
 
                     reflectionConstruct(block, assignTo, default, resolveType(typ, table).boxify(),

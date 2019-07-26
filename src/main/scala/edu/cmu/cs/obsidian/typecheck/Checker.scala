@@ -311,6 +311,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def typeBound(table: ContractTable): ObsidianType => ObsidianType = {
         // TODO GENERIC: There's some repetition that could be factored out here
         case np: NonPrimitiveType => np match {
+            // TODO GENERIC: I think this is actually redundant, everything should get looked up by an earlier AST
+            // TODO GENERIC: Rather, it should be
             case c: ContractReferenceType =>
                 table.lookupTypeVar(c.contractName)
                     .map(typeBound(table)(_).withTypeState(c.permission))
@@ -322,13 +324,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case i: InterfaceContractType => i
 
-            case GenericType(gVar, bound) =>
-                bound match {
-                    case GenericBoundPerm(interfaceType, permission) =>
-                        ContractReferenceType(interfaceType, permission, isRemote = false)
-                    case GenericBoundStates(interfaceType, states) =>
-                        StateType(interfaceType, states, isRemote = false)
-                }
+            case GenericType(gVar, bound) => bound.referenceType
         }
 
         case t => t
