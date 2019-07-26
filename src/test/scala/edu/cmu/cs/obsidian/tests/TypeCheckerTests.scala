@@ -137,19 +137,19 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def assignmentTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
-            (SubtypingError(BoolType(), IntType(), false), 38)
+            (SubtypingError(BoolType(), IntType(), false), 39)
                 ::
-                (InconsistentContractTypeError("C_Shared", "C_Owned"), 41)
+                (InconsistentContractTypeError("C_Shared", "C_Owned"), 42)
                 ::
-                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), false), "f2"), 20)
+                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), false), "f2"), 21)
                 ::
-                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), false), "f3"), 22)
+                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), false), "f3"), 23)
                 ::
-                (VariableUndefinedError("j", null), 49)
+                (VariableUndefinedError("j", null), 50)
                 ::
-                (AssignmentError(), 51)
+                (AssignmentError(), 52)
                 ::
-                (InvalidNonThisFieldAssignment(), 54)
+                (InvalidNonThisFieldAssignment(), 55)
                 ::
                 Nil
         )

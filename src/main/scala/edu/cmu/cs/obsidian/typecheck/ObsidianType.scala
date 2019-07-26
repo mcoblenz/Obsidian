@@ -97,6 +97,9 @@ case class ContractReferenceType(override val contractType: ContractType,
 
     override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType =
         copy(contractType = contractType.copy(typeArgs = contractParams))
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
+        this.copy(permission = otherType.permission).setLoc(this)
 }
 
 
@@ -226,6 +229,8 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
 
     override def withParams(contractParams: Seq[ObsidianType]): StateType =
         this.copy(contractType = ContractType(contractName, contractParams))
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType = otherType
 }
 
 object StateType {
@@ -353,28 +358,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     override def baseTypeName: String = contractName
 
-    //    override def toString: String = {
-    //        val modifiersString = modifiers.map(m => m.toString).mkString(" ")
-    //
-    //        if (modifiers.size > 0) {
-    //            modifiersString + " " + t.toString
-    //        }
-    //        else {
-    //            t.toString
-    //        }
-    //    }
-
-    //    override def equals(other: Any): Boolean = {
-    //        other match {
-    //            case NonPrimitiveType(typ, mod) => typ == t && mod == modifiers
-    //            case _ => false
-    //        }
-    //    }
-    //    override def hashCode(): Int = t.hashCode()
-    //    val residualType: ObsidianType = if (modifiers.contains(IsOwned()))
-    //        NonPrimitiveType(t, modifiers - IsOwned() + IsReadOnlyState())
-    //    else this
-
     def topPermissionType = this
 
     override def isAssetReference(contextContractTable: ContractTable): Possibility = {
@@ -392,6 +375,8 @@ sealed trait NonPrimitiveType extends ObsidianType {
     }
 
     def remoteType: NonPrimitiveType
+
+    def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType
 }
 
 case class IntType() extends PrimitiveType {
@@ -448,6 +433,9 @@ case class FFIInterfaceContractType(name: String, simpleType: NonPrimitiveType) 
 
     override def typeState: TypeState = simpleType.typeState
     override def withTypeState(ts: TypeState): NonPrimitiveType = this.copy(simpleType = simpleType.withTypeState(ts))
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
+        InterfaceContractType(name, simpleType.typeByMatchingPermission(otherType))
 }
 
 sealed trait GenericBound {

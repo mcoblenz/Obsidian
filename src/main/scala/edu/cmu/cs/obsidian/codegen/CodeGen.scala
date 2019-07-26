@@ -79,9 +79,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
         }
     }
 
-    /* This method dynamically checks type state and copies the value of conserved fields
-     * (i.e. defined in both states) from one state to another */
-    private final val conserveFieldsName = "__conserveFields"
     /* based on the result of [getStateMeth], this nulls out the appropriate state field
      * so that the old state can be garbage-collected after a transition */
     private final val deleteOldStateName = "__oldStateToNull"
@@ -703,11 +700,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 stateMeth.param(model.directClass("edu.cmu.cs.obsidian.chaincode.SerializationState"), serializationParamName)
                 stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
 
-                stateMeth.body()
-                    ._if(JExpr.ref(serializationParamName).neNull())
-                    ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
-
                 if (!isStub) {
+                    stateMeth.body()
+                        ._if(JExpr.ref(serializationParamName).neNull())
+                        ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
                     stateMeth.body()._return(JExpr.ref(stateField))
                 } else {
                     stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
@@ -908,32 +904,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     private def generateStateHelpers(newClass: JDefinedClass,
                                      translationContext: TranslationContext): Unit = {
-        /* method to take care of conserved fields during a state transition
-         * Invariant for use: [getStateMeth] returns the current state, the new state is passed
-         * as an argument. The new state's inner class field must be non-null. */
-        val conserveMeth = newClass.method(JMod.PRIVATE, model.VOID, conserveFieldsName)
-        conserveMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
-        val nextState = conserveMeth.param(translationContext.stateEnumClass.get, "nextState")
-        val conserveBody = conserveMeth.body()
-        /* match on the current state */
-        for (stFrom <- translationContext.states.values) {
-            val thisStateBody = conserveBody._if(
-                    invokeGetState(JExpr._this(), false).eq(stFrom.enumVal))
-                ._then()
-            /* match on the target state */
-            for (stTo <- translationContext.states.values if stTo != stFrom) {
-                val assignBody = thisStateBody._if(
-                        nextState.eq(stTo.enumVal))
-                    ._then()
-                val (fromName, toName) = (stFrom.astState.name, stTo.astState.name)
-                for (f <- translationContext.conservedFields(fromName, toName)) {
-                    /* assign the field to the new state from the old */
-                    assignBody.assign(stTo.innerClassField.ref(f.name),
-                                        stFrom.innerClassField.ref(f.name))
-                }
-            }
-        }
-
         /* method to null out old state
          * Invariant for use: [getStateMeth] returns the current state; this will be the state
          * whose inner class field this method nullifies. */
@@ -1852,6 +1822,9 @@ class CodeGen (val target: Target, table: SymbolTable) {
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.InvalidStateException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.StateLockException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
+        method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
 
         val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
                                                                   .asInstanceOf[Option[Transaction]]
@@ -3134,7 +3107,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     ifStateLocked._then()._throw(exception)
                 }
 
-
+                /* nullify old state inner class field */
+                body.invoke(deleteOldStateName)
 
                 /* construct a new instance of the inner contract */
                 val newStateContext = translationContext.states(newStateName)
@@ -3152,13 +3126,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     case None =>
                         // Fields should have been initialized individually, via S1::foo = bar.
                 }
-
-
-                /* assign conserved fields (implicit to programmer) */
-                body.invoke(conserveFieldsName).arg(newStateContext.enumVal)
-
-                /* nullify old state inner class field */
-                body.invoke(deleteOldStateName)
 
                 /* change the enum to reflect the new state */
                 body.assign(JExpr.ref(stateField), translationContext.getEnum(newStateName))

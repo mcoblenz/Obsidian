@@ -14,10 +14,9 @@ main contract TypeInference {
     }
 
     TypeInference@T1() {
+        c = new C();
         ->T1;
     }
-
-
 
     C@S1 c;
 

@@ -108,7 +108,7 @@ public class SerializationState {
     public void mapReturnedObject(ObsidianSerialized obj, boolean returnedReferenceIsOwned) {
         loadReturnedObjectsMap(stub);
         System.out.println("returnedObjectClassMap: " + returnedObjectClassMap);
-        System.out.println("obj: " + obj);
+        System.out.println("obj: " + obj + "; ID = " + obj.__getGUID());
         returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
     }
 

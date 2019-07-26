@@ -46,7 +46,7 @@ case class Context(table: DeclarationTable,
             underlyingVariableMap,
             isThrown,
             Set.empty,
-            Set.empty,
+            localFieldsInitialized,
             Map.empty,
             valVariables)
 
@@ -1252,14 +1252,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             if (context.get(referenceIdentifier).isDefined) {
                 // This was a local variable.
-                context.updated(referenceIdentifier, finalType)
+                context.updated(referenceIdentifier, passedType.typeByMatchingPermission(finalType))
             }
             else {
                 // This was a field or a static invocation. If it was a field, update the field's type.
                 val currentFieldType = context.lookupCurrentFieldTypeInThis(referenceIdentifier)
 
                 if (currentFieldType.isDefined && currentFieldType.get != finalType) {
-                    context.updatedThisFieldType(referenceIdentifier, finalType)
+                    context.updatedThisFieldType(referenceIdentifier, passedType.typeByMatchingPermission(finalType))
                 }
                 else {
                     // No need to update anything for static invocations.
@@ -1445,7 +1445,7 @@ private def checkStatement(
                         typ
                 }
 
-                (contextPrime.updated(name, declaredType), VariableDeclWithInit(exprType, name, ePrime))
+                (contextPrime.updated(name, declaredType), VariableDeclWithInit(typ, name, ePrime))
 
             case Return() =>
                 decl match {
@@ -1625,7 +1625,15 @@ private def checkStatement(
                         oldType
                     }
 
-                (contextPrime.updated("this", newSimpleType).updatedAfterTransition(), Transition(newStateName, newUpdatesOption, context.thisType.permission).setLoc(s))
+                // Any initialization checking that will happen later can assume all the state fields have been initialized.
+                var contextAfterTransition = contextPrime.updated("this", newSimpleType).updatedAfterTransition()
+                if (updates.isDefined) {
+                    for (update <- updates.get) {
+                        contextAfterTransition = contextAfterTransition.updatedWithFieldInitialization(update._1.name)
+                    }
+                }
+
+                (contextAfterTransition, Transition(newStateName, newUpdatesOption, context.thisType.permission).setLoc(s))
 
             case Assignment(ReferenceIdentifier(x), e: Expression) =>
                 if (context.valVariables.contains(x)) {
@@ -2322,6 +2330,8 @@ private def checkStatement(
 
         val (outputContext, newBody) = checkStatementSequence(constr, initContext, constr.body)
 
+
+
         // Check that all the states the constructor can end in are valid, named states
         constr.resultType match {
             case StateType(_, states, _) => {
@@ -2365,10 +2375,10 @@ private def checkStatement(
         }
 
         // If there are states, we'll check to make sure the transitions initialize all fields.
-        // But if there are no states, we have to check separately.
-        if (!hasStates && !outputContext.isThrown) {
+        // But we need to check contract fields separately.
+        if (!outputContext.isThrown) {
             for (field <- table.allFields) {
-                if (!outputContext.localFieldsInitialized.contains(field.name)) {
+                if (field.availableIn.isEmpty && !outputContext.localFieldsInitialized.contains(field.name)) {
                     logError(constr, UninitializedFieldError(field.name))
                 }
             }
