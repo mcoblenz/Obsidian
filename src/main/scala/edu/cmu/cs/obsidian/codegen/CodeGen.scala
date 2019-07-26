@@ -1242,7 +1242,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             newClass.constructor(JMod.PUBLIC)
         }
 
-        if (aContract.params.nonEmpty) {
+        if (aContract.params.nonEmpty && !aContract.isInterface) {
             generatePermVarDefinitions(translationContext, aContract, newClass)
         }
 
@@ -3072,6 +3072,32 @@ class CodeGen (val target: Target, table: SymbolTable) {
         "__" + stateName + "__init__" + fieldName
     }
 
+    def stateCond(states: Set[String], jEx: IJExpression): IJExpression =
+        // We need this toSet here because we have a scala.collection.Set not a scala.collection.immutable.Set...
+        // We use Unowned() here because it doesn't actually matter, since we're just doing a state comparison
+        stateCond(States(states.toSet), jEx, Unowned())
+
+    def stateCond(typeState: TypeState, jEx: IJExpression, ePerm: Permission): IJExpression = typeState match {
+        case States(states) =>
+            // Generates:
+            // new HashSet<String>(Arrays.asList(states)).contains(e.getState().toString())
+            JExpr._new(model.directClass("java.util.HashSet").narrow(model.directClass("java.lang.String")))
+                .arg(withArgs(model.directClass("java.util.Arrays").staticInvoke("asList"),
+                    states.map(JExpr.lit).toSeq))
+                .invoke("contains").arg(invokeGetState(jEx, loadSerialization = true).invoke("toString"))
+        case PermVar(varName) =>
+            // Generates:
+            // this.stateTest(PERMISSION, e.getState().toString(), varName, __st)
+            JExpr.invoke(JExpr._this(), "__stateTest")
+                .arg(JExpr.lit(ePerm.toString))
+                .arg(JExpr._this().invoke("__lookupState").arg(jEx).arg(JExpr.ref(serializationParamName)))
+                .arg(JExpr.ref("__genericPerm" + varName))
+        case permission: Permission =>
+            // This shouldn't happen, as writing a permission test is an error
+            assert(false, "Concrete permission testing not allowed.")
+            JExpr.lit(true)
+    }
+
     private def translateStatement(
                     body: JBlock,
                     statement: Statement,
@@ -3209,47 +3235,20 @@ class CodeGen (val target: Target, table: SymbolTable) {
             case Switch(e, cases) =>
                 val h :: remainingCases = cases
                 val jEx = translateExpr(e, translationContext, localContext)
-                val eqState = (s: String) =>
-                    // TODO
-                    /* somewhat of a bad workaround, but the alternative involves knowing the
-                     * type of the expression jEx: in general, this requires an analysis
-                     * to link references to declarations */
-                    invokeGetState(jEx, true).invoke("toString").invoke("equals").arg(JExpr.lit(s))
 
-                val jIf = body._if(eqState(h.stateName))
+                val jIf = body._if(stateCond(Set(h.stateName), jEx))
                 translateBody(jIf._then(), h.body, translationContext, localContext)
 
                 var jPrev = jIf
                 for (_case <- remainingCases) {
-                    jPrev = jPrev._elseif(eqState(_case.stateName))
+                    jPrev = jPrev._elseif(stateCond(Set(_case.stateName), jEx))
                     translateBody(jPrev._then(), _case.body, translationContext, localContext)
                 }
                 // If no cases matched, this indicates a bug. Abort.
                 jPrev._else()._throw(JExpr._new(model.ref("RuntimeException")))
             case IfInState(e, ePerm, state, s1, s2) =>
                 val jEx = translateExpr(e, translationContext, localContext)
-
-                // TODO GENERIC: Clean this up
-                val cond = state match {
-                    case States(states) =>
-                        // Generates:
-                        // new HashSet<String>(Arrays.asList(states)).contains(e.getState().toString())
-                        JExpr._new(model.directClass("java.util.HashSet").narrow(model.directClass("java.lang.String")))
-                            .arg(withArgs(model.directClass("java.util.Arrays").staticInvoke("asList"),
-                                            states.map(JExpr.lit).toSeq))
-                            .invoke("contains").arg(invokeGetState(jEx, loadSerialization = true).invoke("toString"))
-                    case PermVar(varName) =>
-                        // Generates:
-                        // this.stateTest(PERMISSION, e.getState().toString(), varName, __st)
-                        JExpr.invoke(JExpr._this(), "__stateTest")
-                            .arg(JExpr.lit(ePerm.toString))
-                            .arg(JExpr._this().invoke("__lookupState").arg(jEx).arg(JExpr.ref(serializationParamName)))
-                            .arg(JExpr.ref("__genericPerm" + varName))
-                    case permission: Permission =>
-                        assert(false); JExpr.lit(true) // TODO GENERIC: This should be based on ePerm
-                }
-
-                val jIf = body._if(cond)
+                val jIf = body._if(stateCond(state, jEx, ePerm))
 
                 val shouldStateLock = e match {
                     case ReferenceIdentifier(x) => true

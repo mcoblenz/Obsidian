@@ -53,10 +53,5 @@ main contract GenericInterfaceParamsBasic {
         Foo[NopConsumer[A], A] f = new Foo[NopConsumer[A], A](new NopConsumer[A]());
         f.consume(a);
     }
-
-    transaction makeStoreSubtype() {
-        // Should be fine, even though Consumer[A] != NopConsumer[A], because NopConsumer[A] <: Consumer[A]
-        Store[Consumer[A]] s = new Store[NopConsumer[A]](new NopConsumer[A]());
-    }
 }
 

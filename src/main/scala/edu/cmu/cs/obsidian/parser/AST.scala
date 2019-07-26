@@ -287,6 +287,9 @@ case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
         TryCatch(s1.map(_.substitute(genericParams, actualParams)), s2.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
 }
+// TODO GENERIC: We could just compile switches to an if-else tree to simplify things.
+//  However, that would require a default. Given we currently have no such thing, it's basically
+//  impossible to write a polymorphic switch
 case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Switch =
         Switch(e.substitute(genericParams, actualParams),
@@ -295,54 +298,19 @@ case class Switch(e: Expression, cases: Seq[SwitchCase]) extends Statement {
 }
 case class SwitchCase(stateName: String, body: Seq[Statement]) extends AST {
     def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): SwitchCase = {
-        val newStateName = ObsidianType.stateSubstitutions(genericParams, actualParams).get(stateName) match {
-            case Some(permOrState) => permOrState match {
-                case States(states) =>
-                    if (states.size > 1) {
-                        // TODO GENERIC: Clean this up (log error, or...?) Should probably actually generate multiple cases for this one
-                        assert(false, s"Bad subsitutition: $states for $stateName. Reason: Can only substitute a single state here")
-                        stateName
-                    } else {
-                        states.head
-                    }
-                case PermVar(varName) =>
-                    // TODO GENERIC: Improve this. Should probably either delete the case or just compile anyway, since the case will never be hit
-                    assert(false, s"Bad substitution: Cannot substitute a perm var ($varName) for a state in a switch case.")
-                    stateName
-                case perm: Permission =>
-                    // TODO GENERIC: Improve this. Should probably either delete the case or just compile anyway, since the case will never be hit
-                    assert(false, s"Bad substitution: Cannot substitute a permission ($perm) for a state in a switch case.")
-                    stateName
-            }
-            case None => stateName
-        }
-
-        SwitchCase(newStateName, body.map(_.substitute(genericParams, actualParams)))
+        SwitchCase(stateName, body.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
     }
 }
 
-case class StaticAssert(expr: Expression, statesOrPermissions: Seq[Identifier]) extends Statement {
-    def transform(stateMap: Map[String, TypeState],
-                  identifier: Identifier): Seq[Identifier] =
-    // TODO GENERIC: handle everything correctly...
-        stateMap.get(identifier._1) match {
-            case Some(permOrState) => permOrState match {
-                case States(states) => states.map((_, identifier._2)).toSeq
-                case perm: Permission => (perm.toString, identifier._2) :: Nil
-
-                // TODO GENERIC: I think?
-                case PermVar(varName) => assert(false, "There should be no permission variables left"); null
-            }
-
-            case None => identifier :: Nil
+case class StaticAssert(expr: Expression, typeState: TypeState) extends Statement {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StaticAssert = {
+        val newState = typeState match {
+            case permVar: PermVar => ObsidianType.lookupState(genericParams, actualParams)(permVar)
+            case ts => ts
         }
 
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StaticAssert = {
-        val stateMap = ObsidianType.stateSubstitutions(genericParams, actualParams)
-
-        StaticAssert(expr.substitute(genericParams, actualParams),
-            statesOrPermissions.flatMap(transform(stateMap, _))).setLoc(this)
+        StaticAssert(expr.substitute(genericParams, actualParams), newState).setLoc(this)
     }
 }
 

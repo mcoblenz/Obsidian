@@ -75,10 +75,5 @@ main contract C {
         // Error, NopConsumer has kind * => *, not *
         Foo[NopConsumer, A] f = new Foo[NopConsumer, A](new NopConsumer());
     }
-
-    transaction makeStoreSubtype() {
-        // Should be fine, even though Consumer[A] != NopConsumer[A], because NopConsumer[A] <: Consumer[A]
-        Store[Consumer[A]] s = new Store[NopConsumer[A]](new NopConsumer[A]());
-    }
 }
 

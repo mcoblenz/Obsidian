@@ -150,17 +150,15 @@ class ContractTable(
 
     def contractType: ContractType =
         contract match {
-            case ObsidianContractImpl(modifiers, name, params, implementBound, declarations, transitions, isInterface, sp) =>
-                ContractType(name, params)
-            case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
-                ContractType(name, Nil)
+            case impl: ObsidianContractImpl => ContractType(name, impl.params)
+            case impl: JavaFFIContractImpl => ContractType(name, Nil)
         }
 
     def possibleStatesFor(typ: NonPrimitiveType): Set[String] =
         typ match {
             case ContractReferenceType(contractType, permission, isRemote) =>
                 lookupContract(contractType.contractName).map(_.possibleStates).getOrElse(Set())
-            case FFIInterfaceContractType(name, simpleType) => possibleStatesFor(simpleType)
+            case InterfaceContractType(name, simpleType) => possibleStatesFor(simpleType)
             case StateType(contractName, stateNames, isRemote) => stateNames
             case g: GenericType => g.lookupInterface(this).get.possibleStates
         }

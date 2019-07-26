@@ -139,7 +139,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Assignment.obs",
             (SubtypingError(BoolType(), IntType(), false), 39)
                 ::
-                (InconsistentContractTypeError("C_Shared", "C_Owned"), 42)
+                (InconsistentContractTypeError(ContractType("C_Shared", Nil), ContractType("C_Owned", Nil)), 42)
                 ::
                 (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), false), "f2"), 21)
                 ::
@@ -350,10 +350,9 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def contractUndefinedTest(): Unit = {
         runTest("resources/tests/type_checker_tests/UndefinedContract.obs",
-            (ContractUndefinedError("OtherThing"), 3)
-                ::
-                (ContractUndefinedError("OtherThing"), 7)
-                ::
+            (ContractUndefinedError("OtherThing"), 3) ::
+                (ContractUndefinedError("OtherThing"), 7) ::
+                (ContractUndefinedError("OtherThing"), 7) ::
                 Nil
         )
     }
@@ -569,9 +568,9 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/StaticAsserts.obs",
             (StaticAssertInvalidState("C", "S3"), 6)
                 ::
-                (StaticAssertFailed(This(), Seq("S2"), StateType(ContractType("C", Nil), Set("S1", "S2"), false)), 17)
+                (StaticAssertFailed(This(), States(Set("S2")), StateType(ContractType("C", Nil), Set("S1", "S2"), false)), 17)
                 ::
-                (StaticAssertFailed(ReferenceIdentifier("ow"), Seq("Unowned"), ContractReferenceType(ContractType("C", Nil), Owned(), false)), 24)
+                (StaticAssertFailed(ReferenceIdentifier("ow"), Unowned(), ContractReferenceType(ContractType("C", Nil), Owned(), false)), 24)
                 ::
                 Nil
         )
@@ -664,7 +663,7 @@ class TypeCheckerTests extends JUnitSuite {
             (StateCheckOnPrimitiveError(), 45) ::
               (StateCheckRedundant(), 56) ::
               (StaticAssertFailed(
-                ReferenceIdentifier("s"), Seq("Owned"),
+                ReferenceIdentifier("s"), Owned(),
                 StateType(ContractType("LightSwitch", Nil), "On", false)), 62) ::
               (StateCheckRedundant(), 67) ::
               Nil)

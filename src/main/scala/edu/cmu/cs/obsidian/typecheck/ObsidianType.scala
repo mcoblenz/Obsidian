@@ -3,8 +3,12 @@ import edu.cmu.cs.obsidian.parser._
 
 sealed trait TypeState
 
-case class States(states: Set[String]) extends TypeState
-case class PermVar(varName: String) extends TypeState
+case class States(states: Set[String]) extends TypeState {
+    override def toString: String = states.mkString(" | ")
+}
+case class PermVar(varName: String) extends TypeState {
+    override def toString: String = varName
+}
 
 sealed trait Permission extends TypeState {
     def residual: Permission
@@ -222,7 +226,7 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
     override def typeState: TypeState = States(stateNames)
 
     override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
-        case States(states) => this.copy(stateNames = stateNames)
+        case States(states) => this.copy(stateNames = states)
         case PermVar(varName) => ??? // TODO GENERIC: What to do here?
         case permission: Permission => ContractReferenceType(contractType, permission, isRemote)
     }
@@ -409,7 +413,7 @@ case class BottomType() extends ObsidianType {
 }
 
 // TODO GENERIC: Does this need to be extended for generics?
-case class FFIInterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
+case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
     override val isBottom: Boolean = false
     override def residualType(mode: OwnershipConsumptionMode): NonPrimitiveType = this
@@ -422,7 +426,7 @@ case class FFIInterfaceContractType(name: String, simpleType: NonPrimitiveType) 
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {
         simpleType.substitute(genericParams, actualParams) match {
-            case np: NonPrimitiveType => FFIInterfaceContractType(name, np)
+            case np: NonPrimitiveType => InterfaceContractType(name, np)
 
             case other => ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(this)
         }
@@ -451,7 +455,7 @@ sealed trait GenericBound {
     def residualType(mode: OwnershipConsumptionMode): GenericBound
 
     // TODO GENERIC: Should isRemote be false or should it be part of the bound?
-    def referenceType: ObsidianType// = ContractReferenceType(contractType, permission, isRemote = false)
+    def referenceType: NonPrimitiveType
 }
 
 case class GenericBoundPerm(interfaceType: ContractType, permission: Permission) extends GenericBound {
@@ -481,7 +485,7 @@ case class GenericBoundPerm(interfaceType: ContractType, permission: Permission)
 
     override def typeState: TypeState = permission
 
-    override def referenceType: ObsidianType = ContractReferenceType(interfaceType, permission, isRemote = false)
+    override def referenceType: NonPrimitiveType = ContractReferenceType(interfaceType, permission, isRemote = false)
 }
 
 case class GenericBoundStates(interfaceType: ContractType, states: Set[String]) extends GenericBound {
@@ -513,7 +517,7 @@ case class GenericBoundStates(interfaceType: ContractType, states: Set[String]) 
 
     override def typeState: TypeState = States(states)
 
-    override def referenceType: ObsidianType = StateType(interfaceType, states, isRemote = false)
+    override def referenceType: NonPrimitiveType = StateType(interfaceType, states, isRemote = false)
 }
 
 case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[String]) {
@@ -551,19 +555,14 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
         }
 
     def lookupInterface(contractTable: ContractTable): Option[ContractTable] =
-        // TODO GENERIC: Does this work?
-        // TODO GENERIC: Allow the default of not including an interface at all
         contractTable.lookupContract(bound.interfaceType)
 
     override def isAssetReference(contextContractTable: ContractTable): Possibility =
         Possibility.fromBoolean(gVar.isAsset)
 
     override def contractType: ContractType = bound.interfaceType
-
-    // TODO GENERIC: what to do here??
     override def genericParams: Seq[ObsidianType] = Nil
 
-    // TODO GENERIC: Is there more substitution that needs to be done here or is this sufficient
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {
         val idx = genericParams.indexWhere(_.gVar.varName == this.gVar.varName)
 
@@ -589,17 +588,6 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
         }
     }
 
-//    override def withStates(stateNames: Set[String]): GenericType =
-//        copy(bound = bound.withStates(stateNames))
-//
-//    // Get rid of the permission variable, otherwise the permission variable will take precedence
-//    override def withPermission(permission: Permission): GenericType =
-//        GenericType(gVar.copy(permissionVar = None), bound.withPermission(permission))
-
-//    override def permissionOrState: Either[Permission, Set[String]] =
-//        bound.permissionOrState
-
-    // TODO GENERIC: Is there something more that should happen here?
     override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType = this
 
     override def codeGenName: String = gVar.varName
@@ -614,4 +602,7 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
         case Some(name) => PermVar(name)
         case None => bound.typeState
     }
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
+        withTypeState(otherType.permission)
 }

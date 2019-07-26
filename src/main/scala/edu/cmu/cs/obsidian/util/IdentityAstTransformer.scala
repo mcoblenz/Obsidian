@@ -328,14 +328,15 @@ class IdentityAstTransformer {
                 var errors = List.empty[ErrorRecord]
                 val newCases = cases.map(_case => {
                     val (newBody, newContext, newErrors) = transformBody(table, lexicallyInsideOf, context, _case.body, params)
-                    errors = errors ++ newErrors;
+                    errors = errors ++ newErrors
                     _case.copy(body = newBody).setLoc(_case)
                 })
                 val newSwitch = oldSwitch.copy(e = transformExpression(e),
                                                cases = newCases).setLoc(oldSwitch)
                 (newSwitch, context, errors)
             case oldAssert@StaticAssert(e, l) =>
-                (StaticAssert(transformExpression(e), l).setLoc(oldAssert), context, Seq())
+                var (newL, errors) = transformTypeState(table, lexicallyInsideOf, l, oldAssert.loc, params)
+                (StaticAssert(transformExpression(e), newL).setLoc(oldAssert), context, errors)
             case e: Expression => (transformExpression(e), context, Seq())
         }
     }

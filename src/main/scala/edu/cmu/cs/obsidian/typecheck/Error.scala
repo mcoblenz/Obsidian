@@ -89,7 +89,7 @@ case class FieldUndefinedError(fieldOf: NonPrimitiveType, fName: String) extends
     val msg: String = fieldOf match {
         case ContractReferenceType(cName, _, _) => s"Field '$fName' is not defined in contract '$cName'"
         case StateType(cName, stateNames, _) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
-        case FFIInterfaceContractType(name, typ) => s"Interfaces do not include fields."
+        case InterfaceContractType(name, typ) => s"Interfaces do not include fields."
     }
 }
 case class RecursiveFieldTypeError(cName: String, fName: String) extends Error {
@@ -114,7 +114,7 @@ case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extend
     val msg: String = receiver match {
         case ContractReferenceType(cName, _, _) =>
             s"No transaction or function with name '$name' was found in contract '$cName'"
-        case FFIInterfaceContractType(cName, _) =>
+        case InterfaceContractType(cName, _) =>
             s"No transaction or function with name '$name' was found in interface '$cName'"
         case StateType(cName, sNames, _) =>
             s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"
@@ -247,8 +247,8 @@ case class StaticAssertOnPrimitiveError(e: Expression) extends Error {
     val msg: String = s"Cannot check the ownership or state of primitive expression '$e'."
 }
 
-case class StaticAssertFailed(e: Expression, statesOrPermissions: Seq[String], actualType: ObsidianType) extends Error {
-    val stateStr = statesOrPermissions.mkString(" | ")
+case class StaticAssertFailed(e: Expression, statesOrPermissions: TypeState, actualType: ObsidianType) extends Error {
+    val stateStr = statesOrPermissions.toString
 
     val msg: String = s"Expression '$e' failed assertion $stateStr. Actual type: $actualType."
 }
@@ -284,7 +284,7 @@ case class ReceiverTypeIncompatibleError(transactionName: String, actualType: Ob
     val msg: String = s"Cannot invoke $transactionName on a receiver of type $actualType; a receiver of type $expectedType is required."
 }
 
-case class InconsistentContractTypeError(declaredContractName: String, actualContractName: String) extends Error {
+case class InconsistentContractTypeError(declaredContractName: ContractType, actualContractName: ContractType) extends Error {
     val msg: String = s"Cannot assign a value of contract $actualContractName to a variable that requires a value of contract $declaredContractName."
 }
 

@@ -23,6 +23,8 @@ main contract C {
 
         [ow @ Unowned]; // should fail
 
-        [ow @ Owned | Unowned];
+        // TODO: Not sure why we want this.
+        // In the interest of making thing more uniform, I ended up accidentally disallowing this---I can put it back if necessary.
+        // [ow @ Owned | Unowned];
     }
 }

@@ -193,9 +193,7 @@ object Parser extends Parsers {
     }
 
     private def parseBody: Parser[Seq[Statement]] =
-        rep(parseAtomicStatement) ^^ {
-            case statements => statements
-        }
+        rep(parseAtomicStatement) ^^ (statements => statements)
 
     private def parseAtomicStatement: Parser[Statement] = {
         val parseReturn = ReturnT() ~ opt(parseExpr) ~! SemicolonT() ^^ {
@@ -273,8 +271,21 @@ object Parser extends Parsers {
                 case switch ~ e ~ _ ~ cases ~ _ => Switch(e, cases).setLoc(switch)
         }
 
-        val parseStaticAssertion = LBracketT() ~! parseExpr ~ AtT() ~ parseIdAlternatives ~ RBracketT() ~! SemicolonT() ^^ {
-            case _ ~ expr ~ at ~ idents ~ _ ~ _ => StaticAssert(expr, idents).setLoc(at)
+        val parseTypeState = parseIdAlternatives ^^ {
+            idents =>
+                if (idents.size == 1) {
+                    resolvePermission(idents.head._1) match {
+                        case Some(perm) => perm
+                        case None => States(idents.map(_._1).toSet)
+                    }
+                } else {
+                    States(idents.map(_._1).toSet)
+                }
+        }
+
+        val parseStaticAssertion = LBracketT() ~! parseExpr ~ AtT() ~ parseTypeState ~ RBracketT() ~! SemicolonT() ^^ {
+            case _ ~ expr ~ at ~ typestate ~ _ ~ _ =>
+                StaticAssert(expr, typestate).setLoc(at)
         }
 
 
@@ -598,21 +609,17 @@ object Parser extends Parsers {
     }
 
     // TODO: maybe we can check here that the constructor has the appropriate name?
-    private def parseConstructor = {
-        parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
-            case name ~ params ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val genParams = params.map {
-                    case _ ~ types ~ _ => types
-                }.getOrElse(List())
-
-                val resultType = extractTypeFromPermission(permission, name._1, genParams, isRemote = false, defaultOwned = false)
+    private def parseConstructor (params: Seq[GenericType]) = {
+        parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
+            case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
+                val resultType = extractTypeFromPermission(permission, name._1, params, isRemote = false, defaultOwned = false)
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }
 
     private def parseDeclInContract(params: List[GenericType], isInterface:Boolean,
                                     sourcePath: String)(contractName: String, contractParams: List[GenericType]):  Parser[Declaration] = {
-        parseFieldDecl | parseStateDecl | parseConstructor | parseContractDecl(sourcePath) |
+        parseFieldDecl | parseStateDecl | parseConstructor(contractParams) | parseContractDecl(sourcePath) |
             parseTransDecl(params, isInterface)(contractName, contractParams)
     }
 
