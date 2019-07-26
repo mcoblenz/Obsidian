@@ -1,7 +1,7 @@
 
 //Write a Person contract that has an owned reference to a Wallet object. Person should also have an addMoney() 
-//transaction that takes in a Money parameter and passes it to its Wallet's receiveMoney() transaction. 
-//addMoney() should return the old money that was replaced
+//transaction that takes in a Money parameter and passes it to its Wallet's replaceMoney() transaction. 
+//addMoney() should return the Wallet's initial money that was replaced
 
 //Note: the Person contract MUST be main
 
