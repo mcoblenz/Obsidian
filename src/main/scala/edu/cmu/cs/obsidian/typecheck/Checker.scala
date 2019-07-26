@@ -441,6 +441,27 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // TODO GENERIC: Right now we just take the ct from the first one,
                 //  but there probably be some merging/checking to make sure merging is okay
                 Some(StateType(ct, unionStates, false))
+
+            // TODO GENERIC: Make sure there is right
+            case (g1@GenericType(gVar1, gBound1), g2@GenericType(gVar2, gBound2)) =>
+                if (gVar1.permissionVar.isDefined && gVar2.permissionVar.isDefined) {
+                    Some(t1)
+                } else {
+                    val typeForMismatchedPermissions =
+                        if (t1.isAssetReference(contractTable) != No()) {
+                            None
+                        }
+                        else {
+                            Some(t1.withTypeState(Unowned()))
+                        }
+
+                    g1.permission match {
+                        case Owned() => typeForMismatchedPermissions
+                        case Unowned() => if (g2.permission == Shared()) Some(t1) else typeForMismatchedPermissions
+                        case Shared() => if (g2.permission == Unowned()) Some(t2) else typeForMismatchedPermissions
+                        case Inferred() => assert(assertion = false, "Inferred types should be removed"); None
+                    }
+                }
             case _ => None
         }
     }
@@ -535,21 +556,21 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 name: String,
                 receiver: Expression,
                 params: Seq[ObsidianType],
-                args: Seq[Expression]): (ObsidianType, Context, Boolean, Expression, Seq[Expression]) = {
+                args: Seq[Expression]): (ObsidianType, Context, Boolean, Expression, Seq[GenericType], Seq[Expression]) = {
             val (receiverType, contextAfterReceiver, receiverPrime) = inferAndCheckExpr(decl, context, receiver, NoOwnershipConsumption())
 
             // Terrible special case just for now. TODO: remove this.
             if (name == "sqrt" && args.length == 1) {
                 // Int isn't really right either, but it will have to do for now.
-                return (IntType(), context, false, receiverPrime, args)
+                return (IntType(), context, false, receiverPrime, Nil, args)
             }
 
             // Eliminate things we can't invoke methods on first.
             val nonPrimitiveReceiverType = receiverType match {
-                case BottomType() => return (BottomType(), contextAfterReceiver, false, receiverPrime, args)
+                case BottomType() => return (BottomType(), contextAfterReceiver, false, receiverPrime, Nil, args)
                 case UnitType() | IntType() | BoolType() | StringType() =>
                     logError(e, NonInvokeableError(receiverType))
-                    return (BottomType(), contextAfterReceiver, false, receiverPrime, args)
+                    return (BottomType(), contextAfterReceiver, false, receiverPrime, Nil, args)
                 case np: NonPrimitiveType => np
             }
 
@@ -576,14 +597,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case None =>
                     val err = MethodUndefinedError(nonPrimitiveReceiverType, name)
                     logError(e, err)
-                    return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, args)
+                    return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, Nil, args)
                 case Some(t) => t
             }
 
             if (receiverType.isInstanceOf[FFIInterfaceContractType] && !foundTransaction.get.isStatic) {
                 val err = NonStaticAccessError(foundTransaction.get.name, receiver.toString)
                 logError(e, err)
-                return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, args)
+                return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, foundTransaction.get.params, args)
             }
 
             if (!invokable.isStatic && isSubtype(context.contractTable, receiverType, invokable.thisType, receiver.isInstanceOf[This]).isDefined) {
@@ -608,7 +629,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             val (exprSequence, contextAfterArgs, correctInvokable) =
                 checkArgs(e, contextAfterReceiver, specList, args) match {
-                    case None => return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, args)
+                    case None => return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, foundTransaction.get.params, args)
                     case Some(x) => x
                 }
 
@@ -627,7 +648,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             // Update field types if we invoked a private method.
             val contextAfterPrivateInvocation = updateFieldsForPrivateInvocation(contextPrime, foundTransaction.get)
 
-            (resultType, contextAfterPrivateInvocation, isFFIInvocation, receiverPrime, exprSequence)
+            (resultType, contextAfterPrivateInvocation, isFFIInvocation, receiverPrime, foundTransaction.get.params, exprSequence)
         }
 
          e match {
@@ -785,14 +806,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          (BottomType(), newContext, newExpr)
                  }
 
-             case LocalInvocation(name, params, args: Seq[Expression]) =>
-                 val (typ, con, _, _, newArgs) = handleInvocation(context, name, This(), params, args)
+             case LocalInvocation(name, _, params, args: Seq[Expression]) =>
+                 val (typ, con, _, _, newGenericParams, newArgs) = handleInvocation(context, name, This(), params, args)
                  //This may need correction.
-                 (typ, con, LocalInvocation(name, params, newArgs).setLoc(e))
+                 (typ, con, LocalInvocation(name, newGenericParams, params, newArgs).setLoc(e))
 
-             case Invocation(receiver: Expression, params, name, args: Seq[Expression], isFFIInvocation) =>
-                 val (typ, con, isFFIInv, newReceiver, newArgs) = handleInvocation(context, name, receiver, params, args)
-                 (typ, con, Invocation(newReceiver, params, name, newArgs, isFFIInv).setLoc(e))
+             case Invocation(receiver: Expression, _, params, name, args: Seq[Expression], isFFIInvocation) =>
+                 val (typ, con, isFFIInv, newReceiver, newGenericParams, newArgs) = handleInvocation(context, name, receiver, params, args)
+                 (typ, con, Invocation(newReceiver, newGenericParams, params, name, newArgs, isFFIInv).setLoc(e))
 
              case c@Construction(contractType, args: Seq[Expression], isFFIInvocation) =>
                  val tableLookup = context.contractTable.lookupContract(contractType.contractName)
@@ -897,7 +918,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case Return() | ReturnExpr(_) | Revert(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
-                case IfInState(e, state, s1, s2) =>
+                case IfInState(e, ePerm, state, s1, s2) =>
                     hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
                 case Switch(e, cases) =>
                     hasRet = cases.foldLeft(true)((prev, aCase) => prev && hasReturnStatement(tx, aCase.body))
@@ -1688,7 +1709,7 @@ private def checkStatement(
                     contextPrime)
                 (mergeContext(s, contextIfFalse, contextIfTrue), IfThenElse(ePrime, checkedTrueStatements, checkedFalseStatements).setLoc(s))
 
-            case IfInState(e, state, body1, body2) =>
+            case IfInState(e, ePerm, state, body1, body2) =>
 
                 val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
 
@@ -1700,31 +1721,31 @@ private def checkStatement(
                           logError(e, StateCheckOnPrimitiveError())
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
+                        return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
                     case _ =>
                         if (!t.isBottom) {
                             logError(e, SwitchError(t))
                         }
                         // There was previously some kind of error. Don't propagate it.
-                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
+                        return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
                 }
 
                 val contractTable = context.contractTable.lookupContract(contractName) match {
                     case Some(table) => table
                     case None =>
                         logError(e, SwitchError(t))
-                        return (contextPrime, IfInState(ePrime, state, body1, body2).setLoc(s))
+                        return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
                 }
 
                 val allStates = contractTable.possibleStates
 
                 var resetOwnership: Option[(String, NonPrimitiveType)] = None
 
-                val (contextForCheckingTrueBranch, contextForCheckingFalseBranch) =
+                val (contextForCheckingTrueBranch, ePermPrime, contextForCheckingFalseBranch) =
                     t match {
                         case p: PrimitiveType =>
                             logError(s, StateCheckOnPrimitiveError())
-                            (contextPrime, contextPrime)
+                            (contextPrime, Inferred(), contextPrime)
                         case np: NonPrimitiveType =>
                             val ident = e match {
                                 // If e is a variable, we might be able to put it in the context with the appropriate state.
@@ -1734,39 +1755,78 @@ private def checkStatement(
                                 case _ => None
                             }
 
+                            // TODO GENERIC: Refactor this mess...
                             ident match {
                                 case Some(x) =>
                                     np.permission match {
                                         case Owned() =>
-                                            val newType = StateType(np.contractType, Set(state._1), np.isRemote)
-                                            t match {
-                                                case StateType(_, specificStates, _) =>
-                                                    if (specificStates.size == 1 && specificStates.contains(state._1)) {
-                                                        logError(e, StateCheckRedundant())
+                                            state match {
+                                                case States(states) =>
+                                                    val newType = np.withTypeState(state)
+                                                    t match {
+                                                        case StateType(_, specificStates, _) =>
+                                                            if (specificStates == states) {
+                                                                logError(e, StateCheckRedundant())
+                                                            }
+                                                            val typeFalse =
+                                                                StateType(np.contractType, specificStates -- states, np.isRemote)
+                                                            (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
+                                                                np.permission,
+                                                                contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                                        case _ =>
+                                                            if (allStates == states) {
+                                                                logError(e, StateCheckRedundant())
+                                                            }
+                                                            val typeFalse = StateType(np.contractType, allStates -- states, np.isRemote)
+                                                            (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
+                                                                np.permission,
+                                                                contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                                     }
-                                                    val typeFalse = StateType(np.contractType, specificStates - state._1, np.isRemote)
-                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
-                                                case _ =>
-                                                    if (allStates.size == 1 && allStates.contains(state._1)) {
-                                                        logError(e, StateCheckRedundant())
+                                                case permission: Permission =>
+                                                    if (isSubpermission(np.permission, permission)) {
+                                                        (contextPrime, np.permission, contextPrime)
+                                                    } else {
+                                                        // TODO GENERIC: Log an error here
+                                                        assert(false); null
                                                     }
-                                                    val typeFalse = StateType(np.contractType, allStates - state._1, np.isRemote)
-                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                                case permVar: PermVar =>
+                                                    val newType = np.withTypeState(permVar)
+                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
+                                                        np.permission,
+                                                        contextPrime)
                                             }
-                                        case Unowned() => (contextPrime, contextPrime)
+                                        case Unowned() => (contextPrime, np.permission, contextPrime)
                                         case Shared() | Inferred() =>
                                             // If it's Inferred(), there's going to be another error later. For now, be optimistic.
-                                            if (allStates.size == 1 && allStates.contains(state._1)) {
-                                                logError(e, StateCheckRedundant())
+                                            state match {
+                                                case States(states) =>
+                                                    if (allStates == states) {
+                                                        logError(e, StateCheckRedundant())
+                                                    }
+                                                    val newType = np.withTypeState(state)
+                                                    val typeFalse = StateType(np.contractType, allStates -- states, np.isRemote)
+                                                    resetOwnership = Some((x, np))
+                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
+                                                        np.permission,
+                                                        contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
+                                                case permission: Permission =>
+                                                    // TODO GENERIC: Should probably give an error regardless
+                                                    //  since this should never actually come up during typechecking I think
+                                                    if (isSubpermission(Shared(), permission)) {
+                                                        (contextPrime, np.permission, contextPrime)
+                                                    } else {
+                                                        assert(false); null // TODO GENERIC: Probably give some error here?
+                                                    }
+                                                case permVar: PermVar =>
+                                                    val newType = np.withTypeState(permVar)
+                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
+                                                        np.permission,
+                                                        contextPrime)
                                             }
-                                            val newType = StateType(np.contractType, Set(state._1), np.isRemote)
-                                            val typeFalse = StateType(np.contractType, allStates - state._1, np.isRemote)
-                                            resetOwnership = Some((x, np))
-                                            (contextPrime.updated(x, newType).updatedMakingVariableVal(x), contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                     }
-                                case None => (contextPrime, contextPrime)
+                                case None => (contextPrime, np.permission, contextPrime)
                             }
-                        case BottomType() => (contextPrime, contextPrime)
+                        case BottomType() => (contextPrime, Inferred(), contextPrime)
                     }
 
                 val (trueContext, checkedTrueStatements) = checkStatementSequence(decl, contextForCheckingTrueBranch, body1)
@@ -1786,7 +1846,7 @@ private def checkStatement(
                     contextPrime)
 
                 val mergedContext = mergeContext(s, contextIfFalse, contextIfTrue)
-                val newStatement = IfInState(ePrime, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
+                val newStatement = IfInState(ePrime, ePermPrime, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
 
                 (mergedContext, newStatement)
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>

@@ -103,4 +103,8 @@ class CompilerTests extends JUnitSuite {
     @Test def interfaceUse(): Unit = {
         testContract("InterfaceUse")
     }
+
+    @Test def genericsStateVariables(): Unit = {
+        testContract("GenericsStateVariables")
+    }
 }

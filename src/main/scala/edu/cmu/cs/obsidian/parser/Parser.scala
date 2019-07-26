@@ -246,13 +246,15 @@ object Parser extends Parsers {
             case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s ~ _ ~ None =>
                 stOpt match {
                     case None => If(e, s).setLoc(_if)
-                    case Some(_ ~ stateName) => IfInState(e, stateName, s, Seq.empty).setLoc(_if)
+                    // TODO GENERIC: Allow multiple states here, I guess?
+                    case Some(_ ~ stateName) => IfInState(e, Inferred(), States(Set(stateName._1)), s, Seq.empty).setLoc(_if)
                 }
 
             case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) =>
                 stOpt match {
                     case None => IfThenElse(e, s1, s2).setLoc(_if)
-                    case Some(_ ~ stateName) => IfInState(e, stateName, s1, s2).setLoc(_if)
+                    // TODO GENERIC: Allow multiple states here, I guess?
+                    case Some(_ ~ stateName) => IfInState(e, Inferred(), States(Set(stateName._1)), s1, s2).setLoc(_if)
                 }
 
         }
@@ -356,7 +358,8 @@ object Parser extends Parsers {
     private def parseExprBottom: Parser[Expression] = {
         def parseLocalInv = {
             parseId ~ parseTypeList ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
-                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, params, args).setLoc(name)
+                // genericParams will be filled in later by the typechecker
+                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, Nil, params, args).setLoc(name)
             }
         }
 
@@ -367,7 +370,8 @@ object Parser extends Parsers {
             dots.foldLeft(e)(
                 (e: Expression, inv: DotExpr) => inv match {
                     case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
-                    case Right((funcName, params, args)) => Invocation(e, params, funcName._1, args, false).setLoc(funcName)
+                    // genericParams will be filled in later by the typechecker
+                    case Right((funcName, params, args)) => Invocation(e, Nil, params, funcName._1, args, false).setLoc(funcName)
                 }
             )
         }

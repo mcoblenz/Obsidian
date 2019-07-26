@@ -11,8 +11,16 @@ init() {
 
     # Then go to run the tests
     cd network-framework
-    ./down.sh
-    ./up.sh -s "$1"
+
+    # Check if we need to take the network down and put it back up, or if we can just upgrade.
+    # This is useful when debugging; on Travis we'll always have to take it down and put it back up
+    cur_proj="$( source ".env"; echo "$CHAINCODE_DIRECTORY" )"
+    if [[ "$cur_proj" == "$1" ]]; then
+        ./upgrade.sh
+    else
+        ./down.sh
+        ./up.sh -s "$1"
+    fi
 }
 
 check() {

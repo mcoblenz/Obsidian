@@ -71,7 +71,7 @@ class IdentityAstTransformer {
                 newDecls = newDecls.reverse
 
                 val (newTypeArgs, allTypeErrors) =
-                    obsContract.bound.typeArgs.map(transformType(table, cTable, emptyContext, _, obsContract.loc)).unzip
+                    obsContract.bound.typeArgs.map(transformType(table, cTable, emptyContext, _, obsContract.loc, Nil)).unzip
                 val newBound = obsContract.bound.copy(typeArgs = newTypeArgs)
 
                 val oldContract = obsContract
@@ -117,7 +117,7 @@ class IdentityAstTransformer {
         val thisType =  ContractReferenceType(lexicallyInsideOf.contractType, Owned(), false)
 
         val context = startContext(lexicallyInsideOf, List.empty, thisType) // Permission of this is irrelevant when transforming fields
-        val (newType, errors) = transformType(table, lexicallyInsideOf, context, f.typ, f.loc)
+        val (newType, errors) = transformType(table, lexicallyInsideOf, context, f.typ, f.loc, Nil)
         (f.copy(typ = newType).setLoc(f), errors)
     }
 
@@ -189,15 +189,19 @@ class IdentityAstTransformer {
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             args: Seq[VariableDeclWithSpec],
-            thisType: ObsidianType): (Seq[VariableDeclWithSpec], Seq[ErrorRecord]) = {
+            thisType: ObsidianType,
+            params: Seq[GenericType]): (Seq[VariableDeclWithSpec], Seq[ErrorRecord]) = {
         var errors = List.empty[ErrorRecord]
         var newArgs: Seq[VariableDeclWithSpec] = Nil
         val context = startContext(lexicallyInsideOf, args, thisType)
         for (a <- args) {
-            val (transformedType, newErrors) = transformType(table, lexicallyInsideOf, context - a.varName, a.typIn, a.loc)
+            val (transformedType, newErrors) = transformType(table, lexicallyInsideOf, context - a.varName, a.typIn, a.loc, params)
             errors = errors ++ newErrors
 
-            val aNew = a.copy(typIn = transformedType)
+            val (transformedTypeOut, newErrorsOut) = transformType(table, lexicallyInsideOf, context - a.varName, a.typOut, a.loc, params)
+            errors = errors ++ newErrorsOut
+
+            val aNew = a.copy(typIn = transformedType, typOut = transformedTypeOut)
             newArgs = aNew +: newArgs
         }
         (newArgs.reverse, errors)
@@ -209,18 +213,17 @@ class IdentityAstTransformer {
             t: Transaction): (Transaction, Seq[ErrorRecord]) = {
         val context = startContext(lexicallyInsideOf, t.args, t.thisType)
 
-
-        var (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args, t.thisType)
+        val (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args, t.thisType, t.params)
 
         val newEnsures = t.ensures.map(en => en.copy(expr = transformExpression(en.expr)))
 
         val (newRetType, retTypeErrors) = t.retType match {
             case None => (None, List.empty)
             case Some(retType) =>
-                val (transformedType, errs) = transformType(table, lexicallyInsideOf, context, retType, t.loc)
+                val (transformedType, errs) = transformType(table, lexicallyInsideOf, context, retType, t.loc, t.params)
                 (Some(transformedType), errs)
         }
-        val (newTransactionBody, _, bodyErrors) =  transformBody(table, lexicallyInsideOf, context, t.body)
+        val (newTransactionBody, _, bodyErrors) =  transformBody(table, lexicallyInsideOf, context, t.body, t.params)
         val newTransaction = t.copy(retType = newRetType, args = newArgs, ensures = newEnsures,
             body = newTransactionBody).setLoc(t)
         (newTransaction, retTypeErrors ++ argErrors ++ bodyErrors)
@@ -234,9 +237,9 @@ class IdentityAstTransformer {
         // Constructors always own "this".
         val thisType =  ContractReferenceType(lexicallyInsideOf.contractType, Owned(), false)
 
-        val (newArgs, argsTransformErrors) = transformArgs(table, lexicallyInsideOf, c.args, thisType)
+        val (newArgs, argsTransformErrors) = transformArgs(table, lexicallyInsideOf, c.args, thisType, Nil)
         val context = startContext(lexicallyInsideOf, c.args, thisType)
-        var (newBody, _, bodyTransformErrors) = transformBody(table, lexicallyInsideOf, context, c.body)
+        val (newBody, _, bodyTransformErrors) = transformBody(table, lexicallyInsideOf, context, c.body, Nil)
         val errors = argsTransformErrors ++ bodyTransformErrors
 
         (c.copy(args = newArgs, body = newBody).setLoc(c), errors)
@@ -246,12 +249,13 @@ class IdentityAstTransformer {
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             inScope: Context,
-            b: Seq[Statement]): (Seq[Statement], Context, Seq[ErrorRecord]) = {
+            b: Seq[Statement],
+            params: Seq[GenericType]): (Seq[Statement], Context, Seq[ErrorRecord]) = {
         b match {
             case Seq() => (Seq(), inScope, Seq())
             case s +: rest =>
-                val (sNew, inScopeNew, errors) = transformStatement(table, lexicallyInsideOf, inScope, s)
-                val (restStatements, finalContext, restErrors) = transformBody(table, lexicallyInsideOf, inScopeNew, rest)
+                val (sNew, inScopeNew, errors) = transformStatement(table, lexicallyInsideOf, inScope, s, params)
+                val (restStatements, finalContext, restErrors) = transformBody(table, lexicallyInsideOf, inScopeNew, rest, params)
                 (sNew +: restStatements, finalContext, errors ++ restErrors)
         }
     }
@@ -260,20 +264,21 @@ class IdentityAstTransformer {
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             context: Context,
-            s: Statement): (Statement, Context, Seq[ErrorRecord]) = {
+            s: Statement,
+            params: Seq[GenericType]): (Statement, Context, Seq[ErrorRecord]) = {
         s match {
             case oldDecl@VariableDecl(typ, varName) =>
-                val newTypChoice = transformType(table, lexicallyInsideOf, context, typ, s.loc)
-                val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc)
+                val newTypChoice = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
+                val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
                 (oldDecl.copy(typ = newTyp).setLoc(oldDecl), context.updated(varName, newTyp), errors)
             case oldDecl@VariableDeclWithSpec(typIn, typOut, varName) =>
-                val (newTypIn, errorsIn) = transformType(table, lexicallyInsideOf, context, typIn, s.loc)
-                val (newTypOut, errorsOut) = transformType(table, lexicallyInsideOf, context, typOut, s.loc)
+                val (newTypIn, errorsIn) = transformType(table, lexicallyInsideOf, context, typIn, s.loc, params)
+                val (newTypOut, errorsOut) = transformType(table, lexicallyInsideOf, context, typOut, s.loc, params)
                 val newDecl = oldDecl.copy(typIn = newTypIn, typOut = newTypOut)
                 val totalErrors = errorsIn ++ errorsOut
                 (newDecl, context.updated(varName, newTypIn), totalErrors)
             case oldDecl@VariableDeclWithInit(typ, varName, e) =>
-                val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc)
+                val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
                 val newDecl = oldDecl.copy(typ = newTyp, e = transformExpression(e)).setLoc(oldDecl)
                 (newDecl, context.updated(varName, newTyp), errors)
             case r@Return() => (r, context, Seq())
@@ -291,36 +296,38 @@ class IdentityAstTransformer {
                 (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())
             case t@Revert(e) => (t, context, Seq())
             case oldIf@If(eCond, sIf) =>
-                val (sIfNew, newContext, errors) = transformBody(table, lexicallyInsideOf, context, sIf)
+                val (sIfNew, newContext, errors) = transformBody(table, lexicallyInsideOf, context, sIf, params)
                 val newIf = oldIf.copy(s = sIfNew, eCond = transformExpression(eCond)).setLoc(oldIf)
                 (newIf, newContext, errors)
             case oldIf@IfThenElse(eCond, s1, s2) =>
-                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1)
-                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2)
+                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1, params)
+                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2, params)
                 val newIf = oldIf.copy(
                     s1 = s1New,
                     s2 = s2New,
                     eCond = transformExpression(eCond)
                 ).setLoc(oldIf)
                 (newIf, context, errors1 ++ errors2)
-            case oldIf@IfInState(e, state, s1, s2) =>
-                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1)
-                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2)
+            case oldIf@IfInState(e, ePerm, state, s1, s2) =>
+                val (newState, errors3) = transformTypeState(table, lexicallyInsideOf, state, oldIf.loc, params)
+                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1, params)
+                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2, params)
                 val newIf = oldIf.copy(
+                    e = transformExpression(e),
+                    typeState = newState,
                     s1 = s1New,
-                    s2 = s2New,
-                    e = transformExpression(e)
+                    s2 = s2New
                 ).setLoc(oldIf)
-                (newIf, context, errors1 ++ errors2)
+                (newIf, context, errors1 ++ errors2 ++ errors3)
             case oldTry@TryCatch(s1, s2) =>
-                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1)
-                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2)
+                val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1, params)
+                val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2, params)
                 val newIf = oldTry.copy(s1 = s1New, s2 = s2New).setLoc(oldTry)
                 (newIf, context, errors1 ++ errors2)
             case oldSwitch@Switch(e, cases) =>
                 var errors = List.empty[ErrorRecord]
                 val newCases = cases.map(_case => {
-                    val (newBody, newContext, newErrors) = transformBody(table, lexicallyInsideOf, context, _case.body)
+                    val (newBody, newContext, newErrors) = transformBody(table, lexicallyInsideOf, context, _case.body, params)
                     errors = errors ++ newErrors;
                     _case.copy(body = newBody).setLoc(_case)
                 })
@@ -333,12 +340,17 @@ class IdentityAstTransformer {
         }
     }
 
+    def transformTypeState(table: SymbolTable, lexicallyInsideOf: DeclarationTable, typeState: TypeState,
+                       pos: Position, params: Seq[GenericType]): (TypeState, List[ErrorRecord]) =
+        (typeState, List())
+
     def transformType(
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             context: Context,
             t: ObsidianType,
-            pos: Position): (ObsidianType, List[ErrorRecord]) = {
+            pos: Position,
+            params: Seq[GenericType]): (ObsidianType, List[ErrorRecord]) = {
         (t, List.empty[ErrorRecord])
     }
 }

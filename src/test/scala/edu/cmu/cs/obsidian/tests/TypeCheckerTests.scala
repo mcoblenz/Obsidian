@@ -861,8 +861,8 @@ class TypeCheckerTests extends JUnitSuite {
             (ReceiverTypeIncompatibleError("t5",
                 ContractReferenceType(ContractType("PermissionPassing", Nil), Unowned(), false),
                 ContractReferenceType(ContractType("PermissionPassing", Nil), Owned(), false)), 47) ::
-                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil)), 58) ::
-                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil)), 65) ::
+                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 58) ::
+                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 65) ::
                 Nil)
     }
 

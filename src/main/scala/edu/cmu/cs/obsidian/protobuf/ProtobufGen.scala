@@ -26,9 +26,12 @@ object ProtobufGen {
     }
 
 
-    def genericParams(aContract: Contract): List[ProtobufDeclaration] =
+    def genericParams(aContract: Contract): List[ProtobufDeclaration] = {
         // TODO GENERIC: factor out this string constant
-        aContract.params.map(p => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__generic" + p.gVar.varName)).toList
+        aContract.params.map(p => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__generic" + p.gVar.varName)).toList ++
+        aContract.params.flatMap(p => p.gVar.permissionVar.toSeq).map(pVar =>
+            ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__genericPerm" + pVar)).toList
+    }
 
     def interfaceParams(aContract: Contract): List[ProtobufDeclaration] =
         if (aContract.isInterface) {
@@ -59,7 +62,8 @@ object ProtobufGen {
         )
 
         val declsWithGUID =
-            ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") :: genericParams(aContract) ++ interfaceParams(aContract) ++ decls
+            ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") ::
+                genericParams(aContract) ++ interfaceParams(aContract) ++ decls
 
         val contractMessage = if (stateNames.nonEmpty) {
             val oneOfOptions = stateNames.map((stateName: String) =>

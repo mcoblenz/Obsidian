@@ -167,21 +167,24 @@ case class Dereference(e: Expression, f: String) extends Expression {
         Dereference(e.substitute(genericParams, actualParams), f).setLoc(this)
 }
 
-case class LocalInvocation(name: String, params: Seq[ObsidianType], args: Seq[Expression]) extends Expression {
+case class LocalInvocation(name: String, genericParams: Seq[GenericType],
+                           params: Seq[ObsidianType], args: Seq[Expression]) extends Expression {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LocalInvocation =
         LocalInvocation(name,
+            genericParams,
             params.map(_.substitute(genericParams, actualParams)),
             args.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
 
     override def toString: String = s"$name(${args.mkString(",")})"
 }
-case class Invocation(recipient: Expression, params: Seq[ObsidianType],
+case class Invocation(recipient: Expression, genericParams: Seq[GenericType], params: Seq[ObsidianType],
                       name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     override def toString: String = s"$recipient.$name(${args.mkString(",")})"
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Invocation =
         Invocation(recipient.substitute(genericParams, actualParams),
+            genericParams,
             params.map(_.substitute(genericParams, actualParams)),
             name,
             args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
@@ -264,31 +267,19 @@ case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement])
             s2.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
 }
-case class IfInState(e: Expression, state: Identifier, s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
+// TODO GENERIC: Make sure we properly store the permission of e here when we typecheck this
+case class IfInState(e: Expression, ePerm: Permission, typeState: TypeState, s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Statement = {
-        ObsidianType.stateSubstitutions(genericParams, actualParams).get(state._1) match {
-            case Some(permOrState) => permOrState match {
-                    case perm: Permission =>
-                        assert(false); null // TODO GENERIC: Update this to do what we end up doing in the paper
-
-                    case States(states) =>
-                        IfInState(e.substitute(genericParams, actualParams),
-                            (states.head, state._2),
-                            s1.map(_.substitute(genericParams, actualParams)),
-                            s2.map(_.substitute(genericParams, actualParams)))
-                            .setLoc(this)
-
-                    // TODO GENERIC: HANDLE THIS CASE
-                    case PermVar(varName) => assert(false); null
-                }
-
-            case None =>
-                IfInState(e.substitute(genericParams, actualParams),
-                    state,
-                    s1.map(_.substitute(genericParams, actualParams)),
-                    s2.map(_.substitute(genericParams, actualParams)))
-                    .setLoc(this)
+        val newTypeState = typeState match {
+            case permVar: PermVar => ObsidianType.lookupState(genericParams, actualParams)(permVar)
+            case ts => ts
         }
+
+        IfInState(e.substitute(genericParams, actualParams),
+            ePerm,
+            newTypeState,
+            s1.map(_.substitute(genericParams, actualParams)),
+            s2.map(_.substitute(genericParams, actualParams))).setLoc(this)
     }
 }
 case class TryCatch(s1: Seq[Statement], s2: Seq[Statement]) extends Statement {

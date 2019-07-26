@@ -12,13 +12,13 @@ import scala.util.parsing.input.Position
 
 // Checks to make sure all state names mentioned in type names are actually valid states.
 object StateNameValidator extends IdentityAstTransformer {
-
     override def transformType(
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             context: Context,
             t: ObsidianType,
-            pos: Position): (ObsidianType, List[ErrorRecord]) = {
+            pos: Position,
+            params: Seq[GenericType]): (ObsidianType, List[ErrorRecord]) = {
         t match {
             case np: NonPrimitiveType => lexicallyInsideOf.lookupContract(np.contractName) match {
                 case Some(ct) =>
@@ -43,7 +43,7 @@ object StateNameValidator extends IdentityAstTransformer {
                 case None =>
                     lexicallyInsideOf.contract match {
                         case impl: ObsidianContractImpl =>
-                            impl.params.find(p => p.gVar.varName == np.contractName) match {
+                            (impl.params ++ params).find(p => p.gVar.varName == np.contractName) match {
                                 case Some(genericType) =>
                                     val newGenericType = np match {
                                         case StateType(contractType, states, isRemote) =>
@@ -69,6 +69,26 @@ object StateNameValidator extends IdentityAstTransformer {
                     }
             }
             case _ => (t, List.empty)
+        }
+    }
+
+    override def transformTypeState(table: SymbolTable, lexicallyInsideOf: DeclarationTable, typeState: TypeState,
+                                    pos: Position, params: Seq[GenericType]): (TypeState, List[ErrorRecord]) = {
+        val allParams = lexicallyInsideOf.contract match {
+            case impl: ObsidianContractImpl => impl.params ++ params
+            case _ => params
+        }
+
+        typeState match {
+            case sts@States(states) =>
+                val lookedUp = states.map(state => allParams.find(_.hasPermissionVar(state)))
+                lookedUp.find(_.isDefined) match {
+                    case Some(genericType) =>
+                        (PermVar(genericType.get.gVar.permissionVar.get), List())
+                    case None => (sts, List())
+                }
+
+            case ts => (ts, List())
         }
     }
 }
