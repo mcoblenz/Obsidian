@@ -11,3 +11,8 @@ contract House {
 contract Park {
 
 }
+
+main contract Person {
+    House@Owned house;
+    Park@Shared shared;
+}

@@ -6,6 +6,10 @@ contract Money {
     int amount;
 
     //TODO: write your constructor here
+    Money@Owned() { 
+        int amount = new int;
+    }
+
 
     transaction getAmount() returns int {
         return amount;
@@ -16,7 +20,7 @@ main contract Wallet {
     Money@Owned m;
 
     Wallet@Owned() {
-        m = new Money(); //TODO: you will have to change this once you make your new constructor (you can have the money amount be any int value)
+        m = new Money(int value); //TODO: you will have to change this once you make your new constructor (you can have the money amount be any int value)
     }
 
     transaction spendMoney() {

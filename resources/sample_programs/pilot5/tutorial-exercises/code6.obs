@@ -22,7 +22,7 @@ main contract Voter {
     }
 
     transaction vote(Voter@Registered >> FinishedVoting this) {
-        // TODO
+        -> FinishedVoting;
     }
 
     transaction register(Voter@Eligible >> (Registered | Ineligible) this) {

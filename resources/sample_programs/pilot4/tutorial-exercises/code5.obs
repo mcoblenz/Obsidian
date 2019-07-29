@@ -8,6 +8,21 @@
 
 //NOTE: You do NOT need to write a constructor for Drink (you can ignore this compiler error for now)
 
+main contract Drink {
+    state Hot {
+        CupSleeve@Owned c;
+    }
+    state Cold{
+        IceCube@Owned i;
+    }
+    state Lukewarm;
+
+    int temp available in Hot, Cold, Lukewarm;
+
+
+
+}
+
 
 contract IceCube {
     //...

@@ -31,3 +31,11 @@ contract Wallet {
     }
 
 }
+
+main contract Person {
+    Wallet@Owned w;
+
+    transaction addMoney(Money@Owned >> Unowned mon) returns Money@Owned {
+        return w.replaceMoney(mon);
+    }
+}

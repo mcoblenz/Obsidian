@@ -7,7 +7,29 @@ If it is closed, neither transaction can be done.
 
 Please write your code below. The Person contract is given below.
 */
+main contract Restaurant{
+
+
+    state Open;
+
+    state Closed;
+    
+    transaction dineIn(Resturant@Open this, Person@Shared, int numPeople){
+
+    }
+
+    transaction takeOut(Resturant@Open this, Person@Shared){
+            
+    }
+
+
+
+}
+
 
 contract Person {
     //...
+
+
+
 }

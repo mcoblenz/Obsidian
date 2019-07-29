@@ -13,4 +13,46 @@ main asset contract Casino {
     }
 
     //TODO: Add your code here.
+
+    transaction makeBet(Bettor@Unowned bettor, string predictedOutcome, Money@Owned >> Unowned m) {
+        if (currentGame in BeforePlay) {
+            if (bets.contains(bettor)) {
+                Bet oldBet = bets.popSpecific(bettor);
+                BetPrediction oldBp = oldBet.getBetPrediction();
+                Money refund = money.splitMoney(oldBp.getBetAmount());
+                bettor.receiveMoney(refund);
+            }
+            BetPrediction bp = new BetPrediction(predictedOutcome, m.getAmount());
+            money.mergeMoney(m);
+            Bet b = new Bet(bettor, bp);
+            bets.append(b);
+        } else {
+            bettor.receiveMoney(m);
+        }
+    }
+
+    transaction playGame() {
+        if (currentGame in BeforePlay) {
+            currentGame.startPlaying();
+            currentGame.finishPlaying();
+        }
+    }
+
+    transaction claimMoney(Bettor@Unowned bettor) {
+        if (currentGame in FinishedPlaying) {
+            if (bets.contains(bettor)) {
+                Bet bet = bets.popSpecific(bettor);
+                BetPrediction oldBp = bet.getBetPrediction();
+                if (oldBp.getPredOutcome() == currentGame.calculateOutcome()) {
+                    Money refund = money.splitMoney(2 * oldBp.getBetAmount());
+                    bettor.receiveMoney(refund);
+                }
+            }
+        }
+    }
+
+    transaction prepareNextGame() {
+        bets = new BetList();
+        currentGame = new Game();
+    }
 }

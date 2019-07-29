@@ -16,3 +16,15 @@ contract IceCube {
 contract CupSleeve {
     //...
 }
+
+main contract Drink {
+    state Hot {
+        CupSleeve@Owned cs;
+    }
+    state Cold {
+        IceCube@Owned ic;
+    }
+    state Lukewarm;
+
+    int temperature available in Hot, Cold, Lukewarm;
+}
