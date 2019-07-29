@@ -155,7 +155,6 @@ case class Context(table: DeclarationTable,
         thisFieldTypes.get(fieldName).orElse(lookupDeclaredFieldTypeInType(typ)(fieldName))
     }
 
-    // TODO GENERIC: Write some comments
     def genericParams(typ: ObsidianType): Seq[GenericType] = {
         typ match {
             case np: NonPrimitiveType =>
@@ -193,9 +192,8 @@ case class Context(table: DeclarationTable,
         typ match {
             case np: NonPrimitiveType =>
                 // Look up the type in the current scope, NOT with lookupFunction.
-                contractTable.lookupContract(np.contractName)
+                contractTable.lookupContract(np.contractType)
                     .flatMap(_.lookupTransaction(transactionName))
-                    .map(_.substitute(genericParams(np), actualParams(np)))
             case _ => None
         }
     }
@@ -309,22 +307,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def typeBound(table: ContractTable): ObsidianType => ObsidianType = {
-        // TODO GENERIC: There's some repetition that could be factored out here
         case np: NonPrimitiveType => np match {
-            // TODO GENERIC: I think this is actually redundant, everything should get looked up by an earlier AST
-            // TODO GENERIC: Rather, it should be
-            case c: ContractReferenceType =>
-                table.lookupTypeVar(c.contractName)
-                    .map(typeBound(table)(_).withTypeState(c.permission))
-                    .getOrElse(c)
-            case s: StateType =>
-                table.lookupTypeVar(s.contractName)
-                    .map(typeBound(table)(_).withTypeState(States(s.stateNames)))
-                    .getOrElse(s)
-
-            case i: InterfaceContractType => i
-
             case GenericType(gVar, bound) => bound.referenceType
+            case t => t
         }
 
         case t => t
@@ -437,8 +422,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             case (StateType(ct, ss1, _), StateType(_, ss2, _)) =>
                 val unionStates = ss1.union(ss2)
-                // TODO GENERIC: Right now we just take the ct from the first one,
-                //  but there probably be some merging/checking to make sure merging is okay
                 Some(StateType(ct, unionStates, false))
 
             // TODO GENERIC: Make sure this is right
@@ -1418,7 +1401,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 exprType match {
                                     case exprNonPrimitiveType: NonPrimitiveType =>
                                         if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
-                                            // TODO GENERIC: See if this case be cleaned up
                                             // We only want the permission/states from the expr, not the whole thing
                                             val tempTyp = np.withTypeState(exprNonPrimitiveType.permission)
                                             exprNonPrimitiveType match {

@@ -443,6 +443,10 @@ case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) ext
 }
 
 sealed trait GenericBound {
+    def genericParams: Seq[ObsidianType]
+
+    def withParams(contractParams: Seq[ObsidianType]): GenericBound
+
     def typeState: TypeState
 
     def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound
@@ -456,6 +460,8 @@ sealed trait GenericBound {
 
     // TODO GENERIC: Should isRemote be false or should it be part of the bound?
     def referenceType: NonPrimitiveType
+
+    def show(genericVar: GenericVar): String
 }
 
 case class GenericBoundPerm(interfaceType: ContractType, permission: Permission) extends GenericBound {
@@ -486,6 +492,22 @@ case class GenericBoundPerm(interfaceType: ContractType, permission: Permission)
     override def typeState: TypeState = permission
 
     override def referenceType: NonPrimitiveType = ContractReferenceType(interfaceType, permission, isRemote = false)
+
+    override def genericParams: Seq[ObsidianType] = interfaceType.typeArgs
+    override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
+        copy(interfaceType = interfaceType.copy(typeArgs = contractParams))
+
+    private def declBound(genericVar: GenericVar): String =
+        s"where ${genericVar.varName} implements $interfaceType"
+
+    private def permBound(genericVar: GenericVar): String =
+        if (genericVar.permissionVar.isDefined) {
+            s" where ${genericVar.permissionVar.get} is $permission"
+        } else {
+            ""
+        }
+
+    override def show(genericVar: GenericVar): String = declBound(genericVar) + permBound(genericVar)
 }
 
 case class GenericBoundStates(interfaceType: ContractType, states: Set[String]) extends GenericBound {
@@ -518,13 +540,35 @@ case class GenericBoundStates(interfaceType: ContractType, states: Set[String]) 
     override def typeState: TypeState = States(states)
 
     override def referenceType: NonPrimitiveType = StateType(interfaceType, states, isRemote = false)
+
+    override def genericParams: Seq[ObsidianType] = interfaceType.typeArgs
+    override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
+        copy(interfaceType = interfaceType.copy(typeArgs = contractParams))
+
+    private def declBound(genericVar: GenericVar): String =
+        s"where ${genericVar.varName} implements $interfaceType"
+
+    private def permBound(genericVar: GenericVar): String =
+        if (genericVar.permissionVar.isDefined) {
+            s" where ${genericVar.permissionVar.get} is (${states.mkString(" | ")})"
+        } else {
+            ""
+        }
+
+    override def show(genericVar: GenericVar): String = declBound(genericVar) + permBound(genericVar)
 }
 
 case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[String]) {
     def hasPermissionVar(stateName: String): Boolean = permissionVar.contains(stateName)
+
+    override def toString: String =
+        s"${if (isAsset) { "asset " } else { "" }}$varName${if (permissionVar.isDefined) { "@" + permissionVar.get } else { "" }}"
 }
 
 case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimitiveType {
+    override def toString: String =
+        s"$gVar ${bound.show(gVar)}"
+
     def hasPermissionVar(stateName: String): Boolean = gVar.hasPermissionVar(stateName)
 
     // We need to treat all permission variables as though they may be owned
@@ -561,7 +605,7 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
         Possibility.fromBoolean(gVar.isAsset)
 
     override def contractType: ContractType = bound.interfaceType
-    override def genericParams: Seq[ObsidianType] = Nil
+    override def genericParams: Seq[ObsidianType] = bound.genericParams
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {
         val idx = genericParams.indexWhere(_.gVar.varName == this.gVar.varName)
@@ -588,7 +632,8 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
         }
     }
 
-    override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType = this
+    override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType =
+        copy(bound = bound.withParams(contractParams))
 
     override def codeGenName: String = gVar.varName
 

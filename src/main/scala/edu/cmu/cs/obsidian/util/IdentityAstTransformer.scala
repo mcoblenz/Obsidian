@@ -74,12 +74,15 @@ class IdentityAstTransformer {
                     obsContract.bound.typeArgs.map(transformType(table, cTable, emptyContext, _, obsContract.loc, Nil)).unzip
                 val newBound = obsContract.bound.copy(typeArgs = newTypeArgs)
 
+                val (newParams, errorLists) =
+                    obsContract.params.map(transformType(table, cTable, emptyContext, _, obsContract.loc, Nil)).unzip
+
                 val oldContract = obsContract
                 val newContract =
                     ObsidianContractImpl(
                         oldContract.modifiers,
                         oldContract.name,
-                        oldContract.params,
+                        newParams.map(_.asInstanceOf[GenericType]),
                         newBound,
                         newDecls,
                         oldContract.transitions,
@@ -87,7 +90,7 @@ class IdentityAstTransformer {
                         oldContract.sourcePath
                     ).setLoc(obsContract)
 
-                (newContract, errors.reverse ++ allTypeErrors.flatten.toList)
+                (newContract, errors.reverse ++ allTypeErrors.flatten.toList ++ errorLists.flatten)
 
             case ffiContract: JavaFFIContractImpl =>
                 (ffiContract, Nil)
@@ -196,10 +199,8 @@ class IdentityAstTransformer {
         val context = startContext(lexicallyInsideOf, args, thisType)
         for (a <- args) {
             val (transformedType, newErrors) = transformType(table, lexicallyInsideOf, context - a.varName, a.typIn, a.loc, params)
-            errors = errors ++ newErrors
-
             val (transformedTypeOut, newErrorsOut) = transformType(table, lexicallyInsideOf, context - a.varName, a.typOut, a.loc, params)
-            errors = errors ++ newErrorsOut
+            errors = errors ++ newErrors ++ newErrorsOut
 
             val aNew = a.copy(typIn = transformedType, typOut = transformedTypeOut)
             newArgs = aNew +: newArgs
@@ -207,11 +208,31 @@ class IdentityAstTransformer {
         (newArgs.reverse, errors)
     }
 
+    def requireNonPrimitive(originalType: NonPrimitiveType,
+                            lexicallyInsideOf: DeclarationTable,
+                            pos: Position,
+                            transformedType: (ObsidianType, List[ErrorRecord])): (NonPrimitiveType, List[ErrorRecord]) = {
+        transformedType._1 match {
+            case np: NonPrimitiveType =>
+                (np, transformedType._2)
+
+            case t =>
+                (originalType, List(ErrorRecord(NonPrimitiveTypeTransformError(originalType, t), pos, lexicallyInsideOf.contract.sourcePath)))
+        }
+    }
+
     def transformTransaction(
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             t: Transaction): (Transaction, Seq[ErrorRecord]) = {
         val context = startContext(lexicallyInsideOf, t.args, t.thisType)
+
+        // TODO GENERIC: Maybe there's a better way. We need to ensure we return a nonprimitivetype,
+        //  but we also need to transform thisType to handle generic parameters properly
+        val (newThisType, thisTypeErrors) =
+            requireNonPrimitive(t.thisType, lexicallyInsideOf, t.loc, transformType(table, lexicallyInsideOf, context, t.thisType, t.loc, t.params))
+        val (newThisFinalType, thisFinalTypeErrors) =
+            requireNonPrimitive(t.thisFinalType, lexicallyInsideOf, t.loc, transformType(table, lexicallyInsideOf, context, t.thisFinalType, t.loc, t.params))
 
         val (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args, t.thisType, t.params)
 
@@ -224,9 +245,14 @@ class IdentityAstTransformer {
                 (Some(transformedType), errs)
         }
         val (newTransactionBody, _, bodyErrors) =  transformBody(table, lexicallyInsideOf, context, t.body, t.params)
-        val newTransaction = t.copy(retType = newRetType, args = newArgs, ensures = newEnsures,
-            body = newTransactionBody).setLoc(t)
-        (newTransaction, retTypeErrors ++ argErrors ++ bodyErrors)
+        val newTransaction =
+            t.copy(retType = newRetType,
+                thisType = newThisType,
+                thisFinalType = newThisFinalType,
+                args = newArgs,
+                ensures = newEnsures,
+                body = newTransactionBody).setLoc(t)
+        (newTransaction, thisTypeErrors ++ thisFinalTypeErrors ++ retTypeErrors ++ argErrors ++ bodyErrors)
     }
 
     def transformConstructor(
@@ -234,15 +260,19 @@ class IdentityAstTransformer {
             lexicallyInsideOf: DeclarationTable,
             c: Constructor): (Constructor, Seq[ErrorRecord]) = {
 
+        val (newResultType, resTypeErrors) =
+            requireNonPrimitive(c.resultType, lexicallyInsideOf, c.loc,
+                transformType(table, lexicallyInsideOf, emptyContext, c.resultType, c.loc, Nil))
+
         // Constructors always own "this".
-        val thisType =  ContractReferenceType(lexicallyInsideOf.contractType, Owned(), false)
+        val thisType = ContractReferenceType(lexicallyInsideOf.contractType, Owned(), false)
 
         val (newArgs, argsTransformErrors) = transformArgs(table, lexicallyInsideOf, c.args, thisType, Nil)
         val context = startContext(lexicallyInsideOf, c.args, thisType)
         val (newBody, _, bodyTransformErrors) = transformBody(table, lexicallyInsideOf, context, c.body, Nil)
-        val errors = argsTransformErrors ++ bodyTransformErrors
+        val errors = resTypeErrors ++ argsTransformErrors ++ bodyTransformErrors
 
-        (c.copy(args = newArgs, body = newBody).setLoc(c), errors)
+        (c.copy(resultType = newResultType, args = newArgs, body = newBody).setLoc(c), errors)
     }
 
     def transformBody(

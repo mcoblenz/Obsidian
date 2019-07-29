@@ -20,7 +20,13 @@ object StateNameValidator extends IdentityAstTransformer {
             pos: Position,
             params: Seq[GenericType]): (ObsidianType, List[ErrorRecord]) = {
         t match {
-            case np: NonPrimitiveType => lexicallyInsideOf.lookupContract(np.contractName) match {
+            case genericType: GenericType =>
+                val (transformedParams, errorLists) =
+                    genericType.genericParams.map(transformType(table, lexicallyInsideOf, context, _, pos, params)).unzip
+                (genericType.withParams(transformedParams), errorLists.flatten.toList)
+            // TODO GENERIC: Clean this up
+            case np: NonPrimitiveType =>
+                lexicallyInsideOf.lookupContract(np.contractName) match {
                 case Some(ct) =>
                     np match {
                         case StateType(_, stateNames, _) =>
@@ -32,12 +38,17 @@ object StateNameValidator extends IdentityAstTransformer {
                             }
 
                             if (errors.isEmpty) {
-                                (np, errors)
+                                val (transformedParams, errorLists) =
+                                    np.genericParams.map(transformType(table, lexicallyInsideOf, context, _, pos, params)).unzip
+                                (np.withParams(transformedParams), errors ++ errorLists.flatten)
                             } else {
                                 (BottomType(), errors)
                             }
 
-                        case _ => (np, List.empty)
+                        case _ =>
+                            val (transformedParams, errorLists) =
+                                np.genericParams.map(transformType(table, lexicallyInsideOf, context, _, pos, params)).unzip
+                            (np.withParams(transformedParams), errorLists.flatten.toList)
                     }
 
                 case None =>
@@ -57,14 +68,14 @@ object StateNameValidator extends IdentityAstTransformer {
                                         case _ => genericType.withTypeState(np.permission)
                                     }
 
-                                    // TODO GENERIC: Factor out this sort of thing to like a copy permission/state thing
-                                    (newGenericType, List())
+                                    val (transformedParams, errorLists) =
+                                        newGenericType.genericParams.map(transformType(table, lexicallyInsideOf, context, _, pos, params)).unzip
+                                    (newGenericType.withParams(transformedParams), errorLists.flatten.toList)
                                 case None =>
                                     (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                             }
 
                         case _: JavaFFIContractImpl =>
-                            // TODO GENERIC: how to handle interaction between java and obsidian generics?
                             (BottomType(), List(ErrorRecord(ContractUndefinedError(np.contractName), pos, currentContractSourcePath)))
                     }
             }

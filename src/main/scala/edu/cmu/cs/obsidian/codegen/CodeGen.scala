@@ -2529,7 +2529,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 if (resType.isPrimitive) {
                     resType
                 } else {
-                    narrowWith(resType.boxify(), n.genericParams)
+                    n match {
+                        // Generic types shouldn't be narrowed (e.g., we can't write T<Int> where T is variable)
+                        case genericType: GenericType => resType.boxify()
+                        case _ => narrowWith(resType.boxify(), n.genericParams)
+                    }
                 }
             }
             case _ => model.VOID // TODO: translate PDTs

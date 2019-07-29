@@ -419,3 +419,8 @@ case class GenericParameterAssetError(paramName: String, argTypeName: String) ex
     val msg: String =
         s"Argument type $argTypeName is an asset, but the type parameter $paramName is not allowed to be an asset. Add the 'asset' modifier to $paramName to allow the parameter to be an asset."
 }
+
+case class NonPrimitiveTypeTransformError(originalType: NonPrimitiveType, transformedType: ObsidianType) extends Error {
+    override val msg: String =
+        s"Type $originalType was transformed into $transformedType, which isn't a non-primitive type."
+}

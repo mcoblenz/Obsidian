@@ -410,6 +410,9 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
             (StateUndefinedError("C1", "OtherState"), 12)
                 ::
+                (NonPrimitiveTypeTransformError(StateType(ContractType("C1", Nil), Set("S2", "OtherState"), isRemote = false),
+                    BottomType()), 12)
+                ::
                 (SubtypingError(
                     StateType(ContractType("C1", Nil), Set("S1", "S2"), false),
                     StateType(ContractType("C1", Nil), Set("S1", "S3"), false), false), 17
@@ -790,6 +793,11 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def genericsInterfaceWithParameters(): Unit = {
+        val consumerBound =
+            GenericBoundPerm(ContractType("Consumer",
+                List(GenericType(GenericVar(isAsset = false, "U", None),
+                    GenericBoundPerm(ContractType("Top", Nil), Inferred())))), Unowned())
+
         runTest("resources/tests/type_checker_tests/GenericInterfaceParameters.obs",
             (ArgumentSubtypingError("consume", "x", StringType(), IntType()), 49) ::
             (ArgumentSubtypingError("Store", "t",
@@ -799,17 +807,14 @@ class TypeCheckerTests extends JUnitSuite {
                 ContractReferenceType(ContractType("A", Nil), Owned(), isRemote = false),
                 IntType()), 65) ::
             (GenericParameterError(
-                GenericType(GenericVar(isAsset = false, "T", None),
-                    GenericBoundPerm(ContractType("Consumer", List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false))), Unowned())),
+                GenericType(GenericVar(isAsset = false, "T", None), consumerBound),
                 ContractReferenceType(ContractType("A", Nil), Inferred(), isRemote = false)
             ), 70) ::
             (GenericParameterError(
-                GenericType(GenericVar(isAsset = false,"T",None),
-                    GenericBoundPerm(ContractType("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false))), Unowned())),
+                GenericType(GenericVar(isAsset = false,"T",None), consumerBound),
                 ContractReferenceType(ContractType("NopConsumer", List(StringType())), Inferred(), isRemote = false)), 73) ::
             (GenericParameterError(
-                GenericType(GenericVar(isAsset = false,"T",None),
-                    GenericBoundPerm(ContractType("Consumer",List(ContractReferenceType(ContractType("U", Nil), Inferred(), isRemote = false))), Unowned())),
+                GenericType(GenericVar(isAsset = false,"T",None), consumerBound),
                 ContractReferenceType(ContractType("NopConsumer", List()), Inferred(), isRemote = false)), 76) ::
             // Intentionally duplicated error: one for the type in the generic, one for the actual construction
             (GenericParameterListError(1, 0), 76) ::
