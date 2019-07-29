@@ -280,7 +280,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* method to check if contract is actually implementing an interface */
     private def contractIsSubtype(table: ContractTable, c1: ContractType, c2: ContractType, isThis: Boolean): Boolean = {
         // Everything is a subtype of Top
-        // TODO GENERIC: Get rid of this constant/special casing...
         if (c2.contractName == "Top") {
             return true
         }
@@ -334,7 +333,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case _ => false
                 }
 
-            // TODO GENERIC: Get rid of these special cases for top
             case (p: PrimitiveType, np: NonPrimitiveType) => np.contractName == "Top"
 
             case _ => false
@@ -424,7 +422,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val unionStates = ss1.union(ss2)
                 Some(StateType(ct, unionStates, false))
 
-            // TODO GENERIC: Make sure this is right
             case (g1@GenericType(gVar1, gBound1), g2@GenericType(gVar2, gBound2)) =>
                 if (gVar1.permissionVar.isDefined && gVar2.permissionVar.isDefined) {
                     Some(t1)
@@ -854,7 +851,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          (newExprSequence, outTyp, cntxt)
                  }
 
-                 // TODO GENERIC: Will want to infer generic type parameters here
                  (simpleType, contextPrime, Construction(contractType, exprList, isFFIInv))
 
              case Disown(e) =>
@@ -1959,7 +1955,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case _ => typ
                 }
 
-                // TODO GENERIC: Clean this up
                 typToCheck match {
                     case b: BottomType => ()
                     case p: PrimitiveType => logError(s, StaticAssertOnPrimitiveError(e))

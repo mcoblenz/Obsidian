@@ -27,7 +27,6 @@ object ProtobufGen {
 
 
     def genericParams(aContract: Contract): List[ProtobufDeclaration] = {
-        // TODO GENERIC: factor out this string constant
         aContract.params.map(p => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__generic" + p.gVar.varName)).toList ++
         aContract.params.flatMap(p => p.gVar.permissionVar.toSeq).map(pVar =>
             ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__genericPerm" + pVar)).toList

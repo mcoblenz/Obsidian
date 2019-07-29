@@ -244,14 +244,12 @@ object Parser extends Parsers {
             case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s ~ _ ~ None =>
                 stOpt match {
                     case None => If(e, s).setLoc(_if)
-                    // TODO GENERIC: Allow multiple states here, I guess?
                     case Some(_ ~ stateName) => IfInState(e, Inferred(), States(Set(stateName._1)), s, Seq.empty).setLoc(_if)
                 }
 
             case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) =>
                 stOpt match {
                     case None => IfThenElse(e, s1, s2).setLoc(_if)
-                    // TODO GENERIC: Allow multiple states here, I guess?
                     case Some(_ ~ stateName) => IfInState(e, Inferred(), States(Set(stateName._1)), s1, s2).setLoc(_if)
                 }
 
@@ -544,7 +542,6 @@ object Parser extends Parsers {
 
 
     private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String, contractParams: Seq[GenericType]): Parser[Transaction] = {
-        // TODO GENERIC: Add generic parameters here (and also to interfaces)
         parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~!
             opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
             opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
@@ -652,13 +649,11 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseWhereImplements: Parser[ContractType] = {
+    private def parseWhereImplements: Parser[Option[ContractType]] = {
         WhereT() ~ parseId ~ ImplementsT() ~ parseType ^^ {
             case _ ~ typeVar ~ _ ~ typeBound => typeBound match {
-                case np: NonPrimitiveType => np.contractType
-
-                // TODO GENERIC: Use a proper parser error message
-                case _ => assert(false, "Contract cannot implement primitive type."); null
+                case np: NonPrimitiveType => Some(np.contractType)
+                case _ => failure("Contract cannot implement primitive type."); None
             }
         }
     }
@@ -682,11 +677,9 @@ object Parser extends Parsers {
             case assetMod ~ varId ~ stateVarId ~ implements ~ subpermBound =>
                 val stateVar = stateVarId.map(_._2._1)
 
-                val contractBound = implements.getOrElse(ContractType("Top", Nil))
+                val contractBound = implements.flatten.getOrElse(ContractType("Top", Nil))
                 val varBound = subpermBound.getOrElse(Left(Unowned()))
                 val gVar = GenericVar(assetMod.isDefined, varId._1, stateVar)
-
-                // TODO GENERIC: Ensure that the "wheres" only refer to this variable
 
                 varBound match {
                     case Left(perm) => GenericType(gVar, GenericBoundPerm(contractBound, perm))
@@ -721,7 +714,6 @@ object Parser extends Parsers {
 
                 val implementBound = impl match {
                     case Some(_ ~ bound) => bound
-                    // TODO GENERIC: Consolidate all these references to Top
                     case None => ContractType("Top", Nil)
                 }
 

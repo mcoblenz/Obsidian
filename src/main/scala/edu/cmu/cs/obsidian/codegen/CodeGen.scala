@@ -1066,7 +1066,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
     }
 
     def boundClass(self: JTypeVar, bound: GenericBound): AbstractJClass =
-        // TODO GENERIC: get rid of special casing
         if (bound.interfaceType.contractName == "Top") {
             obsidianSerialized
         } else {
@@ -1074,7 +1073,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
         }
 
     def implementBound(translationContext: TranslationContext, bound: ContractType): AbstractJClass =
-    // TODO GENERIC: get rid of special casing
         if (bound.contractName == "Top") {
             obsidianSerialized
         } else {
@@ -1121,28 +1119,12 @@ class CodeGen (val target: Target, table: SymbolTable) {
     }
 
     def generatePermVarDefinitions(translationContext: TranslationContext, aContract: Contract, newClass: JDefinedClass): Unit = {
-        // TODO GENERIC: Refactor this method into several methods
-        for (param <- aContract.params) {
-            param.gVar.permissionVar match {
-                case Some(permVarName) =>
-                    newClass.field(JMod.PRIVATE, stringHashSet(), genericPermParamName(permVarName))
-                case None => ()
-            }
-        }
+        generatePermVarFields(aContract, newClass)
+        generateStateTestMeth(newClass)
+        generateLookupStateMeth(newClass)
+    }
 
-        val stateTest = newClass.method(JMod.PRIVATE, model.BOOLEAN, "__stateTest")
-        val referencePermission = stateTest.param(javaString(), "referencePerm")
-        val stateName = stateTest.param(javaString(), "stateName")
-        val mappingRes = stateTest.param(stringHashSet(), "mappingRes")
-        // TODO GENERIC: Should we explicitly disallow naming states "Owned", etc.?
-
-        // Check if we mapped to a permission
-        val ownedTest = testPermission(stateTest.body(), referencePermission, Owned(), mappingRes)
-        val sharedTest = testPermission(ownedTest._else(), referencePermission, Shared(), mappingRes)
-        val unownedTest = testPermission(sharedTest._else(), referencePermission, Unowned(), mappingRes)
-
-        unownedTest._else()._return(mappingRes.invoke("contains").arg(stateName))
-
+    private def generateLookupStateMeth(newClass: JDefinedClass) = {
         val lookupState = newClass.method(JMod.PRIVATE, javaString(), "__lookupState")
         val param = lookupState.param(model.directClass("java.lang.Object"), "obj")
         val serializationState = lookupState.param(serializationStateType(), serializationParamName)
@@ -1155,6 +1137,30 @@ class CodeGen (val target: Target, table: SymbolTable) {
         lookupState.body()._return(result)
     }
 
+    private def generateStateTestMeth(newClass: JDefinedClass) = {
+        val stateTest = newClass.method(JMod.PRIVATE, model.BOOLEAN, "__stateTest")
+        val referencePermission = stateTest.param(javaString(), "referencePerm")
+        val stateName = stateTest.param(javaString(), "stateName")
+        val mappingRes = stateTest.param(stringHashSet(), "mappingRes")
+
+        // Check if we mapped to a permission
+        val ownedTest = testPermission(stateTest.body(), referencePermission, Owned(), mappingRes)
+        val sharedTest = testPermission(ownedTest._else(), referencePermission, Shared(), mappingRes)
+        val unownedTest = testPermission(sharedTest._else(), referencePermission, Unowned(), mappingRes)
+
+        unownedTest._else()._return(mappingRes.invoke("contains").arg(stateName))
+    }
+
+    private def generatePermVarFields(aContract: Contract, newClass: JDefinedClass) = {
+        for (param <- aContract.params) {
+            param.gVar.permissionVar match {
+                case Some(permVarName) =>
+                    newClass.field(JMod.PRIVATE, stringHashSet(), genericPermParamName(permVarName))
+                case None => ()
+            }
+        }
+    }
+
     private def translateContract(
                     aContract: Contract,
                     newClass: JDefinedClass,
@@ -1162,10 +1168,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
         for (param <- aContract.params) {
             generify(newClass, param)
         }
-
-//        if (aContract.isInterface) {
-//            newClass.generify("ObsidianSerializedVar")
-//        }
 
         target match {
             case Client(mainContract, _) =>
@@ -1176,18 +1178,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 newClass._implements(implementBound(translationContext, aContract.bound))
         }
 
-//        aContract match {
-//            case javaFFIContractImpl(name, interface, javaPath, declarations) => {
-//                newClass._extends(model.directClass((javaPath.map(tuple=> tuple._1)).mkString(".")))
-//            }
-//            case _ =>
-//        }
-
         if (!aContract.isInterface) {
             generateLazySerializationCode(aContract, newClass, translationContext)
 
             for (param <- aContract.params) {
-                newClass.field(JMod.PRIVATE, javaString, genericParamName(param))
+                newClass.field(JMod.PRIVATE, javaString(), genericParamName(param))
             }
         }
 
@@ -2502,7 +2497,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
             case n: NonPrimitiveType => {
-                // TODO GENERIC: Refactor this part into smaller methods
                 val contractTableOpt = table.contractLookup.get(n.codeGenName)
 
                 val (resType, isInterface) = contractTableOpt match {
@@ -2731,7 +2725,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 recurse(e1).invoke("equals").arg(recurse(e2)).not()
             case Dereference(e1, f) => recurse(e1).ref(f) /* TODO : do we ever need this? */
 
-            // TODO GENERIC: Handle these params
             case LocalInvocation(name, genericParams, params, args) =>
                 if (name == "sqrt" && args.length == 1) {
                     val arg0 = recurse(args.head)

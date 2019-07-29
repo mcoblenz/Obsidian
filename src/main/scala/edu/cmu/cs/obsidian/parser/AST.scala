@@ -18,7 +18,6 @@ trait HasLocation {
 sealed abstract class AST() extends HasLocation
 
 
-// TODO GENERIC: Should we split substitute off into a trait? Maybe not, since the ObsidianType substitute has a different return type (e.g., generic Obsidian type)
 sealed abstract class Statement() extends AST {
     def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Statement
 }
@@ -267,7 +266,6 @@ case class IfThenElse(eCond: Expression, s1: Seq[Statement], s2: Seq[Statement])
             s2.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
 }
-// TODO GENERIC: Make sure we properly store the permission of e here when we typecheck this
 case class IfInState(e: Expression, ePerm: Permission, typeState: TypeState, s1: Seq[Statement], s2: Seq[Statement]) extends Statement {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Statement = {
         val newTypeState = typeState match {
@@ -318,8 +316,8 @@ case class StaticAssert(expr: Expression, typeState: TypeState) extends Statemen
 case class TypeDecl(name: String, typ: ObsidianType) extends Declaration {
     val tag: DeclarationTag = TypeDeclTag
 
-    // TODO GENERIC: Does this still get used/matter?
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): TypeDecl = ???
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): TypeDecl =
+        copy(typ = typ.substitute(genericParams, actualParams))
 }
 
 sealed trait IsAvailableInStates {
@@ -388,7 +386,6 @@ case class Transaction(name: String,
             params,
             args.map(_.substitute(genericParams, actualParams)),
             retType.map(_.substitute(genericParams, actualParams)),
-            // TODO GENERIC: Seems like this doesn't do anything, but just in case
             ensures.map(_.substitute(genericParams, actualParams)),
             body.map(_.substitute(genericParams, actualParams)),
             isStatic,
@@ -464,7 +461,6 @@ case class ObsidianContractImpl(override val modifiers: Set[ContractModifier],
 }
 
 /* FFI contract for Java */
-// TODO GENERIC: How do our generics interact with Java's? Probably just rely on the interface to get the types right?
 case class JavaFFIContractImpl(name: String,
                                interface: String,
                                javaPath: Seq[Identifier],
@@ -472,13 +468,10 @@ case class JavaFFIContractImpl(name: String,
                                override val declarations: Seq[Declaration] = Seq.empty) extends Contract(name, sp){
     val tag: DeclarationTag = ContractDeclTag
 
-    // TODO GENERIC: Maybe this should actually do something
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): JavaFFIContractImpl = this
-    // TODO GENERIC: Is this the right bound?
     override def bound: ContractType = ContractType(interface, Nil)
     override def isInterface: Boolean = false
 
-    // TODO GENERIC: Maybe do something here
     override def params: Seq[GenericType] = Nil
 }
 
