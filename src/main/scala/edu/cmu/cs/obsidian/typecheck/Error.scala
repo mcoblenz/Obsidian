@@ -424,3 +424,27 @@ case class NonPrimitiveTypeTransformError(originalType: NonPrimitiveType, transf
     override val msg: String =
         s"Type $originalType was transformed into $transformedType, which isn't a non-primitive type."
 }
+
+case class PermissionCheckRedundant(actualPerm: Permission, testPermission: Permission,
+                                    isSubperm: Boolean) extends Error {
+    private val isSubpermStr: String =
+        if (isSubperm) {
+            "is a subpermission. The then-branch will always be taken"
+        } else {
+            "is not a subpermission. The else-branch will always be taken"
+        }
+
+    override val msg: String =
+        s"Redundant permission check. Testing for permission $testPermission, but actual permission is $isSubperm, " +
+            s"which $isSubpermStr."
+}
+
+case class AssetStateImplError(implState: State, interfaceState: State) extends Error {
+    override val msg: String =
+        s"State ${implState.name} is an asset state but it implements a state which is not an asset state."
+}
+
+case class BadFFIInterfaceBoundError(name: String) extends Error {
+    override val msg: String =
+        s"Cannot override '$name' because it is an FFI contract."
+}

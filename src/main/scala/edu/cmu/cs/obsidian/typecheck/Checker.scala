@@ -1786,12 +1786,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                                 contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                                     }
                                                 case permission: Permission =>
-                                                    if (isSubpermission(np.permission, permission)) {
-                                                        (contextPrime, np.permission, contextPrime)
-                                                    } else {
-                                                        // TODO GENERIC: Log an error here
-                                                        assert(false); null
-                                                    }
+                                                    logError(e, PermissionCheckRedundant(np.permission, permission, isSubpermission(np.permission, permission)))
+                                                    return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
                                                 case permVar: PermVar =>
                                                     val newType = np.withTypeState(permVar)
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
@@ -1813,7 +1809,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                         np.permission,
                                                         contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
                                                 case permission: Permission =>
-                                                    assert(false); null // TODO GENERIC: Give some error here?
+                                                    logError(e, PermissionCheckRedundant(np.permission, permission, isSubpermission(np.permission, permission)))
+                                                    return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
                                                 case permVar: PermVar =>
                                                     val newType = np.withTypeState(permVar)
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
@@ -2493,7 +2490,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         checkIsSubtype(table, ast, arg1.typOut, arg2.typOut)
     }
 
-    // TODO GENERIC: Should we have some override keyword for method/state implementing
     def implementOk(table: ContractTable, tx: Transaction, interfaceTx: Transaction): Unit = {
         if (tx.args.length != interfaceTx.args.length) {
             logError(tx, MethodImplArgsError(tx.name, tx.args, interfaceTx.args))
@@ -2513,9 +2509,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
     def implementOk(table: ContractTable, contract: Contract, interfaceName: String,
                     declarations: Seq[Declaration], boundDecls: Seq[Declaration]): Unit = {
-        // TODO GENERIC: Ensure that asset states are properly implemented
         var toImplStates = boundDecls.flatMap {
-            case State(name, fields, isAsset) => name :: Nil
+            case state: State => state :: Nil
             case _ => Nil
         }.toSet
 
@@ -2533,8 +2528,19 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         for (decl <- declarations) {
             decl match {
-                case State(name, fields, isAsset) =>
-                    toImplStates = toImplStates.filter(_ != name)
+                case s@State(name, fields, isAsset) =>
+                    toImplStates = toImplStates.filter(state => {
+                        if (state.name == name) {
+                            if (isAsset && !state.isAsset) {
+                                logError(s, AssetStateImplError(s, state))
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            true
+                        }
+                    })
 
                 case declaration: InvokableDeclaration => declaration match {
                     case transaction: Transaction =>
@@ -2549,7 +2555,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         for (stateName <- toImplStates) {
-            logError(contract, MissingStateImplError(contract.name, interfaceName, stateName))
+            logError(contract, MissingStateImplError(contract.name, interfaceName, stateName.name))
         }
 
         for (transaction <- toImplTransactions) {
@@ -2569,8 +2575,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         case Some(interface) => interface.contract match {
                             case impl: ObsidianContractImpl => impl.substitute(impl.params, obsContract.bound.typeArgs).declarations
                             case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) =>
-                                // TODO GENERIC: This should never happen, log a real error though
-                                assert(false, "Cannot implement a JavaFFIContract"); Nil
+                                logError(obsContract, BadFFIInterfaceBoundError(name))
+                                Nil
                         }
                         case None =>
                             logError(obsContract, InterfaceNotFoundError(obsContract.name, obsContract.bound.contractName))
