@@ -95,7 +95,7 @@ case class ContractReferenceType(override val contractType: ContractType,
 
     override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
         case States(states) => StateType(contractType, states, isRemote)
-        case PermVar(varName) => ??? // TODO GENERIC: Does this need to be implemented?
+        case PermVar(varName) => assert(false, "Trying to use a permission variable on a concrete type"); null
         case permission: Permission => this.copy(permission = permission)
     }
 
@@ -227,8 +227,10 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
 
     override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
         case States(states) => this.copy(stateNames = states)
-        case PermVar(varName) => ??? // TODO GENERIC: What to do here?
         case permission: Permission => ContractReferenceType(contractType, permission, isRemote)
+        case PermVar(varName) =>
+            // This should never happen
+            assert(false, "Trying to use a state variable on a concrete type"); null
     }
 
     override def withParams(contractParams: Seq[ObsidianType]): StateType =
@@ -299,23 +301,13 @@ object ObsidianType {
     def substituteVarName(contractName: String,
                           genericParams: Seq[GenericType],
                           actualParams: Seq[ObsidianType]): Option[ObsidianType] = {
-        // TODO GENERIC: Is this actually the right approach. What if the name conflicts? Should we just substitute anyway or warn?
-        var idx = genericParams.indexWhere(p => p.gVar.varName == contractName)
+        val idx = genericParams.indexWhere(p => p.gVar.varName == contractName)
 
         // If idx is too large, then we will get an error elsewhere
         if (idx >= 0 && idx < actualParams.length) {
             Some(actualParams(idx))
         } else {
             None
-        }
-    }
-
-    def requireNonPrimitive(typ: ObsidianType): NonPrimitiveType = {
-        typ match {
-            case np: NonPrimitiveType => np
-
-            // TODO GENERIC: Improve this message, rpobably should log a real error
-            case t => assert(false, s"A nonprimitive type is required, but found: $t"); null
         }
     }
 }
@@ -458,7 +450,6 @@ sealed trait GenericBound {
     def permission: Permission
     def residualType(mode: OwnershipConsumptionMode): GenericBound
 
-    // TODO GENERIC: Should isRemote be false or should it be part of the bound?
     def referenceType: NonPrimitiveType
 
     def show(genericVar: GenericVar): String

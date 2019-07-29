@@ -370,7 +370,6 @@ case class InterfaceNotFoundError(contractName: String, interfaceName: String) e
     val msg: String = s"Cannot find the interface $interfaceName that $contractName implements."
 }
 
-// TODO GENERIC: Should we allow this?
 case class InterfaceConstructorError() extends Error {
     val msg: String = "Interfaces are not allowed to contain constructors."
 }

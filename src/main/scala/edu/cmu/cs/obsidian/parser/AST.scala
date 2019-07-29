@@ -355,7 +355,7 @@ case class Constructor(name: String,
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Constructor = {
         Constructor(name, args.map(_.substitute(genericParams, actualParams)),
-            ObsidianType.requireNonPrimitive(resultType.substitute(genericParams, actualParams)),
+            resultType.substitute(genericParams, actualParams).asInstanceOf[NonPrimitiveType],
             body.map(_.substitute(genericParams, actualParams)))
             .setLoc(this)
     }
@@ -390,8 +390,8 @@ case class Transaction(name: String,
             body.map(_.substitute(genericParams, actualParams)),
             isStatic,
             isPrivate,
-            ObsidianType.requireNonPrimitive(thisType.substitute(genericParams, actualParams)),
-            ObsidianType.requireNonPrimitive(thisFinalType.substitute(genericParams, actualParams)),
+            thisType.substitute(genericParams, actualParams).asInstanceOf[NonPrimitiveType],
+            thisFinalType.substitute(genericParams, actualParams).asInstanceOf[NonPrimitiveType],
             initialFieldTypes.mapValues(_.substitute(genericParams, actualParams)),
             finalFieldTypes.mapValues(_.substitute(genericParams, actualParams)))
             .setLoc(this)

@@ -48,8 +48,6 @@ class StateTable(
 
     def name: String = astNodeRaw.name
 
-    // TODO GENERIC: Are these right (i.e., should it be nil or something else)?
-    // TODO GENERIC: Shouldn't both of these be referring to the same ContractType?
     def nonPrimitiveType = StateType(ContractType(contract.name, Nil), astNodeRaw.name, false)
     def contractType: ContractType = ContractType(name, Nil)
 
@@ -92,7 +90,6 @@ class ContractTable(
         symbolTable: SymbolTable,
         parentContract: Option[ContractTable]) extends DeclarationTable {
 
-    // TODO GENERIC: Is this the right approach for subtituting type parameters?
     /**
       * Constructs a new contract table with the current contract updated to
       * @param typeArgs
@@ -100,22 +97,9 @@ class ContractTable(
       */
     def substitute(typeArgs: Seq[ObsidianType]): ContractTable = {
         val newContract = contract match {
-            case obsCon: ObsidianContractImpl =>
-                obsCon.substitute(obsCon.params, typeArgs)
-
-            // TODO GENERIC: Handle the FFI somehow
-            case javacon : JavaFFIContractImpl =>
-                // If it's empty we're not actually trying to substitute anything
-                if (typeArgs.nonEmpty) {
-                    assert(false, "Cannot substitute into java ffi contract")
-                }
-
-                javacon
+            case obsCon: ObsidianContractImpl => obsCon.substitute(obsCon.params, typeArgs)
+            case javacon : JavaFFIContractImpl => javacon
         }
-
-        // TODO GENERIC: Should the symbolTable be appropriately updated?
-        // TODO GENERIC: Maybe we shouldn't do it like this, and instead just make the lookup functions
-        //  take the type parameters and redo the substitution
 
         new ContractTable(newContract, symbolTable, parentContract)
     }

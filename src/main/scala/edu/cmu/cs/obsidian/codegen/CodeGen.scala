@@ -2151,7 +2151,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         // We swallow all these exceptions related to reflection. This should be safe, since we only
         // lookup methods that we know we generate.
-        // TODO GENERIC: Verify this really is safe, or handle the exception better
         for (exceptionClass <- exceptionClasses) {
             tryBlock._catch(exceptionClass).body().assign(assignTo, default)
         }
