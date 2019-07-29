@@ -19,8 +19,6 @@ public interface ObsidianSerialized {
                 WrongNumberOfArgumentsException, InvalidStateException, ObsidianRevertException,
                 IllegalOwnershipConsumptionException, StateLockException;
 
-    public void initFromArchive(Object archive, SerializationState __st) throws com.google.protobuf.InvalidProtocolBufferException;
-
     public void flush();
     public abstract boolean methodReceiverIsOwnedAtBeginning(String transactionName);
     public abstract boolean methodReceiverIsOwnedAtEnd(String transactionName);
