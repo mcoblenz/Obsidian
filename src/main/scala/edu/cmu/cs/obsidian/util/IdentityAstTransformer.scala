@@ -124,56 +124,92 @@ class IdentityAstTransformer {
         (f.copy(typ = newType).setLoc(f), errors)
     }
 
-    def transformExpression(e: Expression): Expression = {
+    def transformUnary(table: SymbolTable, lexicallyInsideOf: DeclarationTable, context: Context,
+                       e: Expression, params: Seq[GenericType],
+                       f: Expression => Expression): (Expression, List[ErrorRecord]) = {
+        val (newE, errors) = transformExpression(table, lexicallyInsideOf, context, e, params)
+        (f(newE), errors)
+    }
+
+    def transformBinary(table: SymbolTable, lexicallyInsideOf: DeclarationTable, context: Context,
+                        e1: Expression, e2: Expression, params: Seq[GenericType],
+                        f: (Expression, Expression) => Expression): (Expression, List[ErrorRecord]) = {
+        val (newE1, errors1) = transformExpression(table, lexicallyInsideOf, context, e1, params)
+        val (newE2, errors2) = transformExpression(table, lexicallyInsideOf, context, e2, params)
+        (f(newE1, newE2), errors1 ++ errors2)
+    }
+
+    def transformExpression(table: SymbolTable, lexicallyInsideOf: DeclarationTable,
+                            context: Context, e: Expression, params: Seq[GenericType]): (Expression, List[ErrorRecord]) = {
+        // TODO: The AST transformers could be made cleaner via some sort of Writer monad
         e match {
-            case v: ReferenceIdentifier => v
-            case n: NumLiteral => n
-            case s: StringLiteral => s
-            case t: TrueLiteral => TrueLiteral().setLoc(t)
-            case f: FalseLiteral => FalseLiteral().setLoc(f)
-            case t: This => This().setLoc(t)
-            case p: Parent => Parent().setLoc(p)
+            case v: ReferenceIdentifier => (v, List())
+            case n: NumLiteral => (n, List())
+            case s: StringLiteral => (s, List())
+            case t: TrueLiteral => (TrueLiteral().setLoc(t), List())
+            case f: FalseLiteral => (FalseLiteral().setLoc(f), List())
+            case t: This => (This().setLoc(t), List())
+            case p: Parent => (Parent().setLoc(p), List())
             case c: Conjunction =>
-                Conjunction(transformExpression(c.e1), transformExpression(c.e2)).setLoc(c)
+                transformBinary(table, lexicallyInsideOf, context, c.e1, c.e2, params, Conjunction(_, _).setLoc(c))
             case d: Disjunction =>
-                Disjunction(transformExpression(d.e1), transformExpression(d.e2)).setLoc(d)
+                transformBinary(table, lexicallyInsideOf, context, d.e1, d.e2, params, Disjunction(_, _).setLoc(d))
             case n: LogicalNegation =>
-                LogicalNegation(transformExpression(n.e)).setLoc(n)
+               transformUnary(table, lexicallyInsideOf, context, n.e, params, LogicalNegation(_).setLoc(n))
             case a: Add =>
-                Add(transformExpression(a.e1), transformExpression(a.e2)).setLoc(a)
+                transformBinary(table, lexicallyInsideOf, context, a.e1, a.e2, params, Add(_, _).setLoc(a))
             case s: Subtract =>
-                Subtract(transformExpression(s.e1), transformExpression(s.e2)).setLoc(s)
+                transformBinary(table, lexicallyInsideOf, context, s.e1, s.e2, params, Subtract(_, _).setLoc(s))
             case d: Divide =>
-                Divide(transformExpression(d.e1), transformExpression(d.e2)).setLoc(d)
+                transformBinary(table, lexicallyInsideOf, context, d.e1, d.e2, params, Divide(_, _).setLoc(d))
             case m: Multiply =>
-                Multiply(transformExpression(m.e1), transformExpression(m.e2)).setLoc(m)
+                transformBinary(table, lexicallyInsideOf, context, m.e1, m.e2, params, Multiply(_, _).setLoc(m))
             case mod: Mod =>
-                Mod(transformExpression(mod.e1), transformExpression(mod.e2)).setLoc(mod)
+                transformBinary(table, lexicallyInsideOf, context, mod.e1, mod.e2, params, Mod(_, _).setLoc(mod))
             case n: Negate =>
-                Negate(transformExpression(n.e)).setLoc(n)
+                transformUnary(table, lexicallyInsideOf, context, n.e, params, Negate(_).setLoc(n))
             case eq: Equals =>
-                Equals(transformExpression(eq.e1), transformExpression(eq.e2)).setLoc(eq)
+                transformBinary(table, lexicallyInsideOf, context, eq.e1, eq.e2, params, Equals(_, _).setLoc(eq))
             case g: GreaterThan =>
-                GreaterThan(transformExpression(g.e1), transformExpression(g.e2)).setLoc(g)
+                transformBinary(table, lexicallyInsideOf, context, g.e1, g.e2, params, GreaterThan(_, _).setLoc(g))
             case g: GreaterThanOrEquals =>
-                GreaterThanOrEquals(transformExpression(g.e1), transformExpression(g.e2)).setLoc(g)
+                transformBinary(table, lexicallyInsideOf, context, g.e1, g.e2, params, GreaterThanOrEquals(_, _).setLoc(g))
             case l: LessThan =>
-                LessThan(transformExpression(l.e1), transformExpression(l.e2)).setLoc(l)
+                transformBinary(table, lexicallyInsideOf, context, l.e1, l.e2, params, LessThan(_, _).setLoc(l))
             case l: LessThanOrEquals =>
-                LessThanOrEquals(transformExpression(l.e1), transformExpression(l.e2)).setLoc(l)
+                transformBinary(table, lexicallyInsideOf, context, l.e1, l.e2, params, LessThanOrEquals(_, _).setLoc(l))
             case ne: NotEquals =>
-                NotEquals(transformExpression(ne.e1), transformExpression(ne.e2)).setLoc(ne)
-            case d: Dereference => d.copy(e = transformExpression(d.e)).setLoc(d)
+                transformBinary(table, lexicallyInsideOf, context, ne.e1, ne.e2, params, NotEquals(_, _).setLoc(ne))
+            case d: Dereference =>
+                transformUnary(table, lexicallyInsideOf, context, d.e, params, Dereference(_, d.f).setLoc(d))
             case i: LocalInvocation =>
-                i.copy(args = i.args.map(eArg => transformExpression(eArg))).setLoc(i)
+                val (newParams, errors) =
+                    i.params.map(transformType(table, lexicallyInsideOf, context, _, e.loc, params)).unzip
+                val (newArgs, argErrors) =
+                    i.args.map(transformExpression(table, lexicallyInsideOf, context, _, params)).unzip
+                (i.copy(args = newArgs, params = newParams).setLoc(i), errors.flatten.toList ++ argErrors.flatten.toList)
             case i: Invocation =>
-                i.copy(recipient = transformExpression(i.recipient), args = i.args.map(eArg => transformExpression(eArg))).setLoc(i)
+                val (newRecipient, recipientErrors) =
+                    transformExpression(table, lexicallyInsideOf, context, i.recipient, params)
+                val (newParams, errors) =
+                    i.params.map(transformType(table, lexicallyInsideOf, context, _, e.loc, params)).unzip
+                val (newArgs, argErrors) =
+                    i.args.map(transformExpression(table, lexicallyInsideOf, context, _, params)).unzip
+                (i.copy(recipient = newRecipient, args = newArgs, params = newParams).setLoc(i),
+                    recipientErrors ++
+                    errors.flatten.toList ++
+                    argErrors.flatten.toList)
 
             case c: Construction =>
-                c.copy(args = c.args.map(eArg => transformExpression(eArg))).setLoc(c)
+                val (newParams, errors) =
+                    c.contractType.typeArgs.map(transformType(table, lexicallyInsideOf, context, _, e.loc, params)).unzip
+                val (newArgs, argErrors) =
+                    c.args.map(transformExpression(table, lexicallyInsideOf, context, _, params)).unzip
+                (c.copy(args = newArgs, contractType = c.contractType.copy(typeArgs = newParams)).setLoc(c),
+                    errors.flatten.toList ++ argErrors.flatten.toList)
             case d@Disown(e) =>
-                Disown(transformExpression(e)).setLoc(d)
-            case s: StateInitializer => s.copy().setLoc(s)
+                transformUnary(table, lexicallyInsideOf, context, d.e, params, Disown(_).setLoc(d))
+            case s: StateInitializer => (s.copy().setLoc(s), List())
         }
     }
 
@@ -236,7 +272,10 @@ class IdentityAstTransformer {
 
         val (newArgs, argErrors) = transformArgs(table, lexicallyInsideOf, t.args, t.thisType, t.params)
 
-        val newEnsures = t.ensures.map(en => en.copy(expr = transformExpression(en.expr)))
+        val (newEnsures, allEnsureErrors) = t.ensures.map(en => {
+            val (newExpr, ensureErrors) = transformExpression(table, lexicallyInsideOf, context, en.expr, t.params)
+            (en.copy(expr = newExpr), ensureErrors)
+        }).unzip
 
         val (newRetType, retTypeErrors) = t.retType match {
             case None => (None, List.empty)
@@ -252,7 +291,9 @@ class IdentityAstTransformer {
                 args = newArgs,
                 ensures = newEnsures,
                 body = newTransactionBody).setLoc(t)
-        (newTransaction, thisTypeErrors ++ thisFinalTypeErrors ++ retTypeErrors ++ argErrors ++ bodyErrors)
+        (newTransaction,
+            thisTypeErrors ++ thisFinalTypeErrors ++ retTypeErrors ++
+            argErrors ++ allEnsureErrors.flatten.toList ++ bodyErrors)
     }
 
     def transformConstructor(
@@ -298,7 +339,6 @@ class IdentityAstTransformer {
             params: Seq[GenericType]): (Statement, Context, Seq[ErrorRecord]) = {
         s match {
             case oldDecl@VariableDecl(typ, varName) =>
-                val newTypChoice = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
                 (oldDecl.copy(typ = newTyp).setLoc(oldDecl), context.updated(varName, newTyp), errors)
             case oldDecl@VariableDeclWithSpec(typIn, typOut, varName) =>
@@ -309,65 +349,84 @@ class IdentityAstTransformer {
                 (newDecl, context.updated(varName, newTypIn), totalErrors)
             case oldDecl@VariableDeclWithInit(typ, varName, e) =>
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
-                val newDecl = oldDecl.copy(typ = newTyp, e = transformExpression(e)).setLoc(oldDecl)
-                (newDecl, context.updated(varName, newTyp), errors)
+                val (newE, exprErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)
+                val newDecl = oldDecl.copy(typ = newTyp, e = newE).setLoc(oldDecl)
+                (newDecl, context.updated(varName, newTyp), errors ++ exprErrors)
             case r@Return() => (r, context, Seq())
-            case r@ReturnExpr(e) => (ReturnExpr(transformExpression(e)).setLoc(r), context, Seq())
+            case r@ReturnExpr(e) =>
+                val (newE, exprErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)
+                (ReturnExpr(newE).setLoc(r), context, exprErrors)
             case t@Transition(newStateName, updates, p) =>
                 updates match {
                     case None => (Transition(newStateName, updates, p).setLoc(t), context, Seq())
                     case Some(u) =>
-                        val mapFun = (p: (ReferenceIdentifier, Expression)) => (p._1, transformExpression(p._2))
-                        val transformedUpdates = u.map(mapFun)
+                        val mapFun = (p: (ReferenceIdentifier, Expression)) => {
+                            val (newE, errs) = transformExpression(table, lexicallyInsideOf, context, p._2, params)
+                            ((p._1, newE), errs)
+                        }
+                        val (transformedUpdates, errors) = u.map(mapFun).unzip
 
-                        (Transition(newStateName, Some(transformedUpdates), p).setLoc(t), context, Seq())
+                        (Transition(newStateName, Some(transformedUpdates), p).setLoc(t), context, errors.flatten.toList)
                 }
             case a@Assignment(assignTo, e) =>
-                (Assignment(transformExpression(assignTo), transformExpression(e)).setLoc(a), context, Seq())
-            case t@Revert(e) => (t, context, Seq())
+                val (newAssignTo, assignToErrors) = transformExpression(table, lexicallyInsideOf, context, assignTo, params)
+                val (newE, exprErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)
+                (Assignment(newAssignTo, newE).setLoc(a), context, assignToErrors ++ exprErrors)
+            case t@Revert(e) =>
+                e.map(transformExpression(table, lexicallyInsideOf, context, _, params)) match {
+                    case Some((newE, exprErrors)) =>
+                        (Revert(Some(newE)).setLoc(t), context, exprErrors)
+                    case None => (Revert(None).setLoc(t), context, List())
+                }
             case oldIf@If(eCond, sIf) =>
+                val (newECond, condErrors) = transformExpression(table, lexicallyInsideOf, context, eCond, params)
                 val (sIfNew, newContext, errors) = transformBody(table, lexicallyInsideOf, context, sIf, params)
-                val newIf = oldIf.copy(s = sIfNew, eCond = transformExpression(eCond)).setLoc(oldIf)
-                (newIf, newContext, errors)
+                val newIf = oldIf.copy(s = sIfNew, eCond = newECond).setLoc(oldIf)
+                (newIf, newContext, errors ++ condErrors)
             case oldIf@IfThenElse(eCond, s1, s2) =>
+                val (newECond, condErrors) = transformExpression(table, lexicallyInsideOf, context, eCond, params)
                 val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1, params)
                 val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2, params)
                 val newIf = oldIf.copy(
                     s1 = s1New,
                     s2 = s2New,
-                    eCond = transformExpression(eCond)
+                    eCond = newECond
                 ).setLoc(oldIf)
-                (newIf, context, errors1 ++ errors2)
+                (newIf, context, condErrors ++ errors1 ++ errors2)
             case oldIf@IfInState(e, ePerm, state, s1, s2) =>
+                val (newE, condErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)
                 val (newState, errors3) = transformTypeState(table, lexicallyInsideOf, state, oldIf.loc, params)
                 val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1, params)
                 val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2, params)
                 val newIf = oldIf.copy(
-                    e = transformExpression(e),
+                    e = newE,
                     typeState = newState,
                     s1 = s1New,
                     s2 = s2New
                 ).setLoc(oldIf)
-                (newIf, context, errors1 ++ errors2 ++ errors3)
+                (newIf, context, condErrors ++ errors1 ++ errors2 ++ errors3)
             case oldTry@TryCatch(s1, s2) =>
                 val (s1New, newContext1, errors1) = transformBody(table, lexicallyInsideOf, context, s1, params)
                 val (s2New, newContext2, errors2) = transformBody(table, lexicallyInsideOf, context, s2, params)
                 val newIf = oldTry.copy(s1 = s1New, s2 = s2New).setLoc(oldTry)
                 (newIf, context, errors1 ++ errors2)
             case oldSwitch@Switch(e, cases) =>
+                val (newE, eErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)
                 var errors = List.empty[ErrorRecord]
                 val newCases = cases.map(_case => {
                     val (newBody, newContext, newErrors) = transformBody(table, lexicallyInsideOf, context, _case.body, params)
                     errors = errors ++ newErrors
                     _case.copy(body = newBody).setLoc(_case)
                 })
-                val newSwitch = oldSwitch.copy(e = transformExpression(e),
-                                               cases = newCases).setLoc(oldSwitch)
-                (newSwitch, context, errors)
+                val newSwitch = oldSwitch.copy(e = newE, cases = newCases).setLoc(oldSwitch)
+                (newSwitch, context, eErrors ++ errors)
             case oldAssert@StaticAssert(e, l) =>
-                var (newL, errors) = transformTypeState(table, lexicallyInsideOf, l, oldAssert.loc, params)
-                (StaticAssert(transformExpression(e), newL).setLoc(oldAssert), context, errors)
-            case e: Expression => (transformExpression(e), context, Seq())
+                val (newE, exprErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)
+                val (newL, errors) = transformTypeState(table, lexicallyInsideOf, l, oldAssert.loc, params)
+                (StaticAssert(newE, newL).setLoc(oldAssert), context, exprErrors ++ errors)
+            case e: Expression =>
+                val (newE, errors) = transformExpression(table, lexicallyInsideOf, context, e, params)
+                (newE, context, errors)
         }
     }
 

@@ -860,6 +860,10 @@ class TypeCheckerTests extends JUnitSuite {
             , 8) :: Nil)
     }
 
+    @Test def genericsLinkedList(): Unit = {
+        runTest("resources/tests/type_checker_tests/GenericLinkedList.obs", Nil)
+    }
+
     @Test def permissionPassing(): Unit = {
         runTest("resources/tests/type_checker_tests/PermissionPassing.obs",
             (ReceiverTypeIncompatibleError("t5",
