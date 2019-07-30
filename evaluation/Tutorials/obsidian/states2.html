@@ -1,0 +1,99 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Part 6: States -- Manipulating State</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h1>Part 6: States -- Manipulating State</h1>
+
+
+<h2> The <code>-></code> Operator</h2>
+<p>Methods, including constructors, can change the state of <code>this</code> with the <code>-></code> operator:</p>
+
+<pre>
+<code>
+  LightSwitch() { // constructor
+    ->Off; // Transition to Off state.
+  }
+</code>
+</pre>
+
+<p>Methods can specify what states the object must be in before they can be invoked and what states the object will be in after they exit by annotating the <code>this</code> parameter. Constructors can specify what state they end in.</p>
+
+<pre>
+<code>
+  LightSwitch@Off() { // constructor always ends with the object in Off state
+    ->Off;
+  }
+
+  transaction turnOn(LightSwitch@Off >> On this) // turnOn() can only be called on objects that are in Off state.
+  {
+    ->On;
+  }
+
+  transaction turnOff(LightSwitch@On >> Off this)
+  {
+    ->Off;
+  }
+</code>
+</pre>
+
+If a state has fields (like the <code>On</code> state in the definition of a <code>LightSwitch</code> with <code>brightness</code>), then we can
+transition to that state as follows:
+
+<pre>
+<code>
+
+  transaction turnOn(LightSwitch@Off >> On this, int b) // turnOn() can only be called on objects that are in Off state.
+  {
+    ->On (brightness = b);
+  }
+
+</code>
+</pre>
+
+In addition, a transaction can begin or end in multiple states. This is specified with the <code>|</code> operator. An example is shown below:
+<pre>
+  <code>
+  
+    transaction doSomething(LightSwitch@Off >> (On | Off) this)
+    {
+      if (...) {
+        -> On;
+      }
+      else {
+        -> Off;
+      }
+    }
+  
+  </code>
+  </pre>
+
+
+
+<br/>
+<br/>
+<h2>Optional compiler checks</h2>
+<p>As before, the programmer can use <code>[]</code> statements to check state information at compile time. For example, <code>[s@Off];</code> will cause a compiler error if <code>s</code> does not refer to an object in <code>Off</code> state.</p>
+
+
+<br/>
+<br/>
+<h2>Testing states with <code>in</code></h2>
+<pre>
+<code>
+transaction test2(LightSwitch@Shared s) {
+    if (s in On) { // runtime check to see whether the object referenced by s is in state On
+        s.turnOff(); // OK due to runtime check
+    }
+
+}
+</code>
+</pre>
+
+<p>Within the scope of the <code>if...in</code> block, the compiler requires that if there <string>is</strong> an owner of the object referenced by <code>s</code>, then the owner's state specification is never violated. If it is, then the program is terminated; it is up to the programmer to make sure the body of the <code>if in</code> block does not change the state inappropriately.</p>
+

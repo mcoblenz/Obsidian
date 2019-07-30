@@ -1,14 +1,14 @@
 <!DOCTYPE HTML>
 <html lang="en">
 <head>
-    <title>Part 3: Assets</title>
+    <title>Part 4: Assets</title>
     <meta charset="utf-8"  />
     <link rel="stylesheet" href="../stylesheet.css"/>
     <link href="../prism.css" rel="stylesheet" />
 </head>
 <body class="language-obsidian">
 <script src="../prism.js"></script>
-<h1><strong>Part 3: Assets</strong></h1>
+<h1><strong>Part 4: Assets</strong></h1>
 
 <p>Some owning references are to things that should not be accidentally lost. To prevent accidental loss, we can declare contracts 
     with the keyword <code>asset</code>. Let's do this for <code>Money</code>:</p>
@@ -42,7 +42,7 @@ transaction test() returns Money@Owned {
 </code>
 </pre>
 
-<p>Note that non-owning references to <code>Money</code> are not restricted; the compiler gives no errors when they go out of scope.</p>
+<p>NOTE: non-owning references to <code>Money</code> are not restricted; the compiler gives no errors when they go out of scope.</p>
 
 
 </body></html>
