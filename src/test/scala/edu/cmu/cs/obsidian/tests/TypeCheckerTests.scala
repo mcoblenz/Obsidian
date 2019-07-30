@@ -762,8 +762,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def genericsOwnership(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsOwnership.obs",
             (InvalidInconsistentFieldType("x",
-                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(ContractType("Top",Nil), Unowned())),
-                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(ContractType("Top",Nil),Owned()))), 12) ::
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType("Top",Nil), Unowned())),
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType("Top",Nil),Owned()))), 12) ::
             Nil)
     }
 
@@ -782,21 +782,22 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def genericsInterfaceImplementsBound(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericInterfaceBounds.obs",
-            (MethodUndefinedError(GenericType(GenericVar(isAsset = false,"T",None), GenericBoundPerm(ContractType("Top",Nil),Owned())),"validate"), 29) ::
+            (MethodUndefinedError(GenericType(GenericVar(isAsset = false,"T",None),
+                GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top",Nil),Owned())),"validate"), 29) ::
             (ArgumentSubtypingError("store", "a",
                 StateType(ContractType("NoImplValidatable", Nil), "Invalid", isRemote = false),
                 StateType(ContractType("DummyValidatable", Nil), "Invalid", isRemote = false)), 67) ::
             (GenericParameterError(GenericType(GenericVar(isAsset = false,"A",None),
-                GenericBoundPerm(ContractType("Validatable",Nil),Unowned())),
+                GenericBoundPerm(interfaceSpecified = true, permSpecified = false, ContractType("Validatable",Nil),Unowned())),
                 ContractReferenceType(ContractType("NoImplValidatable", Nil), Inferred(), isRemote = false)), 73) ::
             Nil)
     }
 
     @Test def genericsInterfaceWithParameters(): Unit = {
         val consumerBound =
-            GenericBoundPerm(ContractType("Consumer",
+            GenericBoundPerm(interfaceSpecified = true, permSpecified = false, ContractType("Consumer",
                 List(GenericType(GenericVar(isAsset = false, "U", None),
-                    GenericBoundPerm(ContractType("Top", Nil), Inferred())))), Unowned())
+                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top", Nil), Inferred())))), Unowned())
 
         runTest("resources/tests/type_checker_tests/GenericInterfaceParameters.obs",
             (ArgumentSubtypingError("consume", "x", StringType(), IntType()), 49) ::
@@ -829,8 +830,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def genericsStateVariables(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsStateVariables.obs",
             (InvalidInconsistentFieldType("val",
-                GenericType(GenericVar(isAsset = false,"X",None),GenericBoundPerm(ContractType("Top", Nil),Unowned())),
-                GenericType(GenericVar(isAsset = false,"X",Some("s")),GenericBoundPerm(ContractType("Top",Nil),Unowned()))), 16) ::
+                GenericType(GenericVar(isAsset = false,"X",None),GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top", Nil),Unowned())),
+                GenericType(GenericVar(isAsset = false,"X",Some("s")),GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top",Nil),Unowned()))), 16) ::
             (ReceiverTypeIncompatibleError("getX",
                 StateType(ContractType("A", Nil), "S2", isRemote = false),
                 StateType(ContractType("A", Nil), "S1", isRemote = false)), 66) ::
@@ -847,7 +848,7 @@ class TypeCheckerTests extends JUnitSuite {
             (GenericParameterAssetError("X", "C"), 63) ::
             (ReceiverTypeIncompatibleError("go",
                 GenericType(GenericVar(isAsset = false, "X", Some("s")),
-                    GenericBoundPerm(ContractType("Go", Nil), Unowned())),
+                    GenericBoundPerm(interfaceSpecified = true, permSpecified = true, ContractType("Go", Nil), Unowned())),
                 ContractReferenceType(ContractType("Go", Nil), Owned(), isRemote = false)), 55) ::
                 Nil)
     }

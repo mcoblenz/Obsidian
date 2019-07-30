@@ -278,16 +278,24 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     /* method to check if contract is actually implementing an interface */
-    private def contractIsSubtype(table: ContractTable, c1: ContractType, c2: ContractType, isThis: Boolean): Boolean = {
+    private def contractIsSubtype(table: ContractTable, c1: ContractType, c2: ContractType, isThis: Boolean): Either[Boolean, Error] = {
         // Everything is a subtype of Top
         if (c2.contractName == "Top") {
-            return true
+            return Left(true)
         }
 
-        val c1Table = globalTable.contractLookup(c1.contractName)
-        val c2Table = globalTable.contractLookup(c2.contractName)
+        val c1Lookup = globalTable.contract(c1.contractName).map(_.contract)
+        val c2Lookup = globalTable.contract(c2.contractName).map(_.contract)
 
-        (c1Table.contract, c2Table.contract) match {
+        if (c1Lookup.isEmpty) {
+            return Right(ContractUndefinedError(c1.contractName))
+        }
+
+        if (c1Lookup.isEmpty) {
+            return Right(ContractUndefinedError(c2.contractName))
+        }
+
+        Left((c1Lookup.get, c2Lookup.get) match {
             case (obs1: ObsidianContractImpl, obs2: ObsidianContractImpl) =>
                 if (!obs1.isInterface && obs2.isInterface) {
                     val interfaceMatches = obs1.bound.contractName == obs2.name
@@ -302,7 +310,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (jvcon1: JavaFFIContractImpl, jvcon2: JavaFFIContractImpl) => jvcon1 == jvcon2
             case (obs: ObsidianContractImpl, jvcon: JavaFFIContractImpl) => false
             case (jvcon: JavaFFIContractImpl, obs:ObsidianContractImpl) => obs.name == jvcon.interface
-        }
+        })
     }
 
     private def typeBound(table: ContractTable): ObsidianType => ObsidianType = {
@@ -325,11 +333,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 (np1, np2) match {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
-                        contractIsSubtype(table, c1, c2, isThis) && isSubpermission(c1p, c2p)
+                        contractIsSubtype(table, c1, c2, isThis) match {
+                            case Left(isSubtypeRes) => isSubtypeRes && isSubpermission(c1p, c2p)
+                            case Right(err) => return Some(err)
+                        }
                     case (StateType(c1, ss1, _), StateType(c2, ss2, _)) =>
-                        contractIsSubtype(table, c1, c2, isThis) && ss1.subsetOf(ss2)
+                        contractIsSubtype(table, c1, c2, isThis) match {
+                            case Left(isSubtypeRes) => isSubtypeRes && ss1.subsetOf(ss2)
+                            case Right(err) => return Some(err)
+                        }
                     case (StateType(c1, ss1, _), ContractReferenceType(c2, c2p, _)) =>
-                        contractIsSubtype(table, c1, c2, isThis)
+                        contractIsSubtype(table, c1, c2, isThis) match {
+                            case Left(isSubtypeRes) => isSubtypeRes
+                            case Right(err) => return Some(err)
+                        }
                     case _ => false
                 }
 

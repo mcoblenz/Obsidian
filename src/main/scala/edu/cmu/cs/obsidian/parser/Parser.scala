@@ -677,14 +677,17 @@ object Parser extends Parsers {
             case assetMod ~ varId ~ stateVarId ~ implements ~ subpermBound =>
                 val stateVar = stateVarId.map(_._2._1)
 
+                val definesInterface = implements.flatten.isDefined
                 val contractBound = implements.flatten.getOrElse(ContractType("Top", Nil))
-                val varBound = subpermBound.getOrElse(Left(Unowned()))
                 val gVar = GenericVar(assetMod.isDefined, varId._1, stateVar)
 
-                varBound match {
-                    case Left(perm) => GenericType(gVar, GenericBoundPerm(contractBound, perm))
-                    case Right(states) => GenericType(gVar, GenericBoundStates(contractBound, states))
+                val bound = subpermBound match {
+                    case Some(Left(perm)) => GenericBoundPerm(definesInterface, permSpecified = true, contractBound, perm)
+                    case Some(Right(states)) => GenericBoundStates(definesInterface, permSpecified = true, contractBound, states)
+                    case None => GenericBoundPerm(definesInterface, permSpecified = false, contractBound, Unowned())
                 }
+
+                GenericType(gVar, bound)
         }
     }
 

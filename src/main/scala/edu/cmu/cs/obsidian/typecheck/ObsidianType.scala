@@ -14,13 +14,6 @@ sealed trait Permission extends TypeState {
     def residual: Permission
 }
 
-// This should ONLY be used for passing generic type parameters to functions
-//case class Unspecified() extends Permission {
-//    override def toString: String = "Unspecified"
-//
-//    override def residual: Permission = Unspecified()
-//}
-
 case class Shared() extends Permission {
     override def toString: String = "Shared"
 
@@ -453,9 +446,19 @@ sealed trait GenericBound {
     def referenceType: NonPrimitiveType
 
     def show(genericVar: GenericVar): String
+
+    def interfaceSpecified: Boolean
+
+    def declBound(genericVar: GenericVar): String =
+        if (interfaceSpecified) {
+            s" where ${genericVar.varName} implements $interfaceType"
+        } else {
+            ""
+        }
 }
 
-case class GenericBoundPerm(interfaceType: ContractType, permission: Permission) extends GenericBound {
+case class GenericBoundPerm(interfaceSpecified: Boolean, permSpecified: Boolean,
+                            interfaceType: ContractType, permission: Permission) extends GenericBound {
     override def residualType(mode: OwnershipConsumptionMode): GenericBound = {
         if (permission == Owned()) {
             val newPermission =
@@ -475,7 +478,7 @@ case class GenericBoundPerm(interfaceType: ContractType, permission: Permission)
         copy(permission = permission)
 
     override def withStates(stateNames: Set[String]): GenericBound =
-        GenericBoundStates(interfaceType, stateNames)
+        GenericBoundStates(interfaceSpecified, permSpecified, interfaceType, stateNames)
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound =
         this.copy(interfaceType = interfaceType.substitute(genericParams, actualParams))
@@ -488,11 +491,8 @@ case class GenericBoundPerm(interfaceType: ContractType, permission: Permission)
     override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
         copy(interfaceType = interfaceType.copy(typeArgs = contractParams))
 
-    private def declBound(genericVar: GenericVar): String =
-        s"where ${genericVar.varName} implements $interfaceType"
-
     private def permBound(genericVar: GenericVar): String =
-        if (genericVar.permissionVar.isDefined) {
+        if (genericVar.permissionVar.isDefined && permSpecified) {
             s" where ${genericVar.permissionVar.get} is $permission"
         } else {
             ""
@@ -501,7 +501,8 @@ case class GenericBoundPerm(interfaceType: ContractType, permission: Permission)
     override def show(genericVar: GenericVar): String = declBound(genericVar) + permBound(genericVar)
 }
 
-case class GenericBoundStates(interfaceType: ContractType, states: Set[String]) extends GenericBound {
+case class GenericBoundStates(interfaceSpecified: Boolean, permSpecified: Boolean,
+                              interfaceType: ContractType, states: Set[String]) extends GenericBound {
     override def permission: Permission = Owned()
 
     override def residualType(mode: OwnershipConsumptionMode): GenericBound =
@@ -517,11 +518,11 @@ case class GenericBoundStates(interfaceType: ContractType, states: Set[String]) 
                     case NoOwnershipConsumption() => Owned()
                 }
 
-            GenericBoundPerm(interfaceType, newPermission)
+            GenericBoundPerm(interfaceSpecified, permSpecified, interfaceType, newPermission)
         }
 
     override def withPermission(permission: Permission): GenericBound =
-        GenericBoundPerm(interfaceType, permission)
+        GenericBoundPerm(interfaceSpecified, permSpecified, interfaceType, permission)
 
     override def withStates(stateNames: Set[String]): GenericBound = this.copy(states = stateNames)
 
@@ -535,9 +536,6 @@ case class GenericBoundStates(interfaceType: ContractType, states: Set[String]) 
     override def genericParams: Seq[ObsidianType] = interfaceType.typeArgs
     override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
         copy(interfaceType = interfaceType.copy(typeArgs = contractParams))
-
-    private def declBound(genericVar: GenericVar): String =
-        s"where ${genericVar.varName} implements $interfaceType"
 
     private def permBound(genericVar: GenericVar): String =
         if (genericVar.permissionVar.isDefined) {
@@ -558,7 +556,7 @@ case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[S
 
 case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimitiveType {
     override def toString: String =
-        s"$gVar ${bound.show(gVar)}"
+        s"$gVar${bound.show(gVar)}"
 
     def hasPermissionVar(stateName: String): Boolean = gVar.hasPermissionVar(stateName)
 
