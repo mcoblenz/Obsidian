@@ -14,6 +14,9 @@ import scala.collection.mutable.ArrayBuffer
 class TypeCheckerTests extends JUnitSuite {
     type LineNumber = Int
 
+    private val topContractType = ContractType("Top", Nil)
+    private val topBound = GenericBoundPerm(_: Boolean, _: Boolean, topContractType, Unowned())
+
     private def runTest(file: String, expectedErrors: Seq[(Error, LineNumber)]): Unit = {
         var prog: Program = null
         try {
@@ -734,6 +737,17 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def multipleConstructorDistinguishableTest(): Unit = {
         runTest("resources/tests/type_checker_tests/MultiConstrDistinguishable.obs",
             Nil)
+    }
+
+    @Test def transactionParamShadowTest(): Unit = {
+        val contractParam = GenericType(GenericVar(isAsset = false, "X", Some("s")), topBound(false, false))
+        val fParam = GenericType(GenericVar(isAsset = false, "X", Some("t")), topBound(false, false))
+        val gParam = GenericType(GenericVar(isAsset = false, "Y", Some("s")), topBound(false, false))
+
+        runTest("resources/tests/type_checker_tests/TransactionParamShadow.obs",
+            (GenericParamShadowError("f", fParam, "TransactionParamShadow", contractParam), 3) ::
+            (GenericParamShadowError("f", gParam, "TransactionParamShadow", contractParam), 6) ::
+                Nil)
     }
 
     @Test def interfaceDoesntRequireReturnTest(): Unit = {

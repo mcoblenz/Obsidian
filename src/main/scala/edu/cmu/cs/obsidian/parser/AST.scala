@@ -333,9 +333,8 @@ case class Field(isConst: Boolean,
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Field = {
         val idx = genericParams.indexWhere(_ == typ)
 
-        if (idx >= 0) {
-            Field(isConst, actualParams(idx), name, availableIn)
-                .setLoc(this)
+        if (idx >= 0 && idx < actualParams.length) {
+            Field(isConst, actualParams(idx), name, availableIn).setLoc(this)
         } else {
             Field(isConst, typ.substitute(genericParams, actualParams), name, availableIn)
                 .setLoc(this)

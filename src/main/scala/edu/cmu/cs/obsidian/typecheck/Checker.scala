@@ -2078,6 +2078,24 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def checkTransactionInState(tx: Transaction,
                                         lexicallyInsideOf: DeclarationTable,
                                         initContext: Context): Transaction = {
+
+        lexicallyInsideOf.contract match {
+            case obsCon: ObsidianContractImpl =>
+                for (param <- tx.params) {
+                    obsCon.params.find(param.shadows)
+                        .foreach(contractParam => logError(tx, GenericParamShadowError(tx.name, param, obsCon.name, contractParam)))
+                }
+            case _: JavaFFIContractImpl => ()
+        }
+
+        for (i <- tx.params.indices) {
+            for (j <- i + 1 until tx.params.size) {
+                if (tx.params(i).shadows(tx.params(j))) {
+                    logError(tx, GenericParamShadowError(tx.name, tx.params(i), tx.name, tx.params(j)))
+                }
+            }
+        }
+
         var context = initContext
 
         for (arg <- tx.args) {
@@ -2580,6 +2598,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         contract match {
             case obsContract : ObsidianContractImpl =>
                 val table = globalTable.contractLookup(obsContract.name)
+
+                for (i <- obsContract.params.indices) {
+                    for (j <- i + 1 until obsContract.params.size) {
+                        if (obsContract.params(i).shadows(obsContract.params(j))) {
+                            logError(obsContract, GenericParamShadowError(obsContract.name, obsContract.params(i), obsContract.name, obsContract.params(j)))
+                        }
+                    }
+                }
 
                 if (!obsContract.isInterface) {
                     val boundDecls = globalTable.contract(obsContract.bound.contractName) match {

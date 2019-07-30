@@ -1,0 +1,8 @@
+main contract TransactionParamShadow[X@s] {
+    // Error: X here shadows the X above
+    transaction f[X@t](X@t x) {}
+
+    // Error: s here shadows the s above
+    transaction f[Y@s](Y@s x) {}
+}
+

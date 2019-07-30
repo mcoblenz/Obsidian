@@ -9,7 +9,7 @@ main contract LinkedList[T@s] {
         ->Empty;
     }
 
-    transaction append[T@s](LinkedList@Owned this, T@s >> Unowned ptr) {
+    transaction append(LinkedList@Owned this, T@s >> Unowned ptr) {
         switch this {
             case HasNext {
                 next.append(ptr);

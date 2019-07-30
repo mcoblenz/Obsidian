@@ -639,4 +639,12 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
 
     override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
         withTypeState(otherType.permission)
+
+    def shadows(other: GenericType): Boolean = {
+        val permVarsMatch = (gVar.permissionVar, other.gVar.permissionVar) match {
+            case (Some(permVar1), Some(permVar2)) => permVar1 == permVar2
+            case _ => false
+        }
+        gVar.varName == other.gVar.varName || permVarsMatch
+    }
 }
