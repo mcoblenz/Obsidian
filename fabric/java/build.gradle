@@ -15,12 +15,7 @@ sourceCompatibility = 1.8
 
 repositories {
     maven {
-        // TODO UNDO THIS. Just for testing changes to standard library
-        // url 'http://obsidian-lang.com/repository'
-        url 'http://reedoei.com/files/repository'
-    }
-    maven {
-        url 'https://repository.mulesoft.org/nexus/content/repositories/public/'
+        url 'http://obsidian-lang.com/repository'
     }
     jcenter()
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
