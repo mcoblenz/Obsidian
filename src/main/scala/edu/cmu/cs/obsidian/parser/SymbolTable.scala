@@ -91,9 +91,10 @@ class ContractTable(
         parentContract: Option[ContractTable]) extends DeclarationTable {
 
     /**
-      * Constructs a new contract table with the current contract updated to
-      * @param typeArgs
-      * @return
+      * Constructs a new contract table with the current contract updated by substituting typeArgs for
+      * the contract's generic parameters
+      * @param typeArgs The types to substitute in for the current contract's generic parameters
+      * @return the updated contract table
       */
     def substitute(typeArgs: Seq[ObsidianType]): ContractTable = {
         val newContract = contract match {

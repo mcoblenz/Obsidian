@@ -434,7 +434,7 @@ case class PermissionCheckRedundant(actualPerm: Permission, testPermission: Perm
         }
 
     override val msg: String =
-        s"Redundant permission check. Testing for permission $testPermission, but actual permission is $isSubperm, " +
+        s"Redundant permission check. Testing for permission $testPermission, but actual permission is $actualPerm, " +
             s"which $isSubpermStr."
 }
 
@@ -445,7 +445,7 @@ case class AssetStateImplError(implState: State, interfaceState: State) extends 
 
 case class BadFFIInterfaceBoundError(name: String) extends Error {
     override val msg: String =
-        s"Cannot override '$name' because it is an FFI contract."
+        s"Cannot override '$name' because it is implemented in Java, not Obsidian."
 }
 
 case class GenericParamShadowError(param1Binder: String, param1: GenericType,

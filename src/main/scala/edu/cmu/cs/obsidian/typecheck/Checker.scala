@@ -506,7 +506,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     def substituteOk(table: ContractTable, ast: AST, params: Seq[GenericType], typeArgs: Seq[ObsidianType]): Unit = {
-        // TODO GENERIC: Will have to update this if we do inference for the type args
         if (params.length != typeArgs.length) {
             logError(ast, GenericParameterListError(params.length, typeArgs.length))
         }
