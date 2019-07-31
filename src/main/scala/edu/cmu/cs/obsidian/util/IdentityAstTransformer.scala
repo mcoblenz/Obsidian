@@ -17,7 +17,7 @@ class IdentityAstTransformer {
 
     def transformProgram(table: SymbolTable): (SymbolTable, Seq[ErrorRecord]) = {
         var errorRecords = List.empty[ErrorRecord]
-        var contracts = List[Contract](ObsidianContractImpl(Set(), "Top", Nil, ContractType("Top", Nil), Nil, None, isInterface = true, ""))
+        var contracts = List[Contract](ContractType.topContractImpl)
         assert(table.ast.imports.isEmpty, "Imports should be empty after processing.")
 
         for ((contractName, contractTable) <- table.contractLookup) {

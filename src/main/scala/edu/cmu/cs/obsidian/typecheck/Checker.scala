@@ -280,7 +280,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* method to check if contract is actually implementing an interface */
     private def contractIsSubtype(table: ContractTable, c1: ContractType, c2: ContractType, isThis: Boolean): Either[Boolean, Error] = {
         // Everything is a subtype of Top
-        if (c2.contractName == "Top") {
+        if (c2.contractName == ContractType.topContractName) {
             return Left(true)
         }
 
@@ -350,7 +350,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case _ => false
                 }
 
-            case (p: PrimitiveType, np: NonPrimitiveType) => np.contractName == "Top"
+            case (p: PrimitiveType, np: NonPrimitiveType) => np.contractName == ContractType.topContractName
 
             case _ => false
         }

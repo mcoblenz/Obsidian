@@ -681,7 +681,7 @@ object Parser extends Parsers {
                 val stateVar = stateVarId.map(_._2._1)
 
                 val definesInterface = implements.flatten.isDefined
-                val contractBound = implements.flatten.getOrElse(ContractType("Top", Nil))
+                val contractBound = implements.flatten.getOrElse(ContractType.topContractType)
                 val gVar = GenericVar(assetMod.isDefined, varId._1, stateVar)
 
                 val bound = subpermBound match {
@@ -720,7 +720,7 @@ object Parser extends Parsers {
 
                 val implementBound = impl match {
                     case Some(_ ~ bound) => bound
-                    case None => ContractType("Top", Nil)
+                    case None => ContractType.topContractType
                 }
 
                 LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name._1, params)) ~! RBraceT() ^^ {

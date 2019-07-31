@@ -116,6 +116,24 @@ case class ContractType(contractName: String, typeArgs: Seq[ObsidianType]) {
         }
 }
 
+object ContractType {
+    def topContractName: String = "Contract"
+    def topContractParams: Seq[GenericType] = Nil
+    def topContractType: ContractType = ContractType(topContractName, topContractParams)
+    def unownedTop: ObsidianType =
+        ContractReferenceType(topContractType, Unowned(), isRemote = false)
+    def topContractImpl =
+        ObsidianContractImpl(
+            Set(),
+            topContractName,
+            topContractParams,
+            topContractType,
+            Nil,
+            None,
+            isInterface = true,
+            "")
+}
+
 object Possibility {
     def fromBoolean(b: Boolean): Possibility =
         if (b) {

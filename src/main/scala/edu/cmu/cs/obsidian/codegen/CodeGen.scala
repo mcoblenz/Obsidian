@@ -1066,14 +1066,14 @@ class CodeGen (val target: Target, table: SymbolTable) {
     }
 
     def boundClass(self: JTypeVar, bound: GenericBound): AbstractJClass =
-        if (bound.interfaceType.contractName == "Top") {
+        if (bound.interfaceType.contractName == ContractType.topContractName) {
             obsidianSerialized
         } else {
             resolveType(bound.referenceType, table, Some(self)).boxify()
         }
 
     def implementBound(translationContext: TranslationContext, bound: ContractType): AbstractJClass =
-        if (bound.contractName == "Top") {
+        if (bound.contractName == ContractType.topContractName) {
             obsidianSerialized
         } else {
             // We can put any permission for referenceType, since we only need to get the translated name
@@ -1475,13 +1475,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
         initMeth.body()._return(JExpr.newArray(model.BYTE, 0))
     }
 
-    def topRef: ObsidianType =
-        ContractReferenceType(ContractType("Top", Nil), Unowned(), isRemote = false)
-
     def resolveTypeVars(contract: Contract, typeParams: Seq[ObsidianType]): Seq[ObsidianType] = {
         typeParams.map {
             case p@(genericType: GenericType) =>
-                contract.params.find(_.gVar.varName == genericType.gVar.varName).map(_ => p).getOrElse(topRef)
+                contract.params.find(_.gVar.varName == genericType.gVar.varName).map(_ => p).getOrElse(ContractType.unownedTop)
 
             case t => t
         }

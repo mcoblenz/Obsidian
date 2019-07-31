@@ -14,8 +14,7 @@ import scala.collection.mutable.ArrayBuffer
 class TypeCheckerTests extends JUnitSuite {
     type LineNumber = Int
 
-    private val topContractType = ContractType("Top", Nil)
-    private val topBound = GenericBoundPerm(_: Boolean, _: Boolean, topContractType, Unowned())
+    private val topBound = GenericBoundPerm(_: Boolean, _: Boolean, ContractType.topContractType, Unowned())
 
     private def runTest(file: String, expectedErrors: Seq[(Error, LineNumber)]): Unit = {
         var prog: Program = null
@@ -776,8 +775,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def genericsOwnership(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsOwnership.obs",
             (InvalidInconsistentFieldType("x",
-                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType("Top",Nil), Unowned())),
-                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType("Top",Nil),Owned()))), 12) ::
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType.topContractType, Unowned())),
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType.topContractType, Owned()))), 12) ::
             Nil)
     }
 
@@ -797,7 +796,7 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def genericsInterfaceImplementsBound(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericInterfaceBounds.obs",
             (MethodUndefinedError(GenericType(GenericVar(isAsset = false,"T",None),
-                GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top",Nil),Owned())),"validate"), 29) ::
+                GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType,Owned())),"validate"), 29) ::
             (ArgumentSubtypingError("store", "a",
                 StateType(ContractType("NoImplValidatable", Nil), "Invalid", isRemote = false),
                 StateType(ContractType("DummyValidatable", Nil), "Invalid", isRemote = false)), 67) ::
@@ -811,7 +810,7 @@ class TypeCheckerTests extends JUnitSuite {
         val consumerBound =
             GenericBoundPerm(interfaceSpecified = true, permSpecified = false, ContractType("Consumer",
                 List(GenericType(GenericVar(isAsset = false, "U", None),
-                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top", Nil), Inferred())))), Unowned())
+                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Inferred())))), Unowned())
 
         runTest("resources/tests/type_checker_tests/GenericInterfaceParameters.obs",
             (ArgumentSubtypingError("consume", "x", StringType(), IntType()), 49) ::
@@ -844,8 +843,10 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def genericsStateVariables(): Unit = {
         runTest("resources/tests/type_checker_tests/GenericsStateVariables.obs",
             (InvalidInconsistentFieldType("val",
-                GenericType(GenericVar(isAsset = false,"X",None),GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top", Nil),Unowned())),
-                GenericType(GenericVar(isAsset = false,"X",Some("s")),GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType("Top",Nil),Unowned()))), 16) ::
+                GenericType(GenericVar(isAsset = false,"X",None),
+                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Unowned())),
+                GenericType(GenericVar(isAsset = false,"X",Some("s")),
+                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Unowned()))), 16) ::
             (ReceiverTypeIncompatibleError("getX",
                 StateType(ContractType("A", Nil), "S2", isRemote = false),
                 StateType(ContractType("A", Nil), "S1", isRemote = false)), 66) ::
