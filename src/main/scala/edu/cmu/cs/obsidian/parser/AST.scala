@@ -5,8 +5,6 @@ import edu.cmu.cs.obsidian.lexer.Token
 import edu.cmu.cs.obsidian.parser.Parser.{EndsInState, Identifier}
 import edu.cmu.cs.obsidian.typecheck._
 
-import scala.collection.GenTraversableOnce
-
 trait HasLocation {
     var loc: Position = NoPosition
     def setLoc(t: Token): this.type = { loc = t.pos; this }
@@ -55,115 +53,57 @@ sealed abstract class InvokableDeclaration() extends Declaration {
     val isStatic: Boolean
 }
 
+// Expressions not containing other expressions
+sealed abstract class AtomicExpression extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): AtomicExpression = this
+}
+
+sealed abstract class UnaryExpression(make: Expression => UnaryExpression,
+                                      e: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): UnaryExpression =
+        make(e.substitute(genericParams, actualParams)).setLoc(this)
+}
+
+sealed abstract class BinaryExpression(make: (Expression, Expression) => BinaryExpression,
+                                       e1: Expression,
+                                       e2: Expression) extends Expression {
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): BinaryExpression =
+        make(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
+            .setLoc(this)
+}
+
 /* Expressions */
-case class ReferenceIdentifier(name: String) extends Expression {
+case class ReferenceIdentifier(name: String) extends AtomicExpression {
     override val toString = name
-
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ReferenceIdentifier = this
 }
 
-case class NumLiteral(value: Int) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): NumLiteral = this
-}
-case class StringLiteral(value: String) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StringLiteral = this
-}
-case class TrueLiteral() extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): TrueLiteral = this
-}
-case class FalseLiteral() extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): FalseLiteral = this
-}
-case class This() extends Expression {
+case class NumLiteral(value: Int) extends AtomicExpression
+case class StringLiteral(value: String) extends AtomicExpression
+case class TrueLiteral() extends AtomicExpression
+case class FalseLiteral() extends AtomicExpression
+case class This() extends AtomicExpression {
     override def toString: String = "this"
-
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): This = this
 }
-case class Parent() extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Parent = this
-}
-case class Conjunction(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Conjunction =
-        Conjunction(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Disjunction(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Disjunction =
-        Disjunction(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class LogicalNegation(e: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LogicalNegation =
-        LogicalNegation(e.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Add(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Add =
-        Add(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Subtract(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Subtract =
-        Subtract(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Divide(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Divide =
-        Divide(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Multiply(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Multiply =
-        Multiply(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Mod(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Mod =
-        Mod(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Negate(e: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Negate =
-        Negate(e.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Equals(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Equals =
-        Equals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class GreaterThan(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GreaterThan =
-        GreaterThan(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class GreaterThanOrEquals(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GreaterThanOrEquals =
-        GreaterThanOrEquals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class LessThan(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LessThan =
-        LessThan(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class LessThanOrEquals(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LessThanOrEquals =
-        LessThanOrEquals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class NotEquals(e1: Expression, e2: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): NotEquals =
-        NotEquals(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
-case class Dereference(e: Expression, f: String) extends Expression {
+case class Parent() extends AtomicExpression
+case class Conjunction(e1: Expression, e2: Expression) extends BinaryExpression(Conjunction, e1, e2)
+case class Disjunction(e1: Expression, e2: Expression) extends BinaryExpression(Disjunction, e1, e2)
+case class LogicalNegation(e: Expression) extends UnaryExpression(LogicalNegation, e)
+case class Add(e1: Expression, e2: Expression) extends BinaryExpression(Add, e1, e2)
+case class Subtract(e1: Expression, e2: Expression) extends BinaryExpression(Subtract, e1, e2)
+case class Divide(e1: Expression, e2: Expression) extends BinaryExpression(Divide, e1, e2)
+case class Multiply(e1: Expression, e2: Expression) extends BinaryExpression(Multiply, e1, e2)
+case class Mod(e1: Expression, e2: Expression) extends BinaryExpression(Mod, e1, e2)
+case class Negate(e: Expression) extends UnaryExpression(Negate, e)
+case class Equals(e1: Expression, e2: Expression) extends BinaryExpression(Equals, e1, e2)
+case class GreaterThan(e1: Expression, e2: Expression) extends BinaryExpression(GreaterThan, e1, e2)
+case class GreaterThanOrEquals(e1: Expression, e2: Expression) extends BinaryExpression(GreaterThanOrEquals, e1, e2)
+case class LessThan(e1: Expression, e2: Expression) extends BinaryExpression(LessThan, e1, e2)
+case class LessThanOrEquals(e1: Expression, e2: Expression) extends BinaryExpression(LessThanOrEquals, e1, e2)
+case class NotEquals(e1: Expression, e2: Expression) extends BinaryExpression(NotEquals, e1, e2)
+case class Dereference(e: Expression, f: String) extends UnaryExpression(Dereference(_, f), e) {
     override def toString: String = {
         s"$e.$f"
     }
-
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Dereference =
-        Dereference(e.substitute(genericParams, actualParams), f).setLoc(this)
 }
 
 case class LocalInvocation(name: String, genericParams: Seq[GenericType],
@@ -195,11 +135,7 @@ case class Construction(contractType: ContractType, args: Seq[Expression], isFFI
             args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
             .setLoc(this)
 }
-case class Disown(e: Expression) extends Expression {
-    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Disown =
-        Disown(e.substitute(genericParams, actualParams))
-            .setLoc(this)
-}
+case class Disown(e: Expression) extends UnaryExpression(Disown, e)
 case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StateInitializer = this
 }
