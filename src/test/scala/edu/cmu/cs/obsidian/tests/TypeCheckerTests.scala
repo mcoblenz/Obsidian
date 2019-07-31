@@ -930,4 +930,9 @@ class TypeCheckerTests extends JUnitSuite {
                 (UnusedOwnershipError("this"), 172) ::
                 Nil)
     }
+
+    @Test def duplicateContractDecl(): Unit = {
+        runTest("resources/tests/type_checker_tests/DuplicateContractDecl.obs",
+            (DuplicateContractError("Contract"), 2) :: Nil)
+    }
 }

@@ -1,0 +1,3 @@
+// Not allowed: Contract is analagous to Object in Java, and is defined by the compiler
+main contract Contract {}
+

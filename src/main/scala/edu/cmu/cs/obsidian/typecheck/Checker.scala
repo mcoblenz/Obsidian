@@ -2595,7 +2595,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         currentContractSourcePath = contract.sourcePath
 
         contract match {
-            case obsContract : ObsidianContractImpl =>
+            case obsContract: ObsidianContractImpl =>
                 val table = globalTable.contractLookup(obsContract.name)
 
                 for (i <- obsContract.params.indices) {
@@ -2627,7 +2627,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 checkConstructors(table.constructors, obsContract, table)
 
                 obsContract.copy(declarations = newDecls)
-            case ffiContract : JavaFFIContractImpl => ffiContract
+            case ffiContract: JavaFFIContractImpl => ffiContract
+        }
+    }
+
+    def checkForDuplicateTopDecl(contracts: Seq[Contract]): Unit = {
+        var foundTop = false
+        for (contract <- contracts) {
+            if (contract.name == ContractType.topContractName) {
+                if (foundTop) {
+                    logError(contract, DuplicateContractError(contract.name))
+                } else {
+                    foundTop = true
+                }
+            }
         }
     }
 
@@ -2639,6 +2652,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case obsContract : ObsidianContractImpl => checkContract(obsContract)
             case ffiContract : JavaFFIContractImpl => ffiContract
         }
+
+        checkForDuplicateTopDecl(globalTable.ast.contracts)
 
         val newContracts = globalTable.ast.contracts.map(checkDiffContract)
 
