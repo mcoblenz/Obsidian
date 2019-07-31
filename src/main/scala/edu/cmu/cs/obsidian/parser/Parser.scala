@@ -114,8 +114,10 @@ object Parser extends Parsers {
     }
 
     private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]],
-                                          name: String, genericParams: Seq[ObsidianType],
-                                          isRemote: Boolean, defaultOwned: Boolean): NonPrimitiveType = {
+                                          name: String,
+                                          genericParams: Seq[ObsidianType],
+                                          isRemote: Boolean,
+                                          defaultOwned: Boolean): NonPrimitiveType = {
         val defaultPermission = if (defaultOwned) Owned() else Inferred()
 
         val contractType = ContractType(name, genericParams)
@@ -125,7 +127,8 @@ object Parser extends Parsers {
             case Some(_ ~ permissionIdentSeq) =>
                 if (permissionIdentSeq.size == 1) {
                     val thePermissionOrState = permissionIdentSeq.head
-                    resolvePermission(thePermissionOrState._1) match {
+                    val permission = resolvePermission(thePermissionOrState._1)
+                    permission match {
                         case None => StateType(contractType, thePermissionOrState._1, isRemote)
                         case Some(p) => ContractReferenceType(contractType, p, isRemote)
                     }
