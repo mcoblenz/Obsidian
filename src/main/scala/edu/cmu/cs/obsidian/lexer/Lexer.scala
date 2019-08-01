@@ -59,6 +59,8 @@ object Lexer extends RegexParsers {
         case "transitions" => TransitionsT()
         case "with" => WithT()
         case "implements" => ImplementsT()
+        case "where" => WhereT()
+        case "is" => IsT()
         case id => IdentifierT(id)
     }
 

@@ -118,7 +118,8 @@ case class MethodUndefinedError(receiver: NonPrimitiveType, name: String) extend
             s"No transaction or function with name '$name' was found in interface '$cName'"
         case StateType(cName, sNames, _) =>
             s"No transaction or function with name '$name' was found in states '$sNames' of contract '$cName'"
-
+        case GenericType(gVar, bound) =>
+            s"No transaction or function with name '$name' was found in generic type $gVar implementing $bound."
     }
 }
 case class StateUndefinedError(cName: String, sName: String) extends Error {
@@ -246,8 +247,8 @@ case class StaticAssertOnPrimitiveError(e: Expression) extends Error {
     val msg: String = s"Cannot check the ownership or state of primitive expression '$e'."
 }
 
-case class StaticAssertFailed(e: Expression, statesOrPermissions: Seq[String], actualType: ObsidianType) extends Error {
-    val stateStr = statesOrPermissions.mkString(" | ")
+case class StaticAssertFailed(e: Expression, statesOrPermissions: TypeState, actualType: ObsidianType) extends Error {
+    val stateStr = statesOrPermissions.toString
 
     val msg: String = s"Expression '$e' failed assertion $stateStr. Actual type: $actualType."
 }
@@ -283,7 +284,7 @@ case class ReceiverTypeIncompatibleError(transactionName: String, actualType: Ob
     val msg: String = s"Cannot invoke $transactionName on a receiver of type $actualType; a receiver of type $expectedType is required."
 }
 
-case class InconsistentContractTypeError(declaredContractName: String, actualContractName: String) extends Error {
+case class InconsistentContractTypeError(declaredContractName: ContractType, actualContractName: ContractType) extends Error {
     val msg: String = s"Cannot assign a value of contract $actualContractName to a variable that requires a value of contract $declaredContractName."
 }
 
@@ -359,4 +360,95 @@ case class AmbiguousConstructorError(contractName: String,
 case class ConstructorAnnotationMissingError(contractName: String) extends Error {
     val msg: String = s"Missing a permission on the result type of a constructor of $contractName " +
                       s"(e.g., $contractName@Owned, $contractName@State, where State is a valid state for $contractName)."
+}
+
+case class InterfaceInstantiationError(contractName: String) extends Error {
+    val msg: String = s"Cannot instantiate interface $contractName."
+}
+
+case class InterfaceNotFoundError(contractName: String, interfaceName: String) extends Error {
+    val msg: String = s"Cannot find the interface $interfaceName that $contractName implements."
+}
+
+case class InterfaceConstructorError() extends Error {
+    val msg: String = "Interfaces are not allowed to contain constructors."
+}
+
+case class MethodImplArgsError(transName: String,
+                               actualList: Seq[VariableDeclWithSpec],
+                               expectedList: Seq[VariableDeclWithSpec]) extends Error {
+    val msg: String = s"Transaction $transName implements a transaction, but the argument lists are incompatible:\n " +
+                      s"Actual: $actualList\n" +
+                      s"Expected: $expectedList"
+}
+
+case class MethodImplReturnTypeError(transName: String,
+                                     retType: Option[ObsidianType],
+                                     interfaceRetType: Option[ObsidianType]) extends Error {
+    val msg: String =
+        if (retType.isDefined) {
+            s"Transaction $transName returns ${retType.get}, but the transaction it implements has no return type."
+        } else {
+            s"Transaction $transName has no return type, but the transaction it implements returns ${interfaceRetType.get}."
+        }
+}
+
+case class MissingStateImplError(contractName: String, interfaceName: String, stateName: String) extends Error {
+    val msg: String =
+        s"Missing state $stateName from interface $interfaceName in contract $contractName."
+}
+
+case class MissingTransactionImplError(contractName: String, interfaceName: String,
+                                       transactionName: String) extends Error {
+    val msg: String =
+        s"Missing transaction $transactionName from interface $interfaceName in contract $contractName."
+}
+
+case class GenericParameterListError(paramsLength: Int, actualLength: Int) extends Error {
+    val msg: String =
+        s"Expected $paramsLength generic parameters but got $actualLength parameters"
+}
+
+case class GenericParameterError(param: GenericType, actualArg: ObsidianType) extends Error {
+    val msg: String =
+        s"Argument $actualArg is not compatible with generic parameter $param"
+}
+
+case class GenericParameterAssetError(paramName: String, argTypeName: String) extends Error {
+    val msg: String =
+        s"Argument type $argTypeName is an asset, but the type parameter $paramName is not allowed to be an asset. Add the 'asset' modifier to $paramName to allow the parameter to be an asset."
+}
+
+case class NonPrimitiveTypeTransformError(originalType: NonPrimitiveType, transformedType: ObsidianType) extends Error {
+    override val msg: String =
+        s"Type $originalType was transformed into $transformedType, which isn't a non-primitive type."
+}
+
+case class PermissionCheckRedundant(actualPerm: Permission, testPermission: Permission,
+                                    isSubperm: Boolean) extends Error {
+    private val isSubpermStr: String =
+        if (isSubperm) {
+            "is a subpermission. The then-branch will always be taken"
+        } else {
+            "is not a subpermission. The else-branch will always be taken"
+        }
+
+    override val msg: String =
+        s"Redundant permission check. Testing for permission $testPermission, but actual permission is $actualPerm, " +
+            s"which $isSubpermStr."
+}
+
+case class AssetStateImplError(implState: State, interfaceState: State) extends Error {
+    override val msg: String =
+        s"State ${implState.name} is an asset state but it implements a state which is not an asset state."
+}
+
+case class BadFFIInterfaceBoundError(name: String) extends Error {
+    override val msg: String =
+        s"Cannot override '$name' because it is implemented in Java, not Obsidian."
+}
+
+case class GenericParamShadowError(param1Binder: String, param1: GenericType,
+                                   param2Binder: String, param2: GenericType) extends Error {
+    override val msg: String = s"$param1 in $param1Binder shadows $param2 of $param2Binder."
 }

@@ -1,21 +1,40 @@
 package edu.cmu.cs.obsidian.typecheck
 import edu.cmu.cs.obsidian.parser._
 
+sealed trait TypeState
 
-trait Permission
+case class States(states: Set[String]) extends TypeState {
+    override def toString: String = states.mkString(" | ")
+}
+case class PermVar(varName: String) extends TypeState {
+    override def toString: String = varName
+}
+
+sealed trait Permission extends TypeState {
+    def residual: Permission
+}
+
 case class Shared() extends Permission {
     override def toString: String = "Shared"
+
+    override def residual: Permission = Shared()
 }
 case class Owned() extends Permission {
     override def toString: String = "Owned"
+
+    override def residual: Permission = Unowned()
 }
 
 case class Unowned() extends Permission {
     override def toString: String = "Unowned"
+
+    override def residual: Permission = Unowned()
 }
 
 case class Inferred() extends Permission {
     override def toString: String = "Inferred"
+
+    override def residual: Permission = Inferred()
 } // For local variables
 
 trait OwnershipConsumptionMode
@@ -24,18 +43,19 @@ case class ConsumingOwnedGivesUnowned() extends OwnershipConsumptionMode
 case class NoOwnershipConsumption() extends OwnershipConsumptionMode
 
 // Type of references to contracts.
-case class ContractReferenceType(contractType: ContractType, permission: Permission, override val isRemote: Boolean) extends NonPrimitiveType {
+case class ContractReferenceType(override val contractType: ContractType,
+                                 permission: Permission,
+                                 override val isRemote: Boolean) extends NonPrimitiveType {
     override def toString: String =
         if (permission == Inferred()) {
-            contractName
-        }
-        else {
-            contractName + "@" + permission
+            s"$contractType"
+        } else {
+            s"$contractType@$permission"
         }
 
     val contractName: String = contractType.contractName
 
-    override def isOwned = permission == Owned()
+    override def isOwned: Boolean = permission == Owned()
 
     override def residualType(mode: OwnershipConsumptionMode): NonPrimitiveType = {
         if (permission == Owned()) {
@@ -55,11 +75,28 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
 
     override def topPermissionType: NonPrimitiveType = this.copy(permission = Unowned()).setLoc(this)
 
-    override def remoteType: NonPrimitiveType = ContractReferenceType(contractType, permission, true)
+    override def remoteType: NonPrimitiveType = ContractReferenceType(contractType, permission, isRemote = true)
+
+    override def genericParams: Seq[ObsidianType] = contractType.typeArgs
+
+    override  def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType =
+        ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(
+            ContractReferenceType(contractType.substitute(genericParams, actualParams), permission, isRemote))
+            .withTypeState(permission)
+
+    override def typeState: TypeState = permission
+
+    override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
+        case States(states) => StateType(contractType, states, isRemote)
+        case PermVar(varName) => assert(false, "Trying to use a permission variable on a concrete type"); null
+        case permission: Permission => this.copy(permission = permission)
+    }
+
+    override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType =
+        copy(contractType = contractType.copy(typeArgs = contractParams))
 
     override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
         this.copy(permission = otherType.permission).setLoc(this)
-
 }
 
 
@@ -67,11 +104,46 @@ case class ContractReferenceType(contractType: ContractType, permission: Permiss
 // Type of actual contracts. This is ALMOST NEVER the right class; it is specially for actual contracts.
 // Almost everywhere will use ContractReferenceType. This intentionally does not extend ObsidianType
 // because it is not available in the language itself (for now).
-case class ContractType(contractName: String) {
-    override def toString: String = contractName
+case class ContractType(contractName: String, typeArgs: Seq[ObsidianType]) {
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ContractType =
+        ContractType(contractName, typeArgs.map(_.substitute(genericParams, actualParams)))
+
+    override def toString: String =
+        if (typeArgs.isEmpty) {
+            contractName
+        } else {
+            s"$contractName[${typeArgs.mkString(", ")}]"
+        }
 }
 
-trait Possibility
+object ContractType {
+    def topContractName: String = "Contract"
+    def topContractParams: Seq[GenericType] = Nil
+    def topContractType: ContractType = ContractType(topContractName, topContractParams)
+    def unownedTop: ObsidianType =
+        ContractReferenceType(topContractType, Unowned(), isRemote = false)
+    def topContractImpl =
+        ObsidianContractImpl(
+            Set(),
+            topContractName,
+            topContractParams,
+            topContractType,
+            Nil,
+            None,
+            isInterface = true,
+            "")
+}
+
+object Possibility {
+    def fromBoolean(b: Boolean): Possibility =
+        if (b) {
+            Yes()
+        } else {
+            No()
+        }
+}
+
+sealed trait Possibility
 case class Yes() extends Possibility
 case class Maybe() extends Possibility
 case class No() extends Possibility
@@ -82,15 +154,15 @@ case class No() extends Possibility
  *
  * StateType is always owned.
  * */
-case class StateType(contractName: String, stateNames: Set[String], override val isRemote: Boolean) extends NonPrimitiveType {
-    def this(contractName: String, stateName: String, isRemote: Boolean) = {
-        this(contractName, Set(stateName), isRemote)
+case class StateType(override val contractType: ContractType, stateNames: Set[String], override val isRemote: Boolean) extends NonPrimitiveType {
+    def this(contractType: ContractType, stateName: String, isRemote: Boolean) = {
+        this(contractType, Set(stateName), isRemote)
     }
 
     private def orOfStates: String = stateNames.mkString(" | ")
 
-    override def toString: String = contractName + "@" +
-        (if (stateNames.size > 1) "(" + orOfStates + ")" else orOfStates)
+    override def toString: String =
+        s"$contractType@${if (stateNames.size > 1) s"($orOfStates)" else orOfStates}"
 
     override val permission = Owned()
 
@@ -108,7 +180,7 @@ case class StateType(contractName: String, stateNames: Set[String], override val
                     case NoOwnershipConsumption() => Owned()
                 }
 
-            ContractReferenceType(ContractType(contractName), newPermission, isRemote).setLoc(this)
+            ContractReferenceType(contractType, newPermission, isRemote).setLoc(this)
         }
     }
     override val topPermissionType: NonPrimitiveType = this
@@ -140,14 +212,47 @@ case class StateType(contractName: String, stateNames: Set[String], override val
         }
     }
 
-    override def remoteType: NonPrimitiveType = StateType(contractName, stateNames, true)
+    override def remoteType: NonPrimitiveType = StateType(contractType, stateNames, isRemote = true)
 
-    override def typeByMatchingPermission(otherType: NonPrimitiveType) = otherType
+    override val contractName: String = contractType.contractName
 
+    override def genericParams: Seq[ObsidianType] = contractType.typeArgs
+
+    def substituteStateNames(stateNames: Set[String], genericParams: Seq[GenericType],
+                             actualParams: Seq[ObsidianType]): TypeState = {
+        val stateNameMap = ObsidianType.stateSubstitutions(genericParams, actualParams)
+        val results = stateNames.map(name => stateNameMap.getOrElse(name, States(Set(name))))
+
+        results.find(!_.isInstanceOf[States]) match {
+            case Some(ts) => ts
+            case None => States(results.flatMap(_.asInstanceOf[States].states))
+        }
+    }
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType =
+        ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(
+            StateType(contractType.substitute(genericParams, actualParams), stateNames, isRemote))
+            .withTypeState(substituteStateNames(stateNames, genericParams, actualParams))
+
+    override def typeState: TypeState = States(stateNames)
+
+    override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
+        case States(states) => this.copy(stateNames = states)
+        case permission: Permission => ContractReferenceType(contractType, permission, isRemote)
+        case PermVar(varName) =>
+            // This should never happen
+            assert(false, "Trying to use a state variable on a concrete type"); null
+    }
+
+    override def withParams(contractParams: Seq[ObsidianType]): StateType =
+        this.copy(contractType = ContractType(contractName, contractParams))
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType = otherType
 }
 
 object StateType {
-    def apply(contractName: String, stateName: String, isRemote: Boolean): StateType = new StateType(contractName, Set(stateName), isRemote)
+    def apply(contractType: ContractType, stateName: String, isRemote: Boolean): StateType =
+        new StateType(contractType, Set(stateName), isRemote)
 }
 
 
@@ -162,6 +267,13 @@ object StateType {
 
 /* Invariant for permissioned types: any path that occurs in the type makes "this" explicit */
 sealed trait ObsidianType extends HasLocation {
+    def typeParams: Seq[ObsidianType]
+    def withParams(contractParams: Seq[ObsidianType]): ObsidianType
+
+    def typeState: TypeState
+
+    def withTypeState(ts: TypeState): ObsidianType
+
     // for tests
     val isBottom: Boolean
 
@@ -177,6 +289,38 @@ sealed trait ObsidianType extends HasLocation {
     def isAssetReference(contextContractTable: ContractTable): Possibility = No()
 
     def baseTypeName: String = toString
+
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType
+}
+
+object ObsidianType {
+    def lookupState(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType])(permVar: PermVar): TypeState =
+        stateSubstitutions(genericParams, actualParams).getOrElse(permVar.varName, permVar)
+
+    def stateSubstitutions(genericParams: Seq[GenericType],
+                           actualParams: Seq[ObsidianType]): Map[String, TypeState] = {
+        val t = for ((genParam, actualParam) <- genericParams.zip(actualParams)) yield {
+            genParam.gVar.permissionVar match {
+                case Some(varName) => (varName, actualParam.typeState) :: Nil
+                case None => Nil
+            }
+        }
+
+        t.flatten.toMap
+    }
+
+    def substituteVarName(contractName: String,
+                          genericParams: Seq[GenericType],
+                          actualParams: Seq[ObsidianType]): Option[ObsidianType] = {
+        val idx = genericParams.indexWhere(p => p.gVar.varName == contractName)
+
+        // If idx is too large, then we will get an error elsewhere
+        if (idx >= 0 && idx < actualParams.length) {
+            Some(actualParams(idx))
+        } else {
+            None
+        }
+    }
 }
 
 /* int, bool, or string */
@@ -184,6 +328,16 @@ sealed trait PrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
     override def residualType(mode: OwnershipConsumptionMode): ObsidianType = this
     override val topPermissionType: ObsidianType = this
+
+    // Substituting for primitives does nothing
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = this
+
+    override def withTypeState(ts: TypeState): ObsidianType = this
+    // All primitive types are treated as owned
+    override def typeState: TypeState = Owned()
+
+    override def typeParams: Seq[ObsidianType] = Nil
+    override def withParams(contractParams: Seq[ObsidianType]): ObsidianType = this
 }
 
 /* all permissioned types are associated with their corresponding symbol table
@@ -197,6 +351,18 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     val contractName: String
 
+    def codeGenName: String = contractName
+
+    override def typeParams: Seq[ObsidianType] = contractType.typeArgs
+    def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType
+
+    override def isOwned: Boolean = permission == Owned()
+
+    def contractType: ContractType = ContractType(contractName, genericParams)
+    def genericParams: Seq[ObsidianType]
+
+    override def withTypeState(ts: TypeState): NonPrimitiveType
+
     override def baseTypeName: String = contractName
 
     def topPermissionType = this
@@ -207,7 +373,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
                 if (contract.contract.isAsset) {
                     Yes()
                 } else {
-                    StateType(contractName, contract.possibleStates, isRemote).isAssetReference(contextContractTable)
+                    StateType(contract.contractType, contract.possibleStates, isRemote).isAssetReference(contextContractTable)
                 }
             }
 
@@ -219,7 +385,6 @@ sealed trait NonPrimitiveType extends ObsidianType {
 
     def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType
 }
-
 
 case class IntType() extends PrimitiveType {
     override def toString: String = "int"
@@ -241,8 +406,16 @@ case class BottomType() extends ObsidianType {
     val isBottom: Boolean = true
     override def residualType(mode: OwnershipConsumptionMode): ObsidianType = this
     override def topPermissionType: ObsidianType = this
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = this
+
+    override def withParams(contractParams: Seq[ObsidianType]): ObsidianType = this
+    override def typeState: TypeState = Unowned() // Doesn't really matter for bottom
+    override def withTypeState(ts: TypeState): ObsidianType = BottomType()
+    override def typeParams: Seq[ObsidianType] = Nil
 }
 
+// TODO GENERIC: Does this need to be extended for generics?
 case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) extends NonPrimitiveType {
     override def toString: String = name
     override val isBottom: Boolean = false
@@ -252,6 +425,244 @@ case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) ext
     override val permission: Permission = simpleType.permission
     override def remoteType: NonPrimitiveType = this
 
-    override def typeByMatchingPermission(otherType: NonPrimitiveType) =
+    override def genericParams: Seq[ObsidianType] = simpleType.genericParams
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {
+        simpleType.substitute(genericParams, actualParams) match {
+            case np: NonPrimitiveType => InterfaceContractType(name, np)
+
+            case other => ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(this)
+        }
+    }
+
+    override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType =
+        this.copy(simpleType = simpleType.withParams(contractParams))
+
+    override def typeState: TypeState = simpleType.typeState
+    override def withTypeState(ts: TypeState): NonPrimitiveType = this.copy(simpleType = simpleType.withTypeState(ts))
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
         InterfaceContractType(name, simpleType.typeByMatchingPermission(otherType))
+}
+
+sealed trait GenericBound {
+    def genericParams: Seq[ObsidianType]
+
+    def withParams(contractParams: Seq[ObsidianType]): GenericBound
+
+    def typeState: TypeState
+
+    def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound
+
+    def withStates(stateNames: Set[String]): GenericBound
+    def withPermission(permission: Permission): GenericBound
+
+    def interfaceType: ContractType
+    def permission: Permission
+    def residualType(mode: OwnershipConsumptionMode): GenericBound
+
+    def referenceType: NonPrimitiveType
+
+    def show(genericVar: GenericVar): String
+
+    def interfaceSpecified: Boolean
+
+    def declBound(genericVar: GenericVar): String =
+        if (interfaceSpecified) {
+            s" where ${genericVar.varName} implements $interfaceType"
+        } else {
+            ""
+        }
+}
+
+case class GenericBoundPerm(interfaceSpecified: Boolean, permSpecified: Boolean,
+                            interfaceType: ContractType, permission: Permission) extends GenericBound {
+    override def residualType(mode: OwnershipConsumptionMode): GenericBound = {
+        if (permission == Owned()) {
+            val newPermission =
+                mode match {
+                    case ConsumingOwnedGivesShared() => Shared()
+                    case ConsumingOwnedGivesUnowned() => Unowned()
+                    case NoOwnershipConsumption() => Owned()
+                }
+
+            this.copy(permission = newPermission)
+        } else {
+            this
+        }
+    }
+
+    override def withPermission(permission: Permission): GenericBound =
+        copy(permission = permission)
+
+    override def withStates(stateNames: Set[String]): GenericBound =
+        GenericBoundStates(interfaceSpecified, permSpecified, interfaceType, stateNames)
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound =
+        this.copy(interfaceType = interfaceType.substitute(genericParams, actualParams))
+
+    override def typeState: TypeState = permission
+
+    override def referenceType: NonPrimitiveType = ContractReferenceType(interfaceType, permission, isRemote = false)
+
+    override def genericParams: Seq[ObsidianType] = interfaceType.typeArgs
+    override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
+        copy(interfaceType = interfaceType.copy(typeArgs = contractParams))
+
+    private def permBound(genericVar: GenericVar): String =
+        if (genericVar.permissionVar.isDefined && permSpecified) {
+            s" where ${genericVar.permissionVar.get} is $permission"
+        } else {
+            ""
+        }
+
+    override def show(genericVar: GenericVar): String = declBound(genericVar) + permBound(genericVar)
+}
+
+case class GenericBoundStates(interfaceSpecified: Boolean, permSpecified: Boolean,
+                              interfaceType: ContractType, states: Set[String]) extends GenericBound {
+    override def permission: Permission = Owned()
+
+    override def residualType(mode: OwnershipConsumptionMode): GenericBound =
+        if (mode == NoOwnershipConsumption()) {
+            this
+        } else {
+            val newPermission =
+                mode match {
+                    case ConsumingOwnedGivesShared() => Shared()
+                    case ConsumingOwnedGivesUnowned() => Unowned()
+
+                    // This shouldn't happen, since we check for it above
+                    case NoOwnershipConsumption() => Owned()
+                }
+
+            GenericBoundPerm(interfaceSpecified, permSpecified, interfaceType, newPermission)
+        }
+
+    override def withPermission(permission: Permission): GenericBound =
+        GenericBoundPerm(interfaceSpecified, permSpecified, interfaceType, permission)
+
+    override def withStates(stateNames: Set[String]): GenericBound = this.copy(states = stateNames)
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): GenericBound =
+        this.copy(interfaceType = interfaceType.substitute(genericParams, actualParams))
+
+    override def typeState: TypeState = States(states)
+
+    override def referenceType: NonPrimitiveType = StateType(interfaceType, states, isRemote = false)
+
+    override def genericParams: Seq[ObsidianType] = interfaceType.typeArgs
+    override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
+        copy(interfaceType = interfaceType.copy(typeArgs = contractParams))
+
+    private def permBound(genericVar: GenericVar): String =
+        if (genericVar.permissionVar.isDefined) {
+            s" where ${genericVar.permissionVar.get} is (${states.mkString(" | ")})"
+        } else {
+            ""
+        }
+
+    override def show(genericVar: GenericVar): String = declBound(genericVar) + permBound(genericVar)
+}
+
+case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[String]) {
+    def hasPermissionVar(stateName: String): Boolean = permissionVar.contains(stateName)
+
+    override def toString: String =
+        s"${if (isAsset) { "asset " } else { "" }}$varName${if (permissionVar.isDefined) { "@" + permissionVar.get } else { "" }}"
+}
+
+case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimitiveType {
+    override def toString: String =
+        s"$gVar${bound.show(gVar)}"
+
+    def hasPermissionVar(stateName: String): Boolean = gVar.hasPermissionVar(stateName)
+
+    // We need to treat all permission variables as though they may be owned
+    override def isOwned: Boolean =
+        gVar.permissionVar.isDefined || super.isOwned
+
+    override val permission: Permission = bound.permission
+    override val contractName: String = bound.interfaceType.contractName
+
+    override def remoteType: NonPrimitiveType = this
+
+    override def residualType(mode: OwnershipConsumptionMode): ObsidianType =
+        if (mode == NoOwnershipConsumption()) {
+            this
+        } else if (isOwned) {
+            val newPermission =
+                mode match {
+                    case ConsumingOwnedGivesShared() => Shared()
+                    case ConsumingOwnedGivesUnowned() => Unowned()
+
+                    // This shouldn't happen, since we check for it above
+                    case NoOwnershipConsumption() => Owned()
+                }
+
+            withTypeState(newPermission)
+        } else {
+            this
+        }
+
+    def lookupInterface(contractTable: ContractTable): Option[ContractTable] =
+        contractTable.lookupContract(bound.interfaceType)
+
+    override def isAssetReference(contextContractTable: ContractTable): Possibility =
+        Possibility.fromBoolean(gVar.isAsset)
+
+    override def contractType: ContractType = bound.interfaceType
+    override def genericParams: Seq[ObsidianType] = bound.genericParams
+
+    override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType = {
+        val idx = genericParams.indexWhere(_.gVar.varName == this.gVar.varName)
+
+        // if idx is greater, we'll get an error elsewhere
+        if (idx >= 0 && idx < actualParams.length) {
+            // If we have a permission var, we want to lookup the correct thing to substitute
+            // Otherwise, we will just keep what we had
+            val defaultPermOrState = bound.typeState match {
+                case p: PermVar => ObsidianType.lookupState(genericParams, actualParams)(p)
+                case ts => ts
+            }
+
+            val typeState = gVar.permissionVar match {
+                case Some(permissionVarName) =>
+                    ObsidianType.stateSubstitutions(genericParams, actualParams)
+                        .getOrElse(permissionVarName, defaultPermOrState)
+                case None => defaultPermOrState
+            }
+
+            actualParams(idx).withTypeState(typeState)
+        } else {
+            this.copy(bound = bound.substitute(genericParams, actualParams))
+        }
+    }
+
+    override def withParams(contractParams: Seq[ObsidianType]): NonPrimitiveType =
+        copy(bound = bound.withParams(contractParams))
+
+    override def codeGenName: String = gVar.varName
+
+    override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
+        case States(states) => GenericType(gVar.copy(permissionVar = None), bound.withStates(states))
+        case permission: Permission => GenericType(gVar.copy(permissionVar = None), bound.withPermission(permission))
+        case PermVar(varName) => this.copy(gVar = gVar.copy(permissionVar = Some(varName)))
+    }
+
+    override def typeState: TypeState = gVar.permissionVar match {
+        case Some(name) => PermVar(name)
+        case None => bound.typeState
+    }
+
+    override def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType =
+        withTypeState(otherType.permission)
+
+    def shadows(other: GenericType): Boolean = {
+        val permVarsMatch = (gVar.permissionVar, other.gVar.permissionVar) match {
+            case (Some(permVar1), Some(permVar2)) => permVar1 == permVar2
+            case _ => false
+        }
+        gVar.varName == other.gVar.varName || permVarsMatch
+    }
 }

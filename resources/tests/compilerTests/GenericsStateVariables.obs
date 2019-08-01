@@ -1,0 +1,192 @@
+contract Maybe[X@s] {
+    state Nothing;
+    state Just {
+        X@s val;
+    }
+
+    Maybe@Nothing() {
+        ->Nothing;
+    }
+
+    Maybe@Just(X@s >> Unowned _val) {
+        ->Just(val = _val);
+    }
+
+    transaction peek(Maybe@Just this) returns X@Unowned {
+        return val;
+    }
+
+    transaction get(Maybe@Just >> Nothing this) returns X@s {
+        X res = val;
+        ->Nothing;
+        return res;
+    }
+
+    transaction storeOwned(Maybe@Nothing >> (Nothing | Just) this, X@Owned >> Unowned x) {
+        if (x in s) {
+            ->Just(val = x);
+        }
+    }
+
+    transaction storeShared(Maybe@Nothing >> (Nothing | Just) this, X@Shared >> Unowned x) {
+        if (x in s) {
+            ->Just(val = x);
+        }
+    }
+
+    transaction storeUnowned(Maybe@Nothing >> (Nothing | Just) this, X@Unowned x) {
+        if (x in s) {
+            ->Just(val = x);
+        }
+    }
+}
+
+contract A {
+    state S1 {
+        int x;
+    }
+
+    state S2;
+
+    A@S1(int _x) {
+        ->S1(x = _x);
+    }
+
+    transaction getX(A@S1 this) returns int {
+        return x;
+    }
+
+    transaction toS2(A@S1 >> S2 this) {
+        ->S2;
+    }
+
+    transaction share() {}
+
+    transaction unown(A@Shared >> Unowned this) {}
+}
+
+contract StateTester[X@s] {
+    StateTester@Owned() {}
+
+    transaction isInState(X@Owned >> Unowned x) returns bool {
+        if (x in s) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
+main contract GenericsStateVariables {
+    transaction g() returns int {
+        Maybe[A@S1] maybeA = new Maybe[A@S1](new A(14));
+        return maybeA.get().getX();
+    }
+
+    transaction stateTestTrue() returns bool {
+        return new StateTester[A@S1]().isInState(new A(4));
+    }
+
+    transaction stateTestFalse() returns bool {
+        A a = new A(4);
+        a.toS2();
+        return new StateTester[A@S1]().isInState(a);
+    }
+
+    transaction testStoreStateShared() returns bool {
+        A a = new A(4);
+        Maybe[A@S1] maybeA = new Maybe[A@S1]();
+        disown a;
+        maybeA.storeShared(a);
+        if (maybeA in Just) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    transaction testStoreStateSharedWrongState() returns bool {
+        A a = new A(4);
+        Maybe[A@S1] maybeA = new Maybe[A@S1]();
+        a.toS2();
+        disown a;
+        maybeA.storeShared(a);
+        if (maybeA in Just) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    transaction testStoreOwned() returns bool {
+        A a = new A(4);
+        Maybe[A@Owned] maybeA = new Maybe[A@Owned]();
+        maybeA.storeOwned(a);
+        if (maybeA in Just) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    transaction testStoreOwnedNotOwned() returns bool {
+        A a = new A(4);
+        Maybe[A@Owned] maybeA = new Maybe[A@Owned]();
+        disown a;
+        maybeA.storeShared(a);
+        if (maybeA in Just) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    transaction testStoreShared() returns bool {
+        A a = new A(4);
+        Maybe[A@Shared] maybeA = new Maybe[A@Shared]();
+        a.share(); [a@Shared];
+        maybeA.storeShared(a);
+        if (maybeA in Just) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    transaction testStoreSharedNotShared() returns bool {
+        A a = new A(4);
+        Maybe[A@Shared] maybeA = new Maybe[A@Shared]();
+        a.unown(); [a@Unowned];
+        maybeA.storeUnowned(a);
+        if (maybeA in Just) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    transaction testStoreUnowned() returns bool {
+        A a = new A(4);
+        Maybe[A@Unowned] maybeA = new Maybe[A@Unowned]();
+        a.unown(); [a@Unowned];
+        maybeA.storeUnowned(a);
+        if (maybeA in Just) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    transaction testStoreUnownedNotUnowned() returns bool {
+        A a = new A(4);
+        Maybe[A@Unowned] maybeA = new Maybe[A@Unowned]();
+        maybeA.storeUnowned(a);
+        // Even though `a` is not unowned, it's a subpermission of it (as everything is), so this will still work
+        if (maybeA in Just) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+

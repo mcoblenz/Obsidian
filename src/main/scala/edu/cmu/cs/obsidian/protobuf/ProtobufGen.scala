@@ -26,6 +26,21 @@ object ProtobufGen {
     }
 
 
+    def genericParams(aContract: Contract): List[ProtobufDeclaration] = {
+        aContract.params.map(p => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__generic" + p.gVar.varName)).toList ++
+        aContract.params.flatMap(p => p.gVar.permissionVar.toSeq).map(pVar =>
+            ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__genericPerm" + pVar)).toList
+    }
+
+    def interfaceParams(aContract: Contract): List[ProtobufDeclaration] =
+        if (aContract.isInterface) {
+            List(ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__implementingClassName"),
+                ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__implementingClassArchiveName"),
+                ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__implementingClassData"))
+        } else {
+            List()
+        }
+
     // Contracts translate to messages.
     private def translateContract(aContract: Contract): ProtobufDeclaration = {
         // We only care about the fields. The actual code is irrelevant.
@@ -45,17 +60,19 @@ object ProtobufGen {
             }
         )
 
-        val declsWithGUID = ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") :: decls
+        val declsWithGUID =
+            ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") ::
+                genericParams(aContract) ++ interfaceParams(aContract) ++ decls
 
-        val contractMessage = if (stateNames.length > 0) {
+        val contractMessage = if (stateNames.nonEmpty) {
             val oneOfOptions = stateNames.map((stateName: String) =>
                 (ObjectType(stateName), "state" + stateName))
             val stateDecl = ProtobufOneOf("state", oneOfOptions)
 
-            new ProtobufMessage(stateDecl::declsWithGUID, aContract.name)
+            ProtobufMessage(stateDecl :: declsWithGUID, aContract.name)
         }
         else {
-            new ProtobufMessage(declsWithGUID, aContract.name)
+            ProtobufMessage(declsWithGUID, aContract.name)
         }
 
         val contractOrGUIDFields : List[(FieldType, String)] = List[(FieldType, String)]((ObjectType(aContract.name), "obj"),

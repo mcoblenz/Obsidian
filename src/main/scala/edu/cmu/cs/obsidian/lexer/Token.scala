@@ -50,6 +50,8 @@ case class PrivateT() extends Token { override def toString: String = "private" 
 case class TransitionsT() extends Token { override def toString: String = "transitions" }
 case class WithT() extends Token { override def toString: String = "with"}
 case class ImplementsT() extends Token { override def toString: String = "implements" }
+case class WhereT() extends Token { override def toString: String = "where" }
+case class IsT() extends Token { override def toString: String = "is" }
 
 case class IdentifierT(x: String) extends Token { override def toString: String = s"$x" }
 case class NumLiteralT(x: Int) extends Token { override def toString: String = s"$x" }

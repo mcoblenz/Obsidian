@@ -1,0 +1,45 @@
+interface Predicate[X@s] {
+    transaction test(X@s >> Unowned x) returns bool;
+}
+
+contract A {
+    state S1;
+    state S2;
+
+    A@S1() {
+        ->S1;
+    }
+}
+
+contract AStateChecker implements Predicate[A@Shared] {
+    transaction test(A@Shared >> Unowned x) returns bool {
+        if (x in S1) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
+contract ConstPred[X@s] implements Predicate[X@s] {
+    bool val;
+
+    ConstPred@Owned(bool val) {
+        this.val = val;
+    }
+
+    transaction test(X@s >> Unowned x) returns bool {
+        return val;
+    }
+}
+
+main contract InterfaceUse {
+    transaction f() returns bool {
+        return new ConstPred[A@S1](false).test(new A());
+    }
+
+    transaction g() returns bool {
+        return new AStateChecker().test(new A());
+    }
+}
+

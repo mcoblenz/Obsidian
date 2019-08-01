@@ -1,0 +1,75 @@
+contract Maybe[X@s] {
+    state Nothing;
+    state Just {
+        X@s val;
+    }
+
+    Maybe@Nothing() {
+        ->Nothing;
+    }
+
+    Maybe@Just(X@s >> Unowned _val) {
+        ->Just(val = _val);
+    }
+
+    // This should give an error because s might be Owned
+    transaction bad(Maybe@Just this) returns X@s {
+        return val;
+    }
+
+    transaction peek(Maybe@Just this) returns X@Unowned {
+        return val;
+    }
+
+    transaction get(Maybe@Just >> Nothing this) returns X@s {
+        X res = val;
+        ->Nothing;
+        return res;
+    }
+}
+
+contract A {
+    state S1 {
+        int x;
+    }
+
+    state S2;
+
+    A@S1(int _x) {
+        ->S1(x = _x);
+    }
+
+    transaction getX(A@S1 this) returns int {
+        return x;
+    }
+
+    transaction toS2(A@S1 >> S2 this) {
+        ->S2;
+    }
+}
+
+main contract C {
+    transaction f() returns int {
+        Maybe[int] maybeInt = new Maybe[int](4);
+        return maybeInt.get();
+    }
+
+    transaction g() returns int {
+        Maybe[A@S1] maybeA = new Maybe[A@S1](new A(4));
+        return maybeA.get().getX();
+    }
+
+    transaction h() returns int {
+        A a = new A(7);
+        a.toS2();
+        Maybe[A@S2] maybeA = new Maybe[A@S2](a);
+        return maybeA.get().getX(); // This should fail, because get() will give us a : A@S2
+    }
+
+    transaction foo() returns int {
+        Maybe[A@S1] maybeA = new Maybe[A@S1](new A(4));
+        // This should also fail, because peek() returns an Unowned reference
+        return maybeA.peek().getX();
+    }
+}
+

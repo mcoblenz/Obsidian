@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module external.linked.project.id="obsidianimports [file:/home/roei/ObsidianImports/]" external.linked.project.path="$MODULE_DIR$/../.." external.root.project.path="$MODULE_DIR$/../.." external.system.id="SBT" type="JAVA_MODULE" version="4">
+<module external.linked.project.id="obsidiangenericsimpl [file:/home/roei/ObsidianGenericsImpl/]" external.linked.project.path="$MODULE_DIR$/../.." external.root.project.path="$MODULE_DIR$/../.." external.system.id="SBT" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet type="Python" name="Python">
       <configuration sdkName="" />
@@ -14,6 +14,7 @@
       <sourceFolder url="file://$MODULE_DIR$/../../src/test/scala" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/../../target/scala-2.12/src_managed/main" isTestSource="false" generated="true" />
       <sourceFolder url="file://$MODULE_DIR$/../../target/scala-2.12/src_managed/test" isTestSource="true" generated="true" />
+      <sourceFolder url="file://$MODULE_DIR$/../../Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian" type="java-resource" />
       <excludeFolder url="file://$MODULE_DIR$/../../target" />
     </content>
     <orderEntry type="inheritedJdk" />
@@ -63,6 +64,6 @@
     <orderEntry type="library" name="sbt: com.google.protobuf:protobuf-java:3.7.0:jar" level="project" />
     <orderEntry type="library" name="sbt: com.helger:jcodemodel:3.0.3:jar" level="project" />
     <orderEntry type="library" name="sbt: net.jcip:jcip-annotations:1.0:jar" level="project" />
-    <orderEntry type="library" name="scala-sdk-2.12.6" level="application" />
+    <orderEntry type="library" name="Bundled Protobuf Distribution" level="application" />
   </component>
 </module>

@@ -1,0 +1,66 @@
+asset contract C {}
+
+contract Identity[X@s] {
+    transaction id(X@s >> Unowned x) returns X@s {
+        return x;
+    }
+}
+
+contract AssetIdentity[asset X@s] {
+    transaction id(X@s >> Unowned x) returns X@s {
+        return x;
+    }
+}
+
+interface Go {
+    state A;
+
+    transaction go(Go@Owned >> A this);
+}
+
+contract D implements Go {
+    state A;
+
+    D@A() {
+        ->A;
+    }
+
+    transaction go(D@Owned >> A this) {
+        ->A;
+    }
+}
+
+contract BadAssetManager[asset X@s
+                         where X implements Go
+                         where s is Owned] {
+    // error, because x could be an owned asset
+    transaction drop(X@s >> Unowned x) {}
+
+    transaction boundTest(X@s >> Unowned x) returns X@A {
+        x.go();
+        return x;
+    }
+}
+
+contract BadAssetManager2[asset X@s
+                          where X implements Go] {
+    // error, because x could be an owned asset
+    transaction drop(X@s >> Unowned val) {}
+}
+
+contract BadBound[X@s
+                  where X implements Go
+                  where s is Unowned] {
+    transaction boundTest(X@s >> Unowned x) returns X@A {
+        x.go(); // error, we don't know that x is owned
+        return x;
+    }
+}
+
+main contract Main {
+    transaction f() {
+        AssetIdentity[C@Owned] temp1 = new AssetIdentity[C@Owned](new C()); // This is fine
+        Identity[C@Owned] temp2 = new Identity[C@Owned](new C()); // This should fail, because identity can only hold non-assets
+    }
+}
+

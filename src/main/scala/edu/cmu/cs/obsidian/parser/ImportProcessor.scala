@@ -111,9 +111,9 @@ object ImportProcessor {
     def filterTags(contracts: Seq[Contract]): Seq[Contract] = {
         contracts.map(c => c match {
             case c: ObsidianContractImpl =>
-                     val newMods = c.modifiers - IsMain() + IsImport()
-                     val newC = ObsidianContractImpl(newMods, c.name, c.declarations, c.transitions, c.isInterface, c.sourcePath).setLoc(c)
-                     newC
+                val newMods = c.modifiers - IsMain() + IsImport()
+                val newC = ObsidianContractImpl(newMods, c.name, c.params, c.bound, c.declarations, c.transitions, c.isInterface, c.sourcePath).setLoc(c)
+                newC
             case c: JavaFFIContractImpl => c
         })
     }

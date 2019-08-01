@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.parser
 
 import java.io.{InputStream, StringWriter}
 
-import edu.cmu.cs.obsidian.lexer
+import edu.cmu.cs.obsidian.{lexer, parser}
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.typecheck._
 import org.apache.commons.io.IOUtils
@@ -91,19 +91,21 @@ object Parser extends Parsers {
       }
     }
 
-    private def parseType: Parser[ObsidianType] = {
+    private def parseNonPrimitive: Parser[NonPrimitiveType] = {
+        opt(RemoteT()) ~ parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ opt(AtT() ~! parseIdAlternatives) ^^ {
+            case remote ~ id ~ genericParams ~ permissionToken => {
+                val isRemote = remote.isDefined
+                val actualGenerics = genericParams.map {
+                    case _ ~ params ~ _ => params
+                }.getOrElse(List())
 
-
-        val parseNonPrimitive: Parser[NonPrimitiveType] = {
-             opt(RemoteT()) ~ parseId ~ opt(AtT() ~! parseIdAlternatives) ^^ {
-                case remote ~ id ~ permissionToken => {
-                    val isRemote = remote.isDefined
-                    val typ = extractTypeFromPermission(permissionToken, id._1, isRemote, false)
-                    typ.setLoc(id)
-                }
+                val typ = extractTypeFromPermission(permissionToken, id._1, actualGenerics, isRemote, defaultOwned = false)
+                typ.setLoc(id)
             }
         }
+    }
 
+    private def parseType: Parser[ObsidianType] = {
         val intPrim = IntT() ^^ { t => IntType().setLoc(t) }
         val boolPrim = BoolT() ^^ { t => BoolType().setLoc(t) }
         val stringPrim = StringT() ^^ { t => StringType().setLoc(t) }
@@ -111,22 +113,28 @@ object Parser extends Parsers {
         parseNonPrimitive | intPrim | boolPrim | stringPrim
     }
 
-    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]], name: String, isRemote: Boolean, defaultOwned: Boolean): NonPrimitiveType = {
+    private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]],
+                                          name: String,
+                                          genericParams: Seq[ObsidianType],
+                                          isRemote: Boolean,
+                                          defaultOwned: Boolean): NonPrimitiveType = {
         val defaultPermission = if (defaultOwned) Owned() else Inferred()
+
+        val contractType = ContractType(name, genericParams)
+
         permission match {
-            case None => ContractReferenceType(ContractType(name), defaultPermission, isRemote)
+            case None => ContractReferenceType(contractType, defaultPermission, isRemote)
             case Some(_ ~ permissionIdentSeq) =>
                 if (permissionIdentSeq.size == 1) {
                     val thePermissionOrState = permissionIdentSeq.head
                     val permission = resolvePermission(thePermissionOrState._1)
                     permission match {
-                        case None => StateType(name, thePermissionOrState._1, isRemote)
-                        case Some(p) => ContractReferenceType(ContractType(name), p, isRemote)
+                        case None => StateType(contractType, thePermissionOrState._1, isRemote)
+                        case Some(p) => ContractReferenceType(contractType, p, isRemote)
                     }
-                }
-                else {
+                } else {
                     val stateNames = permissionIdentSeq.map(_._1)
-                    StateType(name, stateNames.toSet, isRemote)
+                    StateType(contractType, stateNames.toSet, isRemote)
                 }
         }
     }
@@ -176,7 +184,7 @@ object Parser extends Parsers {
                                 }
                                 (correctedType, correctedType)
                             case Some(_ ~ idSeq) => {
-                                val typOut = extractTypeFromPermission(permission, t.contractName, t.isRemote, false)
+                                val typOut = extractTypeFromPermission(permission, t.contractName, t.genericParams, t.isRemote, false)
                                 (t, typOut)
                             }
                         }
@@ -188,9 +196,7 @@ object Parser extends Parsers {
     }
 
     private def parseBody: Parser[Seq[Statement]] =
-        rep(parseAtomicStatement) ^^ {
-            case statements => statements
-        }
+        rep(parseAtomicStatement) ^^ (statements => statements)
 
     private def parseAtomicStatement: Parser[Statement] = {
         val parseReturn = ReturnT() ~ opt(parseExpr) ~! SemicolonT() ^^ {
@@ -241,13 +247,13 @@ object Parser extends Parsers {
             case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s ~ _ ~ None =>
                 stOpt match {
                     case None => If(e, s).setLoc(_if)
-                    case Some(_ ~ stateName) => IfInState(e, stateName, s, Seq.empty).setLoc(_if)
+                    case Some(_ ~ stateName) => IfInState(e, Inferred(), States(Set(stateName._1)), s, Seq.empty).setLoc(_if)
                 }
 
             case _if ~ _ ~ e ~ stOpt ~ _ ~ _ ~ s1 ~ _ ~ Some(_ ~ _ ~ s2 ~ _) =>
                 stOpt match {
                     case None => IfThenElse(e, s1, s2).setLoc(_if)
-                    case Some(_ ~ stateName) => IfInState(e, stateName, s1, s2).setLoc(_if)
+                    case Some(_ ~ stateName) => IfInState(e, Inferred(), States(Set(stateName._1)), s1, s2).setLoc(_if)
                 }
 
         }
@@ -266,8 +272,21 @@ object Parser extends Parsers {
                 case switch ~ e ~ _ ~ cases ~ _ => Switch(e, cases).setLoc(switch)
         }
 
-        val parseStaticAssertion = LBracketT() ~! parseExpr ~ AtT() ~ parseIdAlternatives ~ RBracketT() ~! SemicolonT() ^^ {
-            case _ ~ expr ~ at ~ idents ~ _ ~ _ => StaticAssert(expr, idents).setLoc(at)
+        val parseTypeState = parseIdAlternatives ^^ {
+            idents =>
+                if (idents.size == 1) {
+                    resolvePermission(idents.head._1) match {
+                        case Some(perm) => perm
+                        case None => States(idents.map(_._1).toSet)
+                    }
+                } else {
+                    States(idents.map(_._1).toSet)
+                }
+        }
+
+        val parseStaticAssertion = LBracketT() ~! parseExpr ~ AtT() ~ parseTypeState ~ RBracketT() ~! SemicolonT() ^^ {
+            case _ ~ expr ~ at ~ typestate ~ _ ~ _ =>
+                StaticAssert(expr, typestate).setLoc(at)
         }
 
 
@@ -342,29 +361,38 @@ object Parser extends Parsers {
         accept("string literal", partialFunction)
     }
 
+    private def parseTypeList: Parser[Seq[ObsidianType]] =
+        opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ^^ {
+            case Some(_ ~ params ~ _) => params
+            case None => List()
+        }
+
     private def parseExprBottom: Parser[Expression] = {
         def parseLocalInv = {
-            parseId ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
-                case name ~ _ ~ args ~ _ => LocalInvocation(name._1, args).setLoc(name)
+            parseId ~ parseTypeList ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
+                // genericParams will be filled in later by the typechecker
+                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, Nil, params, args).setLoc(name)
             }
         }
 
         /* avoids left recursion by parsing from the dot, e.g. ".f(a)", not "x.f(a)" */
-        type DotExpr = Either[Identifier, (Identifier, Seq[Expression])]
+        type DotExpr = Either[Identifier, (Identifier, Seq[ObsidianType], Seq[Expression])]
 
         def foldDotExpr(e: Expression, dots: Seq[DotExpr]): Expression = {
             dots.foldLeft(e)(
                 (e: Expression, inv: DotExpr) => inv match {
                     case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
-                    case Right((funcName, args)) => Invocation(e, funcName._1, args, false).setLoc(funcName)
+                    // genericParams will be filled in later by the typechecker
+                    case Right((funcName, params, args)) => Invocation(e, Nil, params, funcName._1, args, false).setLoc(funcName)
                 }
             )
         }
 
         def parseDots: Parser[Expression => Expression] = {
-            val parseOne: Parser[DotExpr] = DotT() ~! parseId ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
-                case _ ~ name ~ Some(_ ~ args ~ _) => Right((name, args))
-                case _ ~ name ~ None => Left(name)
+            val parseOne: Parser[DotExpr] = DotT() ~! parseId ~
+                parseTypeList ~ opt(LParenT() ~ parseArgList ~ RParenT()) ^^ {
+                case _ ~ name ~ params ~ Some(_ ~ args ~ _) => Right((name, params, args))
+                case _ ~ name ~ params ~ None => Left(name)
             }
 
             rep(parseOne) ^^ ((lst: Seq[DotExpr]) => (e: Expression) => foldDotExpr(e, lst))
@@ -385,8 +413,14 @@ object Parser extends Parsers {
         }
 
         val parseNew = {
-            NewT() ~! parseId ~! LParenT() ~! parseArgList ~! RParenT() ^^ {
-                case _new ~ name ~ _ ~ args ~ _ => Construction(name._1, args, false).setLoc(_new)
+            NewT() ~! parseId ~! opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ~ LParenT() ~! parseArgList ~! RParenT() ^^ {
+                case _new ~ name ~ typeParamsOpt ~ _ ~ args ~ _ =>
+                    val typeParams = typeParamsOpt match {
+                        case Some(_ ~ params ~ _) => params
+                        case None => Nil
+                    }
+
+                    Construction(ContractType(name._1, typeParams), args, false).setLoc(_new)
             }
         }
 
@@ -510,13 +544,19 @@ object Parser extends Parsers {
     }
 
 
-    private def parseTransDecl(isInterface:Boolean)(contractName: String): Parser[Transaction] = {
-        parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
-          opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
-            case opts ~ privateMethodFieldTypes ~ t ~ name ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
+    private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String, contractParams: Seq[GenericType]): Parser[Transaction] = {
+        parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~!
+            opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
+            opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
+            case opts ~ privateMethodFieldTypes ~ t ~ name ~ paramsOpt ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
                 val nameString = name match {
                     case MainT() => "main"
                     case id => id.asInstanceOf[Identifier]._1
+                }
+
+                val params = paramsOpt match {
+                    case Some(_ ~ ps ~ _) => ps
+                    case None => Nil
                 }
 
                 val (thisArg, filteredArgs) = args.headOption match {
@@ -529,15 +569,16 @@ object Parser extends Parsers {
                         }
                 }
 
+                val thisContractType = ContractType(contractName, contractParams)
+
                 val finalType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName), Shared(), false)
-                    case Some(v) => v.typOut
+                    case None => ContractReferenceType(thisContractType, Shared(), false)
+                    case Some(v) => v.typOut.withParams(contractParams)
                 }
 
                 val thisType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName), Shared(), false)
-                    case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType]
-
+                    case None => ContractReferenceType(ContractType(contractName, contractParams), Shared(), false)
+                    case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType].withParams(contractParams)
                 }
 
                 val initialFieldTypes = privateMethodFieldTypes match {
@@ -550,7 +591,7 @@ object Parser extends Parsers {
                     case Some(_ ~ argDefList ~ _) => argDefList.map((v: VariableDeclWithSpec) => (v.varName, v.typOut))
                 }
 
-                Transaction(nameString, filteredArgs, returns,
+                Transaction(nameString, params, filteredArgs, returns,
                     ensures, body, opts.isStatic, opts.isPrivate,
                     thisType, finalType.asInstanceOf[NonPrimitiveType],
                     initialFieldTypes.toMap, finalFieldTypes.toMap).setLoc(t)
@@ -567,17 +608,19 @@ object Parser extends Parsers {
         }
     }
 
-    // maybe we can check here that the constructor has the appropriate name?
-    private def parseConstructor = {
+    // TODO: maybe we can check here that the constructor has the appropriate name?
+    private def parseConstructor (params: Seq[GenericType]) = {
         parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name._1, isRemote = false, defaultOwned = false)
+                val resultType = extractTypeFromPermission(permission, name._1, params, isRemote = false, defaultOwned = false)
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }
 
-    private def parseDeclInContract(isInterface:Boolean, sourcePath: String)(contractName: String):  Parser[Declaration] = {
-        parseFieldDecl | parseStateDecl | parseConstructor | parseContractDecl(sourcePath) | parseTransDecl(isInterface)(contractName)
+    private def parseDeclInContract(params: List[GenericType], isInterface:Boolean,
+                                    sourcePath: String)(contractName: String, contractParams: List[GenericType]):  Parser[Declaration] = {
+        parseFieldDecl | parseStateDecl | parseConstructor(contractParams) | parseContractDecl(sourcePath) |
+            parseTransDecl(params, isInterface)(contractName, contractParams)
     }
 
     private def parseContractModifier = {
@@ -601,12 +644,86 @@ object Parser extends Parsers {
         }
     }
 
+    private def parseContractType = {
+        parseId ~ opt(LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT()) ^^ {
+            case name ~ optParams =>
+                val params = optParams.map(_._1._2).getOrElse(List())
+                ContractType(name._1, params)
+        }
+    }
+
+    private def parseWhereImplements: Parser[Option[ContractType]] = {
+        WhereT() ~ parseId ~ ImplementsT() ~ parseType ^^ {
+            case _ ~ typeVar ~ _ ~ typeBound => typeBound match {
+                case np: NonPrimitiveType => Some(np.contractType)
+                case _ => failure("Contract cannot implement primitive type."); None
+            }
+        }
+    }
+
+    private def parseWhereSubperm: Parser[Either[Permission, Set[String]]] = {
+        WhereT() ~ parseId ~ IsT() ~ parseIdAlternatives ^^ {
+            case _ ~ permVar ~ _ ~ permBound =>
+                if (permBound.length == 1) {
+                    resolvePermission(permBound.head._1) match {
+                        case Some(perm) => Left(perm)
+                        case None => Right(permBound.map(_._1).toSet)
+                    }
+                } else {
+                    Right(permBound.map(_._1).toSet)
+                }
+        }
+    }
+
+    private def genericParam = {
+        opt(AssetT()) ~ parseId ~ opt(AtT() ~ parseId) ~ opt(parseWhereImplements) ~ opt(parseWhereSubperm) ^^ {
+            case assetMod ~ varId ~ stateVarId ~ implements ~ subpermBound =>
+                val stateVar = stateVarId.map(_._2._1)
+
+                val definesInterface = implements.flatten.isDefined
+                val contractBound = implements.flatten.getOrElse(ContractType.topContractType)
+                val gVar = GenericVar(assetMod.isDefined, varId._1, stateVar)
+
+                val bound = subpermBound match {
+                    case Some(Left(perm)) => GenericBoundPerm(definesInterface, permSpecified = true, contractBound, perm)
+                    case Some(Right(states)) => GenericBoundStates(definesInterface, permSpecified = true, contractBound, states)
+                    case None => GenericBoundPerm(definesInterface, permSpecified = false, contractBound, Unowned())
+                }
+
+                GenericType(gVar, bound)
+        }
+    }
+
+    private def parseGenericParams = {
+        opt(RemoteT()) ~ parseId ~ LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
+            case isRemote ~ name ~ _ ~ genParams ~ _ ~ permission =>
+                extractTypeFromPermission(permission, name._1, genParams, isRemote.isDefined, defaultOwned = false)
+        }
+    }
+
+    private def parseGenericId = {
+        parseId ~! opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ^^ {
+            case id ~ optParams =>
+                optParams match {
+                    case Some(_ ~ params ~ _) =>  (id, params)
+                    case None => (id, List())
+                }
+        }
+    }
+
     private def parseContractDecl(srcPath: String) = {
-        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseId >> {
-            case mod ~ ct ~ name =>
+        rep(parseContractModifier) ~ (ContractT() | InterfaceT()) ~! parseGenericId ~ opt(ImplementsT() ~ parseContractType) >> {
+            case mod ~ ct ~ identifier ~ impl =>
                 val isInterface = ct == InterfaceT()
 
-                LBraceT() ~! rep(parseTransitions | parseDeclInContract(isInterface, srcPath)(name._1)) ~! RBraceT() ^^ {
+                val (name, params) = identifier
+
+                val implementBound = impl match {
+                    case Some(_ ~ bound) => bound
+                    case None => ContractType.topContractType
+                }
+
+                LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name._1, params)) ~! RBraceT() ^^ {
                 case _ ~ contents ~ _ =>
                     // Make sure there's only one transition diagram.
                     val separateTransitions = contents.filter({
@@ -622,8 +739,7 @@ object Parser extends Parsers {
                     val transitions =
                         if (transitionsEdges.isEmpty) {
                             None
-                        }
-                        else {
+                        } else {
                             Some(Transitions(transitionsEdges))
                         }
 
@@ -632,7 +748,7 @@ object Parser extends Parsers {
                         case _ => false
                     }).map(_.asInstanceOf[Declaration])
 
-                    ObsidianContractImpl(mod.toSet, name._1, decls, transitions, isInterface, srcPath).setLoc(ct)
+                    ObsidianContractImpl(mod.toSet, name._1, params, implementBound, decls, transitions, isInterface, srcPath).setLoc(ct)
             }
         }
     }

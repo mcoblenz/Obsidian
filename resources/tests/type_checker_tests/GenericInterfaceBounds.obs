@@ -1,0 +1,77 @@
+interface Validatable {
+    state Valid;
+    state Invalid;
+
+    transaction validate(Validatable@Invalid >> (Valid | Invalid) this);
+}
+
+contract C[A where A implements Validatable] {
+    state Empty;
+    state Full {
+        A@Valid val;
+    }
+
+    C@Empty() {
+        ->Empty;
+    }
+
+    transaction store(A@Invalid >> Unowned a) {
+        a.validate();
+        if (a in Valid) {
+            ->Full(val = a);
+        }
+    }
+}
+
+contract D[T] {
+    transaction f(T@Owned t) {
+        // This should fail because it is undefined (the bound is wrong)
+        t.validate();
+    }
+}
+
+contract DummyValidatable implements Validatable {
+    state Valid;
+    state Invalid;
+
+    DummyValidatable@Invalid() {
+        ->Invalid;
+    }
+
+    transaction validate(DummyValidatable@Owned >> Valid this) {
+        ->Valid;
+    }
+}
+
+contract NoImplValidatable {
+    state Invalid;
+
+    // Include this constructor to avoid the uninteresting warning that 'd' is Owned rather than Invalid below in Main#h
+    NoImplValidatable@Invalid() {
+        ->Invalid;
+    }
+}
+
+main contract Main {
+    transaction f() {
+        DummyValidatable d = new DummyValidatable();
+        C[DummyValidatable] c = new C[DummyValidatable]();
+        c.store(d);
+    }
+
+    transaction g() {
+        NoImplValidatable d = new NoImplValidatable();
+        C[DummyValidatable] c = new C[DummyValidatable]();
+
+        // Error, wrong type stored
+        c.store(d);
+    }
+
+    transaction h() {
+        NoImplValidatable d = new NoImplValidatable();
+        // Error, NoImplValidatable is not a valid parameter here
+        C[NoImplValidatable] c = new C[NoImplValidatable]();
+        c.store(d);
+    }
+}
+
