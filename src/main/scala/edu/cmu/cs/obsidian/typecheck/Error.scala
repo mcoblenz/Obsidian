@@ -90,6 +90,8 @@ case class FieldUndefinedError(fieldOf: NonPrimitiveType, fName: String) extends
         case ContractReferenceType(cName, _, _) => s"Field '$fName' is not defined in contract '$cName'"
         case StateType(cName, stateNames, _) => s"Field '$fName' is not defined in states '$stateNames' of contract '$cName'"
         case InterfaceContractType(name, typ) => s"Interfaces do not include fields."
+        case GenericType(gVar, _) => val varName = gVar.varName
+                                     s"Type variable '$varName' does not define field '$fName'."
     }
 }
 case class RecursiveFieldTypeError(cName: String, fName: String) extends Error {
