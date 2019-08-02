@@ -1,0 +1,72 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Prescription</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h2>Prescription</h2>
+
+<p> In this example, we will explore a prescription-filling system, with a Pharmacy, Prescriptions, and Patients.
+Patients have prescriptions, which they must first deposit at a Pharmacy before filling.
+Each Prescription can be filled a set number of times. </p>
+
+<p>
+This system is intended to reflect the following rule on prescriptions:
+<ul>
+    <li>A prescription cannot be filled more times than the designated number of refills specifies. </li>
+    <li>A prescription can be deposited at only one Pharmacy. </li>
+    <li>Prescription-filling is implemented in Prescription.doFill(). </li>
+</ul>
+
+<!-- However, the Drug Enforcement Agency is worried that the code below might allow violations of the rule by -->
+<!-- malevolent patients, who might modify the Patient contract. -->
+<!-- The rest of the contracts, including Prescription and Pharmacy, cannot be modified by patients. -->
+<!-- Note that each contract may be instantiated multiple times. -->
+</p>
+
+<p> The code in the file <code>Prescription.obs</code>contains several tasks, each labeled <code> // TODO TASK #: ... </code>.
+You do not have to do the tasks in any particular order, but they are numbered by anticipated difficulty, with lower numbers being less time consuming. </p>
+
+<p> Below are the declarations of contracts and transactions that are useful for managing collections of PharmacyPrescriptionRecords. The full code can be found in Collections.obs in the same directory as the main file (Prescription.obs).</p>
+
+<pre>
+<code>
+contract MaybeRecord {
+    asset state Something {
+        PharmacyPrescriptionRecord@HasFills record;
+    }
+
+    state Nothing;
+
+    MaybeRecord@Nothing();
+    MaybeRecord@Something(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord);
+
+    transaction getRecord(MaybeRecord@Just >> Nothing this) returns PharmacyPrescriptionRecord@HasFills;
+}
+
+contract PharmacyPrescriptionRecordList {
+    state Nil;
+    asset state Cons {
+        PharmacyPrescriptionRecord@HasFills record;
+        PharmacyPrescriptionRecordList@Shared next;
+    }
+
+    PharmacyPrescriptionRecordList@Nil();
+    PharmacyPrescriptionRecordList@Cons(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
+                                        PharmacyPrescriptionRecordList@Shared tail);
+
+    transaction prependIfNotEmpty(PharmacyPrescriptionRecord@Owned >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared;
+
+    transaction contains(Prescription@Unowned prescription) returns bool;
+    transaction removeIfExists(Prescription@Unowned prescription) returns MaybeRecord@Owned;
+}
+</code>
+</pre>
+
+</body>
+</html>
+

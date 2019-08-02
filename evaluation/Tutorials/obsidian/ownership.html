@@ -1,0 +1,99 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Part 1: Ownership</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h1><strong>Part 1: Ownership</strong></h1>
+ <!-- local variables never include annotatations. Params and fields always do. -->
+<p>Our new programming language is object-oriented. It includes <em>contracts</em>, which are like classes, which can have <em>fields</em> 
+    and <em>transactions</em>, which are analogous to functions. 
+    In addition, of the many <strong>variables</strong> or <strong>fields</strong> that reference objects, exactly <strong>one</strong> of them 
+    can own the object, as seen in diagram <strong>(a)</strong> below. An object can have any number of Unowned references, and, if the object is not Owned, 
+    it can have any number of Shared references (shown in <strong>(b)</strong> below). An object with Shared references can also have Unowned references,
+    but not Owned ones.
+</p>
+
+<img src="ownership-diagram.png" alt="Ownership" style="width:1000px;height:400px;"> </img>
+
+<p> Here is an example of a contract (a <code>Wallet</code>) with an object (in this case a <code>Money</code>) that has one <code>Owned</code> reference: </p>
+<pre>
+<code>
+contract Money {
+}
+
+<strong>contract</strong> Wallet {
+    Money@Owned m; // @Owned indicates that the reference m owns the object it refers to
+    
+    transaction spendMoney() {
+        ...
+    }
+}
+</code>
+</pre>
+
+
+<p>The compiler tracks ownership of each variable every time the variable is used. This information is part of the <em>type</em> of the variable. For example, the type of <code>m</code> is <code>Money@Owned</code>. Information about ownership is NOT available at runtime; it is only available during compilation.</p>
+
+<ul>
+    <li>If a reference is the only one that holds ownership, then it is <code>Owned</code>.</li>
+    <li>If all references to the object are the same (there is no owner), then each reference is <code>Shared</code>.</li>
+    <li>If a reference is NOT the owning one, but there might be another owning reference, then the reference is <code>Unowned</code>.</li>
+</ul>
+
+<h3>Method return types</h3>
+<p>
+When transactions return objects, the types must be annotated in the function header. For example:
+<pre>
+<code>
+transaction withdraw() returns Money@Owned {
+    // body not shown
+}
+</code>
+</pre>
+</p>
+
+<h3>Method parameters</h3>
+<p>When a reference is passed to a transaction as an argument, the transaction's declaration specifies initial and final ownership with <code>>></code>. For example:</p>
+
+<pre>
+<code>
+transaction spend(Money@Owned >> Unowned m) { // m is Owned initially but must be Unowned at the end.
+	// implementation not shown
+};
+
+transaction testSpend(Money@Owned >> Unowned m) {
+	spend(m);
+	// m is now of type Money@Unowned due to specification on spend() declaration.
+}
+</code>
+</pre>
+
+<p>If a transaction expects an argument that is <code>Unowned</code>, this means that the transaction cannot take ownership. As a result, it is safe to pass an <code>Owned</code> reference as an argument to a transaction that expects an <code>Unowned</code> argument. After the transaction returns, the caller still holds ownership.</p>
+
+<p>If a transaction parameter lacks >>, then ownership will not change. For example, <code>transaction test(Money@Owned m)</code> is equivalent to <code>transaction test(Money@Owned >> Owned m)</code>. <code>transaction foo(Money@Unowned m)</code> can accept a <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that transaction.
+
+    <h3>Method receivers (<code>this</code>)</h3>
+    <p>Sometimes the ownership of <code>this</code> needs to change in a transaction. That fact can be specified by adding <code>this</code> as the first argument in the transaction declaration. For example:</p>
+    
+    <pre>
+    <code>
+    contract Money {
+        transaction discard(Money@Owned >> Unowned this) {
+            disown this;
+        }
+    }
+    
+    contract Wallet {
+        transaction throwAwayMoney(Money @ Owned >> Unowned money) {
+            money.discard(); // 'this' argument is implicit; do not include it in transaction call.
+        }
+    }
+    </code>
+    </pre>
+
+</body></html>

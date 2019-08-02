@@ -1,0 +1,82 @@
+import "resources/sample_programs/betting_utils.obs"
+
+main asset contract Casino {
+
+    Money@Owned money;
+    Game@Owned currentGame; //The game that is currently being played
+    BetList@Shared bets; //The bets for the current game being played
+
+    state AcceptingBets;
+    state PlayingGame;
+    state FinishedGame;
+
+    Casino@Owned() {
+        money = new Money(100000);
+        currentGame = new Game();
+        bets = new BetList();
+        ->AcceptingBets;
+    }
+
+    transaction createNewGame(Casino@FinishedGame >> AcceptingBets this) {
+        currentGame = new Game();
+        bets = new BetList();
+        ->AcceptingBets;
+    }
+
+    transaction startGame(Casino@AcceptingBets >> PlayingGame this) {
+        if (currentGame in BeforePlay) {
+            currentGame.startPlaying();
+        }
+        ->PlayingGame;
+    }
+
+    transaction finishGame(Casino@PlayingGame >> FinishedGame this) {
+        if (currentGame in Playing) {
+            currentGame.finishPlaying();
+        }
+        -> FinishedGame;
+    }
+
+    transaction makeBet(Casino@AcceptingBets this, Bettor@Unowned b, Money@Owned >> Unowned m, string predOut) {
+        if (currentGame in Playing) {
+            revert("Cannot make bet");
+        }
+        if (currentGame in FinishedPlaying) {
+            revert("Cannot make bet");
+        }
+        int betAmount = m.getAmount();
+        money.mergeMoney(m);
+        BetPrediction p = new BetPrediction(predOut, betAmount);
+        Bet bet = new Bet(b, p);
+        if (bets.contains(b)) {
+            BetPrediction pred = bets.popSpecific(b).getBetPrediction();
+            int amountToReturn = pred.getBetAmount();
+            Money m = money.splitMoney(amountToReturn);
+            b.receiveMoney(m);
+        }
+        bets.append(bet);
+
+    }
+
+    transaction collectMoney(Casino@FinishedGame this, Bettor@Unowned b) {
+        if (currentGame in FinishedPlaying) {
+            if (!bets.contains(b)) {
+                revert("Bettor did not make a bet on this game");
+            }
+            else {
+                Bet temp = bets.popSpecific(b);
+                BetPrediction p = temp.getBetPrediction();
+                if (p.getPredOutcome() == currentGame.calculateOutcome()) {
+                    int amountToReturn = p.getBetAmount() * 2;
+                    Money m = money.splitMoney(amountToReturn);
+                    b.receiveMoney(m);
+
+                }
+                //If predicted wrong, no money is given.
+            }
+        }
+        else {
+            revert ("Cannot return money when Game is not over");
+        }
+    }
+}

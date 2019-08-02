@@ -1,0 +1,27 @@
+// Money is shared, trusted code -- but it only has to be written once.
+asset contract Money {
+    int value;
+
+    Money@Owned(int v) {
+        value = v;
+    }
+
+    transaction getValue(Money@Unowned this) returns int {
+        return value;
+    }
+
+    transaction split(Money@Owned this, int v) returns Money@Owned {
+        if (v > value) {
+            revert;
+        }
+        value = value - v;
+        Money result = new Money(v);
+        return result;
+    }
+
+    transaction merge(Money@Owned this, Money@Owned >> Unowned other) {
+        value = value + other.getValue();
+        disown other;
+    }
+}
+

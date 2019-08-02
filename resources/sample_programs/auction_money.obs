@@ -1,0 +1,179 @@
+//English Auction
+
+asset contract Bidder {
+    string name;
+    Money@Owned money;
+    ItemList@Owned inventory; // can add infinite items to inventory
+
+    Bidder@Owned(string n, int m) {
+        name = n;
+        money = new Money(m);
+        inventory = new ItemList();
+    }
+
+    transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {  
+        Money m = money.getSomeMoney(bidAmount);
+        Bid bid = new Bid(m);
+        return bid;
+    }
+
+    transaction getName(Bidder@Unowned this) returns string {
+        return name;
+    }
+
+    transaction won(Bidder@Unowned this, Item@Owned >> Unowned i) {
+        inventory.append(i);
+    }
+
+    transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
+        money.addMoney(bid.getMoney());
+        disown bid;
+    }
+}
+
+asset contract Seller {
+    state Sold {
+        Bid@Owned bid;
+    }
+    state Unsold {
+        Item@Owned item;
+    };
+    state InAuction;
+
+    Seller@Unsold() {
+        -> Unsold(item = new Item());
+    }
+
+    transaction giveItem(Seller@Unsold >> InAuction this) returns Item@Owned {
+        Item temp = item;
+        -> InAuction;
+        return temp;
+    }
+
+    transaction receiveBid(Seller@Unsold >> Sold this, Bid@Owned >> Unowned b) {
+        -> Sold(bid = b);
+    }
+}
+
+contract Item {
+
+}
+
+contract ItemList {
+    state Empty;
+    state HasItems {
+        Item@Owned item;
+        ItemList@Owned next;
+    }
+
+    ItemList@Empty() {
+        ->Empty;
+    }
+
+    transaction append(ItemList@Owned this, Item@Owned >> Unowned it) {
+        ItemList ilist = new ItemList();
+        -> HasItems(item = it, next = ilist);
+    }
+}
+
+asset contract Money {
+    int amount;
+
+    Money@Owned(int amt) {
+        amount = amt;
+    }
+
+    transaction addMoney(Money this, Money@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    transaction getAmount(Money this) returns int {
+        return amount;
+    }
+
+    transaction getSomeMoney(Money this, int amt) returns Money@Owned {
+        if (amt > amount) {
+            revert "Can't split out more money than is available in a given Money object.";
+        } else {
+            amount = amount - amt;
+            return new Money(amt);
+        }
+    }
+}
+
+asset contract Bid {
+    Money@Owned money;
+
+    state Open;
+    state Stale;
+
+    Bid@Open(Money@Owned >> Unowned m) {
+        money = m;
+        ->Open;
+    }
+
+    transaction getMoney(Bid@Owned this) returns Money@Owned {
+        Money temp = new Money(money.getAmount());
+        -> Stale;
+        return temp;
+    }
+
+    transaction getAmount(Bid@Owned this) returns int {
+        return money.getAmount();
+    }
+}
+
+
+main asset contract Auction {
+
+    Bidder@Unowned maxBidder;
+    Seller@Unsold seller;
+    Item@Owned item available in Open, BiddingDone;
+
+    state Open {
+        Bid@Owned bid;
+    }
+    state BiddingDone {
+        Bid@Owned finalBid;
+    }
+    
+    state Closed;
+
+    Auction@Owned() {
+        maxBidder = new Bidder("none", 0);
+        seller = new Seller();
+        -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
+    }
+
+    transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
+        if (newBid.getAmount() > bid.getAmount()) {
+            setCurrentBid(newBid);
+            Bidder tempBidder = maxBidder;
+            maxBidder = bidder;
+        }
+        else {
+            returnBidMoney(newBid, bidder);
+        }
+    }
+
+    transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
+        Bid tempBid = bid;
+        returnBidMoney(tempBid, maxBidder);
+        bid = b;
+    }
+
+    transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
+        bidder.receiveBidMoney(b);
+    }
+
+    transaction finishBidding(Auction@Open >> BiddingDone this) {
+        -> BiddingDone(item = item, finalBid = bid);
+    }
+
+    transaction giveItem(Auction@BiddingDone >> Closed this) {
+        maxBidder.won(item);
+        seller.receiveBid(finalBid);
+        -> Closed;
+    }
+}

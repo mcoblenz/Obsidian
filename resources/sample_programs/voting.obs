@@ -1,0 +1,138 @@
+
+contract Voter {
+    int id;
+    string name;
+    bool citizen;
+
+    state Eligible;
+    state Ineligible;
+    state FinishedVoting;
+
+    Voter@Owned() {
+        id = -1;
+        name = "none";
+        citizen = false;
+        -> Ineligible;
+    }
+
+    transaction getId() returns int {
+        return id;
+    }
+
+    transaction getName(Voter@Owned >> Owned this) returns string {
+        return name;
+    }
+
+    transaction getCitizenship() returns bool {
+        return citizen;
+    }
+
+    transaction vote(Voter@Eligible >> FinishedVoting this, string proposalName) {
+        -> FinishedVoting;
+    }
+
+    transaction setVotValues(int newId, string newName, bool val) {
+        //Try
+        id = newId;
+        name = newName;
+        citizen = val;
+        if (not citizen) {
+            ->Ineligible;
+        }
+        else {
+            ->Eligible;
+        }
+        // Catch
+        // revert("List the following values: ID (int), Name, Citizenship status (true/false)");
+    }
+}
+
+contract Proposal {
+    string name;
+    int numVotes;
+
+    Proposal@Owned() {
+        name = "none";
+        numVotes = 0;
+    }
+
+    transaction getVote(Proposal@Owned >> Owned this, Voter@FinishedVoting v) {
+        numVotes = numVotes + 1;
+    }
+
+    transaction getNumVotes(Proposal@Owned >> Owned this) returns int {
+        return numVotes;
+    }
+
+    transaction setValues(Proposal@Owned >> Owned this, string newName) {
+        name = newName;
+    }
+
+    transaction getName(Proposal@Owned >> Owned this) returns string {
+        return name;
+    }
+}
+
+main contract Election {
+
+    Proposal@Owned proposal;
+    Voter@Owned v1;
+    int numVoters;
+
+    state NewElection;
+    state ProposalCreated;
+    state Voting;
+    state Closed;
+
+    Election@Owned() {
+        numVoters = 0;
+        -> NewElection;
+        proposal = new Proposal();
+        v1 = new Voter();
+    }
+
+    transaction getValues() returns string{
+        return proposal.getName();
+    }
+
+    transaction getVoterName() returns string {
+        return v1.getName();
+    }
+
+    transaction newProposal(Election@NewElection >> ProposalCreated this, string name) {
+        proposal.setValues(name);
+        -> ProposalCreated;
+
+    }
+
+    transaction newVoter(Election@ProposalCreated >> Voting this, int id, string name, bool citizenship) {
+        v1.setVotValues(id, name, citizenship);
+        if (citizenship) {
+            numVoters = numVoters + 1;
+        }
+        -> Voting;
+    }
+
+    transaction vote(Election@Voting >> Voting this, string name) {
+        //For each voter:
+        if (v1 in Eligible) {
+            v1.vote(name);
+            proposal.getVote(v1);
+        }
+
+    }
+
+    transaction closeElection(Election@Voting >> Closed this) returns string {
+        -> Closed;
+        if (proposal.getNumVotes() > numVoters / 2) {
+            return "The proposal has passed!";
+        }
+        else {
+            return "The proposal has failed :(";
+        }
+    }
+
+    transaction reset(Election@Closed >> NewElection this) {
+        -> NewElection;
+    }
+}

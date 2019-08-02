@@ -1,4 +1,4 @@
-import "resources/demos/Prescription/Collections.obs"
+import "evaluation/Tutorials/prescription-exercises/Collections.obs"
 
 // Prescriptions are immutable by design; pharmacies that want to record information about
 // prescriptions must do so in a separate data structure.
@@ -22,11 +22,11 @@ contract Prescription {
 	}
 }
 
-asset contract PharmacyPrescriptionRecord {
+contract PharmacyPrescriptionRecord {
     state Empty;
 
     state HasFills {
-        int fillsLeft; // Might be nice to have a nonnegative int type
+        int fillsLeft;
         Prescription@Owned prescription;
     }
 
@@ -42,7 +42,8 @@ asset contract PharmacyPrescriptionRecord {
         return prescription;
     }
 
-    transaction checkAndUpdateFills(PharmacyPrescriptionRecord@HasFills >> (Empty | HasFills) this) {
+    // // TODO TASK 2: Fill in the type signature of this transaction.
+    transaction checkAndUpdateFills(PharmacyPrescriptionRecord@HasFills >> (HasFills | Empty) this) {
         if (fillsLeft > 1) {
             fillsLeft = fillsLeft - 1;
         } else {
@@ -59,6 +60,7 @@ main contract Pharmacy {
     PharmacyPrescriptionRecordList@Shared prescriptions;
 
 	// Must be called before the patient can fill a new prescription.
+    // TODO TASK 1: Fill in the type signature of this transaction.
 	transaction depositPrescription(Prescription@Owned >> Unowned prescription) {
 		if (prescriptions.contains(prescription)) {
             revert "PrescriptionAlreadyDepositedException";
@@ -68,18 +70,12 @@ main contract Pharmacy {
 	}
 
 	transaction fillPrescription(Prescription@Unowned prescription) {
-		// Can't fill a prescription that wasn't deposited in this pharmacy.
-		MaybeRecord result = prescriptions.removeIfExists(prescription);
+        // The prescription list can only contain records in HasFills, so we remove the record, as we need to decrement the fills counter.
+		MaybeRecord maybeRecord = prescriptions.removeIfExists(prescription);
 
-		if (result in Nothing) {
-			revert "PrescriptionNotDepositedException";
-		} else {
-            PharmacyPrescriptionRecord record = result.getRecord();
-            doFill(record);
-
-            record.checkAndUpdateFills();
-            prescriptions = prescriptions.prependIfNotEmpty(record);
-        }
+        // TODO TASK 3: Fill in the rest of this transaction. You will need to call doFill() on the appropriate PharmacyPrescriptionRecord.
+        //              Be sure to record that the prescription has been filled.
+        PharmacyPrescriptionRecord.doFill();
 	}
 
 	private transaction doFill(PharmacyPrescriptionRecord@HasFills record) {

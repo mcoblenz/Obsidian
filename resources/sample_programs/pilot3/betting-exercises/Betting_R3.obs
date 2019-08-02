@@ -1,0 +1,67 @@
+import "resources/sample_programs/pilot2/betting_utils.obs"
+import "resources/sample_programs/pilot2/games.obs"
+
+
+main asset contract Casino {
+
+    Money@Owned money;
+    GameRecordList@Shared gamerecords;
+
+    state Open;
+    state Playing;
+    state FinishedPlaying;
+
+    GameRecord@Owned currentGame available in Playing, FinishedPlaying;
+
+    Casino@Open() {
+        money = new Money(100000);
+        gamerecords = new GameRecordList();
+
+        -> Open;
+    }
+    //TODO: Add your code here.
+
+    transaction betOnGame(Casino@Playing this, Bettor@Owned b, Bet@Unowned bsBet) {
+        if (currentGame.getGame() in Start) {
+            if (currentGame.getBets().contains(b)) {
+                // Bettor already made a bet
+                Bet oldBet = currentGame.getBets().popSpecific(b);
+
+                // Need to give them their money back
+                b.receiveMoney(money.splitMoney(oldBet.getPrediction().getBetAmount()));
+            }
+
+            money.mergeMoney(b.withdrawMoney(bsBet.getPrediction().getBetAmount()));
+            currentGame.getBets().append(bsBet);
+        }
+    }
+
+    transaction giveBackMoney(Casino@FinishedPlaying this, Bettor b, int amt) {
+        b.receiveMoney(money.splitMoney(amt));
+    }
+
+    transaction startGamePlay(Casino@Playing this) {
+        currentGame.getGame().startPlaying();
+    }
+
+    transaction endGame(Casino@Playing >> FinishedPlaying this) {
+        currentGame.getGame().finishPlaying();
+        gamerecords.append(currentGame);
+        -> FinishedPlaying (currentGame = currentGame);
+    }
+
+    transaction claimWinnings(Casino@FinishedPlaying this, Bettor b) {
+        if (currentGame.getBets().contains(b)) {
+            Prediction pred = currentGame.getBets().popSpecific(b).getPrediction();
+            Player p = pred.getPrediction();
+             if (currentGame.getGame().calculateWinner() == p) {
+                giveBackMoney(b, pred.getBetAmount() * 2);
+            }
+        }
+    }
+
+    transaction startGame(Casino@(Open|FinishedPlaying) >> Playing this) {
+        GameRecord newGame = new GameRecord();
+        -> Playing(currentGame = new GameRecord());
+    }
+}

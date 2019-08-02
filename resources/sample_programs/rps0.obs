@@ -1,0 +1,66 @@
+contract Player {
+    string move;
+
+    Player() {
+        move = "none";
+    }
+
+    transaction getMove() returns string {
+        return move;
+    }
+
+    transaction setMove(string newMove) {
+        move = newMove;
+    }
+}
+main contract Game {
+    Player@Shared p1;
+    Player@Shared p2;
+
+    Game() {
+        p1 = new Player();
+        p2 = new Player();
+    }
+
+    transaction p1Move(string move) {
+        p1.setMove(move);
+    }
+
+    transaction p2Move(string move) {
+        p2.setMove(move);
+    }
+
+
+    transaction play() returns string {
+
+        string p1Move = p1.getMove();
+        string p2Move = p2.getMove();
+
+        if (p1Move == "rock") {
+            if (p2Move == "scissors") {
+                return "Player 1 wins!";
+            }
+            if (p2Move == "paper") {
+                return "Player 2 wins!";
+            }
+        }
+        if (p1Move == "paper") {
+            if (p2Move == "rock") {
+                return "Player 1 wins!";
+            }
+            if (p2Move == "scissors") {
+                return "Player 2 wins!";
+            }
+        }
+        if (p1Move == "scissors") {
+            if (p2Move == "paper") {
+                return "Player 1 wins!";
+            }
+            if (p2Move == "rock") {
+                return "Player 2 wins!";
+            }
+        }
+        return "Tie";
+
+    }
+}

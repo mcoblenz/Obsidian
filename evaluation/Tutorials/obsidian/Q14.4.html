@@ -1,0 +1,25 @@
+The next several questions concern this code:
+<pre>
+<code class="language-obsidian">
+asset class Money {&hellip;}
+asset class Bank {
+  Money@Owned myMoney;
+  
+  void depositMoney(Money @ Owned &gt;&gt; Unowned deposit) { &hellip; }  
+  Money@Owned withdrawMoney() {&hellip;} // Withdraws all money
+}
+
+class Test {
+   Bank b;
+
+  void putMoneyInBank(Money @ Owned &gt;&gt; Unowned m) {     
+    // At the beginning of this method, m owns an instance of Money.    
+    Money@Owned q = m; // Location (A)
+    b.depositMoney(q); // Location (B)
+    // Location (C)
+    b.depositMoney(b.withdrawMoney()) // Location (D)
+  }
+}
+</code>
+</pre>
+At the beginning of <code>putMoneyInBank()</code>, what is the type of <code>m</code>?

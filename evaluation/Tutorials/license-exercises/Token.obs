@@ -1,0 +1,87 @@
+// Very repetitive, can imagine a generic interface for Tokens:
+
+/* asset interface Token[c] { */
+/*     state Unknown; */
+/*     state Valid; */
+
+/*     transaction checkToken(Token@Unknown >> Valid this, Licensor@Unowned licensor); */
+/*     transaction getData(Token@Valid this) returns c; */
+/* } */
+
+asset contract License {
+    state Unknown;
+    state Valid;
+
+    Licensor@Unowned issuer;
+    int feeAmount;
+
+    License@Unknown(Licensor@Unowned issuer, int feeAmount) {
+        this.issuer = issuer;
+        this.feeAmount = feeAmount;
+        ->Unknown;
+    }
+
+    // While this doesn't guarantee all tokens are checked properly, it does at least remind the caller that tokens should be checked
+    transaction checkToken(License@Unknown >> Valid this, Licensor@Unowned licensor) {
+        if (issuer != licensor) {
+            revert "Licensor is not issuer";
+        }
+
+        ->Valid;
+    }
+
+    transaction getFeeAmount(License@Unowned this) returns int {
+        return feeAmount;
+    }
+}
+
+asset contract Approval {
+    state Unknown;
+    state Valid;
+
+    Licensor@Unowned issuer;
+
+    Approval@Unknown(Licensor@Unowned issuer) {
+        this.issuer = issuer;
+        ->Unknown;
+    }
+
+    transaction checkToken(Approval@Unknown >> Valid this, Licensor@Unowned licensor) {
+        if (issuer != licensor) {
+            revert "Licensor is not issuer";
+        }
+
+        ->Valid;
+    }
+}
+
+asset contract Commission {
+    state Unknown;
+    state Valid;
+    state Completed;
+
+    Money@Owned payment available in Unknown, Valid;
+
+    Licensor@Unowned issuer;
+
+    Commission@Unknown(Licensor@Unowned issuer, Money@Owned >> Unowned _payment) {
+        this.issuer = issuer;
+        ->Unknown(payment = _payment);
+    }
+
+    transaction checkToken(Commission@Unknown >> Valid this, Licensor@Unowned licensor) {
+        if (issuer != licensor) {
+            revert "Licensor is not issuer";
+        }
+
+        Money m = payment;
+        ->Valid(payment = m);
+    }
+
+    transaction getPayment(Commission@Valid >> Completed this) returns Money@Owned {
+        Money m = payment;
+        ->Completed;
+        return m;
+    }
+}
+

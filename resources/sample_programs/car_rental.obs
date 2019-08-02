@@ -1,0 +1,123 @@
+contract Person {
+    string name;
+    Money@Owned money;
+    Wallet@Owned wallet;
+    Garage@Owned garage;
+
+    Person@Owned(string n) {
+        name = n;
+        money = new Money();
+        wallet = new Wallet();
+        garage = new Garage();
+        wallet.addMoney(money);
+    }
+
+    transaction getMoney(Person@Owned this) returns Money@Owned {
+        if (wallet in Full) {
+            return wallet.checkMoney();
+        }
+        else {
+            revert("ERROR: Don't have any money.");
+        }
+    }
+
+    transaction getGarage(Person@Owned this) returns Garage@Owned {
+        return garage;
+    }
+}
+
+contract Car {
+    string name;
+    Car@Owned(string n){
+        name = n;
+    }
+
+}
+
+contract Money {
+
+}
+
+contract Garage {
+    state Full {
+        Car@Owned car;
+    }
+    state Empty;
+
+    Garage@Owned() {
+        -> Empty;
+    }
+
+    transaction addCar(Garage@Owned >> Full this, Car@Owned >> Unowned c) {
+        -> Full(car = c);
+    }
+
+    transaction removeCar(Garage@Full >> Empty this) returns Car@Owned {
+        Car c = car;
+        -> Empty;
+        return c;
+    }
+
+}
+
+contract Wallet {
+    state Full {
+        Money@Owned money;
+    }
+    state Empty;
+
+    Wallet@Owned() {
+        -> Empty;
+    }
+
+    transaction addMoney(Wallet@Owned >> Full this, Money@Owned >> Unowned m) {
+        -> Full(money = m);
+        // disown m;
+    }
+
+    transaction spendMoney(Wallet@Full >> Empty this) returns Money@Owned {
+        Money m = money;
+        -> Empty;
+        return m;
+    }
+
+    transaction checkMoney(Wallet@Full this) returns Money@Owned {
+        return money;
+    }
+}
+
+main contract Dealership {
+    Car@Owned car;
+    Person@Owned person;
+    Wallet@Owned wallet;
+
+    state HasCar;
+    state NoCar;
+
+    Dealership@Owned() {
+        car = new Car("Kia");
+        person = new Person("Bob");
+        wallet = new Wallet();
+        -> HasCar;
+    }
+
+    transaction rentCar(Dealership@HasCar >> NoCar this, Car@Owned >> Unowned c) {
+        //Assume Bob is renting the car. Fill in this transaction.
+        wallet.addMoney(person.getMoney());
+        -> NoCar;
+        person.getGarage().addCar(c);
+
+    }
+
+    transaction returnCar(Dealership@NoCar >> HasCar this, Car@Owned c) returns Money@Owned {
+        //Bob is returning the car; fill in the transaction.
+        -> HasCar;
+        if (wallet in Full) {
+            return wallet.spendMoney();
+        }
+        else {
+            revert("Must rent a car; nothing to return.");
+        }
+    }
+
+}

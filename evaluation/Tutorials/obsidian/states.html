@@ -1,0 +1,89 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Part 5: States</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h1>Part 5: States</h1>
+
+<p>In our new programming language, contracts can define <em>states</em>. For example, a <code>LightSwitch</code> is always 
+  either <code>Off</code> or <code>On</code> (never both):</p>
+
+<pre>
+<code>
+contract LightSwitch {
+  state On;
+  state Off;
+}
+</code>
+</pre>
+
+<p> In addition, fields can be specified to be available only within certain states. For example: </p>
+<pre>
+<code>
+contract LightSwitch {
+    state On {
+      int brightness;
+    }
+    state Off;
+
+    int switchLocation available in On, Off;
+}
+</code>
+</pre>
+<p>In the example above, <code>brightness</code> can only be accessed and used when a <code>LightSwitch</code> is in the <code>On</code> state.
+    On the other hand, <code>switchLocation</code> can be accessed and used in both <code>On</code> and <code>Off</code>, but couldn't be 
+    accessed in any other states if they existed.</p>
+
+  <br/>
+  <h2>States and Ownership</h2>
+  <p>Each object can have one reference that statically specifies what state the object is in. For example, 
+    <code>LightSwitch@On</code> is the type of a variable that refers to a switch that is in <code>On</code> state.
+  </p> 
+    Note that this is an extension of <em>ownership</em>: like ownership, one reference is special. The compiler keeps track 
+    of the possible states an object can be in and makes sure that the specifications are observed. For example:
+  
+  <pre>
+  <code>
+  transaction foo() {
+      LightSwitch s = new LightSwitch(); //Assume a LightSwitch is in Off upon instantiation
+      s.turnOn();
+  }
+  </code>
+  </pre>
+  
+  The compiler checks transaction invocations to make sure they are safe:
+  
+  <pre>
+  <code>
+  transaction foo() {
+      LightSwitch s = new LightSwitch(); //Assume a LightSwitch is in Off upon instantiation
+      s.turnOff(); // COMPILE ERROR: turnOff() requires that s is On, but here s is Off
+  }
+  </code>
+  </pre>
+  
+  <strong> NOTE: there is never a need to specify both <em>ownership</em> and <em>state</em> at the same time; 
+        if a field is in any state, it must be Owned, and if Unowned, the field cannot have a state. </strong>
+
+<br/>
+<br/>
+<h2>States and Assets</h2>
+<p> States can also be declared as <code>asset</code>s, which means the contract is an asset (see Part 4) only when in that state.
+    For example, see an alternate definition of <code>LightSwitch</code> below, in which a <code>LightSwitch</code> is an  <code>asset</code> only
+    when it is turned <code>On</code>. </p>
+
+    <pre>
+    <code>
+    contract LightSwitch {
+      asset state On;
+      state Off;
+    }
+    </code>
+    </pre>
+        
+

@@ -1,0 +1,33 @@
+
+//Finish the vote transaction by transitioning the state of a Voter to the required state.
+
+main contract Voter {
+    string name;
+    bool citizen;
+
+    state Eligible;
+    state Ineligible;
+    state Registered;
+    state FinishedVoting;
+
+    Voter@Owned(string n, bool citizenship) {
+        name = n;
+        citizen = citizenship;
+        if (!citizen) {
+            -> Ineligible;
+        }
+        else {
+            -> Eligible;
+        }
+    }
+
+    transaction vote(Voter@Registered >> FinishedVoting this) {
+        // TODO
+        -> FinishedVoting;
+    }
+
+    transaction register(Voter@Eligible >> (Registered | Ineligible) this) {
+        //...
+        -> Registered; //Always becomes Registered for now, just to compile
+    }
+}

@@ -1,0 +1,18 @@
+
+//Write a contract called Person that has an Owned reference to a House and a Shared reference to a Park. 
+//The House and Park contracts are given below.
+//The Person contract MUST be main
+
+
+contract House {
+
+}
+
+contract Park {
+
+}
+
+main contract Person {
+    House@Owned house;
+    Park@Shared shared;
+}

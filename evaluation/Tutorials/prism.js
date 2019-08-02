@@ -784,7 +784,7 @@ Prism.languages.js = Prism.languages.javascript;
 ********************************************** */
 
 Prism.languages.obsidian = Prism.languages.extend('clike', {
-	'keyword': /\b(?:class|void|Owned|Unowned|Shared|asset|interface|owned|unowned|shared)\b/,
+	'keyword': /\b(?:class|contract|transaction|state|void|int|string|Owned|Unowned|Shared|asset|interface|owned|unowned|shared)\b/,
 //	'number': /\b0b[01]+\b|\b0x[\da-f]*\.?[\da-fp-]+\b|(?:\b\d+\.?\d*|\B\.\d+)(?:e[+-]?\d+)?[df]?/i,
 	'operator': {
 		pattern: /(^|[^.])(?:\+[+=]?|-[-=>]?|!=?|>>?>?=?|==?|[?:~])|@/m,

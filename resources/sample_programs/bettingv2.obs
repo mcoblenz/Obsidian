@@ -1,0 +1,64 @@
+import "resources/sample_programs/pilot2//betting_utils.obs"
+import "resources/sample_programs/pilot2/games.obs"
+
+
+main asset contract Casino {
+
+    Money@Owned money;
+    GameRecordList@Shared gamerecords;
+
+    Casino@Owned() {
+        money = new Money(100000);
+        gamerecords = new GameRecordList();
+    }
+
+    transaction makeBet(Casino@Owned this, Bettor@Unowned b, Money@Owned >> Unowned m, Player@Unowned predictedWinner, Game@Unowned g) {
+        if (g in Playing) {
+            revert("Cannot make bet");
+        }
+        int betAmount = m.getAmount();
+        money.mergeMoney(m);
+        Prediction p = new Prediction(predictedWinner, betAmount);
+        Bet bet = new Bet(b, p);
+        if (gamerecords.contains(g)) {
+            GameRecord gr = gamerecords.popSpecific(g);
+            BetList bets = gr.getBets();
+            if (bets.contains(b)) {
+                Prediction pred = bets.popSpecific(b).getPrediction();
+                int amountToReturn = pred.getBetAmount();
+                Money m = money.splitMoney(amountToReturn);
+                b.receiveMoney(m);
+            }
+            bets.append(bet);
+        }
+        else {
+            revert("cannot bet on this game");
+        }
+        
+    }
+
+    transaction returnMoney(Casino@Owned this, Bettor@Unowned b, Game@Owned g) {
+        if (!gamerecords.contains(g)) {
+            revert("game doesn't exist");
+        }
+        if (g in FinishedPlaying) {
+            GameRecord gr = gamerecords.popSpecific(g);
+            if (!gr.getBets().contains(b)) {
+                revert("Bettor didn't make a bet");
+            }
+            Bet temp = gr.getBets().popSpecific(b);
+            Prediction p = temp.getPrediction();
+            if (p.getPrediction() == g.calculateWinner()) {
+                int amountToReturn = p.getBetAmount() * 2;
+                Money m = money.splitMoney(amountToReturn);
+                b.receiveMoney(m);
+
+            }
+            //If prediction wrong, no money returned
+        }
+        else {
+            revert("cannot return money while game still going on");
+        }
+        
+    }
+}

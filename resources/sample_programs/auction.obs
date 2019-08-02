@@ -1,0 +1,153 @@
+//English Auction
+
+contract Bidder {
+    string name;
+    int bidAmount;
+    int balance;
+
+    state WonItem {
+        Item@Owned item;
+    }
+    state Bidding;
+
+    Bidder@Owned(string n, int m, int b) {
+        bidAmount = b;
+        name = n;
+        balance = m;
+        -> Bidding;
+    }
+
+    transaction createBid(Bidder@Bidding this) returns Bid@Owned {
+        Bid bid = new Bid(bidAmount);
+        balance = balance - bidAmount;
+        return bid;
+    }
+
+    transaction getBidAmount(Bidder@Owned this) returns int {
+        return bidAmount;
+    }
+
+    transaction getName(Bidder@Owned this) returns string {
+        return name;
+    }
+
+    transaction won(Bidder@Bidding >> WonItem this, Item@Owned >> Unowned i) {
+        -> WonItem(item = i);
+    }
+
+    transaction returnBidMoney(Bidder@Owned this, Bid@Owned bid) {
+        balance = balance + bid.getAmount();
+    }
+}
+
+contract Seller {
+    Item@Owned item;
+    Fee@Owned fee;
+    state SoldItem {
+        Bid@Owned bid;
+    }
+    state Unsold;
+
+    Seller@Owned() {
+        item = new Item();
+        fee = new Fee();
+        -> Unsold;
+    }
+
+    transaction receiveBid(Seller@Unsold >> SoldItem this, Bid@Owned >> Unowned b) {
+        -> SoldItem(bid = b);
+    }
+
+    transaction getBackFee(Seller@Unsold this, Fee@Owned >> Unowned f) {
+        fee = f;
+    }
+}
+
+contract Item {
+
+}
+
+contract Fee {
+
+}
+
+
+contract Bid {
+    int amount;
+
+    state Open;
+    state Stale;
+
+    Bid@Owned(int num) {
+        amount = num;
+        ->Open;
+    }
+
+    transaction getAmount(Bid@Owned this) returns int {
+        return amount;
+    }
+
+    transaction bidSurpassed(Bid@Open >> Stale this) {
+        -> Stale;
+    }
+}
+
+
+main contract Auction {
+
+    Bidder@Owned maxBidder;
+    Seller@Owned seller;
+
+    state Open {
+        Item@Owned item;
+        Bid@Owned bid;
+        Fee@Owned fee;
+    }
+    state BiddingDone {
+        Item@Owned it;
+        Bid@Owned finalBid;
+    }
+    state Closed;
+
+
+    Auction@Owned(Item@Owned >> Unowned i, Fee@Owned >> Unowned f) {
+        maxBidder = new Bidder("none",0, 0);
+        seller = new Seller();
+        -> Open(item = i, bid = new Bid(-1), fee = f);
+    }
+
+    transaction makeBid(Auction@Open this, Bidder@Owned >> Unowned bidder) {
+        if (bidder.getBidAmount() > bid.getAmount()) {
+            if (maxBidder.getName() != "none") {
+                if (bid in Open) {
+                    maxBidder.returnBidMoney(bid);
+                    bid.bidSurpassed();
+                }
+            }
+            if (bidder in Bidding) {
+                bid = bidder.createBid();
+            }
+            maxBidder = bidder;
+        }
+    }
+
+    transaction finishBidding(Auction@Open >> BiddingDone this) {
+        if (bid.getAmount() <= 0) {
+            if (seller in Unsold) {
+                seller.getBackFee(fee);
+            }
+        }
+        -> BiddingDone(it = item, finalBid = bid);
+    }
+
+    transaction giveItem(Auction@BiddingDone >> Closed this) {
+        if (maxBidder in Bidding) {
+            maxBidder.won(it);
+        }
+        if (seller in Unsold) {
+            seller.receiveBid(finalBid);
+        }
+        -> Closed;
+    }
+
+}

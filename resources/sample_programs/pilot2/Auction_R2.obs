@@ -1,0 +1,221 @@
+
+/*
+The following program simulates an English auction; there are multiple Bidders 
+who each make a Bid for a single Item being sold by a Seller.
+The highest Bidder will receive the Item for the price of the highest Bid.
+*/
+
+
+
+
+
+/*
+Below is the Bid contract, which represents a single bid in our Auction. 
+Please answer the questions below.
+
+
+TODO: What state is a Bid in at:
+    1. First instantiation? ______Open________________
+    2. The beginning of the bidSurpassed transaction? ____Open_________________
+    3. The end of the bidSurpassed transaction? ____Stale____________________
+*/
+
+asset contract Bid {
+    Money@Owned money;
+
+    state Open;
+    state Stale;
+
+    Bid@Open(Money@Owned >> Unowned m) {
+        money = m;
+        ->Open;
+    }
+
+    transaction getMoney(Bid@Owned this) returns Money@Owned {
+        Money temp = new Money(money.getAmount());
+        -> Stale;
+        return temp;
+    }
+
+    transaction getAmount(Bid@Owned this) returns int {
+        return money.getAmount();
+    }
+
+    transaction bidSurpassed(Bid@Open >> Stale this) {
+        -> Stale;
+    }
+}
+
+
+/*
+Below is the Bidder contract, which represents a bidder in our Auction.
+Uncomment the code and answer all the TODO statements below.
+*/
+
+asset contract Bidder {
+    string name; //Bidder's name
+    Money@Owned money; //The total money owned by the bidder
+    ItemList@Owned inventory; // can add infinite items to inventory
+
+    Bidder@Owned(string n, int m) {
+        name = n;
+        money = new Money(m);
+        inventory = new ItemList();
+    }
+
+    transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {  
+        Money m = money.splitMoney(bidAmount);
+        //4. TODO: Finish this transaction by creating a new bid with the given bidAmount.
+        
+        Bid bid = new Bid(m);
+        return bid;
+    }
+
+    transaction getName(Bidder@Unowned this) returns string {
+        return name;
+    }
+
+    transaction won(Bidder@Unowned this, Item@Owned >> Unowned i) {
+        inventory.append(i);
+    }
+
+    transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
+        money.mergeMoney(bid.getMoney());
+        disown bid;
+    }
+}
+
+/*
+Below are the Seller, Item, ItemList, and Money contracts. Refer to these (as well as the Bid and Bidder contracts above) to complete
+the rest of the Auction exercise.
+*/
+
+asset contract Seller {
+    state Sold {
+        Bid@Owned bid;
+    }
+    state Unsold {
+        Item@Owned item;
+    };
+    state InAuction;
+
+    Seller@Unsold() {
+        -> Unsold(item = new Item());
+    }
+
+    transaction giveItem(Seller@Unsold >> InAuction this) returns Item@Owned {
+        Item temp = item;
+        -> InAuction;
+        return temp;
+    }
+
+    transaction receiveBid(Seller@Unsold >> Sold this, Bid@Owned >> Unowned b) {
+        -> Sold(bid = b);
+    }
+}
+
+contract Item {
+
+}
+
+contract ItemList {
+    state Empty;
+    state HasItems {
+        Item@Owned item;
+        ItemList@Owned next;
+    }
+
+    ItemList@Empty() {
+        ->Empty;
+    }
+
+    transaction append(ItemList@Owned this, Item@Owned >> Unowned it) {
+        ItemList ilist = new ItemList();
+        -> HasItems(item = it, next = ilist);
+    }
+}
+
+asset contract Money {
+    int amount;
+
+    Money@Owned(int amt) {
+        amount = amt;
+    }
+
+    transaction mergeMoney(Money@Owned this, Money@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    transaction getAmount(Money@Unowned this) returns int {
+        return amount;
+    }
+
+    transaction splitMoney(Money@Owned this, int amt) returns Money@Owned {
+        if (amt > amount) {
+            revert "Can't split out more money than is available in a given Money object.";
+        } else {
+            amount = amount - amt;
+            return new Money(amt);
+        }
+    }
+}
+
+/*
+In the Auction contract below, uncomment the code and finish all the TODO statements.
+*/
+
+main asset contract Auction {
+    Bidder@Unowned maxBidder;
+    Seller@Unsold seller;
+    Item@Owned item available in Open, BiddingDone;
+
+    state Open {
+        Bid@Owned bid;
+    }
+    state BiddingDone {
+        Bid@Owned finalBid;
+    }
+    
+    state Closed;
+
+    Auction@Owned() {
+        maxBidder = new Bidder("none", 0);
+        seller = new Seller();
+        -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
+    }
+
+    transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
+        if (newBid.getAmount() > bid.getAmount()) {
+            setCurrentBid(newBid);
+            Bidder tempBidder = maxBidder;
+            maxBidder = bidder;
+        }
+        else {
+            //5. TODO: return the new bid money to the bidder. Refer to the above contracts as needed.
+            returnBidMoney(newBid, bidder);
+        }
+    }
+
+    transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
+        //6. TODO: set the current bid to the new bid b. You may call any other transactions as needed.
+        bid = b;
+    }
+
+    transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
+        bidder.receiveBidMoney(b);
+    }
+
+    transaction finishBidding(Auction@Open >> BiddingDone this) {
+        -> BiddingDone(item = item, finalBid = bid);
+    }
+
+    /* 7. TODO: Assuming this transaction should be called after the "finishBidding" transaction,
+                finish the transaction declaration below. */
+    transaction giveItem(Auction@BiddingDone >> Closed this) {
+        maxBidder.won(item);
+        seller.receiveBid(finalBid);
+        -> Closed;
+    }
+
+}

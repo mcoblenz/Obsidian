@@ -1,0 +1,25 @@
+asset contract Licensor {
+    Money@Owned balance;
+
+    Licensor@Owned() {
+        balance = new Money(0);
+    }
+
+    // TODO: though we would hypothetically need these methods to actually run the program, in practice we do not
+    transaction getLicense(Licensor@Owned this) returns License@Owned {
+        return new License(this, 1);
+    }
+
+    transaction getApproval(Licensor@Owned this, string token) returns Approval@Owned {
+        return new Approval(this);
+    }
+
+    transaction getCommission(Licensor@Owned this, string token, int paymentAmount) returns Commission@Owned {
+        return new Commission(this, balance.split(paymentAmount));
+    }
+
+    transaction pay(Licensor@Owned this, Money@Owned >> Unowned money) {
+        balance.merge(money);
+    }
+}
+

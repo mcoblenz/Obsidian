@@ -1,0 +1,91 @@
+contract Player {
+    string move;
+
+    Player() {
+        move = "none";
+    }
+
+    transaction getMove(Player@Owned >> Owned this) returns string {
+        return move;
+    }
+
+    transaction setMove(Player@Owned >> Owned this, string newMove) {
+        // if ((move != "rock") || (move != "paper") || (move != "scissors")) {
+        //     revert("Possible moves: rock, paper, scissors");
+        // }
+        move = newMove;
+    }
+}
+main contract Game {
+    Player@Owned p1;
+    Player@Owned p2;
+
+    state p1Win;
+    state p2Win;
+    state tie;
+    state start;
+    state playing;
+
+    Game() {
+        p1 = new Player();
+        p2 = new Player();
+        -> start;
+    }
+
+    transaction p1Move(string move) {
+        p1.setMove(move);
+    }
+
+    transaction p2Move(string move) {
+        p2.setMove(move);
+    }
+
+
+    transaction play() returns string {
+
+        string p1Move = p1.getMove();
+        string p2Move = p2.getMove();
+
+        if (p1Move == "none") {
+            -> playing;
+            return "Player 1 must play";
+        }
+        if (p2Move == "none") {
+            -> playing;
+            return "Player 2 must play";
+        }
+        if (p1Move == "rock") {
+            if (p2Move == "scissors") {
+                -> p1Win;
+                return "Player 1 wins!";
+            }
+            if (p2Move == "paper") {
+                -> p2Win;
+                return "Player 2 wins!";
+            }
+        }
+        if (p1Move == "paper") {
+            if (p2Move == "rock") {
+                -> p1Win;
+                return "Player 1 wins!";
+            }
+            if (p2Move == "scissors") {
+                -> p2Win;
+                return "Player 2 wins!";
+            }
+        }
+        if (p1Move == "scissors") {
+            if (p2Move == "paper") {
+                -> p1Win;
+                return "Player 1 wins!";
+            }
+            if (p2Move == "rock") {
+                -> p2Win;
+                return "Player 2 wins!";
+            }
+        }
+        ->tie;
+        return "Tie";
+
+    }
+}

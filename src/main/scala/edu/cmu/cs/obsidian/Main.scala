@@ -201,6 +201,8 @@ object Main {
 
             //copy the content of the fabric/java/ folder into a folder with the class name
             //have to add the trailing separator to avoid copying the java directory too
+            
+            
             val fabricPath = compilerPath().resolve("fabric").resolve("java")
             val buildPath = fabricPath.resolve("build.gradle")
             val settingsPath = fabricPath.resolve("settings.gradle")
