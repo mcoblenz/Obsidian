@@ -8,4 +8,5 @@ public class IO {
     public void println(String s) {
         System.out.println(s);
     }
+    public void printInt(java.math.BigInteger n) { System.out.print(n); }
 }

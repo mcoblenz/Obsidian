@@ -1,6 +1,7 @@
 interface IOInterface {
     transaction print(string s);
     transaction println(string s);
+    transaction printInt(int n);
 }
 
 contract IO implements IOInterface with java : edu.cmu.cs.obsidian.stdlib.IO;
