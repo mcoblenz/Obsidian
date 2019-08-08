@@ -38,7 +38,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
     private final val serializationParamName: String = "__st"
     private final val constructorReturnsOwnedFieldName: String = "__constructorReturnsOwned"
     private final val constructorReturnsOwnedReferenceMethName = "constructorReturnsOwnedReference"
-    private final val genericParamsFieldName: String = "__genericParams"
 
     private def stateEnumNameForClassName(className: String): String = {
         "State_" + className
@@ -144,7 +143,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     translateOuterContract(obsCon, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
 
                     if (obsCon.isImport) {
-                        translateStubContract(obsCon, programPackage, translationContext)
+                        target match {
+                            case Client(mainContract, _) =>
+                                translateStubContract(obsCon, programPackage, translationContext)
+                            case _ => ()
+                        }
                     }
                 }
 
@@ -176,6 +179,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                                       translationContext: TranslationContext): Unit = {
         var contractClass = programPackage._class(JMod.PUBLIC, classNameForStub(contract.name))
         contractClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientStub"))
+
+        for (param <- contract.params) {
+            generify(contractClass, param)
+        }
+
         val constructor = contractClass.constructor(JMod.PUBLIC)
         val connectionManager = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
         val uuid = constructor.param(classOf[String], "uuid")
@@ -1709,9 +1717,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
             val transCondBody = transCond._then()
             // Check to make sure we have enough arguments.
-            val newInteger = JExpr._new(model.parseType("Integer"))
-            newInteger.arg("0")
-            val argsTest = runArgs.ref("length").eq(newInteger)
+            val zero = JExpr.lit(0);
+            val argsTest = runArgs.ref("length").eq(zero)
             val enoughArgsTest = transCondBody._if(argsTest)
             val enoughArgs = enoughArgsTest._then()
             val notEnoughArgs = enoughArgsTest._else()
@@ -2208,7 +2215,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     archive.invoke("getObj")
                 }
 
-            // This should never actually happen, since it would be caught be the typechecker
+            // This should never actually happen, since it would be caught by the typechecker
             case t => assert(false, "Attempting to code generate construction for primitive or bottom type.")
                 archive.invoke("getObj")
         }
@@ -2624,10 +2631,6 @@ class CodeGen (val target: Target, table: SymbolTable) {
             newClass.field(JMod.PUBLIC, resolveType(decl.typ, table), decl.name)
         }
     }
-//
-//    def makeGenericArgs(translationContext: TranslationContext, name: String,
-//                        typeArgs: Seq[ObsidianType]): Seq[IJExpression] = {
-//    }
 
     def arraysAsList(): JInvocation = model.directClass("java.util.Arrays").staticInvoke("asList")
 
@@ -2640,7 +2643,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             val permVarParam = param.gVar.permissionVar.flatMap(pVar => {
                 arg.typeState match {
                     case States(states) => Some(setOf(states.map(JExpr.lit).toSeq))
-                    case PermVar(varName) => Some(JExpr.ref("__genericParam" + varName))
+                    case PermVar(varName) => Some(JExpr.ref(genericPermParamName(varName)))
                     case permission: Permission =>
                         Some(setOf(Seq(JExpr.lit(permission.toString))))
                 }
@@ -3003,7 +3006,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
     /* these methods make shadowing possible */
 
     private def genericPermParamName(pVar: String) = {
-        "__genericPerm" + pVar
+        "__genericPerm_" + pVar
     }
 
     private def dereferenceVariable(name: String,
