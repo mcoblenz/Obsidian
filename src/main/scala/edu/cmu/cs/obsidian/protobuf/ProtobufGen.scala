@@ -5,6 +5,7 @@ import java.io.File
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.util.Util
 import edu.cmu.cs.obsidian.typecheck._
+import edu.cmu.cs.obsidian.protobuf._
 
 class Unimplemented extends Exception {}
 
@@ -21,7 +22,12 @@ object ProtobufGen {
 
         val messages = program.contracts.map(translateContract)
 
-        val result: Seq[(Protobuf, String)] = Seq((new Protobuf(messages), sourceFilename))
+        // A wrapper message for a class that implements something other than just Top.
+        // This way, the client can figure out what class to instantiate when it gets something that it only knows implements a particular interface.
+        val wrapperMessage = ProtobufMessage(List(ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__className"),
+            ProtobufField(BytesType(), "objectRef")), "InterfaceImplementerWrapper")
+
+        val result: Seq[(Protobuf, String)] = Seq((new Protobuf(List(wrapperMessage) ++ messages), sourceFilename))
         result
     }
 
@@ -60,9 +66,11 @@ object ProtobufGen {
             }
         )
 
+
+
         val declsWithGUID =
-            ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") ::
-                genericParams(aContract) ++ interfaceParams(aContract) ++ decls
+            (ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__guid") ::
+                genericParams(aContract) ++ interfaceParams(aContract) ++ decls)
 
         val contractMessage = if (stateNames.nonEmpty) {
             val oneOfOptions = stateNames.map((stateName: String) =>
@@ -74,6 +82,14 @@ object ProtobufGen {
         else {
             ProtobufMessage(declsWithGUID, aContract.name)
         }
+
+        val contractWrapperMessage =
+            if (aContract.bound == ContractType.topContractType)
+                List[ProtobufDeclaration]()
+            else {
+
+                List()
+            }
 
         val contractOrGUIDFields : List[(FieldType, String)] = List[(FieldType, String)]((ObjectType(aContract.name), "obj"),
                                                                                          (edu.cmu.cs.obsidian.protobuf.StringType(), "guid"))
