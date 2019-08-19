@@ -64,6 +64,7 @@ public class ChaincodeClientConnectionManager {
             throw new ChaincodeClientTransactionFailedException(output);
         }
 
-        return output.trim().getBytes();
+        byte[] base64EncodeBytes = output.trim().getBytes();
+        return Base64.getDecoder().decode(base64EncodeBytes);
     }
 }

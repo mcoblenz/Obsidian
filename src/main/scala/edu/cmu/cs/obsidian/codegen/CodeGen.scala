@@ -257,7 +257,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
     }
 
     // Returns a pair of an error-checking block option and the resulting expression.
-    private def unmarshallExprExpectingUUIDObjects(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock): IJExpression = {
+    private def unmarshallExprExpectingUUIDObjects(marshalledExpr: IJExpression, typ: ObsidianType, errorBlock: JBlock, regularBlock: JBlock): IJExpression = {
         typ match {
             case IntType() =>
                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
@@ -277,16 +277,24 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
             // this case encompasses [AstContractType] and [AstStateType]
             case _ =>
-                val targetClass = resolveType(typ, table).asInstanceOf[AbstractJClass]
-                val constructorInvocation = JExpr._new(targetClass)
+                val wrapper = interfaceWrapperType().staticInvoke("parseFrom").arg(marshalledExpr)
+                val wrapperDecl = regularBlock.decl(interfaceWrapperType(), "wrapper", wrapper)
+
+                val className = wrapperDecl.invoke("getClassName")
+                val targetClass = model.directClass("java.lang.Class").staticInvoke("forName").arg(className.plus("__Stub__"))
+
+                val connectionManagerClass = model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager")
+                // I have the JDirectClass, but I need an IJExpression.
+                val connectionManagerClassObj = connectionManagerClass.dotclass()
+
+                val constructor = targetClass.invoke("getConstructor").arg(connectionManagerClassObj).arg(javaStringType.dotclass())
+                val constructorInvocation = constructor.invoke("newInstance")
                 constructorInvocation.arg(JExpr.ref("connectionManager"))
 
-                val stringClass = model.ref("java.lang.String")
-                val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
-                val guidString = JExpr._new(stringClass).arg(marshalledExpr).arg(charset)
+                val guidString = wrapperDecl.invoke("getGuid")
 
                 constructorInvocation.arg(guidString)
-                constructorInvocation
+                JExpr.cast(resolveType(typ, table), constructorInvocation)
         }
     }
 
@@ -435,13 +443,13 @@ class CodeGen (val target: Target, table: SymbolTable) {
         doTransactionInvocation.arg(JExpr.invoke("__getGUID")) // pass UUID so server knows what object to invoke the transaction on
         doTransactionInvocation.arg(transaction.retType.isDefined)
 
-        if (transaction.retType.isDefined) {
+        if (obsidianRetType.isDefined) {
             // return result
             val marshalledResultDecl = tryBlock.body().decl(newClass.owner().ref("byte[]"), "marshalledResult", doTransactionInvocation)
 
             val errorBlock = new JBlock()
 
-            val deserializedArg = unmarshallExprExpectingUUIDObjects(marshalledResultDecl, obsidianRetType.get, errorBlock)
+            val deserializedArg = unmarshallExprExpectingUUIDObjects(marshalledResultDecl, obsidianRetType.get, errorBlock, tryBlock.body())
 
             if (!errorBlock.isEmpty) {
                 tryBlock.body().add(errorBlock)
@@ -461,6 +469,26 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         val bugCatchBlock = tryBlock._catch(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionBugException"))
         bugCatchBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+        if (obsidianRetType.isDefined && obsidianRetType.get.isInstanceOf[NonPrimitiveType]) {
+            // In this case, the unmarshalling method is going to do runtime reflection to figure out what kind of object
+            // this is, in which case some additional exceptions are possible.
+            val classNotFoundBlock = tryBlock._catch(model.directClass("java.lang.ClassNotFoundException"))
+            classNotFoundBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+            val noSuchMethodBlock = tryBlock._catch(model.directClass("java.lang.NoSuchMethodException"))
+            noSuchMethodBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+            val instantiationExceptionBlock = tryBlock._catch(model.directClass("java.lang.InstantiationException"))
+            instantiationExceptionBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+            val illegalAccessExceptionBlock = tryBlock._catch(model.directClass("java.lang.IllegalAccessException"))
+            illegalAccessExceptionBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+            val invocationTargetExceptionBlock = tryBlock._catch(model.directClass("java.lang.reflect.InvocationTargetException"))
+            invocationTargetExceptionBlock.body()._throw(JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException")))
+
+        }
 
         meth
     }
@@ -953,7 +981,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         aContract.params.foreach(p => {
             val paramName = genericParamName(p)
-            newDispatcher.param(model.directClass("java.lang.String"), paramName)
+            newDispatcher.param(javaStringType(), paramName)
             newDispatcher.body().assign(JExpr.refthis(paramName), JExpr.ref(paramName))
 
             p.gVar.permissionVar match {
@@ -1106,6 +1134,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     def obsidianSerializedSetType: JNarrowedClass = setType().narrow(obsidianSerialized)
     def obsidianSerializedHashSetType: JNarrowedClass = hashSetType().narrow(obsidianSerialized)
+
+    def interfaceWrapperType() = model.ref("org.hyperledger.fabric.example.InterfaceImplementerWrapperOuterClass.InterfaceImplementerWrapper")
 
     def isPerm(e: IJExpression, p: Permission): IJExpression =
         JExpr.lit(p.toString).invoke("equals").arg(e)
@@ -1679,7 +1709,21 @@ class CodeGen (val target: Target, table: SymbolTable) {
                                                     val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                                                     invocation.arg(charset)
                             //                            case _ => returnObj.invoke("__archiveBytes")
-                            case _ => returnObj.invoke("__getGUID").invoke("getBytes")
+                            case _ =>
+                                // It would be nice if we could only send the wrapper if there's a possibility that
+                                // this class was obtained by substitution from a type variable.
+                                // But that information is gone now, and if/when we support subclassing, we'll need to address that case too.
+                                // For now, do the simple thing, and send class information for all object references.
+                                val wrapperBuilderClass = model.ref("org.hyperledger.fabric.example.InterfaceImplementerWrapperOuterClass.InterfaceImplementerWrapper.Builder")
+                                val wrapperBuilder = enoughArgs.decl(wrapperBuilderClass, "returnWrapperBuilder", interfaceWrapperType().staticInvoke("newBuilder"))
+                                enoughArgs.invoke(wrapperBuilder, "setGuid").arg(returnObj.invoke("__getGUID"))
+                                enoughArgs.invoke(wrapperBuilder, "setClassName").arg(returnObj.invoke("getClass").invoke("getName"))
+
+                                val encoder = model.directClass("java.util.Base64").staticInvoke("getEncoder")
+                                val bytes = wrapperBuilder.invoke("build").invoke("toByteArray")
+                                encoder.invoke("encode").arg(bytes)
+
+                                //returnObj.invoke("__getGUID").invoke("getBytes")
                         }
 
                     )
@@ -2939,7 +2983,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         for (param <- tx.params) {
             generify(meth, param)
-            meth.param(model.directClass("java.lang.String"), genericParamName(param))
+            meth.param(javaStringType(), genericParamName(param))
 
             param.gVar.permissionVar match {
                 case Some(pVar) =>
@@ -3054,7 +3098,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
         case States(states) =>
             // Generates:
             // new HashSet<String>(Arrays.asList(states)).contains(e.getState().toString())
-            JExpr._new(model.directClass("java.util.HashSet").narrow(model.directClass("java.lang.String")))
+            JExpr._new(model.directClass("java.util.HashSet").narrow(javaStringType()))
                 .arg(withArgs(model.directClass("java.util.Arrays").staticInvoke("asList"),
                     states.map(JExpr.lit).toSeq))
                 .invoke("contains").arg(invokeGetState(jEx, loadSerialization = true).invoke("toString"))

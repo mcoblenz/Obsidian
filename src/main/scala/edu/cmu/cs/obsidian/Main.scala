@@ -346,6 +346,7 @@ object Main {
             val mainName = findMainContractName(checkedTable.ast)
 
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(checkedTable.ast, sourceFilename)
+            val protobufOutputPath = outputPath.resolve("protos")
 
             // Each import results in a .proto file, which needs to be compiled.
             for (p <- protobufs) {
@@ -358,11 +359,10 @@ object Main {
 
                 protobuf.build(protobufPath.toFile, protobufOuterClassName)
 
-
                 // Invoke protoc to compile from protobuf to Java.
-                val protoPath = protobufPath.getParent.toString + " " + protobufPath.toString
+                val protoPath = protobufPath.getParent.toString
                 val protocInvocation: String =
-                    "protoc --java_out=" + srcDir + " --proto_path=" + protoPath
+                    "protoc --java_out=" + srcDir + " -I=" + protoPath + " " + protobufPath.toString
 
                 try {
                     val exitCode = protocInvocation.!
@@ -382,7 +382,6 @@ object Main {
                     case None =>
                         Paths.get(mainName)
                 }
-                val protobufOutputPath = outputPath.resolve("protos")
                 val temp = protobufOutputPath.toFile
                 if (temp.exists()) {
                     FileUtils.deleteDirectory(temp)
@@ -393,7 +392,33 @@ object Main {
                 val destFile = Paths.get(s"$protobufOutputPath")
                 val newDest = Paths.get(destFile.toString() + File.separator + sourceFile.getFileName())
                 Files.copy(sourceFile, newDest, StandardCopyOption.REPLACE_EXISTING)
+
             }
+
+            // Compile the wrapper protobuf file.
+            val wrapperProtoPath = compilerPath().resolve("resources")
+                .resolve("protos")
+            // Invoke protoc to compile from protobuf to Java.
+            val wrapperProtocInvocation: String =
+                "protoc --java_out=" + srcDir + " -I=" + wrapperProtoPath + " InterfaceImplementerWrapper.proto"
+
+            try {
+                val exitCode = wrapperProtocInvocation.!
+                if (exitCode != 0) {
+                    println("`" + wrapperProtocInvocation + "` exited abnormally: " + exitCode)
+                    return false
+                }
+            } catch {
+                case e: Throwable => println("Error running protoc: " + e)
+            }
+
+            // Copy the InterfaceImplementerWrapper.proto file.
+            val wrapperProtoPathSrc = compilerPath().resolve("resources")
+                .resolve("protos")
+                .resolve("InterfaceImplementerWrapper.proto")
+            val wrapperProtoPathDest = protobufOutputPath.resolve("InterfaceImplementerWrapper.proto")
+            Files.copy(wrapperProtoPathSrc, wrapperProtoPathDest, StandardCopyOption.REPLACE_EXISTING)
+
 
             generateFabricCode(mainName, options.outputPath, srcDir)
         } catch {

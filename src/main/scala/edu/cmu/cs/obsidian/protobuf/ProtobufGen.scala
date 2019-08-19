@@ -22,12 +22,7 @@ object ProtobufGen {
 
         val messages = program.contracts.map(translateContract)
 
-        // A wrapper message for a class that implements something other than just Top.
-        // This way, the client can figure out what class to instantiate when it gets something that it only knows implements a particular interface.
-        val wrapperMessage = ProtobufMessage(List(ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), "__className"),
-            ProtobufField(BytesType(), "objectRef")), "InterfaceImplementerWrapper")
-
-        val result: Seq[(Protobuf, String)] = Seq((new Protobuf(List(wrapperMessage) ++ messages), sourceFilename))
+        val result: Seq[(Protobuf, String)] = Seq((new Protobuf(messages), sourceFilename))
         result
     }
 
