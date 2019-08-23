@@ -129,5 +129,11 @@ case class ObjectType(typeName: String) extends FieldType {
     }
 }
 
+case class BytesType() extends FieldType {
+    def typeString()  = {
+        "bytes"
+    }
+}
+
 
 

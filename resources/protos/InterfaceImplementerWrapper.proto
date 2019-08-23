@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option java_outer_classname = "InterfaceImplementerWrapperOuterClass";
+
+option java_package = "org.hyperledger.fabric.example";
+
+
+message InterfaceImplementerWrapper {
+    string __className = 1;
+
+    string __guid = 2;
+}
