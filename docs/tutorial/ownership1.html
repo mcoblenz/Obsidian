@@ -1,0 +1,81 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Part 1: Ownership -- Transactions</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h1><strong>Part 1: Ownership -- Transactions </strong></h1>
+<h2>Transaction return types</h2>
+<p>
+When transactions return objects, the type of the returned object must be annotated in the transaction declaration. For example:
+<pre>
+<code>
+transaction withdraw() returns Money@Owned {
+    // body not shown
+    return m; //where m is of type Money@Owned
+}
+</code>
+</pre>
+If we did not return <code>m</code> within the transaction, or if <code>m</code> was not of type <code>Money@Owned</code>, we would get an error.
+</p>
+
+<br/>
+<h2>Transaction parameters</h2>
+<p>When a reference is passed to a transaction as an argument, the transaction's declaration specifies initial and final ownership with <code>>></code>. 
+    If <code>>></code> is not specified for a certain parameter, then the ownership of that parameter <b>doesn't change</b>. For example:</p>
+
+<pre>
+<code>
+transaction spend(Money@Owned >> Unowned m) { // m is Owned initially but must be Unowned at the end.
+	// implementation not shown
+};
+
+transaction testSpend(Money@Owned >> Unowned m) {
+	spend(m);
+	// m is now of type Money@Unowned due to specification on spend() declaration.
+}
+
+transaction foo(Money@Owned m) { //this is the equivalent to Money@Owned >> Owned m
+    // body not shown
+    
+}
+</code>
+</pre>
+
+<p>If a transaction expects an argument that is <code>Unowned</code>, this means that the transaction cannot take ownership. 
+    As a result, it is safe to pass an <code>Owned</code> reference as an argument to a transaction that expects an <code>Unowned</code> argument. 
+    After the transaction returns, the caller still holds ownership.</p>
+
+<p> 
+    For example, <code>transaction bar(Money@Unowned m)</code> can accept a 
+    <code>Money</code> reference with any ownership and the caller maintains whatever ownership it had initially when it called that transaction.
+</p>
+
+
+<br/>
+<h2>Transaction receivers (<code>this</code>)</h2>
+<p>Sometimes the ownership of <code>this</code> (the ownership of this contract) needs to change in a transaction. 
+    That can be specified by adding <code>this</code> as the first argument in the transaction declaration. Note that <code>this</code> is implicit,
+    and is not an actual parameter. For example:</p>
+
+<pre>
+<code>
+contract Money {
+    transaction discard(Money@Owned >> Unowned this) {
+        disown this;
+    }
+}
+
+contract Wallet {
+    transaction throwAwayMoney(Money@Owned >> Unowned money) {
+        money.discard(); // 'this' argument is implicit; do not include it in transaction call.
+    }
+}
+</code>
+</pre>
+
+</body></html>

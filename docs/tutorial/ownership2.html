@@ -1,0 +1,82 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Part 2: Ownership -- Variables </title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<h1><strong>Part 2: Ownership -- Variables</strong></h1>
+
+<h2>Assignment</h2>
+<p>Assignment (<code>=</code>) transfers ownership. That is, the variable on the left becomes the <strong>new</strong> owner, and the variable on the right loses ownership. For example:</p>
+
+<pre>
+<code>
+Money m = ...; // m is Owned
+Money newMoney = m; // m is Unowned, and newMoney is Owned
+// Now m is of type Money@Unowned, not Money@Owned.
+</code>
+</pre>
+
+<br/>
+<h2>Fields</h2>
+<p><strong>Field declarations</strong>&nbsp;MUST include ownership specifications. 
+    This means that&nbsp;at the END of each transaction, the permission (ownership status) of the object the field references MUST 
+    match the annotation on the field when it was <b>declared</b>. For example:</p>
+<pre>
+<code>
+contract Wallet {
+	Money@Owned money; // Note that this annotation is on a field declaration!
+
+	// exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
+	transaction exchange(Money@Owned >> Unowned otherMoney) returns Money@Owned {
+        Money temporaryMoney = money;
+        money = otherMoney;
+        return temporaryMoney;
+	}
+}
+</code>
+</pre>
+NOTE: in the above example, <code>money</code> becomes <code>Unowned</code> in the <code>exchange</code> transaction when the ownership 
+is transferred to <code>temporaryMoney</code>. However, by the end of the transaction, <code>money</code> gets ownership of <code>otherMoney</code>,
+so its permission at the end of the transaction still matches its permission where it was declared (as a field).
+
+<br/><br/>
+<h2>Local variables</h2>
+Local variables (variables declared within transactions) are declared <strong>WITHOUT</strong> any ownership specified; 
+instead, you can optionally write compiler ownership checks <code>[]</code> to specify their ownership. 
+The compiler will output an error if the ownership does not match the check. For example:
+<pre>
+<code>
+transaction withdraw() returns Money@Owned {
+    // body not shown
+}
+
+transaction test() {
+    Money m = withdraw(); [m@Owned];
+    spend(m); [m@Unowned];
+    [m@Owned]; // COMPILE ERROR: m is Unowned here
+</code>
+</pre>
+
+<br/><br/>
+<h2>Constructors</h2>
+<p>Constructors are specified just like in other object-oriented languages, but can include a permission. 
+    Fields of a contract must be initialized in the constructor. For example:</p>
+<pre>
+    <code>
+    contract Wallet {
+        Money@Owned money; // Note that this annotation is on a field declaration!
+    
+        //Constructor, takes in a Money parameter
+        Wallet@Owned(Money@Owned >> Unowned initialMoney) {
+            money = initialMoney;
+        }
+    }
+    </code>
+    </pre>
+
+</body></html>

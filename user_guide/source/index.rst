@@ -3,12 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Obsidian's documentation!
-====================================
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :hidden:
+
+   Getting Started <getting_started>
+   Obsidian Language Tutorial <tutorial/tutorial>
+   Contributing to Obsidian <contributing>
 
 
 
