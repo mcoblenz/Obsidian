@@ -5,4 +5,4 @@
 version: 2
 
 sphinx:
-	configuration: docs/user_guide/source/conf.py
+  configuration: docs/user_guide/source/conf.py
