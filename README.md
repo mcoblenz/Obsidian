@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/mcoblenz/Obsidian.svg?branch=master)](https://travis-ci.org/mcoblenz/Obsidian)
+[![Documentation Status](https://readthedocs.org/projects/obsidian/badge/?version=latest)](https://obsidian.readthedocs.io/en/latest/?badge=latest)
+      
+
 # Obsidian
 Obsidian language development
 
