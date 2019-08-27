@@ -7,11 +7,12 @@ The Obsidian Smart Contract Language
 ======================================
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
 
    Getting Started <getting_started>
    Obsidian Language Tutorial <tutorial/tutorial>
+   Obsidian Reference <reference/reference>
    Contributing to Obsidian <contributing>
 
 
