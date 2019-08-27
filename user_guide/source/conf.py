@@ -18,14 +18,14 @@
 
 import sphinx_rtd_theme
 
-# def setup(sphinx):
-#     from pygments_lexer_solidity import SolidityLexer
-#     sphinx.add_lexer('Solidity', SolidityLexer())
+def setup(sphinx):
+    from pygments_lexer_obsidian import ObsidianLexer
+    sphinx.add_lexer('Obsidian', ObsidianLexer())
     
 # -- Project information -----------------------------------------------------
 
 project = u'Obsidian'
-copyright = u'2019, Michael Coblenz'
+copyright = u'2019, Michael Coblenz and Obsidian Project Contributors'
 author = u'Michael Coblenz'
 
 # The short X.Y version
@@ -77,7 +77,7 @@ exclude_patterns = []
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
-highlight_language = 'Solidity'
+highlight_language = 'Obsidian'
 
 # -- Options for HTML output -------------------------------------------------
 

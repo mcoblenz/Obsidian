@@ -5,7 +5,7 @@
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :hidden:
 
    Getting Started <getting_started>
@@ -14,9 +14,6 @@
 
 
 
-Indices and tables
-==================
+Obsidian is an object-oriented, strongly-typed language for smart contracts. Obsidian provides strong safety guarantees by using *typestate* and *linear types*. 
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+Even if you are highly experienced with OOP, you will find that Obsidian is very different from other languages you have used. Obsidian enables the compiler to reason about what states objects are in; by leveraging the power of the compiler, you can ensure that you only manipulate objects in ways that are appropriate for their current state. We recommend that you read the sections of the manual on *ownership* and *states* before you write your first Obsidian program.
