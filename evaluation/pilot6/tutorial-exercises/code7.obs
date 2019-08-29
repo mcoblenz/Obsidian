@@ -1,0 +1,42 @@
+
+//1. Write code to complete the "buy" transaction declaration below.
+//2. Complete the restock transaction above by transitioning the state of TinyVendingMachine.
+
+asset contract Candy {
+}
+
+asset contract Coin {
+}
+
+asset contract CoinBag {
+
+    transaction deposit(Coin@Owned >> Unowned c) {
+        disown c;
+    }
+}
+
+main asset contract TinyVendingMachine {
+    CoinBag@Owned coinBin;
+
+    state Full {
+        Candy@Owned inventory;
+    }
+    state Empty;
+
+    TinyVendingMachine@Owned () {
+        coinBin = new CoinBag();
+        ->Empty;
+    }
+
+    transaction restock(TinyVendingMachine@Empty >> Full this,
+                        Candy@Owned >> Unowned c) {
+        ->Full(inventory = c);
+    }
+
+    transaction buy(TinyVendingMachine@Full >> Empty this,  Coin@Owned >> Unowned c) returns Candy @ Owned {
+        coinBin.deposit(c);
+        Candy result = inventory;
+        ->Empty;
+        return result;
+    }
+}
