@@ -41,7 +41,7 @@ transition to that state as follows:
     ->On (brightness = b);
    }
 
-In addition, a transaction can begin or end in multiple states. This is specified with the ``|`` operator. An example is shown below:
+In addition, a transaction can begin or end in multiple possible states. This is specified with the ``|`` operator. An example is shown below:
 
 ::  
 

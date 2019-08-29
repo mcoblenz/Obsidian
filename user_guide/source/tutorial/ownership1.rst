@@ -5,10 +5,10 @@ Ownership -- Introduction
 .. highlight:: Obsidian
 
 
-
+Principles of ownership
+------------------------
 Our new programming language is object-oriented. It includes *contracts*, which are like classes, and can have *fields* 
-and *transactions*, analogous to member variables and functions respectively. As in other object-oriented languages,
-there must be exactly one ``main contract``.
+and *transactions*, analogous to Java fields and methods respectively. An Obsidian program must have exactly one ``main contract``.
 In addition, of the many variables or fields that reference objects, exactly *one* of them 
 can own the object, as seen in diagram *(a)* below. An object can have any number of Unowned references, and, if the object is not Owned, 
 it can have any number of Shared references (shown in *(b)* below). An object with Shared references can also have Unowned references,
@@ -19,10 +19,10 @@ but not Owned ones.
    :width: 1000
 
 In other words, the concept of ownership is having different types of references to an object. There are three different 
-types these references: ``Owned``, ``Unowned``, and ``Shared``.
+types of references: ``Owned``, ``Unowned``, and ``Shared``.
 Let's use money as an example. If you have $10, that money belongs to you -- you own it. This is the idea of an ``Owned`` reference.
 You can show this money to anyone else; they can see the money, and talk about it, but they can't do anything with it -- 
-they can't spend it, or save it, or add to it because it's not theirs. This is the idea of an ``Unowned`` reference; it's a reference to an object,
+they can't spend it or save it because it's not theirs. This is the idea of an ``Unowned`` reference; it's a reference to an object,
 but doesn't have as much manipulative power over the object because it doesn't own the object. Now imagine the $10 is in a public pot that anyone can take from. 
 In this case, everyone shares ownership of the money; i.e., you all have ``Shared`` references to it. ``Shared`` references 
 are similar to normal references in other programming languages, and are the default ownership type if no permission is specified.
@@ -58,4 +58,3 @@ The compiler tracks ownership of each variable every time the variable is used. 
 - If a reference is the only one that holds ownership, then it is ``Owned``.
 - If all references to the object are the same (there is no owner), then each reference is ``Shared``.
 - If a reference is NOT the owning one, but there might be another owning reference, then the reference is ``Unowned``.
-

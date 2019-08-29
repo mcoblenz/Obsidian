@@ -69,3 +69,16 @@ Errors can be flagged with ``revert``. A description of the error can be provide
      }
    }
 
+Getting rid of ownership
+--------------------------
+If ownership is no longer desired, ``disown`` can be used to relinquish ownership. For example:
+::
+
+   contract Money {
+       int amount;
+
+       transaction merge(Money@Owned >> Unowned mergeFrom) {
+           amount = amount + mergeFrom.amount;
+           disown mergeFrom; // We absorbed the value of mergeFrom, so the owner doesn't own it anymore.
+       }
+   }
