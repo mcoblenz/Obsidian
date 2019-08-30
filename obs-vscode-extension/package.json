@@ -60,7 +60,11 @@
         "commands": [
             {
                 "command": "extension.compileObsidian",
-                "title": "Obsidian: Compile file"
+                "title": "Obsidian: Compile smart contract"
+            },
+            {
+                "command": "extension.compileObsidianClient",
+                "title": "Obsidian: Compile client"
             }
         ],
         "problemMatchers": [
