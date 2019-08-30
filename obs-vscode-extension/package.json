@@ -9,7 +9,7 @@
     "main": "./out/extension.js",
     "activationEvents": [
         "onLanguage:obs",
-        "onCommand:extension.helloWorld"
+        "onCommand:extension.compileObsidian"
     ],
     "devDependencies": {
         "@types/mocha": "^2.2.42",
@@ -59,7 +59,7 @@
         ],
         "commands": [
             {
-                "command": "extension.helloWorld",
+                "command": "extension.compileObsidian",
                 "title": "Obsidian: Compile file"
             }
         ],
