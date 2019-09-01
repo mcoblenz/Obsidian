@@ -97,7 +97,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
     }
 
     def translateProgram(program: Program,
-                         protobufOuterClassName: String): JCodeModel = {
+                         protobufOuterClassName: String): Either[String, JCodeModel] = {
         // Put all generated code in the same package.
         val programPackage: JPackage = model._package(packageName)
         translateProgramInPackage(program, protobufOuterClassName, programPackage)
@@ -105,7 +105,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     private def translateProgramInPackage(program: Program,
                                           protobufOuterClassName: String,
-                                          programPackage: JPackage): JCodeModel = {
+                                          programPackage: JPackage): Either[String, JCodeModel] = {
         val contractNameResolutionMap: Map[Contract, String] = TranslationContext.contractNameResolutionMapForProgram(program)
         val protobufOuterClassNames = mutable.HashMap.empty[String, String]
 
@@ -140,8 +140,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
             (con, newClass) match {
                 case (obsCon: ObsidianContractImpl, Some(newClass)) => {
                     val translationContext = makeTranslationContext(obsCon, newClass, contractNameResolutionMap, protobufOuterClassNames, false)
-                    translateOuterContract(obsCon, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
-
+                    val translationError = translateOuterContract(obsCon, programPackage, protobufOuterClassName, contractNameResolutionMap, protobufOuterClassNames, translationContext, newClass)
+                    if (translationError.isDefined) {
+                        return Left(translationError.get)
+                    }
                     if (obsCon.isImport) {
                         target match {
                             case Client(mainContract, _) =>
@@ -155,7 +157,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             }
         }
 
-        model
+        Right(model)
     }
 
 
@@ -1310,7 +1312,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                                        contractNameResolutionMap: Map[Contract, String],
                                        protobufOuterClassNames: Map[String, String],
                                        translationContext: TranslationContext,
-                                       newClass: JDefinedClass) = {
+                                       newClass: JDefinedClass): Option[String] = {
         translateContract(aContract, newClass, translationContext)
 
         if (!aContract.isInterface) {
@@ -1323,7 +1325,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     if (aContract == mainContract) {
                         newClass._extends(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientBase"))
                         generateClientMainMethod(newClass)
-                        generateInvokeClientMainMethod(aContract, newClass)
+                        val invocationResult = generateInvokeClientMainMethod(aContract, newClass)
+                        if (invocationResult.nonEmpty) {
+                            return invocationResult
+                        }
                     } else {
                         generateRunMethod(newClass, translationContext, stubType)
                         generateSerialization(aContract, newClass, translationContext)
@@ -1370,6 +1375,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 generateConstructorReturnsOwnedReference(newClass)
             }
         }
+
+        None
     }
 
     private def translateInnerContract(aContract: Contract,
@@ -1832,7 +1839,14 @@ class CodeGen (val target: Target, table: SymbolTable) {
      * It should construct a stub according to the type of the client's main(),
      * and pass it to the client's main() method.
     */
-    private def generateInvokeClientMainMethod(aContract: Contract, newClass: JDefinedClass) = {
+    private def generateInvokeClientMainMethod(aContract: Contract, newClass: JDefinedClass): Option[String] = {
+        val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
+            .asInstanceOf[Option[Transaction]]
+
+        if (mainTransactionOption.isEmpty) {
+            return Some("Error: can't find main transaction in main contract " + aContract.name)
+        }
+
         val method = newClass.method(JMod.PUBLIC, model.VOID, "invokeClientMain")
         method._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
         method._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
@@ -1845,34 +1859,31 @@ class CodeGen (val target: Target, table: SymbolTable) {
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.IllegalOwnershipConsumptionException"))
         method._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
 
-        val mainTransactionOption: Option[Transaction] = aContract.declarations.find((d: Declaration) => d.isInstanceOf[Transaction] && d.asInstanceOf[Transaction].name.equals("main"))
-                                                                  .asInstanceOf[Option[Transaction]]
+        val mainTransaction: Transaction = mainTransactionOption.get
 
-        if (mainTransactionOption.isEmpty) {
-            println("Error: can't find main transaction in main contract " + aContract.name)
-        }
-        else {
-            val mainTransaction: Transaction = mainTransactionOption.get
-
-            // The main transaction expects to be passed a stub of a particular type. Construct it.
-            val stubType: ObsidianType = mainTransaction.args(0).typIn
-            val stubJavaType = resolveType(stubType, table)
-            val newStubExpr = JExpr._new(stubJavaType)
-            newStubExpr.arg(JExpr.ref("connectionManager"))
-            val generateUUID = stubType match {
-                case n: NonPrimitiveType =>
-                    n.codeGenName
-                case _ => assert(false, "Stub must be of nonprimitive type.")
-                    ""
-            }
-            newStubExpr.arg(generateUUID)
-            val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
-            // generate a new serialization state to be compatible
-            val serializationState = method.body.decl(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientSerializationState"), serializationParamName, JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientSerializationState")))
-            val clientMainInvocation = method.body.invoke("main")
-            clientMainInvocation.arg(stubVariable).arg(serializationState)
+        // The main transaction expects to be passed a stub of a particular type. Construct it.
+        if (mainTransaction.args.length == 0) {
+            return Some("Error: main transaction should take an argument referencing a smart contract.")
         }
 
+        val stubType: ObsidianType = mainTransaction.args(0).typIn
+        val stubJavaType = resolveType(stubType, table)
+        val newStubExpr = JExpr._new(stubJavaType)
+        newStubExpr.arg(JExpr.ref("connectionManager"))
+        val generateUUID = stubType match {
+            case n: NonPrimitiveType =>
+                n.codeGenName
+            case _ => assert(false, "Stub must be of nonprimitive type.")
+                ""
+        }
+        newStubExpr.arg(generateUUID)
+        val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
+        // generate a new serialization state to be compatible
+        val serializationState = method.body.decl(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientSerializationState"), serializationParamName, JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientSerializationState")))
+        val clientMainInvocation = method.body.invoke("main")
+        clientMainInvocation.arg(stubVariable).arg(serializationState)
+
+        None
     }
 
     private def generateSerialization(

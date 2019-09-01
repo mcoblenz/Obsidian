@@ -114,7 +114,7 @@ object Main {
         return mainContractOption.get.name
     }
 
-    def translateServerASTToJava (ast: Program, protobufOuterClassName: String, table: SymbolTable): JCodeModel = {
+    def translateServerASTToJava (ast: Program, protobufOuterClassName: String, table: SymbolTable): Either[String, JCodeModel] = {
         // Server must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
@@ -132,7 +132,7 @@ object Main {
         })
     }
 
-    def translateClientASTToJava (ast: Program, protobufOuterClassName: String, table: SymbolTable): JCodeModel = {
+    def translateClientASTToJava (ast: Program, protobufOuterClassName: String, table: SymbolTable): Either[String, JCodeModel] = {
         // Client programs must have a main contract.
         val mainContractOption = findMainContract(ast)
         if (mainContractOption.isEmpty) {
@@ -339,9 +339,21 @@ object Main {
 
             val protobufOuterClassName = Util.protobufOuterClassNameForFilename(sourceFilename)
 
-            val javaModel = if (options.buildClient) translateClientASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
-            else translateServerASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
-            javaModel.build(srcDir.toFile)
+            val errorOrJavaModel =
+                if (options.buildClient) {
+                    translateClientASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
+                } else {
+                    translateServerASTToJava(checkedTable.ast, protobufOuterClassName, transformedTable)
+                }
+
+            errorOrJavaModel match {
+                case Left(errorMessage) => {
+                    println(errorMessage)
+                    return false
+                }
+                case Right(javaModel) =>
+                    javaModel.build(srcDir.toFile)
+            }
 
             val mainName = findMainContractName(checkedTable.ast)
 
