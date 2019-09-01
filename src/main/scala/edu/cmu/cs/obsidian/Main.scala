@@ -142,30 +142,6 @@ object Main {
         codeGen.translateProgram(ast, protobufOuterClassName)
     }
 
-    /* returns the exit code of the jar process */
-    def makeJar(
-            printJavacOutput: Boolean,
-            mainName: String,
-            bytecode: Path): Int  = {
-
-        val manifest = s"Obsidian Runtime/manifest.mf"
-        val entryClass = s"edu.cmu.cs.obsidian.generated_code.$mainName"
-        val jarCmd: Array[String] =
-            Array("jar", "-cvfme", mainName+".jar", manifest, entryClass, "-C", bytecode.toString, "edu")
-        val procJar = Runtime.getRuntime().exec(jarCmd)
-        val compilerOutput = procJar.getErrorStream()
-        val untilEOF = new Scanner(compilerOutput).useDelimiter("\\A")
-        val result = if (untilEOF.hasNext()) {
-            untilEOF.next()
-        } else {
-            ""
-        }
-        print(result)
-
-        procJar.waitFor()
-        procJar.exitValue()
-    }
-
     def recDelete(f: File): Unit = {
         if (f.isDirectory) {
             for (sub_f <- f.listFiles()) {
@@ -352,8 +328,9 @@ object Main {
                     return false
                 }
                 case Right(javaModel) =>
-                    javaModel.build(srcDir.toFile)
+                    javaModel.build(srcDir.toFile, srcDir.toFile, null)
             }
+
 
             val mainName = findMainContractName(checkedTable.ast)
 
