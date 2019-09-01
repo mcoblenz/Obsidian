@@ -886,7 +886,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ContractReferenceType(ContractType("PermissionPassing", Nil), Unowned(), false),
                 ContractReferenceType(ContractType("PermissionPassing", Nil), Owned(), false)), 47) ::
                 (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 58) ::
-                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 65) ::
+                (LostOwnershipErrorDueToSharing(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 65) ::
                 Nil)
     }
 
@@ -898,8 +898,8 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false), false), 25) ::
                 (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
                     ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false), false), 29) ::
-                (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x2")), 41) ::
-                (UnusedExpressionArgumentOwnershipError(ReferenceIdentifier("x7")), 63) ::
+                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x2")), 41) ::
+                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x7")), 63) ::
                 (ReceiverTypeIncompatibleError("t1",
                     ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false),
                     ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false)), 81) ::

@@ -1251,7 +1251,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             if (passedType.isOwned && initialType.permission == Shared() && !finalType.isOwned &&
                 passedType.isAssetReference(context.contractTable) != No()) {
                 // Special case: passing an owned reference to a Shared >> Unowned arg will make the arg Unowned but also lose ownership!
-                logError(arg, UnusedExpressionArgumentOwnershipError(arg))
+                logError(arg, LostOwnershipErrorDueToSharing(arg))
             }
 
             if (context.get(referenceIdentifier).isDefined) {
@@ -1288,7 +1288,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 if (argType.isOwned && argType.isAssetReference(context.contractTable) != No() &&
                     (declaredFinalType.isOwned || !declaredInitialType.isOwned))
                 {
-                    logError(arg, UnusedExpressionArgumentOwnershipError(arg))
+                    if (declaredInitialType.permission == Shared()) {
+                        logError(arg, LostOwnershipErrorDueToSharing(arg))
+                    }
+                    else {
+                        logError(arg, UnusedExpressionArgumentOwnershipError(arg))
+                    }
                 }
                 None
         }
