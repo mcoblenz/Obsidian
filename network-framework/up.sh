@@ -86,7 +86,7 @@ function checkPrereqs() {
 function networkUp() {
   checkPrereqs
   # replace the chaincode directory in the .evn file
-  sed -i.backup "s/^.*CHAINCODE_DIRECTORY=.*$/CHAINCODE_DIRECTORY=$CD/" .env
+  sed -i.backup "s/^.*CHAINCODE_DIRECTORY=.*$/CHAINCODE_DIRECTORY=${CD}/" .env
   rm .env.backup
   # generate artifacts if they don't exist
   if [ ! -d "crypto-config" ]; then
@@ -341,7 +341,7 @@ while getopts "h?c:t:d:f:s:l:i:v:n:" opt; do
     COMPOSE_FILE=$OPTARG
     ;;
   s)
-    CD=$OPTARG
+    CD=${OPTARG}
     ;;
   l)
     LANGUAGE=$OPTARG
