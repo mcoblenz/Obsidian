@@ -168,7 +168,7 @@ object Main {
             /* if an output path is specified, use it; otherwise, use working directory */
             val path = outputPath match {
                 case Some(p) =>
-                    Paths.get(p + mainName)
+                    Paths.get(p).resolve(mainName)
                 case None =>
                     Paths.get(mainName)
             }
@@ -203,7 +203,7 @@ object Main {
 
             replaceClassNameInGradleBuild.!
             new File(gradleBackupPath.toString).delete()
-            println("Successfully generated Fabric chaincode at " + path)
+            println("Successfully generated Fabric chaincode at " + path.toAbsolutePath)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
         }
@@ -335,7 +335,7 @@ object Main {
             val mainName = findMainContractName(checkedTable.ast)
 
             val protobufs: Seq[(Protobuf, String)] = ProtobufGen.translateProgram(checkedTable.ast, sourceFilename)
-            val protobufOutputPath = outputPath.resolve("protos")
+            val protobufOutputPath = outputPath.resolve(mainName).resolve("protos")
 
             // Each import results in a .proto file, which needs to be compiled.
             for (p <- protobufs) {
