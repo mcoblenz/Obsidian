@@ -199,7 +199,7 @@ main asset contract Auction {
     // }
 
     // transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
-    //     //6. TODO: set the current bid to the new bid b. You may call any other transactions as needed.
+    //     //6. TODO: fill this in. You may call any other transactions as needed.
     // }
 
     // transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
