@@ -85,8 +85,10 @@ function checkPrereqs() {
 # Generate the needed certificates, the genesis block and start the network.
 function networkUp() {
   checkPrereqs
-  # replace the chaincode directory in the .evn file
-  sed -i.backup "s/^.*CHAINCODE_DIRECTORY=.*$/CHAINCODE_DIRECTORY=${CD}/" .env
+  CHAINCODE_NAME=$(basename ${CD})
+  # replace the chaincode directory in the .env file
+  sed -i.backup "s,^.*CHAINCODE_DIRECTORY=.*$,CHAINCODE_DIRECTORY=${CD}," .env
+  sed -i.backup "s,^.*CHAINCODE_NAME=.*$,CHAINCODE_NAME=${CHAINCODE_NAME}," .env
   rm .env.backup
   # generate artifacts if they don't exist
   if [ ! -d "crypto-config" ]; then

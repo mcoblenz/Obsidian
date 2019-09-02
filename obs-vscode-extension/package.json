@@ -98,6 +98,10 @@
                 "title": "Obsidian: Compile client"
             },
             {
+               "command": "extension.runObsidianClient",
+               "title": "Obsidian: Run client"
+           },
+            {
                "command": "extension.obsidianDown",
                "title": "Obsidian: Stop Fabric network"
            }

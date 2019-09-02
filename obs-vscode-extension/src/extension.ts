@@ -60,7 +60,6 @@ export function activate(context: vscode.ExtensionContext) {
    context.subscriptions.push(compileClientCommand);
       
    let deployCommand = vscode.commands.registerCommand('extension.deployObsidian', () => {
-   // The code you place here will be executed every time your command is executed
          let compilationTask = getCompilationTask();
          if (compilationTask != undefined) {
             // First, make sure the build is up to date.
@@ -129,6 +128,50 @@ export function activate(context: vscode.ExtensionContext) {
 
    context.subscriptions.push(downCommand);
 
+   let runClientCommand = vscode.commands.registerCommand('extension.runObsidianClient', () => {
+      let compilationTask = getClientCompilationTask();
+      if (compilationTask != undefined) {
+         // First, make sure the build is up to date.
+         vscode.tasks.onDidEndTaskProcess((e) => {
+            if (e.execution.task == compilationTask) {
+               if (e.exitCode == 0) {
+                  // Then figure out what the name of the main contract was.
+                  let editor = vscode.window.activeTextEditor
+                  if (editor != undefined) {
+                     let contractText = editor.document.getText(undefined) // Get the whole file
+                     let mainDeclIndex = contractText.match(/main.*contract\s+(\S+)/);
+                     if (mainDeclIndex != null && mainDeclIndex.length > 1) {                     
+                        let runTask = getRunObsidianClientTask(mainDeclIndex[1]);
+                        if (runTask != undefined) {
+                           vscode.tasks.onDidEndTaskProcess(((e) => {
+                              if (e.execution.task == runTask) {
+                                 if (e.exitCode == 0) {
+                                    vscode.window.showInformationMessage('Client exited.');
+                                 }
+                                 else {
+                                    vscode.window.showErrorMessage("Failed to run client successfully.")
+                                 }
+                              }
+                           }
+                           ))
+                           vscode.tasks.executeTask(runTask as vscode.Task)
+                        }
+                     }
+                  }
+               }
+               else {
+                  vscode.window.showErrorMessage('Compilation failed.');
+               }
+            }
+         })
+
+         vscode.tasks.executeTask(compilationTask as vscode.Task)
+      }
+   });
+
+   context.subscriptions.push(runClientCommand);
+
+
 
 }
 
@@ -147,6 +190,10 @@ export function activate(context: vscode.ExtensionContext) {
 	    return _channel;
     }
 
+    function buildPathForFile(filename: string) {
+      return path.resolve(path.dirname(filename), "build");
+    }
+
     function getCompilationTask(): vscode.Task | undefined {
         let activeEditor = vscode.window.activeTextEditor
         if (activeEditor != undefined) {
@@ -156,7 +203,7 @@ export function activate(context: vscode.ExtensionContext) {
                 file: filename
             }
            
-            let buildPath = path.resolve(path.dirname(filename), "build")
+            let buildPath = buildPathForFile(filename)
             console.log("build path " + buildPath)
             fs.mkdir(buildPath, (err) => {if (err) throw err;} )
             let execution = new vscode.ShellExecution(`obsidianc --output-path ${buildPath} ${filename}`);
@@ -194,7 +241,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
 
-    function getDeployObsidianTask(contractName: String): vscode.Task | undefined {
+    function getDeployObsidianTask(contractName: string): vscode.Task | undefined {
       let activeEditor = vscode.window.activeTextEditor
       if (activeEditor != undefined) {
           let filename = activeEditor.document.fileName
@@ -202,7 +249,10 @@ export function activate(context: vscode.ExtensionContext) {
               type: 'obsidian-deploy',
               file: filename
           }
-          let execution = new vscode.ShellExecution(`obsidianup -s ${contractName}`);
+
+          let buildPath = buildPathForFile(filename);
+          let contractPath = path.resolve(buildPath, contractName)
+          let execution = new vscode.ShellExecution(`obsidianautoup -s ${contractPath}`);
 
           let task = new vscode.Task(kind, filename, 'obsidian-deploy', execution, ["$obsidian"]);
           task.presentationOptions.clear = false
@@ -224,6 +274,26 @@ export function activate(context: vscode.ExtensionContext) {
                file: filename
             }
             let execution = new vscode.ShellExecution(`obsidiandown`);
+
+            let task = new vscode.Task(kind, filename, 'obsidian-deploy', execution, []);
+            task.presentationOptions.clear = false
+            task.presentationOptions.showReuseMessage = false
+            return (task);
+      }
+      else {
+            return undefined;
+      }
+   }
+
+   function getRunObsidianClientTask(jarPath: String): vscode.Task | undefined {
+      let activeEditor = vscode.window.activeTextEditor
+      if (activeEditor != undefined) {
+            let filename = activeEditor.document.fileName
+            let kind: ObsidianCompilationTaskDefinition = {
+               type: 'obsidian-deploy',
+               file: filename
+            }
+            let execution = new vscode.ShellExecution(`java -jar ${jarPath}`);
 
             let task = new vscode.Task(kind, filename, 'obsidian-deploy', execution, []);
             task.presentationOptions.clear = false
