@@ -18,3 +18,11 @@ You can use commands provided within VSCode to build and deploy an Obsidian smar
 
 
 Paths should be relative to the project.json file.
+
+You can see the available Obsidian commands by opening the `Command Palette`_ and typing `Obsidian`.
+
+.. image:: vscode-commands.png
+   :alt: VSCode commands
+   :width: 603
+
+.. _Command Palette: https://code.visualstudio.com/docs/getstarted/userinterface#_command-palette
