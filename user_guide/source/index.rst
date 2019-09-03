@@ -13,6 +13,7 @@ The Obsidian Smart Contract Language
    Getting Started <getting_started>
    Obsidian Language Tutorial <tutorial/tutorial>
    Obsidian Reference <reference/reference>
+   Using the compiler <compiling>
    Contributing to Obsidian <contributing>
 
 
