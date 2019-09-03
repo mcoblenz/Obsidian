@@ -4,6 +4,11 @@ import * as vscode from 'vscode';
 import * as fs from 'fs'
 import * as path from 'path'
 
+interface ProjectConfig {
+   chaincode: string; // Path within this project to the main chaincode contract
+   client: string; // Path within this project to the main client contract
+}
+
 let taskProvider: vscode.Disposable | undefined;
 
 // this method is called when your extension is activated
@@ -67,32 +72,31 @@ export function activate(context: vscode.ExtensionContext) {
                if (e.execution.task == compilationTask) {
                   if (e.exitCode == 0) {
                      // Then figure out what the name of the main contract was.
-                     let editor = vscode.window.activeTextEditor
-                     if (editor != undefined) {
-                        let contractText = editor.document.getText(undefined) // Get the whole file
-                        let mainDeclIndex = contractText.match(/main.*contract\s+(\S+)/);
-                        if (mainDeclIndex != null && mainDeclIndex.length > 1) {                     
-                           let deployTask = getDeployObsidianTask(mainDeclIndex[1]);
-                           if (deployTask != undefined) {
-                              vscode.tasks.onDidEndTaskProcess(((e) => {
-                                 if (e.execution.task == deployTask) {
-                                    if (e.exitCode == 0) {
-                                       vscode.window.showInformationMessage('Fabric network ready to accept transaction requests.');
-                                    }
-                                    else {
-                                       let downTask = getNetworkDownTask();
-                                       vscode.tasks.onDidEndTaskProcess((e) => {
-                                          if (e.execution.task == downTask) {
-                                             vscode.window.showErrorMessage("Deployment failed. Consider trying again; sometimes this happens.")
-                                          }
-                                       })
-                                       vscode.tasks.executeTask(downTask as vscode.Task)
-                                    }
+                     let contractName = chaincodeContractName()
+                     if (contractName == undefined) {
+                        vscode.window.showErrorMessage('Failed to find name of main contract.');
+                     }
+                     else {
+                        let deployTask = getDeployObsidianTask(contractName);
+                        if (deployTask != undefined) {
+                           vscode.tasks.onDidEndTaskProcess(((e) => {
+                              if (e.execution.task == deployTask) {
+                                 if (e.exitCode == 0) {
+                                    vscode.window.showInformationMessage('Fabric network ready to accept transaction requests.');
+                                 }
+                                 else {
+                                    let downTask = getNetworkDownTask();
+                                    vscode.tasks.onDidEndTaskProcess((e) => {
+                                       if (e.execution.task == downTask) {
+                                          vscode.window.showErrorMessage("Deployment failed. Consider trying again; sometimes this happens.")
+                                       }
+                                    })
+                                    vscode.tasks.executeTask(downTask as vscode.Task)
                                  }
                               }
-                              ))
-                              vscode.tasks.executeTask(deployTask as vscode.Task)
                            }
+                           ))
+                           vscode.tasks.executeTask(deployTask as vscode.Task)
                         }
                      }
                   }
@@ -135,27 +139,22 @@ export function activate(context: vscode.ExtensionContext) {
          vscode.tasks.onDidEndTaskProcess((e) => {
             if (e.execution.task == compilationTask) {
                if (e.exitCode == 0) {
-                  // Then figure out what the name of the main contract was.
-                  let editor = vscode.window.activeTextEditor
-                  if (editor != undefined) {
-                     let contractText = editor.document.getText(undefined) // Get the whole file
-                     let mainDeclIndex = contractText.match(/main.*contract\s+(\S+)/);
-                     if (mainDeclIndex != null && mainDeclIndex.length > 1) {                     
-                        let runTask = getRunObsidianClientTask(mainDeclIndex[1]);
-                        if (runTask != undefined) {
-                           vscode.tasks.onDidEndTaskProcess(((e) => {
-                              if (e.execution.task == runTask) {
-                                 if (e.exitCode == 0) {
-                                    vscode.window.showInformationMessage('Client exited.');
-                                 }
-                                 else {
-                                    vscode.window.showErrorMessage("Failed to run client successfully.")
-                                 }
+                  let contractName = clientContractName()
+                  if (contractName != undefined) {
+                     let runTask = getRunObsidianClientTask(contractName);
+                     if (runTask != undefined) {
+                        vscode.tasks.onDidEndTaskProcess(((e) => {
+                           if (e.execution.task == runTask) {
+                              if (e.exitCode == 0) {
+                                 vscode.window.showInformationMessage('Client exited.');
+                              }
+                              else {
+                                 vscode.window.showErrorMessage("Failed to run client successfully.")
                               }
                            }
-                           ))
-                           vscode.tasks.executeTask(runTask as vscode.Task)
                         }
+                        ))
+                        vscode.tasks.executeTask(runTask as vscode.Task)
                      }
                   }
                }
@@ -170,141 +169,212 @@ export function activate(context: vscode.ExtensionContext) {
    });
 
    context.subscriptions.push(runClientCommand);
-
-
-
 }
 
-    interface ObsidianCompilationTaskDefinition extends vscode.TaskDefinition {
-        /**
-         * The file to compile
-         */
-        file: string;
-    }
+   interface ObsidianCompilationTaskDefinition extends vscode.TaskDefinition {
+      /**
+      * The file to compile
+      */
+      file: string;
+   }
 
-    let _channel: vscode.OutputChannel;
-    function getOutputChannel(): vscode.OutputChannel {
-	    if (!_channel) {
-		    _channel = vscode.window.createOutputChannel('Rake Auto Detection');
-	    }
-	    return _channel;
-    }
+   interface ObsidianDownTaskDefinition extends vscode.TaskDefinition {
+   }
 
-    function buildPathForFile(filename: string) {
+
+   let _channel: vscode.OutputChannel;
+   function getOutputChannel(): vscode.OutputChannel {
+      if (!_channel) {
+         _channel = vscode.window.createOutputChannel('Rake Auto Detection');
+      }
+      return _channel;
+   }
+
+   function buildPathForFile(filename: string) {
       return path.resolve(path.dirname(filename), "build");
-    }
+   }
 
-    function getCompilationTask(): vscode.Task | undefined {
-        let activeEditor = vscode.window.activeTextEditor
-        if (activeEditor != undefined) {
-            let filename = activeEditor.document.fileName
-            let kind: ObsidianCompilationTaskDefinition = {
-                type: 'obsidian-compile',
-                file: filename
-            }
-           
-            let buildPath = buildPathForFile(filename)
-            console.log("build path " + buildPath)
-            fs.mkdir(buildPath, (err) => {if (err) throw err;} )
-            let execution = new vscode.ShellExecution(`obsidianc --output-path ${buildPath} ${filename}`);
-            let task = new vscode.Task(kind, filename, 'obsidian-compile', execution, ["$obsidian"]);
-            task.presentationOptions.clear = true
-            task.presentationOptions.showReuseMessage = false
-            task.problemMatchers = ["ObsidianProblemMatcher"]
-            task.group = vscode.TaskGroup.Build;
-            return (task);
-        }
-        else {
-            return undefined;
-        }
-    }
+   function getCompilationTask(): vscode.Task | undefined {
+      let chaincodePath = chaincodeContractPath()
+      if (chaincodePath == undefined) {
+         return undefined
+      }
+
+      let kind: ObsidianCompilationTaskDefinition = {
+            type: 'obsidian-compile',
+            file: chaincodePath
+      }
+   
+      let buildPath = buildPathForFile(chaincodePath)
+      
+      fs.mkdir(buildPath, (err) => {if (err) throw err;} )
+      let execution = new vscode.ShellExecution(`obsidianc --output-path ${buildPath} ${chaincodePath}`);
+      let task = new vscode.Task(kind, chaincodePath, 'obsidian-compile', execution, ["$obsidian"]);
+      task.presentationOptions.clear = true
+      task.presentationOptions.showReuseMessage = false
+      task.problemMatchers = ["ObsidianProblemMatcher"]
+      task.group = vscode.TaskGroup.Build;
+      return (task);
+   }
 
     function getClientCompilationTask(): vscode.Task | undefined {
-        let activeEditor = vscode.window.activeTextEditor
-        if (activeEditor != undefined) {
-            let filename = activeEditor.document.fileName
-            let kind: ObsidianCompilationTaskDefinition = {
-                type: 'obsidian-compile-client',
-                file: filename
-            }
-            let execution = new vscode.ShellExecution(`obsidianc --build-client ${filename}`);
+      let clientPath = clientContractPath()
+      if (clientPath == undefined) {
+         return undefined
+      }
 
-            let task = new vscode.Task(kind, filename, 'obsidian-compile-client', execution, ["$obsidian"]);
-            task.presentationOptions.clear = true
-            task.presentationOptions.showReuseMessage = false
-            task.problemMatchers = ["ObsidianProblemMatcher"]
-            task.group = vscode.TaskGroup.Build;
-            return (task);
-        }
-        else {
-            return undefined;
-        }
+      let buildPath = buildPathForFile(clientPath)
+      
+      fs.mkdir(buildPath, (err) => {if (err) throw err;} )
+
+      let execution = new vscode.ShellExecution(`obsidianc --output-path ${buildPath} --build-client ${clientPath}`);
+      let kind: ObsidianCompilationTaskDefinition = {
+         type: 'obsidian-compile',
+         file: clientPath
+      }
+      let task = new vscode.Task(kind, clientPath, 'obsidian-compile-client', execution, ["$obsidian"]);
+      task.presentationOptions.clear = true
+      task.presentationOptions.showReuseMessage = false
+      task.problemMatchers = ["ObsidianProblemMatcher"]
+      task.group = vscode.TaskGroup.Build;
+      return (task);
     }
 
     function getDeployObsidianTask(contractName: string): vscode.Task | undefined {
-      let activeEditor = vscode.window.activeTextEditor
-      if (activeEditor != undefined) {
-          let filename = activeEditor.document.fileName
-          let kind: ObsidianCompilationTaskDefinition = {
-              type: 'obsidian-deploy',
-              file: filename
-          }
-
-          let buildPath = buildPathForFile(filename);
-          let contractPath = path.resolve(buildPath, contractName)
-          let execution = new vscode.ShellExecution(`obsidianautoup -s ${contractPath}`);
-
-          let task = new vscode.Task(kind, filename, 'obsidian-deploy', execution, ["$obsidian"]);
-          task.presentationOptions.clear = false
-          task.presentationOptions.showReuseMessage = false
-          task.problemMatchers = ["ObsidianProblemMatcher"]
-          return (task);
+      let chaincodePath = chaincodeContractPath()
+      if (chaincodePath == undefined) {
+         return undefined
       }
-      else {
-          return undefined;
+
+      let kind: ObsidianCompilationTaskDefinition = {
+         type: 'obsidian-deploy',
+         file: chaincodePath
       }
+
+      let buildPath = buildPathForFile(chaincodePath);
+      let contractPath = path.resolve(buildPath, contractName)
+      let execution = new vscode.ShellExecution(`obsidianautoup -s ${contractPath}`);
+
+      let task = new vscode.Task(kind, chaincodePath, 'obsidian-deploy', execution, ["$obsidian"]);
+      task.presentationOptions.clear = false
+      task.presentationOptions.showReuseMessage = false
+      task.problemMatchers = ["ObsidianProblemMatcher"]
+      return (task);
    }
 
-   function getNetworkDownTask(): vscode.Task | undefined {
-      let activeEditor = vscode.window.activeTextEditor
-      if (activeEditor != undefined) {
-            let filename = activeEditor.document.fileName
-            let kind: ObsidianCompilationTaskDefinition = {
-               type: 'obsidian-deploy',
-               file: filename
-            }
-            let execution = new vscode.ShellExecution(`obsidiandown`);
+   function getNetworkDownTask(): vscode.Task {
+      let kind: ObsidianDownTaskDefinition = {
+         type: 'obsidian-down',
+      }
+      let execution = new vscode.ShellExecution(`obsidiandown`);
 
-            let task = new vscode.Task(kind, filename, 'obsidian-deploy', execution, []);
-            task.presentationOptions.clear = false
-            task.presentationOptions.showReuseMessage = false
-            return (task);
-      }
-      else {
-            return undefined;
-      }
+      let task = new vscode.Task(kind, "down", 'obsidian-down', execution, []);
+      task.presentationOptions.clear = false
+      task.presentationOptions.showReuseMessage = false
+      return (task);
    }
 
-   function getRunObsidianClientTask(jarPath: String): vscode.Task | undefined {
-      let activeEditor = vscode.window.activeTextEditor
-      if (activeEditor != undefined) {
-            let filename = activeEditor.document.fileName
-            let kind: ObsidianCompilationTaskDefinition = {
-               type: 'obsidian-deploy',
-               file: filename
-            }
-            let execution = new vscode.ShellExecution(`java -jar ${jarPath}`);
+   function getRunObsidianClientTask(clientName: string): vscode.Task | undefined {
+      let clientPath = clientContractPath()
+      if (clientPath == undefined) {
+         return undefined
+      }
 
-            let task = new vscode.Task(kind, filename, 'obsidian-deploy', execution, []);
-            task.presentationOptions.clear = false
-            task.presentationOptions.showReuseMessage = false
-            return (task);
+      let kind: ObsidianCompilationTaskDefinition = {
+            type: 'obsidian-deploy',
+            file: clientPath
       }
-      else {
-            return undefined;
-      }
+
+      let buildPath = buildPathForFile(clientPath);
+      let jarPath = path.resolve(buildPath, clientName, "build", "libs", "chaincode.jar")
+      
+      let execution = new vscode.ShellExecution(`java -jar ${jarPath}`);
+
+      let task = new vscode.Task(kind, clientPath, 'obsidian-deploy', execution, []);
+      task.presentationOptions.clear = false
+      task.presentationOptions.showReuseMessage = false
+      return (task);
    }
   
+   function projectConfig(): ProjectConfig | undefined {
+      let workspacePath = vscode.workspace.rootPath
+
+      if (workspacePath != undefined) {
+         let configFile = fs.readFileSync(path.resolve(workspacePath, "project.json"))
+         let projectConfig = JSON.parse(configFile.toString('utf8'))
+         return projectConfig
+      }
+      else {
+         console.log("undefined root path")
+      }
+      return undefined
+   }
+
+   // If there's a config file, use that. Otherwise, assume the current text editor has a client in it.
+   function clientContractPath(): string | undefined {
+      let activeEditor = vscode.window.activeTextEditor
+      if (activeEditor != undefined) {
+         let config = projectConfig()
+         if (config != undefined) {
+            let basePath = path.dirname(activeEditor.document.fileName)
+            return path.resolve(basePath, config.client)
+         }
+
+         return activeEditor.document.fileName
+      }
+      else {
+         return undefined
+      }         
+   }
+
+   // If there's a config file, use that. Otherwise, assume the current text editor has chaincode in it.
+   function chaincodeContractPath(): string | undefined {
+      let activeEditor = vscode.window.activeTextEditor
+      if (activeEditor != undefined) {
+         let config = projectConfig()
+         if (config != undefined) {
+            let basePath = path.dirname(activeEditor.document.fileName)
+            return path.resolve(basePath, config.chaincode)
+         }
+
+         return activeEditor.document.fileName
+      }
+      else {
+         return undefined
+      }         
+   }
+
+   function mainContractName(contractPath: string): string | undefined {
+      let chaincodeFile = fs.readFileSync(contractPath)
+      let contractText = chaincodeFile.toString('utf8')
+      let mainDeclIndex = contractText.match(/main.*contract\s+(\S+)/);
+      if (mainDeclIndex != null && mainDeclIndex.length > 1) {                     
+         return mainDeclIndex[1]
+      }
+      else {
+         return undefined
+      }
+   }
+
+   function chaincodeContractName(): string | undefined {
+      let chaincodePath = chaincodeContractPath()
+      if (chaincodePath != undefined) {
+        return mainContractName(chaincodePath)
+      }
+      else {
+         return undefined
+      }
+   }
+
+   function clientContractName(): string | undefined {
+      let contractPath = clientContractPath()
+      if (contractPath != undefined) {
+        return mainContractName(contractPath)
+      }
+      else {
+         return undefined
+      }
+   }
 
 // this method is called when your extension is deactivated
 export function deactivate() {}

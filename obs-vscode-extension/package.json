@@ -99,7 +99,7 @@
             },
             {
                "command": "extension.runObsidianClient",
-               "title": "Obsidian: Run client"
+               "title": "Obsidian: Compile and run client"
            },
             {
                "command": "extension.obsidianDown",
