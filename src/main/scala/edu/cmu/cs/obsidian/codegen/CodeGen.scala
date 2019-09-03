@@ -1755,7 +1755,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             }
         }
 
-        // add the getState method here, only if it actually exists, i.e only if there is a
+        // add the getState method here, only if it actually exists, i.e only if there are states defined.
         if (translationContext.states.nonEmpty) {
             val transEq = JExpr.ref("transName").invoke("equals").arg(getStateMeth)
             val transCond = lastTransactionElse match {
@@ -1782,7 +1782,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
             exception.arg(0)
             notEnoughArgs._throw(exception)
 
-            enoughArgs.assign(returnBytes, invokeGetState(JExpr._this(), true).invoke("name").invoke("getBytes"))
+            val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
+            val rawBytes = invokeGetState(JExpr._this(), true).invoke("name").invoke("getBytes").arg(charset)
+            val encoder = model.directClass("java.util.Base64").staticInvoke("getEncoder")
+            enoughArgs.assign(returnBytes, encoder.invoke("encode").arg(rawBytes))
+
         }
 
         /* Find where to throw a 'no such transaction' error.
