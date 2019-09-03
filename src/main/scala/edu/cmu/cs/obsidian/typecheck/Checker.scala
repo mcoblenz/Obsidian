@@ -1098,6 +1098,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 mergeTypes(t1, t2, context1.contractTable) match {
                     case Some(u) => mergedMap = mergedMap.updated(x, u)
                     case None =>
+                        mergedMap = mergedMap.updated(x, BottomType())
                         logError(ast, MergeIncompatibleError(x, t1, t2))
                 }
             }
