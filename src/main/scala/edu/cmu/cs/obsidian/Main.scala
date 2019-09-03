@@ -162,18 +162,11 @@ object Main {
         }
     }
 
-    def generateFabricCode(mainName: String, outputPath: Option[String], srcDir: Path): Unit = {
+    def generateFabricCode(mainName: String, outputPath: Path, srcDir: Path): Unit = {
         try {
             //what we need to do now is move the .java class and the outerclass to a different folder
-            /* if an output path is specified, use it; otherwise, use working directory */
-            val path = outputPath match {
-                case Some(p) =>
-                    Paths.get(p).resolve(mainName)
-                case None =>
-                    Paths.get(mainName)
-            }
             /* create the dir if it doesn't exist */
-            Files.createDirectories(path)
+            Files.createDirectories(outputPath)
 
             //copy the content of the fabric/java/ folder into a folder with the class name
             //have to add the trailing separator to avoid copying the java directory too
@@ -184,26 +177,26 @@ object Main {
             val settingsPath = fabricPath.resolve("settings.gradle")
             val srcPath = fabricPath.resolve("src")
 
-            Files.copy(buildPath, path.resolve("build.gradle"), StandardCopyOption.REPLACE_EXISTING)
-            Files.copy(settingsPath, path.resolve("settings.gradle"), StandardCopyOption.REPLACE_EXISTING)
-            FileUtils.copyDirectory(srcPath.toFile, path.resolve("src").toFile)
+            Files.copy(buildPath, outputPath.resolve("build.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            Files.copy(settingsPath, outputPath.resolve("settings.gradle"), StandardCopyOption.REPLACE_EXISTING)
+            FileUtils.copyDirectory(srcPath.toFile, outputPath.resolve("src").toFile)
 
             val tmpGeneratedCodePath = srcDir.resolve(Paths.get("org", "hyperledger", "fabric", "example"))
-            val javaTargetLocation = Paths.get(path.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
+            val javaTargetLocation = Paths.get(outputPath.toString, "src", "main", "java", "org", "hyperledger", "fabric", "example")
 
             FileUtils.copyDirectory(tmpGeneratedCodePath.toFile, javaTargetLocation.toFile)
 
             //place the correct class name in the build.gradle
-            val gradlePath = Paths.get(path.toString, "build.gradle")
+            val gradlePath = Paths.get(outputPath.toString, "build.gradle")
             val replaceClassNameInGradleBuild: String =
                 "sed -i.backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
 
             //sed automatically creates a backup of the original file, has to be deleted
-            val gradleBackupPath = Paths.get(path.toString, "build.gradle.backup")
+            val gradleBackupPath = Paths.get(outputPath.toString, "build.gradle.backup")
 
             replaceClassNameInGradleBuild.!
             new File(gradleBackupPath.toString).delete()
-            println("Successfully generated Fabric chaincode at " + path.toAbsolutePath)
+            println("Successfully generated Fabric chaincode at " + outputPath.toAbsolutePath)
         } catch {
             case e: Throwable => println("Error generating Fabric code: " + e)
         }
@@ -408,8 +401,31 @@ object Main {
             val wrapperProtoPathDest = protobufOutputPath.resolve("InterfaceImplementerWrapper.proto")
             Files.copy(wrapperProtoPathSrc, wrapperProtoPathDest, StandardCopyOption.REPLACE_EXISTING)
 
+            val finalOutputPath = options.outputPath match {
+                case Some(p) =>
+                    Paths.get(p).resolve(mainName)
+                case None =>
+                    Paths.get(mainName)
+            }
 
-            generateFabricCode(mainName, options.outputPath, srcDir)
+            generateFabricCode(mainName, finalOutputPath, srcDir)
+            if (options.buildClient) {
+                // Run Gradle shadowJar to make client.jar.
+                val buildFilePath = finalOutputPath.resolve("build.gradle")
+                val gradleInvocation = s"gradle shadowJar -b ${buildFilePath.toAbsolutePath}"
+                try {
+                    val exitCode = gradleInvocation.!
+                    if (exitCode != 0) {
+                        println("`" + gradleInvocation + "` exited abnormally: " + exitCode)
+                        return false
+                    }
+                }
+                catch {
+                    case e: Throwable => println("Error running gradle: " + e)
+                }
+            }
+
+
         } catch {
             case e:
                 Parser.ParseException => println (e.message);
