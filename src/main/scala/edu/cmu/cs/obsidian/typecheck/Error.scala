@@ -58,7 +58,7 @@ case class SubtypingError(t1: ObsidianType, t2: ObsidianType, isThis : Boolean) 
                             val p1 = np.permission
                             val p2 = np2.permission
                             s"'this' is $p1 at the end of the transaction, but the transaction signature requires that it be $p1"
-                        case _ => assert(false); "s\"Found type '$t1', but expected something of type '$t2'"
+                        case _ => s"Found type '$t1', but expected something of type '$t2'"
                     }
                 }
                 else {
