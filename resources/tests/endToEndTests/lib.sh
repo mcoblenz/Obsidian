@@ -19,7 +19,7 @@ init() {
         ./upgrade.sh
     else
         ./down.sh
-        ./up.sh -s "$1"
+        ./up.sh -s "../$1"
     fi
 }
 

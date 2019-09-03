@@ -5,7 +5,7 @@ cd ../../../
 sbt "runMain edu.cmu.cs.obsidian.Main resources/demos/TinyVendingMachine/TinyVendingMachine.obs"
 # Then go to run the tests
 cd network-framework
-./up.sh -s TinyVendingMachine
+./up.sh -s ../TinyVendingMachine
 
 CANDY=$(./instantiateOther.sh -q Candy)
 

@@ -6,7 +6,7 @@ sbt "runMain edu.cmu.cs.obsidian.Main resources/tests/compilerTests/BasicGeneric
 # Then go to run the tests
 cd network-framework
 ./down.sh
-./up.sh -s BasicGenerics
+./up.sh -s ../BasicGenerics
 
 check() {
     echo "$1"

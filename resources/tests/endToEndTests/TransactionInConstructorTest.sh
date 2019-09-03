@@ -6,7 +6,7 @@ sbt "runMain edu.cmu.cs.obsidian.Main resources/tests/compilerTests/TransactionI
 # Then go to run the tests
 cd network-framework
 ./down.sh
-./up.sh -s TransactionInConstructor
+./up.sh -s ../TransactionInConstructor
 
 check() {
     echo "$1"

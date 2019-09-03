@@ -6,7 +6,7 @@ sbt "runMain edu.cmu.cs.obsidian.Main resources/tests/compilerTests/MultipleCons
 # Then go to run the tests
 cd network-framework
 ./down.sh
-./up.sh -s MultipleConstructors
+./up.sh -s ../MultipleConstructors
 
 check() {
     echo "$1"
