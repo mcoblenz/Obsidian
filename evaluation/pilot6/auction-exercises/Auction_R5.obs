@@ -84,6 +84,14 @@ asset contract Bidder {
         money.mergeMoney(bid.getMoney());
         disown bid;
     }
+
+    transaction seeInventory(Bidder@Unowned this) returns ItemList@Unowned {
+       return inventory;
+    }
+
+    transaction seeMoney(Bidder@Unowned this) returns Money@Unowned {
+       return money;
+    }
 }
 
 /*
@@ -186,7 +194,8 @@ main asset contract Auction {
         -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
     }
 
-    transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
+    transaction makeBid(Auction@Shared this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
+      if (this in Open) {
         if (newBid.getAmount() > bid.getAmount()) { //if the newBid is higher than the current Bid
             setCurrentBid(newBid);
             Bidder tempBidder = maxBidder;
@@ -197,6 +206,10 @@ main asset contract Auction {
             //You may call any other transactions as needed.
             bidder.receiveBidMoney(newBid);
         }
+      }
+      else {
+         revert ("Can only make a bid on an open auction.");
+      }
     }
 
     transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
@@ -209,8 +222,13 @@ main asset contract Auction {
         bidder.receiveBidMoney(b);
     }
 
-    transaction finishBidding(Auction@Open >> BiddingDone this) {
-        -> BiddingDone(item = item, finalBid = bid);
+    transaction finishBidding(Auction@Shared this) {
+       if (this in Open) {
+         -> BiddingDone(item = item, finalBid = bid);
+       }
+       else {
+          revert ("Can only finish bidding on an open auction.");
+       }
     }
 
     /* 7. TODO: Assuming this transaction should be called after the "finishBidding" transaction,
