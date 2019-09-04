@@ -2270,7 +2270,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                         JExpr._null(), reflectionClassLookupExceptions)
                     tempArchive
                 } else {
-                    block.assign(assignTo, JExpr._new(resolveType(typ, table))) // If not a generic type
+                    val newObj = withArgs(JExpr._new(resolveType(typ, table)), constructorParams)
+                    block.assign(assignTo, newObj) // If not a generic type
                     archive.invoke("getObj")
                 }
 
@@ -2304,7 +2305,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 // TODO
                 /* generate another method that takes the actual archive type
                  * so we don't have to uselessly convert to bytes here */
-                body.decl(model.ref("String"), javaFieldName + "ID",
+                val guidVar = body.decl(model.ref("String"), javaFieldName + "ID",
                     archive.invoke(getterNameForField(javaFieldName)))
                 body.decl(javaFieldType, javaFieldName + "Val",
                     JExpr.cast(javaFieldType,
@@ -2323,7 +2324,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 constructNew(translationContext, field.typ, inContract, archive,
                     checkForObj._else(), fieldVar, fieldVar,
                     List(javaStringType().dotclass()),
-                    List(JExpr.ref(javaFieldName + "ID")))
+                    List(guidVar))
 
                 // We also need to put this thing in the map of loaded objects,
                 // so if someone else references it later, we get the same reference.
@@ -2507,6 +2508,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
             val javaFieldVar = newClass.fields().get(field.name)
             generateFieldInitializer(field, javaFieldVar, cond._then(), archive, translationContext, contract)
         }
+
+        fromArchiveBody.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
     }
 
     private def refGenericParam(param: GenericType) = {
