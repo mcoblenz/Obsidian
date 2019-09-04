@@ -241,27 +241,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    //--------------------------------------------------------------------------
-    // Splitting
-
-    private def canSplit(t1: ObsidianType, t2: ObsidianType, t3: ObsidianType, contextContractTable: ContractTable): Boolean = {
-        t1 match {
-            case np1: NonPrimitiveType =>
-                t2 match {
-                    case np2: NonPrimitiveType =>
-                        t3 match {
-                            case np3: NonPrimitiveType =>
-                                (np3.permission == Unowned()) ||
-                                  (np1.permission == Shared() && np2.permission == Shared() && np3.permission == Shared()) ||
-                                  (np1.permission == Owned() && np2.permission == Shared() && np3.permission == Shared() && np1.isAssetReference(contextContractTable) == No())
-                            case _ => false // can't split non-reference types
-                        }
-                    case _ => false // can't split non-reference types
-                }
-            case _ => false // can't split non-reference types
-        }
-    }
-
     //-------------------------------------------------------------------------
     /* Subtyping definitions */
 
