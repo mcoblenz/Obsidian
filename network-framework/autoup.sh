@@ -76,6 +76,8 @@ if [ $? -eq 0 ]; then #same chaincode path as before
   fi
 else
   echo "different chaincode; restarting"
-  ${NETWORKDIR}/down.sh
+  if [ $NETWORKISUP -ne 0 ]; then
+    ${NETWORKDIR}/down.sh
+  fi
   ${NETWORKDIR}/up.sh $@
 fi
