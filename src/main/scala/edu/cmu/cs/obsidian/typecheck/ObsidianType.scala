@@ -42,10 +42,17 @@ case class ConsumingOwnedGivesShared() extends OwnershipConsumptionMode
 case class ConsumingOwnedGivesUnowned() extends OwnershipConsumptionMode
 case class NoOwnershipConsumption() extends OwnershipConsumptionMode
 
+sealed trait RemoteReferenceType
+case class NotRemoteReferenceType() extends RemoteReferenceType
+case class TopLevelRemoteReferenceType() extends RemoteReferenceType
+case class NonTopLevelRemoteReferenceType() extends RemoteReferenceType
+
 // Type of references to contracts.
 case class ContractReferenceType(override val contractType: ContractType,
                                  permission: Permission,
-                                 override val isRemote: Boolean) extends NonPrimitiveType {
+                                 override val remoteReferenceType: RemoteReferenceType) extends NonPrimitiveType {
+    override val isRemote = remoteReferenceType != NotRemoteReferenceType()
+
     override def toString: String =
         if (permission == Inferred()) {
             s"$contractType"
@@ -75,19 +82,20 @@ case class ContractReferenceType(override val contractType: ContractType,
 
     override def topPermissionType: NonPrimitiveType = this.copy(permission = Unowned()).setLoc(this)
 
-    override def remoteType: NonPrimitiveType = ContractReferenceType(contractType, permission, isRemote = true)
+    override def remoteType(remoteReferenceType: RemoteReferenceType): NonPrimitiveType =
+        ContractReferenceType(contractType, permission, remoteReferenceType).setLoc(this)
 
     override def genericParams: Seq[ObsidianType] = contractType.typeArgs
 
     override  def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType =
         ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(
-            ContractReferenceType(contractType.substitute(genericParams, actualParams), permission, isRemote))
+            ContractReferenceType(contractType.substitute(genericParams, actualParams), permission, remoteReferenceType))
             .withTypeState(permission)
 
     override def typeState: TypeState = permission
 
     override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
-        case States(states) => StateType(contractType, states, isRemote)
+        case States(states) => StateType(contractType, states, remoteReferenceType)
         case PermVar(varName) => assert(false, "Trying to use a permission variable on a concrete type"); null
         case permission: Permission => this.copy(permission = permission)
     }
@@ -121,7 +129,7 @@ object ContractType {
     def topContractParams: Seq[GenericType] = Nil
     def topContractType: ContractType = ContractType(topContractName, topContractParams)
     def unownedTop: ObsidianType =
-        ContractReferenceType(topContractType, Unowned(), isRemote = false)
+        ContractReferenceType(topContractType, Unowned(), NotRemoteReferenceType())
     def topContractImpl =
         ObsidianContractImpl(
             Set(),
@@ -154,10 +162,12 @@ case class No() extends Possibility
  *
  * StateType is always owned.
  * */
-case class StateType(override val contractType: ContractType, stateNames: Set[String], override val isRemote: Boolean) extends NonPrimitiveType {
-    def this(contractType: ContractType, stateName: String, isRemote: Boolean) = {
-        this(contractType, Set(stateName), isRemote)
+case class StateType(override val contractType: ContractType, stateNames: Set[String], override val remoteReferenceType: RemoteReferenceType) extends NonPrimitiveType {
+    def this(contractType: ContractType, stateName: String, remoteReferenceType: RemoteReferenceType) = {
+        this(contractType, Set(stateName), remoteReferenceType)
     }
+
+    override val isRemote = remoteReferenceType != NotRemoteReferenceType()
 
     private def orOfStates: String = stateNames.mkString(" | ")
 
@@ -180,7 +190,7 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
                     case NoOwnershipConsumption() => Owned()
                 }
 
-            ContractReferenceType(contractType, newPermission, isRemote).setLoc(this)
+            ContractReferenceType(contractType, newPermission, remoteReferenceType).setLoc(this)
         }
     }
     override val topPermissionType: NonPrimitiveType = this
@@ -212,7 +222,8 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
         }
     }
 
-    override def remoteType: NonPrimitiveType = StateType(contractType, stateNames, isRemote = true)
+    override def remoteType(remoteReferenceType: RemoteReferenceType): NonPrimitiveType =
+        StateType(contractType, stateNames, remoteReferenceType).setLoc(this)
 
     override val contractName: String = contractType.contractName
 
@@ -231,14 +242,14 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): ObsidianType =
         ObsidianType.substituteVarName(contractName, genericParams, actualParams).getOrElse(
-            StateType(contractType.substitute(genericParams, actualParams), stateNames, isRemote))
+            StateType(contractType.substitute(genericParams, actualParams), stateNames, remoteReferenceType))
             .withTypeState(substituteStateNames(stateNames, genericParams, actualParams))
 
     override def typeState: TypeState = States(stateNames)
 
     override def withTypeState(ts: TypeState): NonPrimitiveType = ts match {
         case States(states) => this.copy(stateNames = states)
-        case permission: Permission => ContractReferenceType(contractType, permission, isRemote)
+        case permission: Permission => ContractReferenceType(contractType, permission, remoteReferenceType)
         case PermVar(varName) =>
             // This should never happen
             assert(false, "Trying to use a state variable on a concrete type"); null
@@ -251,8 +262,8 @@ case class StateType(override val contractType: ContractType, stateNames: Set[St
 }
 
 object StateType {
-    def apply(contractType: ContractType, stateName: String, isRemote: Boolean): StateType =
-        new StateType(contractType, Set(stateName), isRemote)
+    def apply(contractType: ContractType, stateName: String, remoteReferenceType: RemoteReferenceType): StateType =
+        new StateType(contractType, Set(stateName), remoteReferenceType)
 }
 
 
@@ -285,6 +296,7 @@ sealed trait ObsidianType extends HasLocation {
     def topPermissionType: ObsidianType
 
     def isOwned = false
+    val remoteReferenceType: RemoteReferenceType = NotRemoteReferenceType()
 
     def isAssetReference(contextContractTable: ContractTable): Possibility = No()
 
@@ -347,6 +359,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
 
     val isRemote: Boolean = false
+
     val permission: Permission
 
     val contractName: String
@@ -373,7 +386,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
                 if (contract.contract.isAsset) {
                     Yes()
                 } else {
-                    StateType(contract.contractType, contract.possibleStates, isRemote).isAssetReference(contextContractTable)
+                    StateType(contract.contractType, contract.possibleStates, remoteReferenceType).isAssetReference(contextContractTable)
                 }
             }
 
@@ -381,7 +394,7 @@ sealed trait NonPrimitiveType extends ObsidianType {
         }
     }
 
-    def remoteType: NonPrimitiveType
+    def remoteType(remoteReferenceType: RemoteReferenceType): NonPrimitiveType
 
     def typeByMatchingPermission(otherType: NonPrimitiveType): NonPrimitiveType
 }
@@ -423,7 +436,7 @@ case class InterfaceContractType(name: String, simpleType: NonPrimitiveType) ext
     override def topPermissionType: NonPrimitiveType = this
     override val contractName: String = name
     override val permission: Permission = simpleType.permission
-    override def remoteType: NonPrimitiveType = this
+    override def remoteType(remoteReferenceType: RemoteReferenceType): NonPrimitiveType = this
 
     override def genericParams: Seq[ObsidianType] = simpleType.genericParams
 
@@ -503,7 +516,7 @@ case class GenericBoundPerm(interfaceSpecified: Boolean, permSpecified: Boolean,
 
     override def typeState: TypeState = permission
 
-    override def referenceType: NonPrimitiveType = ContractReferenceType(interfaceType, permission, isRemote = false)
+    override def referenceType: NonPrimitiveType = ContractReferenceType(interfaceType, permission, NotRemoteReferenceType())
 
     override def genericParams: Seq[ObsidianType] = interfaceType.typeArgs
     override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
@@ -549,7 +562,7 @@ case class GenericBoundStates(interfaceSpecified: Boolean, permSpecified: Boolea
 
     override def typeState: TypeState = States(states)
 
-    override def referenceType: NonPrimitiveType = StateType(interfaceType, states, isRemote = false)
+    override def referenceType: NonPrimitiveType = StateType(interfaceType, states, NotRemoteReferenceType())
 
     override def genericParams: Seq[ObsidianType] = interfaceType.typeArgs
     override def withParams(contractParams: Seq[ObsidianType]): GenericBound =
@@ -585,7 +598,7 @@ case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimiti
     override val permission: Permission = bound.permission
     override val contractName: String = bound.interfaceType.contractName
 
-    override def remoteType: NonPrimitiveType = this
+    override def remoteType(remoteReferenceType: RemoteReferenceType): NonPrimitiveType = this
 
     override def residualType(mode: OwnershipConsumptionMode): ObsidianType =
         if (mode == NoOwnershipConsumption()) {

@@ -143,9 +143,9 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (InconsistentContractTypeError(ContractType("C_Shared", Nil), ContractType("C_Owned", Nil)), 42)
                 ::
-                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), false), "f2"), 21)
+                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), NotRemoteReferenceType()), "f2"), 21)
                 ::
-                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), false), "f3"), 23)
+                (FieldUndefinedError(ContractReferenceType(ContractType("C_Shared", Nil), Shared(), NotRemoteReferenceType()), "f3"), 23)
                 ::
                 (VariableUndefinedError("j", null), 50)
                 ::
@@ -172,7 +172,7 @@ class TypeCheckerTests extends JUnitSuite {
                 (MustReturnError("t_ret_nonprimitive"), 31)
                 ::
                 (SubtypingError(IntType(),
-                    ContractReferenceType(ContractType("C_Owned", Nil), Owned(), false), false), 33)
+                    ContractReferenceType(ContractType("C_Owned", Nil), Owned(), NotRemoteReferenceType()), false), 33)
                 ::
                 (MustReturnError("no_return"), 38)
                 ::
@@ -215,13 +215,13 @@ class TypeCheckerTests extends JUnitSuite {
                     IntType()), 21)
                 ::
                 (MethodUndefinedError(
-                    ContractReferenceType(ContractType("Invocation", Nil), Shared(), false),
+                    ContractReferenceType(ContractType("Invocation", Nil), Shared(), NotRemoteReferenceType()),
                     "otherMethod"), 23)
                 ::
                 (NonInvokeableError(IntType()), 25)
                 ::
                 (MethodUndefinedError(
-                    ContractReferenceType(ContractType("OtherContract", Nil), Shared(), false),
+                    ContractReferenceType(ContractType("OtherContract", Nil), Shared(), NotRemoteReferenceType()),
                     "anotherMethod"), 32)
                 ::
                 (ArgumentSubtypingError("otherMethod", "x",
@@ -236,7 +236,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def dereferenceTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Dereference.obs",
-            (FieldUndefinedError(ContractReferenceType(ContractType("Construct", Nil), Shared(), false), "x"), 30)
+            (FieldUndefinedError(ContractReferenceType(ContractType("Construct", Nil), Shared(), NotRemoteReferenceType()), "x"), 30)
                 ::
                 (DereferenceError(StringType()), 22)
                 ::
@@ -253,8 +253,8 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (RepeatConstructorsError("Thing"), 27)
                 ::
-                (SubtypingError(ContractReferenceType(ContractType("Thing", Nil), Owned(), false),
-                    ContractReferenceType(ContractType("OtherThing", Nil), Inferred(), false)), 27)
+                (SubtypingError(ContractReferenceType(ContractType("Thing", Nil), Owned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("OtherThing", Nil), Inferred(), NotRemoteReferenceType())), 27)
                 ::
                 (WrongArityError(0, 1, "constructor of Thing"), 39)
                 ::
@@ -294,16 +294,16 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def branchingTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Branching.obs",
             (MergeIncompatibleError("o1",
-                ContractReferenceType(ContractType("LinearContract", Nil), Owned(), false),
-                ContractReferenceType(ContractType("LinearContract", Nil), Unowned(), false)), 29)
+                ContractReferenceType(ContractType("LinearContract", Nil), Owned(), NotRemoteReferenceType()),
+                ContractReferenceType(ContractType("LinearContract", Nil), Unowned(), NotRemoteReferenceType())), 29)
                 ::
                 (UnusedOwnershipError("o2"), 29)
                 ::
                 (UnusedOwnershipError("o2"), 40)
                 ::
                 (MergeIncompatibleError("o1",
-                    ContractReferenceType(ContractType("LinearContract", Nil), Owned(), false),
-                    ContractReferenceType(ContractType("LinearContract", Nil), Unowned(), false)), 49)
+                    ContractReferenceType(ContractType("LinearContract", Nil), Owned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("LinearContract", Nil), Unowned(), NotRemoteReferenceType())), 49)
                 ::
                 (UnusedOwnershipError("o2"), 49)
                 ::
@@ -336,7 +336,7 @@ class TypeCheckerTests extends JUnitSuite {
                 (StateUndefinedError("C", "S3"), 15)
                 ::
                 (FieldUndefinedError(
-                    StateType(ContractType("C", Nil), "S1", false), "x"), 18)
+                    StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), "x"), 18)
                 ::
                 Nil
         )
@@ -395,13 +395,13 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def endsInStateTest(): Unit = {
         runTest("resources/tests/type_checker_tests/EndsInState.obs",
             (SubtypingError(
-                StateType(ContractType("C", Nil), "S1", false),
-                StateType(ContractType("C", Nil), "S2", false), true), 3
+                StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()),
+                StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()), true), 3
             )
                 ::
                 (SubtypingError(
-                    StateType(ContractType("C", Nil), "S2", false),
-                    StateType(ContractType("C", Nil), "S1", false), false), 8
+                    StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()),
+                    StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), false), 8
                 )
                 ::
                 Nil
@@ -412,17 +412,17 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
             (StateUndefinedError("C1", "OtherState"), 12)
                 ::
-                (NonPrimitiveTypeTransformError(StateType(ContractType("C1", Nil), Set("S2", "OtherState"), isRemote = false),
+                (NonPrimitiveTypeTransformError(StateType(ContractType("C1", Nil), Set("S2", "OtherState"), NotRemoteReferenceType()),
                     BottomType()), 12)
                 ::
                 (SubtypingError(
-                    StateType(ContractType("C1", Nil), Set("S1", "S2"), false),
-                    StateType(ContractType("C1", Nil), Set("S1", "S3"), false), false), 17
+                    StateType(ContractType("C1", Nil), Set("S1", "S2"), NotRemoteReferenceType()),
+                    StateType(ContractType("C1", Nil), Set("S1", "S3"), NotRemoteReferenceType()), false), 17
                 )
                 ::
                 (SubtypingError(
-                    StateType(ContractType("C2", Nil), Set("S1", "S2"), false),
-                    StateType(ContractType("C2", Nil), "S1", false), true), 30
+                    StateType(ContractType("C2", Nil), Set("S1", "S2"), NotRemoteReferenceType()),
+                    StateType(ContractType("C2", Nil), "S1", NotRemoteReferenceType()), true), 30
                 )
                 ::
                 (
@@ -450,24 +450,24 @@ class TypeCheckerTests extends JUnitSuite {
             (AssetContractConstructorError("BogusMoney"), 5)
                 ::
                 (InvalidInconsistentFieldType("money",
-                    ContractReferenceType(ContractType("Money", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("Money", Nil), Owned(), false)), 26)
+                    ContractReferenceType(ContractType("Money", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType())), 26)
                 ::
                 (OverwrittenOwnershipError("money"), 27)
                 ::
                 (SubtypingError(
-                    ContractReferenceType(ContractType("Money", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("Money", Nil), Owned(), false), false), 37)
+                    ContractReferenceType(ContractType("Money", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType()), false), 37)
                 ::
                 (NonAssetOwningAssetError("BadWallet",
                     Field(false,
-                        ContractReferenceType(ContractType("Money", Nil), Owned(), false),
+                        ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType()),
                         "money",
                         None)), 43)
                 ::
                 (ArgumentSubtypingError("discardMoney", "m",
-                    ContractReferenceType(ContractType("Money", Nil), Shared(), false),
-                    ContractReferenceType(ContractType("Money", Nil), Owned(), false)),
+                    ContractReferenceType(ContractType("Money", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType())),
                     56)
                 ::
                 (DisownUnowningExpressionError(ReferenceIdentifier("m")), 49)
@@ -481,8 +481,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def ownershipTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
             (InvalidInconsistentFieldType("prescription",
-                ContractReferenceType(ContractType("Prescription", Nil), Unowned(), false),
-                ContractReferenceType(ContractType("Prescription", Nil), Owned(), false)), 15)
+                ContractReferenceType(ContractType("Prescription", Nil), Unowned(), NotRemoteReferenceType()),
+                ContractReferenceType(ContractType("Prescription", Nil), Owned(), NotRemoteReferenceType())), 15)
                 ::
                 Nil
         )
@@ -536,7 +536,7 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def sameFieldNameTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SameNameFields.obs",
             (
-                (FieldUndefinedError(StateType(ContractType("C", Nil), Set("S1"), false), "shared"), 4)
+                (FieldUndefinedError(StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType()), "shared"), 4)
                 ::
                 (CombineAvailableIns("x", "S1, S3", 8), 15)
                     ::
@@ -573,9 +573,9 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/StaticAsserts.obs",
             (StaticAssertInvalidState("C", "S3"), 6)
                 ::
-                (StaticAssertFailed(This(), States(Set("S2")), StateType(ContractType("C", Nil), Set("S1", "S2"), false)), 17)
+                (StaticAssertFailed(This(), States(Set("S2")), StateType(ContractType("C", Nil), Set("S1", "S2"), NotRemoteReferenceType())), 17)
                 ::
-                (StaticAssertFailed(ReferenceIdentifier("ow"), Unowned(), ContractReferenceType(ContractType("C", Nil), Owned(), false)), 24)
+                (StaticAssertFailed(ReferenceIdentifier("ow"), Unowned(), ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType())), 24)
                 ::
                 Nil
         )
@@ -583,16 +583,16 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def typeSpecificationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/TypeSpecification.obs",
-            (SubtypingError(StateType(ContractType("C", Nil), Set("S3", "S2"), false),
-                StateType(ContractType("C", Nil), "S1", false), false), 24)
+            (SubtypingError(StateType(ContractType("C", Nil), Set("S3", "S2"), NotRemoteReferenceType()),
+                StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), false), 24)
                 ::
                 (ArgumentSpecificationError("a", "badChangeA",
-                    StateType(ContractType("A", Nil), "Unavailable", false),
-                    StateType(ContractType("A", Nil), "Available", false)), 51)
+                    StateType(ContractType("A", Nil), "Unavailable", NotRemoteReferenceType()),
+                    StateType(ContractType("A", Nil), "Available", NotRemoteReferenceType())), 51)
                 ::
                 (ArgumentSpecificationError("a", "badChangeA2",
-                    StateType(ContractType("A", Nil), "Available", false),
-                    StateType(ContractType("A", Nil), "Unavailable", false)), 56)
+                    StateType(ContractType("A", Nil), "Available", NotRemoteReferenceType()),
+                    StateType(ContractType("A", Nil), "Unavailable", NotRemoteReferenceType())), 56)
                 ::
                 Nil
         )
@@ -602,22 +602,22 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/ReadOnlyState.obs",
             (TransitionNotAllowedError(), 11) ::
                 (ReceiverTypeIncompatibleError("changeStateShared",
-                    ContractReferenceType(ContractType("C", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("C", Nil), Shared(), false)), 39) ::
+                    ContractReferenceType(ContractType("C", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("C", Nil), Shared(), NotRemoteReferenceType())), 39) ::
                 (ReceiverTypeIncompatibleError("changeStateOwned",
-                    ContractReferenceType(ContractType("C", Nil), Shared(), false),
-                    ContractReferenceType(ContractType("C", Nil), Owned(), false)), 42) ::
+                    ContractReferenceType(ContractType("C", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType())), 42) ::
                 (ReceiverTypeIncompatibleError("changeStateStateSpecified",
-                    ContractReferenceType(ContractType("C", Nil), Owned(), false),
-                    StateType(ContractType("C", Nil), Set("S1"), false)), 45) ::
-                (InvalidInconsistentFieldType("s1C", StateType(ContractType("C", Nil), Set("S2"), false), StateType(ContractType("C", Nil), Set("S1"), false)), 48) ::
+                    ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
+                    StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 45) ::
+                (InvalidInconsistentFieldType("s1C", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 48) ::
                 Nil
         )
     }
 
     @Test def fieldTypeMismatchTest(): Unit = {
         runTest("resources/tests/type_checker_tests/FieldTypeMismatch.obs",
-            (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), Set("S2"), false), StateType(ContractType("C", Nil), Set("S1"), false)), 24) ::
+            (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 24) ::
             Nil
         )
     }
@@ -634,8 +634,8 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/PrivateTransactions.obs",
             (InvalidFinalFieldTypeDeclarationError("bogus"), 30)::
                 (FieldTypesDeclaredOnPublicTransactionError("t2"), 33)::
-                (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), "S2", false), StateType(ContractType("C", Nil), "S1", false)), 42)::
-                (FieldSubtypingError("c", StateType(ContractType("C", Nil), "S1", false), StateType(ContractType("C", Nil), "S2", false)), 48)::
+                (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()), StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType())), 42)::
+                (FieldSubtypingError("c", StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType())), 48)::
             Nil)
     }
 
@@ -660,16 +660,16 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def inStateTest(): Unit = {
         runTest("resources/tests/type_checker_tests/InState.obs",
             (ReceiverTypeIncompatibleError("turnOff",
-                ContractReferenceType(ContractType("LightSwitch", Nil), Unowned(), false),
-                StateType(ContractType("LightSwitch", Nil), "On", false)), 33) ::
+                ContractReferenceType(ContractType("LightSwitch", Nil), Unowned(), NotRemoteReferenceType()),
+                StateType(ContractType("LightSwitch", Nil), "On", NotRemoteReferenceType())), 33) ::
             (ReceiverTypeIncompatibleError("turnOn",
-                ContractReferenceType(ContractType("LightSwitch", Nil), Unowned(), false),
-                StateType(ContractType("LightSwitch", Nil), "Off", false)), 37) ::
+                ContractReferenceType(ContractType("LightSwitch", Nil), Unowned(), NotRemoteReferenceType()),
+                StateType(ContractType("LightSwitch", Nil), "Off", NotRemoteReferenceType())), 37) ::
             (StateCheckOnPrimitiveError(), 45) ::
               (StateCheckRedundant(), 56) ::
               (StaticAssertFailed(
                 ReferenceIdentifier("s"), Owned(),
-                StateType(ContractType("LightSwitch", Nil), "On", false)), 62) ::
+                StateType(ContractType("LightSwitch", Nil), "On", NotRemoteReferenceType())), 62) ::
               (StateCheckRedundant(), 67) ::
               Nil)
 
@@ -690,44 +690,44 @@ class TypeCheckerTests extends JUnitSuite {
             (AmbiguousConstructorError("B",
                 List(AmbiguousConstructorExample("C@S2",
                     VariableDeclWithSpec(
-                        StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), false),
-                        StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), false),
+                        StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), NotRemoteReferenceType()),
+                        StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), NotRemoteReferenceType()),
                         "s1c"),
                     VariableDeclWithSpec(
-                        StateType(ContractType("C", Nil), "S2", false),
-                        StateType(ContractType("C", Nil), "S2", false),
+                        StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()),
+                        StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()),
                         "s2c")))
                     ), 3) ::
                 (AmbiguousConstructorError("D",
                     List(AmbiguousConstructorExample("C@S2",
                         VariableDeclWithSpec(
-                            ContractReferenceType(ContractType("C", Nil), Owned(), false),
-                            ContractReferenceType(ContractType("C", Nil), Owned(), false),
+                            ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
+                            ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
                             "s1c"),
                         VariableDeclWithSpec(
-                            StateType(ContractType("C", Nil), "S2", false),
-                            StateType(ContractType("C", Nil), "S2", false), "s2c")))
+                            StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()),
+                            StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()), "s2c")))
                     ), 16) ::
                 (AmbiguousConstructorError("E",
                     List(AmbiguousConstructorExample("C@Owned",
                         VariableDeclWithSpec(
-                            StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), false),
-                            StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), false),
+                            StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), NotRemoteReferenceType()),
+                            StateType(ContractType("C", Nil), Set("S1", "S2", "S3"), NotRemoteReferenceType()),
                             "s1c"),
                         VariableDeclWithSpec(
-                            ContractReferenceType(ContractType("C", Nil), Unowned(), false),
-                            ContractReferenceType(ContractType("C", Nil), Unowned(), false),
+                            ContractReferenceType(ContractType("C", Nil), Unowned(), NotRemoteReferenceType()),
+                            ContractReferenceType(ContractType("C", Nil), Unowned(), NotRemoteReferenceType()),
                             "s2c"))),
                     ), 21) ::
                 (AmbiguousConstructorError("F",
                     List(AmbiguousConstructorExample("C@Owned",
                         VariableDeclWithSpec(
-                            ContractReferenceType(ContractType("C", Nil), Owned(), false),
-                            ContractReferenceType(ContractType("C", Nil), Owned(), false),
+                            ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
+                            ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
                             "s1c"),
                     VariableDeclWithSpec(
-                        ContractReferenceType(ContractType("C", Nil), Shared(), false),
-                        ContractReferenceType(ContractType("C", Nil), Shared(), false),
+                        ContractReferenceType(ContractType("C", Nil), Shared(), NotRemoteReferenceType()),
+                        ContractReferenceType(ContractType("C", Nil), Shared(), NotRemoteReferenceType()),
                         "s2c"))),
                     ), 26) ::
         Nil)
@@ -784,8 +784,8 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/GenericInterfaceSwitch.obs",
             (InterfaceInstantiationError("Switch"), 52) ::
             (ReceiverTypeIncompatibleError("turnOff",
-                 StateType(ContractType("Switch", Nil), "Off", isRemote = false),
-                 StateType(ContractType("Switch", Nil), "On", isRemote = false)), 38) ::
+                 StateType(ContractType("Switch", Nil), "Off", NotRemoteReferenceType()),
+                 StateType(ContractType("Switch", Nil), "On", NotRemoteReferenceType())), 38) ::
             (MissingStateImplError("NoImplSwitch", "Switch", "On"), 29) ::
             (MissingStateImplError("NoImplSwitch", "Switch", "Off"), 29) ::
             (MissingTransactionImplError("NoImplSwitch", "Switch", "turnOn"), 29) ::
@@ -798,11 +798,11 @@ class TypeCheckerTests extends JUnitSuite {
             (MethodUndefinedError(GenericType(GenericVar(isAsset = false,"T",None),
                 GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType,Owned())),"validate"), 29) ::
             (ArgumentSubtypingError("store", "a",
-                StateType(ContractType("NoImplValidatable", Nil), "Invalid", isRemote = false),
-                StateType(ContractType("DummyValidatable", Nil), "Invalid", isRemote = false)), 67) ::
+                StateType(ContractType("NoImplValidatable", Nil), "Invalid", NotRemoteReferenceType()),
+                StateType(ContractType("DummyValidatable", Nil), "Invalid", NotRemoteReferenceType())), 67) ::
             (GenericParameterError(GenericType(GenericVar(isAsset = false,"A",None),
                 GenericBoundPerm(interfaceSpecified = true, permSpecified = false, ContractType("Validatable",Nil),Unowned())),
-                ContractReferenceType(ContractType("NoImplValidatable", Nil), Inferred(), isRemote = false)), 73) ::
+                ContractReferenceType(ContractType("NoImplValidatable", Nil), Inferred(), NotRemoteReferenceType())), 73) ::
             Nil)
     }
 
@@ -815,21 +815,21 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/GenericInterfaceParameters.obs",
             (ArgumentSubtypingError("consume", "x", StringType(), IntType()), 49) ::
             (ArgumentSubtypingError("Store", "t",
-                ContractReferenceType(ContractType("NopConsumer", List(StringType())), Owned(), isRemote = false),
-                ContractReferenceType(ContractType("Consumer", List(IntType())), Owned(), isRemote = false)), 59) ::
+                ContractReferenceType(ContractType("NopConsumer", List(StringType())), Owned(), NotRemoteReferenceType()),
+                ContractReferenceType(ContractType("Consumer", List(IntType())), Owned(), NotRemoteReferenceType())), 59) ::
             (ArgumentSubtypingError("consume", "u",
-                ContractReferenceType(ContractType("A", Nil), Owned(), isRemote = false),
+                ContractReferenceType(ContractType("A", Nil), Owned(), NotRemoteReferenceType()),
                 IntType()), 65) ::
             (GenericParameterError(
                 GenericType(GenericVar(isAsset = false, "T", None), consumerBound),
-                ContractReferenceType(ContractType("A", Nil), Inferred(), isRemote = false)
+                ContractReferenceType(ContractType("A", Nil), Inferred(), NotRemoteReferenceType())
             ), 70) ::
             (GenericParameterError(
                 GenericType(GenericVar(isAsset = false,"T",None), consumerBound),
-                ContractReferenceType(ContractType("NopConsumer", List(StringType())), Inferred(), isRemote = false)), 73) ::
+                ContractReferenceType(ContractType("NopConsumer", List(StringType())), Inferred(), NotRemoteReferenceType())), 73) ::
             (GenericParameterError(
                 GenericType(GenericVar(isAsset = false,"T",None), consumerBound),
-                ContractReferenceType(ContractType("NopConsumer", List()), Inferred(), isRemote = false)), 76) ::
+                ContractReferenceType(ContractType("NopConsumer", List()), Inferred(), NotRemoteReferenceType())), 76) ::
             // Intentionally duplicated error: one for the type in the generic, one for the actual construction
             (GenericParameterListError(1, 0), 76) ::
             (GenericParameterListError(1, 0), 76) ::
@@ -848,11 +848,11 @@ class TypeCheckerTests extends JUnitSuite {
                 GenericType(GenericVar(isAsset = false,"X",Some("s")),
                     GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Unowned()))), 16) ::
             (ReceiverTypeIncompatibleError("getX",
-                StateType(ContractType("A", Nil), "S2", isRemote = false),
-                StateType(ContractType("A", Nil), "S1", isRemote = false)), 66) ::
+                StateType(ContractType("A", Nil), "S2", NotRemoteReferenceType()),
+                StateType(ContractType("A", Nil), "S1", NotRemoteReferenceType())), 66) ::
             (ReceiverTypeIncompatibleError("getX",
-                ContractReferenceType(ContractType("A", Nil), Unowned(), isRemote = false),
-                StateType(ContractType("A", Nil), "S1", isRemote = false)), 72) ::
+                ContractReferenceType(ContractType("A", Nil), Unowned(), NotRemoteReferenceType()),
+                StateType(ContractType("A", Nil), "S1", NotRemoteReferenceType())), 72) ::
                 Nil)
     }
 
@@ -864,15 +864,15 @@ class TypeCheckerTests extends JUnitSuite {
             (ReceiverTypeIncompatibleError("go",
                 GenericType(GenericVar(isAsset = false, "X", Some("s")),
                     GenericBoundPerm(interfaceSpecified = true, permSpecified = true, ContractType("Go", Nil), Unowned())),
-                ContractReferenceType(ContractType("Go", Nil), Owned(), isRemote = false)), 55) ::
+                ContractReferenceType(ContractType("Go", Nil), Owned(), NotRemoteReferenceType())), 55) ::
                 Nil)
     }
 
     @Test def fieldOwnership(): Unit = {
         runTest("resources/tests/type_checker_tests/FieldOwnershipDiscrepancy.obs",
             (InvalidInconsistentFieldType("c",
-                ContractReferenceType(ContractType("C", Nil), Owned(), false),
-                ContractReferenceType(ContractType("C", Nil), Unowned(), false))
+                ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
+                ContractReferenceType(ContractType("C", Nil), Unowned(), NotRemoteReferenceType()))
             , 8) :: Nil)
     }
 
@@ -883,8 +883,8 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def permissionPassing(): Unit = {
         runTest("resources/tests/type_checker_tests/PermissionPassing.obs",
             (ReceiverTypeIncompatibleError("t5",
-                ContractReferenceType(ContractType("PermissionPassing", Nil), Unowned(), false),
-                ContractReferenceType(ContractType("PermissionPassing", Nil), Owned(), false)), 47) ::
+                ContractReferenceType(ContractType("PermissionPassing", Nil), Unowned(), NotRemoteReferenceType()),
+                ContractReferenceType(ContractType("PermissionPassing", Nil), Owned(), NotRemoteReferenceType())), 47) ::
                 (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 58) ::
                 (LostOwnershipErrorDueToSharing(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 65) ::
                 Nil)
@@ -892,41 +892,41 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def allPermissions(): Unit = {
         runTest("resources/tests/type_checker_tests/AllPermissions.obs",
-            (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false),
-                ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false), false), 19) ::
-                (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false), false), 25) ::
-                (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false), false), 29) ::
+            (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
+                ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), false), 19) ::
+                (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), false), 25) ::
+                (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()), false), 29) ::
                 (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x2")), 41) ::
                 (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x7")), 63) ::
                 (ReceiverTypeIncompatibleError("t1",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false)), 81) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 81) ::
                 (ReceiverTypeIncompatibleError("t4",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false)), 96) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 96) ::
                 (ReceiverTypeIncompatibleError("t5",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false)), 101) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 101) ::
                 (ReceiverTypeIncompatibleError("t1",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false)), 130) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 130) ::
                 (ReceiverTypeIncompatibleError("t2",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false)), 135) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType())), 135) ::
                 (ReceiverTypeIncompatibleError("t4",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false)), 144) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 144) ::
                 (ReceiverTypeIncompatibleError("t5",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), false)), 148) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 148) ::
                 (ReceiverTypeIncompatibleError("t6",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false)), 152) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType())), 152) ::
                 (ReceiverTypeIncompatibleError("t7",
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), false),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), false)), 158) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType())), 158) ::
                 (UnusedOwnershipError("this"), 172) ::
                 Nil)
     }

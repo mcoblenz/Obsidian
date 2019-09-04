@@ -48,7 +48,7 @@ class StateTable(
 
     def name: String = astNodeRaw.name
 
-    def nonPrimitiveType = StateType(ContractType(contract.name, Nil), astNodeRaw.name, false)
+    def nonPrimitiveType = StateType(ContractType(contract.name, Nil), astNodeRaw.name, NotRemoteReferenceType())
     def contractType: ContractType = ContractType(name, Nil)
 
     def ast: State = astNode

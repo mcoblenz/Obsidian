@@ -117,7 +117,7 @@ class IdentityAstTransformer {
             table: SymbolTable,
             lexicallyInsideOf: DeclarationTable,
             f: Field): (Field, Seq[ErrorRecord]) = {
-        val thisType =  ContractReferenceType(lexicallyInsideOf.contractType, Owned(), false)
+        val thisType =  ContractReferenceType(lexicallyInsideOf.contractType, Owned(), NotRemoteReferenceType())
 
         val context = startContext(lexicallyInsideOf, List.empty, thisType) // Permission of this is irrelevant when transforming fields
         val (newType, errors) = transformType(table, lexicallyInsideOf, context, f.typ, f.loc, Nil)
@@ -306,7 +306,7 @@ class IdentityAstTransformer {
                 transformType(table, lexicallyInsideOf, emptyContext, c.resultType, c.loc, Nil))
 
         // Constructors always own "this".
-        val thisType = ContractReferenceType(lexicallyInsideOf.contractType, Owned(), false)
+        val thisType = ContractReferenceType(lexicallyInsideOf.contractType, Owned(), NotRemoteReferenceType())
 
         val (newArgs, argsTransformErrors) = transformArgs(table, lexicallyInsideOf, c.args, thisType, Nil)
         val context = startContext(lexicallyInsideOf, c.args, thisType)

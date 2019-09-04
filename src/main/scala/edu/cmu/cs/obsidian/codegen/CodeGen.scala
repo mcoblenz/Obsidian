@@ -393,7 +393,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val obsidianRetType = transaction.retType match {
             case Some(typ) =>
                 typ match {
-                    case np: NonPrimitiveType => Some(np.remoteType)
+                    case np: NonPrimitiveType => {
+                        // Which variety of remote reference type we pick now doesn't actually matter
+                        // becuase the point is to generate the proper Java type.
+                        Some(np.remoteType(NonTopLevelRemoteReferenceType()))
+                    }
                     case _ => Some(typ)
                 }
             case None => None
@@ -1115,7 +1119,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             obsidianSerialized
         } else {
             // We can put any permission for referenceType, since we only need to get the translated name
-            val referenceType = ContractReferenceType(bound, Unowned(), isRemote = false)
+            val referenceType = ContractReferenceType(bound, Unowned(), NotRemoteReferenceType())
             resolveType(referenceType, table, Some(model.ref(translationContext.getProtobufClassName(translationContext.contract)))).boxify()
         }
 
@@ -2810,7 +2814,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 narrowWith(invocation, params)
 
             case Construction(contractType, args, isFFIInvocation) =>
-                val contractRefType = ContractReferenceType(contractType, Owned(), false)
+                val contractRefType = ContractReferenceType(contractType, Owned(), NotRemoteReferenceType())
                 val resolvedType = resolveType(contractRefType, table)
 
                 // Should've been found when typechecking, so this is safe

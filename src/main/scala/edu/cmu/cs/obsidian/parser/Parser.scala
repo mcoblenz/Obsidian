@@ -99,7 +99,12 @@ object Parser extends Parsers {
                     case _ ~ params ~ _ => params
                 }.getOrElse(List())
 
-                val typ = extractTypeFromPermission(permissionToken, id._1, actualGenerics, isRemote, defaultOwned = false)
+                val remoteType = isRemote match {
+                    case true => NonTopLevelRemoteReferenceType() // Temporary if this is a top-level argument. This will be fixed at a higher level in that case.
+                    case false => NotRemoteReferenceType()
+                }
+
+                val typ = extractTypeFromPermission(permissionToken, id._1, actualGenerics, remoteType, defaultOwned = false)
                 typ.setLoc(id)
             }
         }
@@ -116,25 +121,25 @@ object Parser extends Parsers {
     private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]],
                                           name: String,
                                           genericParams: Seq[ObsidianType],
-                                          isRemote: Boolean,
+                                          remoteReferenceType: RemoteReferenceType,
                                           defaultOwned: Boolean): NonPrimitiveType = {
         val defaultPermission = if (defaultOwned) Owned() else Inferred()
 
         val contractType = ContractType(name, genericParams)
 
         permission match {
-            case None => ContractReferenceType(contractType, defaultPermission, isRemote)
+            case None => ContractReferenceType(contractType, defaultPermission, remoteReferenceType)
             case Some(_ ~ permissionIdentSeq) =>
                 if (permissionIdentSeq.size == 1) {
                     val thePermissionOrState = permissionIdentSeq.head
                     val permission = resolvePermission(thePermissionOrState._1)
                     permission match {
-                        case None => StateType(contractType, thePermissionOrState._1, isRemote)
-                        case Some(p) => ContractReferenceType(contractType, p, isRemote)
+                        case None => StateType(contractType, thePermissionOrState._1, remoteReferenceType)
+                        case Some(p) => ContractReferenceType(contractType, p, remoteReferenceType)
                     }
                 } else {
                     val stateNames = permissionIdentSeq.map(_._1)
-                    StateType(contractType, stateNames.toSet, isRemote)
+                    StateType(contractType, stateNames.toSet, remoteReferenceType)
                 }
         }
     }
@@ -179,12 +184,12 @@ object Parser extends Parsers {
                         permission match {
                             case None =>
                                 val correctedType = t match {
-                                    case ContractReferenceType(ct, Inferred(), isRemote) => ContractReferenceType(ct, Unowned(), isRemote)
+                                    case ContractReferenceType(ct, Inferred(), remoteReferenceType) => ContractReferenceType(ct, Unowned(), remoteReferenceType)
                                     case _ => t
                                 }
                                 (correctedType, correctedType)
                             case Some(_ ~ idSeq) => {
-                                val typOut = extractTypeFromPermission(permission, t.contractName, t.genericParams, t.isRemote, false)
+                                val typOut = extractTypeFromPermission(permission, t.contractName, t.genericParams, t.remoteReferenceType, false)
                                 (t, typOut)
                             }
                         }
@@ -569,29 +574,56 @@ object Parser extends Parsers {
                         }
                 }
 
+                def makeRemoteNonPrimitiveTypeTopLevelIfNeeded(np: NonPrimitiveType): NonPrimitiveType =
+                    name match {
+                        case MainT() =>
+                                if (np.isRemote) {
+                                    np.remoteType(TopLevelRemoteReferenceType())
+                                } else {
+                                    np
+                                }
+                        case _ => np
+                    }
+
+                def makeRemoteTypeTopLevelIfNeeded(t: ObsidianType): ObsidianType =
+                    name match {
+                        case MainT() => t match {
+                            case np: NonPrimitiveType => makeRemoteNonPrimitiveTypeTopLevelIfNeeded(np)
+                            case _ => t
+                            }
+                        case _ => t
+                        }
+
                 val thisContractType = ContractType(contractName, contractParams)
 
                 val finalType = thisArg match {
-                    case None => ContractReferenceType(thisContractType, Shared(), false)
-                    case Some(v) => v.typOut.withParams(contractParams)
+                    case None => ContractReferenceType(thisContractType, Shared(), NotRemoteReferenceType())
+                    case Some(v) => makeRemoteTypeTopLevelIfNeeded(v.typOut.withParams(contractParams))
                 }
 
                 val thisType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName, contractParams), Shared(), false)
-                    case Some(variableDecl) => variableDecl.typIn.asInstanceOf[NonPrimitiveType].withParams(contractParams)
+                    case None => ContractReferenceType(ContractType(contractName, contractParams), Shared(), NotRemoteReferenceType())
+                    case Some(variableDecl) => makeRemoteNonPrimitiveTypeTopLevelIfNeeded(variableDecl.typIn.asInstanceOf[NonPrimitiveType].withParams(contractParams))
                 }
 
                 val initialFieldTypes = privateMethodFieldTypes match {
                     case None => Map.empty
-                    case Some(_ ~ argDefList ~ _) => argDefList.map((v: VariableDeclWithSpec) => (v.varName, v.typIn))
+                    case Some(_ ~ argDefList ~ _) => argDefList.map((v: VariableDeclWithSpec) => (v.varName, makeRemoteTypeTopLevelIfNeeded(v.typIn)))
                 }
 
                 val finalFieldTypes = privateMethodFieldTypes match {
                     case None => Map.empty
-                    case Some(_ ~ argDefList ~ _) => argDefList.map((v: VariableDeclWithSpec) => (v.varName, v.typOut))
+                    case Some(_ ~ argDefList ~ _) => argDefList.map((v: VariableDeclWithSpec) => (v.varName, makeRemoteTypeTopLevelIfNeeded(v.typOut)))
                 }
 
-                Transaction(nameString, params, filteredArgs, returns,
+                val argTypesUpdatedWithRemoteTypes = filteredArgs.map( (d: VariableDeclWithSpec) =>
+                    d match {
+                        case VariableDeclWithSpec(typIn, typOut, varName) =>
+                            VariableDeclWithSpec(makeRemoteTypeTopLevelIfNeeded(typIn), makeRemoteTypeTopLevelIfNeeded(typOut), varName).setLoc(d)
+                    }
+                )
+
+                Transaction(nameString, params, argTypesUpdatedWithRemoteTypes, returns,
                     ensures, body, opts.isStatic, opts.isPrivate,
                     thisType, finalType.asInstanceOf[NonPrimitiveType],
                     initialFieldTypes.toMap, finalFieldTypes.toMap).setLoc(t)
@@ -612,7 +644,7 @@ object Parser extends Parsers {
     private def parseConstructor (params: Seq[GenericType]) = {
         parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
-                val resultType = extractTypeFromPermission(permission, name._1, params, isRemote = false, defaultOwned = false)
+                val resultType = extractTypeFromPermission(permission, name._1, params, NotRemoteReferenceType(), defaultOwned = false)
                 Constructor(name._1, args, resultType, body).setLoc(name)
         }
     }
@@ -691,13 +723,6 @@ object Parser extends Parsers {
                 }
 
                 GenericType(gVar, bound)
-        }
-    }
-
-    private def parseGenericParams = {
-        opt(RemoteT()) ~ parseId ~ LBracketT() ~ repsep(parseType, CommaT()) ~ RBracketT() ~ opt(AtT() ~ parseIdAlternatives) ^^ {
-            case isRemote ~ name ~ _ ~ genParams ~ _ ~ permission =>
-                extractTypeFromPermission(permission, name._1, genParams, isRemote.isDefined, defaultOwned = false)
         }
     }
 

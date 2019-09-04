@@ -416,7 +416,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             case (StateType(ct, ss1, _), StateType(_, ss2, _)) =>
                 val unionStates = ss1.union(ss2)
-                Some(StateType(ct, unionStates, false))
+                Some(StateType(ct, unionStates, NotRemoteReferenceType()))
 
             case (g1@GenericType(gVar1, gBound1), g2@GenericType(gVar2, gBound2)) =>
                 if (gVar1.permissionVar.isDefined && gVar2.permissionVar.isDefined) {
@@ -662,7 +662,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          val tableLookup = context.contractTable.lookupContract(x)
                          if (tableLookup.isDefined) {
                              val contractTable = tableLookup.get
-                             val nonPrimitiveType = ContractReferenceType(contractTable.contractType, Shared(), false)
+                             val nonPrimitiveType = ContractReferenceType(contractTable.contractType, Shared(), NotRemoteReferenceType())
                              (InterfaceContractType(contractTable.name, nonPrimitiveType), context, e)
                          }
                          else {
@@ -834,7 +834,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  val (exprList, simpleType, contextPrime) = result match {
                      // Even if the args didn't check, we can still output a type
-                     case None => (Nil, ContractReferenceType(contractType, Owned(), false), context)
+                     case None => (Nil, ContractReferenceType(contractType, Owned(), NotRemoteReferenceType()), context)
                      case Some((newExprSequence, cntxt, constr)) =>
                          val outTyp = constr.asInstanceOf[Constructor].resultType match {
                              case ContractReferenceType(_, permission, isRemote) =>
@@ -1048,7 +1048,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     private def errorIfNotDisposable(variable: String, typ: ObsidianType, context: Context, ast: AST): Unit = {
         typ match {
             case t: NonPrimitiveType =>
-                if (t.isOwned && t.isAssetReference(context.contractTable) != No()) {
+                if (t.isOwned && t.isAssetReference(context.contractTable) != No() && t.remoteReferenceType != TopLevelRemoteReferenceType()) {
                     logError(ast, UnusedOwnershipError(variable))
                 }
             case _ => ()
@@ -1229,7 +1229,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
         else {
             if (passedType.isOwned && initialType.permission == Shared() && !finalType.isOwned &&
-                passedType.isAssetReference(context.contractTable) != No()) {
+                passedType.isAssetReference(context.contractTable) != No() && passedType.remoteReferenceType != TopLevelRemoteReferenceType()) {
                 // Special case: passing an owned reference to a Shared >> Unowned arg will make the arg Unowned but also lose ownership!
                 logError(arg, LostOwnershipErrorDueToSharing(arg))
             }
@@ -1266,7 +1266,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case _ =>
                 // If the argument isn't bound to a variable but owns an asset, and this call is not going to consume ownership, then error.
                 if (argType.isOwned && argType.isAssetReference(context.contractTable) != No() &&
-                    (declaredFinalType.isOwned || !declaredInitialType.isOwned))
+                    (declaredFinalType.isOwned || !declaredInitialType.isOwned) &&
+                    argType.remoteReferenceType != TopLevelRemoteReferenceType())
                 {
                     if (declaredInitialType.permission == Shared()) {
                         logError(arg, LostOwnershipErrorDueToSharing(arg))
@@ -1610,7 +1611,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType =
                     if (oldType.isOwned) {
-                        StateType(thisTable.contractType, newStateName, false)
+                        StateType(thisTable.contractType, newStateName, NotRemoteReferenceType())
                     }
                     else {
                         // If the old "this" was unowned, we'd better not steal ownership for ourselves here.
@@ -1768,7 +1769,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                                 logError(e, StateCheckRedundant())
                                                             }
                                                             val typeFalse =
-                                                                StateType(np.contractType, specificStates -- states, np.isRemote)
+                                                                StateType(np.contractType, specificStates -- states, np.remoteReferenceType)
                                                             (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
                                                                 np.permission,
                                                                 contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
@@ -1776,7 +1777,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                             if (allStates == states) {
                                                                 logError(e, StateCheckRedundant())
                                                             }
-                                                            val typeFalse = StateType(np.contractType, allStates -- states, np.isRemote)
+                                                            val typeFalse = StateType(np.contractType, allStates -- states, np.remoteReferenceType)
                                                             (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
                                                                 np.permission,
                                                                 contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
@@ -1799,7 +1800,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                         logError(e, StateCheckRedundant())
                                                     }
                                                     val newType = np.withTypeState(state)
-                                                    val typeFalse = StateType(np.contractType, allStates -- states, np.isRemote)
+                                                    val typeFalse = StateType(np.contractType, allStates -- states, np.remoteReferenceType)
                                                     resetOwnership = Some((x, np))
                                                     (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
                                                         np.permission,
@@ -1875,10 +1876,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     val newType: ObsidianType =
                         contractTable.state(sc.stateName) match {
                             case Some(stTable) =>
-                                StateType(contractTable.contractType, stTable.name, false)
+                                StateType(contractTable.contractType, stTable.name, NotRemoteReferenceType())
                             case None =>
                                 logError(sc, StateUndefinedError(contractTable.name, sc.stateName))
-                                ContractReferenceType(contractTable.contractType, Owned(), false)
+                                ContractReferenceType(contractTable.contractType, Owned(), NotRemoteReferenceType())
                         }
 
                     /* special case to allow types to change in the context if we match on a variable */
@@ -2335,7 +2336,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                   Map.empty,
                                   constr.args.map((v: VariableDeclWithSpec) => v.varName).toSet)
 
-        val thisType = ContractReferenceType(table.contractType, Owned(), false)
+        val thisType = ContractReferenceType(table.contractType, Owned(), NotRemoteReferenceType())
 
         initContext = initContext.updated("this", thisType)
 
