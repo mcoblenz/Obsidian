@@ -51,6 +51,8 @@ This command uses the same path to the chaincode that you originally uploaded, s
 
 Clients
 ---------
+The most convenient way to build and run a client is via the VSCode extension. However, if you need to do it manually (perhaps for debugging purposes), you can follow these steps.
+
 To build a client, pass --build-client to the compiler. 
 The compiler will generate a directory that contains a build.gradle file.
 To run the client:

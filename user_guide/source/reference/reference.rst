@@ -5,3 +5,4 @@ Before using this reference guide, please read the entire tutorial first, since 
 
 .. toctree::
    Language Basics <basics>
+   Obsidian Clients <clients>
