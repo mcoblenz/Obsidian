@@ -194,7 +194,7 @@ main asset contract Auction {
         -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
     }
 
-    transaction makeBid(Auction@Shared this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
+    transaction makeBid(Auction@Shared this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) returns Bidder@Unowned {
       if (this in Open) {
         if (newBid.getAmount() > bid.getAmount()) { //if the newBid is higher than the current Bid
             setCurrentBid(newBid);
@@ -210,6 +210,8 @@ main asset contract Auction {
       else {
          revert ("Can only make a bid on an open auction.");
       }
+
+      return bidder;
     }
 
     transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
