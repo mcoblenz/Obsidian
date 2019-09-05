@@ -167,55 +167,62 @@ In the Auction contract below, uncomment the code and finish all the TODO statem
 */
 
 main asset contract Auction {
-    // Bidder@Unowned maxBidder;
-    // Seller@Unsold seller;
-    // Item@Owned item available in Open, BiddingDone;
+   // Bidder@Unowned maxBidder;
+   // Seller@Unsold seller;
+   // Item@Owned item available in Open, BiddingDone;
 
-    // state Open {
-    //     Bid@Owned bid;
-    // }
-    // state BiddingDone {
-    //     Bid@Owned finalBid;
-    // }
-    
-    // state Closed;
+   // state Open {
+   //     Bid@Owned bid;
+   // }
+   // state BiddingDone {
+   //     Bid@Owned finalBid;
+   // }
+   
+   // state Closed;
 
-    // Auction@Owned() {
-    //     maxBidder = new Bidder("none", 0);
-    //     seller = new Seller();
-    //     -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
-    // }
+   // Auction@Owned() {
+   //     maxBidder = new Bidder("none", 0);
+   //     seller = new Seller();
+   //     -> Open(item = seller.giveItem(), bid = new Bid(new Money(0)));
+   // }
 
-    // transaction makeBid(Auction@Open this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) {
-    //     if (newBid.getAmount() > bid.getAmount()) { //if the newBid is higher than the current Bid
-    //         setCurrentBid(newBid);
-    //         Bidder tempBidder = maxBidder;
-    //         maxBidder = bidder;
-    //     }
-    //     else {
-    //         //5. TODO: return the newBid money to the bidder, since the newBid wasn't high enough. 
-    //         //You may call any other transactions as needed.
-    //     }
-    // }
+   //  transaction makeBid(Auction@Shared this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder)  returns Bidder@Unowned {
+   //    if (this in Open) {
+   //      if (newBid.getAmount() > bid.getAmount()) { //if the newBid is higher than the current Bid
+   //          setCurrentBid(newBid);
+   //          Bidder tempBidder = maxBidder;
+   //          maxBidder = bidder;
+   //      }
+   //      else {
+   //          //5. TODO: return the newBid money to the bidder, since the newBid wasn't high enough. 
+   //          //You may call any other transactions as needed.
+   //      }
+   //    }
+   //    else {
+   //       revert ("Can only make a bid on an open auction.");
+   //    }
 
-    // transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
-    //     //6. TODO: fill this in. You may call any other transactions as needed.
-    // }
+   //    return bidder;
+   //  }
 
-    // transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
-    //     bidder.receiveBidMoney(b);
-    // }
+   //  transaction setCurrentBid(Auction@Shared this, Bid@Owned >> Unowned b) {
+   //      //6. TODO: fill this in. You may call any other transactions as needed.
+   //  }
 
-    // transaction finishBidding(Auction@Open >> BiddingDone this) {
-    //     -> BiddingDone(item = item, finalBid = bid);
-    // }
+   //  transaction returnBidMoney(Auction@Open this, Bid@Owned >> Unowned b, Bidder@Unowned bidder) {
+   //      bidder.receiveBidMoney(b);
+   //  }
 
-    // /* 7. TODO: Assuming this transaction should be called after the "finishBidding" transaction,
-    //             finish the transaction declaration below. */
-    // transaction giveItem(/* Fill this in */ this) {
-    //     maxBidder.won(item);
-    //     seller.receiveBid(finalBid);
-    //     -> Closed;
-    // }
+   //  transaction finishBidding(Auction@Shared >> BiddingDone this) {
+   //      -> BiddingDone(item = item, finalBid = bid);
+   //  }
+
+   //  /* 7. TODO: Assuming this transaction should be called after the "finishBidding" transaction,
+   //              finish the transaction declaration below. */
+   //  transaction giveItem(/* Fill this in */ this) {
+   //      maxBidder.won(item);
+   //      seller.receiveBid(finalBid);
+   //      -> Closed;
+   //  }
 
 }

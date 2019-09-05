@@ -11,19 +11,3 @@ Please write your code below. The Person contract is given below.
 contract Person {
     //...
 }
-
-main contract Restaurant {
-    state Open;
-    state Closed;
-
-    Restaurant@Open() {
-        ->Open;
-    }
-
-    transaction dineIn(Restaurant@Open this, Person@Unowned p, int size) {
-        // ...
-    }
-    transaction takeOut(Restaurant@Open this, Person@Unowned p) {
-        // ...
-    }
-}

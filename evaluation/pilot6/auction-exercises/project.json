@@ -1,4 +1,4 @@
 {
-   "chaincode": "Auction_R5.obs",
+   "chaincode": "Auction_R6.obs",
    "client": "auction_client.obs"
 }
