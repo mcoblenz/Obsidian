@@ -45,11 +45,18 @@ If ``>>`` is not specified for a certain parameter, then the ownership of that p
 
 If a transaction expects an argument that is ``Unowned``, this means that the transaction cannot take ownership. 
 As a result, it is safe to pass an ``Owned`` reference as an argument to a transaction that expects an ``Unowned`` argument. 
-After the transaction returns, the caller still holds ownership.
+After the transaction returns, the caller still holds ownership. For example:
 
- 
-For example, ``transaction bar(Money@Unowned m)`` can accept a 
-``Money`` reference with any ownership and the caller maintains whatever ownership it had initially when it called that transaction.
+::
+
+   transaction logMoney(Money@Unowned m) {
+      ...
+   }
+
+   transction callLogMoney(Money@Owned m) {
+      logMoney(m);
+      // OK; m is still an Owned reference.
+   }
 
 
 Transaction receivers (``this``)

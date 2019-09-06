@@ -82,3 +82,18 @@ If ownership is no longer desired, ``disown`` can be used to relinquish ownershi
            disown mergeFrom; // We absorbed the value of mergeFrom, so the owner doesn't own it anymore.
        }
    }
+
+Return
+--------------
+Return statements affect the type of the returned expression according to the declared return type. For example:
+
+::
+
+   asset contract Candy {}
+
+   contract VendingMachine {
+      transaction dispenseCandy() returns Candy@Owned {
+         Candy c = ... // Get an owned reference somehow
+         return c; // Satisfies return type because ownership of c is transferred to the caller
+         // No accidental loss of c here because c is no longer Owned
+      }
