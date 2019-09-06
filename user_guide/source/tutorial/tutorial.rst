@@ -6,7 +6,8 @@ Obsidian Tutorial
    ownership2
    ownership3
    ownership4
+   assets
    states1
    states2
    states3
-   assets
+   states-assets

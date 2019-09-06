@@ -27,7 +27,7 @@ In the example above, ``brightness`` can only be accessed and used when a ``Ligh
 
 States and Ownership
 ---------------------
-Each object can have one reference that statically specifies what state the object is in. For example, 
+Each object can have ONE reference that statically specifies what state the object is in. For example, 
 ``LightSwitch@On`` is the type of a variable that refers to a switch that is in ``On`` state.
    
 Note that this is an extension of *ownership*: like ownership, one reference is special. The compiler keeps track 
@@ -40,6 +40,15 @@ of the possible states an object can be in and makes sure that the specification
       s.turnOn();
    }
   
+States are related to ownership because only ONE reference (the *owning* reference) can specify state. To see why this is, consider the figure below, which shows two references of type `LightSwitch@On` referencing the same `LightSwitch` object:
+
+.. figure:: aliasing_counterexample.png
+   :alt: Aliasing counterexample
+   :width: 300
+   :align: center
+
+The figure shows a hypothetical situation that is *invalid* in Obsidian programs. Suppose the reference on the left is used to change the state of the `LightSwitch` from `On` to `Off`. The reference on the left would then have type `LightSwitch@Off`, but the reference on the right would still have type `LightSwitch@On`, which would be *inconsistent* with the state of the object. To prevent this situation, we require that only owning references carry state information. As a result, any reference that includes state information is automatically also an owning reference.
+
 The compiler checks transaction invocations to make sure they are safe:
   
 ::
@@ -50,20 +59,6 @@ The compiler checks transaction invocations to make sure they are safe:
    }
   
 *NOTE: there is never a need to specify both *ownership* and *state* at the same time; if a field is in any state, it must be Owned, and if Unowned, the field cannot have a state.*
-
-States and Assets
-------------------
-
-States can also be declared as ``asset`` s, which means the contract is an asset (see Part 4) only when in that state.
-For example, see an alternate definition of ``LightSwitch`` below, in which a ``LightSwitch`` is an  ``asset`` only
-when it is turned ``On``. 
-
-::
-
-   contract LightSwitch {
-      asset state On;
-      state Off;
-   }
 
 
 
