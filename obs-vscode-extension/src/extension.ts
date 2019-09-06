@@ -296,17 +296,31 @@ export function activate(context: vscode.ExtensionContext) {
       return (task);
    }
   
-   function projectConfig(): ProjectConfig | undefined {
-      let workspacePath = vscode.workspace.rootPath
+   function projectPath(): string | undefined {
+      let workspaceFolders = vscode.workspace.workspaceFolders
+      if (workspaceFolders != undefined && workspaceFolders.length > 0) {
+         let workspacePath = workspaceFolders[0]
+         return workspacePath.uri.fsPath;
+      }
+      return undefined;
+   }
 
+   function projectConfig(): ProjectConfig | undefined {
+      let workspacePath = projectPath();
       if (workspacePath != undefined) {
-         let configFile = fs.readFileSync(path.resolve(workspacePath, "project.json"))
-         let projectConfig = JSON.parse(configFile.toString('utf8'))
-         return projectConfig
+         try {
+            let configFile = fs.readFileSync(path.resolve(workspacePath, "project.json"))
+            let projectConfig = JSON.parse(configFile.toString('utf8'))
+            return projectConfig
+         }
+         catch (e) {
+            return undefined
+         }
       }
       else {
          console.log("undefined root path")
       }
+
       return undefined
    }
 
@@ -345,13 +359,18 @@ export function activate(context: vscode.ExtensionContext) {
    }
 
    function mainContractName(contractPath: string): string | undefined {
-      let chaincodeFile = fs.readFileSync(contractPath)
-      let contractText = chaincodeFile.toString('utf8')
-      let mainDeclIndex = contractText.match(/main.*contract\s+(\S+)/);
-      if (mainDeclIndex != null && mainDeclIndex.length > 1) {                     
-         return mainDeclIndex[1]
+      try {
+         let chaincodeFile = fs.readFileSync(contractPath)
+         let contractText = chaincodeFile.toString('utf8')
+         let mainDeclIndex = contractText.match(/main.*contract\s+(\S+)/);
+         if (mainDeclIndex != null && mainDeclIndex.length > 1) {                     
+            return mainDeclIndex[1]
+         }
+         else {
+            return undefined
+         }
       }
-      else {
+      catch (e) {
          return undefined
       }
    }
