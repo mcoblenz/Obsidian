@@ -1,6 +1,8 @@
 {
     "name": "obsidian",
     "displayName": "language-obsidian",
+    "publisher": "mcoblenz",
+    "repository": "http://www.github.com/mcoblenz/Obsidian",
     "description": "support for Obsidian language.",
     "version": "0.0.1",
     "engines": {
