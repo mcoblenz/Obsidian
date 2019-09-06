@@ -21,23 +21,26 @@ If we did not return ``m`` within the transaction, or if ``m`` was not of type `
 
 Transaction parameters
 ------------------------
-When a reference is passed to a transaction as an argument, the transaction's declaration specifies initial and final ownership with ``>>``. 
+Unlike in traditional programming languages, in Obsidian, the type of a variable can *change*: ownership is part of types, and ownership can change as operations occur. When a reference is passed to a transaction as an argument, the transaction's declaration specifies initial and final ownership with ``>>``. 
 If ``>>`` is not specified for a certain parameter, then the ownership of that parameter *doesn't change*. For example:
 
 ::
 
-   transaction spend(Money@Owned >> Unowned m) { // m is Owned initially but must be Unowned at the end.
+   // m is Owned initially but must be Unowned at the end.
+   // A caller of spend() must initially own the parameter to spend(), but after 
+   //   the call returns, the caller no longer owns it (hence the name `spend`).
+   transaction spend(Money@Owned >> Unowned m) {
       // implementation not shown
    };
 
-   transaction testSpend(Money@Owned >> Unowned m) {
+   transaction testSpend() {
+      Money m = ...; // Assume that m is an owning reference.
       spend(m);
-      // m is now of type Money@Unowned due to specification on spend() declaration.
+      // m is now of type Money@Unowned because spend() took ownership.
    }
 
    transaction foo(Money@Owned m) { //this is the equivalent to Money@Owned >> Owned m
       // body not shown
-      
    }
 
 If a transaction expects an argument that is ``Unowned``, this means that the transaction cannot take ownership. 

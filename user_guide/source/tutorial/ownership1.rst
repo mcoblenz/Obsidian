@@ -40,12 +40,18 @@ that has one ``Owned`` reference:
    }
 
    main contract Wallet {
-      Money @ Owned m; // @Owned indicates that the reference m owns the object it refers to
+      Money@Owned m; // @Owned indicates that the reference m owns the object it refers to
       
       transaction spendMoney() {
          ...
       }
    }
+
+The figure below shows how Obsidian reference types consist of both a contract and a permission.
+
+.. figure:: syntax-diagram.png
+   :alt: Obsidian type syntax
+   :width: 200
 
 Note that with this code alone, ``m`` is an ``Owned`` reference that doesn't actually point to any object. If we wanted to create a new object,
 we would do it in a similar way to other object-oriented languages: ``m = new Money()``. Now, ``m`` is an Owned reference pointing to a 
