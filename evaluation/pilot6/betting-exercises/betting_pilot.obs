@@ -1,6 +1,10 @@
-import "resources/sample_programs/betting_utils.obs"
+import "betting_utils.obs"
 
 main asset contract Casino {
+
+   state BettingOpen
+   state GameInProgress
+   state GameOver
 
     Money@Owned money;
     Game@Owned currentGame; //The game that is currently being played
@@ -10,6 +14,58 @@ main asset contract Casino {
         money = new Money(100000);
         currentGame = new Game();
         bets = new BetList();
+        ->BettingOpen;
+    }
+
+    transaction cleanup(Casino@GameOver >> BettingOpen this) {
+       if(currentGame in BeforePlay) {
+          revert("No");
+       }
+        if(currentGame in Playing) {
+          revert("No");
+       }
+          bets = new BetList();
+          currentGame = new Game();
+          ->BettingOpen;
+    }
+
+    transaction startNewGame(Casino@BettingOpen >> GameInProgress this) {
+       if(currentGame in BeforePlay) {
+         currentGame.startPlaying();
+         ->GameInProgress;
+       } else {
+          revert ("No");
+       }
+    }
+
+    transaction checkBet(Casino@GameOver this, Bettor@Unowned bettor) {
+       if(bets.contains(bettor)){
+          if (currentGame in FinishedPlaying) {
+          Bet bet = bets.popSpecific(bettor);
+          string outcome = currentGame.calculateOutcome();
+          if(bet.getBetPrediction().getPredOutcome() == outcome) {
+          bet.getBettor().receiveMoney(money.splitMoney(bet.getBetPrediction().getBetAmount() * 2));
+          }}
+       }
+    }
+
+    transaction addBet(Casino@BettingOpen this, Bet@Unowned bet, Money@Owned >> Unowned betMoney) {
+      Bettor bettor = bet.getBettor();
+      int newBetAmount = bet.getBetPrediction().getBetAmount();
+      if(newBetAmount != betMoney.getAmount()) {
+         revert("Monetary values not equal");
+      }
+      if(bets.contains(bettor) {
+        Bet oldBet = bets.popSpecific(bettor);
+        Money returnMoney = money.splitMoney(oldBet.getBetPrediction().getBetAmount());
+        bets.append(bet);
+        bettor.receiveMoney(returnMoney);
+        money.mergeMoney(betMoney);
+      } else {
+         bets.append(bet);
+         money.mergeMoney(betMoney);
+      }
+
     }
 
     //TODO: Add your code here.

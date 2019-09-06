@@ -10,7 +10,7 @@ asset contract Coin {
 
 asset contract CoinBag {
 
-    transaction deposit(Coin@Owned >> Unowned c) {
+    transaction deposit(CoinBag@Owned this, Coin@Owned >> Unowned c) {
         disown c;
     }
 }
@@ -30,10 +30,10 @@ main asset contract TinyVendingMachine {
 
     transaction restock(TinyVendingMachine@Empty >> Full this,
                         Candy@Owned >> Unowned c) {
-        //2. TODO
+        ->Full(inventory = c);
     }
 
-    transaction buy(/* 1. TODO */ this,  /* 1. TODO */ c) returns Candy @ Owned {
+    transaction buy(TinyVendingMachine@Full >> Empty this,  Coin@Owned >> Unowned c) returns Candy @ Owned {
         coinBin.deposit(c);
         Candy result = inventory;
         ->Empty;

@@ -8,6 +8,20 @@
 
 //Note: the Drink contract MUST be main
 
+main contract Drink {
+   state lukewarm;
+   state hot {
+      CupSleeve@Owned sleeve;
+   }
+   state cold {
+      IceCube@Owned cube;
+   }
+   int temp;
+   Drink@Owned() {
+      temp = 15;
+      ->lukewarm;
+   }
+}
 
 contract IceCube {
     //...

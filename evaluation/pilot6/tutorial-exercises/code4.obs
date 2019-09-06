@@ -5,6 +5,14 @@
 
 //Note: the Person contract MUST be main
 
+main contract Person {
+   Wallet@Owned w;
+
+   transaction addMoney(Money@Owned >> Unowned m) returns Money@Owned {
+      return w.replaceMoney(m);
+   }
+}
+
 contract Money {
     int amount;
 

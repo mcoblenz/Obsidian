@@ -3,9 +3,12 @@
 //The House and Park contracts are given below.
 //The Person contract MUST be main
 
+main contract Person {
+   House @ Owned house;
+   Park @ Shared park;
+}
 
 contract House {
-
 }
 
 contract Park {

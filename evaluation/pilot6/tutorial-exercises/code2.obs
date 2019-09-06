@@ -13,7 +13,7 @@ main contract ShareHolder {
         share = new Share();
     }
 
-    transaction receiveShare( /* TODO */ s) {
+    transaction receiveShare(Share@Owned >> Unowned s) {
         //...
     }
 
