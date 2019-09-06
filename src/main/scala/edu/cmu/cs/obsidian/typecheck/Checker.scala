@@ -791,7 +791,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  }
 
              case LocalInvocation(name, _, params, args: Seq[Expression]) =>
-                 val (typ, con, _, _, newGenericParams, newArgs) = handleInvocation(context, name, This(), params, args)
+                 val (typ, con, _, _, newGenericParams, newArgs) = handleInvocation(context, name, This().setLoc(e), params, args)
                  //This may need correction.
                  (typ, con, LocalInvocation(name, newGenericParams, params, newArgs).setLoc(e))
 
