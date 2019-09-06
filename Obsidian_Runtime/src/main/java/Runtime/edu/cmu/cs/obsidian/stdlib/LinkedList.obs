@@ -1,0 +1,55 @@
+main contract LinkedList[T@s] {
+    state Empty;
+
+    state HasNext {
+        LinkedList[T@s]@Owned next;
+        T@s value;
+    }
+
+    LinkedList@Empty() {
+        ->Empty;
+    }
+
+
+    transaction append(LinkedList@Owned this, T@s >> Unowned ptr) {
+        switch this {
+            case HasNext {
+                next.append(ptr);
+            }
+            case Empty {
+                ->HasNext(value = ptr, next = new LinkedList[T@s]());
+            }
+        }
+    }
+
+    transaction length(LinkedList@Owned this) returns int {
+        switch this {
+            case HasNext {
+                return 1 + next.length();
+            }
+            case Empty {
+                return 0;
+            }
+        }
+    }
+
+
+    transaction nth(LinkedList@Owned this, int n) returns T@Unowned {
+        switch this {
+            case HasNext {
+                if (n == 0) {
+                    return value;
+                }
+                else {
+                    return next.nth(n - 1);
+                }
+            }
+            case Empty {
+                revert "Can't get the nth item from an empty list.";
+            }
+        }
+    }
+
+
+
+}

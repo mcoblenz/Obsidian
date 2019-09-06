@@ -118,3 +118,20 @@ contract HoldReference {
         ref = s;
     }
 }
+
+contract StatesWithFields {
+    state S1;
+    state S2 {
+        StatesWithFields@S1 x;
+    }
+
+    StatesWithFields@S1() {
+        ->S1;
+    }
+
+    transaction t() {
+        if (this in S2) {
+            x = new StatesWithFields();
+        }
+    }
+}

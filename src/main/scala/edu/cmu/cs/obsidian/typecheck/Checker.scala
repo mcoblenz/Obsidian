@@ -69,6 +69,15 @@ case class Context(table: DeclarationTable,
             thisFieldTypes.updated(fieldName, newType),
             valVariables)
 
+    def removeThisFieldType(fieldName: String): Context =
+        Context(contractTable,
+            underlyingVariableMap,
+            isThrown,
+            transitionFieldsInitialized,
+            localFieldsInitialized,
+            thisFieldTypes - fieldName,
+            valVariables)
+
     def updatedMakingVariableVal(variableName: String): Context =
         Context(contractTable,
             underlyingVariableMap,
@@ -973,6 +982,25 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    // Removes any field types from thisFieldTypes that are already consisten with their declarations.
+    private def packFieldTypes(context: Context): Context = {
+        var resultContext = context
+        for ((field, typ) <- context.thisFieldTypes) {
+            val requiredFieldType = context.lookupDeclaredFieldTypeInThis(field)
+
+            requiredFieldType match {
+                case None =>
+                    assert(false, "Bug: invalid field in field type context")
+                case Some(declaredFieldType) =>
+                    if (isSubtype(context.contractTable, typ, declaredFieldType, false).isEmpty &&
+                        (typ.isOwned == declaredFieldType.isOwned || declaredFieldType.isBottom)) {
+                        resultContext = resultContext.removeThisFieldType(field)
+                    }
+            }
+        }
+
+        resultContext
+    }
 
     private def checkFieldTypeConsistencyAfterTransaction(context: Context, tx: Transaction): Unit = {
         // First check fields that may be of inconsistent type with their declarations to make sure they match
@@ -1066,7 +1094,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         if (context1.isThrown && !context2.isThrown) return context2
         if (!context1.isThrown && context2.isThrown) return context1
 
-        def mergeMaps(map1: Map[String, ObsidianType], map2: Map[String, ObsidianType]): Map[String, ObsidianType] = {
+        def mergeMaps(map1: Map[String, ObsidianType],
+                      map2: Map[String, ObsidianType],
+                      context1IsThrown: Boolean,
+                      context2IsThrown: Boolean,
+                      dropDisposableReferences: Boolean): Map[String, ObsidianType] = {
             var mergedMap = new TreeMap[String, ObsidianType]()
 
             val inBoth = map1.keys.toSet.intersect(map2.keys.toSet)
@@ -1082,19 +1114,33 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             }
 
-            // Make sure anything that is not in both is disposable.
+            // Make sure anything that is not in both is disposable (if disposing of them is allowed; otherwise error).
+            if (!context1IsThrown) {
+                val inOnlyContext1 = map1.keys.toSet -- inBoth
 
-            val inOnlyContext1 = map1.keys.toSet -- inBoth
-            val inOnlyContext2 = map2.keys.toSet -- inBoth
+                if (dropDisposableReferences) {
+                    inOnlyContext1.foreach((x: String) => errorIfNotDisposable(x, map1(x), context1, ast))
+                }
+                else {
+                    inOnlyContext1.foreach((x: String) => logError(ast, FieldTypesIncompatibleAcrossBranches(x)))
+                }
+            }
+            if (!context2IsThrown) {
+                val inOnlyContext2 = map2.keys.toSet -- inBoth
 
-            inOnlyContext1.foreach((x: String) => errorIfNotDisposable(x, map1(x), context1, ast))
-            inOnlyContext2.foreach((x: String) => errorIfNotDisposable(x, map2(x), context2, ast))
+                if (dropDisposableReferences) {
+                    inOnlyContext2.foreach((x: String) => errorIfNotDisposable(x, map2(x), context2, ast))
+                }
+                else {
+                    inOnlyContext2.foreach((x: String) => logError(ast, FieldTypesIncompatibleAcrossBranches(x)))
+                }
+            }
 
             mergedMap
         }
 
-        val mergedVariableMap = mergeMaps(context1.underlyingVariableMap, context2.underlyingVariableMap)
-        val mergedThisFieldMap = mergeMaps(context1.thisFieldTypes, context2.thisFieldTypes)
+        val mergedVariableMap = mergeMaps(context1.underlyingVariableMap, context2.underlyingVariableMap, context1.isThrown, context2.isThrown, true)
+        val mergedThisFieldMap = mergeMaps(context1.thisFieldTypes, context2.thisFieldTypes, context1.isThrown, context2.isThrown, false)
 
         Context(context1.contractTable,
             mergedVariableMap,
@@ -1823,11 +1869,17 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (trueContext, checkedTrueStatements) = checkStatementSequence(decl, contextForCheckingTrueBranch, body1)
                 val (falseContext, checkedFalseStatements) = checkStatementSequence(decl, contextForCheckingFalseBranch, body2)
 
+                val packedTrueContext = packFieldTypes(trueContext)
+                val packedFalseContext = packFieldTypes(falseContext)
+
                 val (resetTrueContext, resetFalseContext) = resetOwnership match {
-                    case None => (trueContext, falseContext)
-                    case Some((x, oldType)) => (trueContext.updated(x, oldType), falseContext.updated(x, oldType))
+                    case None => (packedTrueContext, packedFalseContext)
+                    case Some((x, oldType)) => (packedTrueContext.updated(x, oldType), packedFalseContext.updated(x, oldType))
                 }
 
+                // The resulting contexts may have modified versions of the
+
+                // Throw out (prune) any variables that were local to the branches.
                 val contextIfTrue = pruneContext(s,
                     resetTrueContext,
                     contextForCheckingTrueBranch)
