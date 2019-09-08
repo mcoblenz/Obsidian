@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+bin_dir="$(cd "$(dirname $BASH_SOURCE)"; pwd)"
+root_dir="$bin_dir/.."
+export OBSIDIAN_COMPILER_DIR="$root_dir"
+
+${OBSIDIAN_COMPILER_DIR}/network-framework/invoke.sh "$@"
+

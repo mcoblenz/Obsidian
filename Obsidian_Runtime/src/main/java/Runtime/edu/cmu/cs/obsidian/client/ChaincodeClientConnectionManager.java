@@ -26,7 +26,7 @@ public class ChaincodeClientConnectionManager {
                 ChaincodeClientTransactionBugException
     {
         ArrayList<String> cmdArgs = new ArrayList<String>();
-        cmdArgs.add("../../../network-framework/invoke.sh");
+        cmdArgs.add("obsidianinvoke");
 
         cmdArgs.add("-q");
         cmdArgs.add(transactionName);
