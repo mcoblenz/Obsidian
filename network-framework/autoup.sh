@@ -65,7 +65,7 @@ checkNetworkIsUp
 NETWORKDIR=$(dirname $BASH_SOURCE)
 
 # Find out if this is the same chaincode path as before.
-FOUND=$(grep -c -e "^${CD}$" .env)
+FOUND=$(grep -c -e "${CD}\$" ${NETWORKDIR}/.env)
 if [ $? -eq 0 ]; then #same chaincode path as before
   if [ $NETWORKISUP -ne 0 ]; then
     echo "network is up; upgrading"
