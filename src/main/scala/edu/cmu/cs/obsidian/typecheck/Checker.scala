@@ -793,8 +793,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                  case (typ, c, ePrime) =>
                                      if (!typ.isBottom) {
                                          logError(e, DereferenceError(typ))
-                                         (ePrime, c)
                                      }
+                                     (ePrime, c)
                              }
                          (BottomType(), newContext, newExpr)
                  }
@@ -1110,7 +1110,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case Some(u) => mergedMap = mergedMap.updated(x, u)
                     case None =>
                         mergedMap = mergedMap.updated(x, BottomType())
-                        logError(ast, MergeIncompatibleError(x, t1, t2))
+                        if (!t1.isBottom && !t2.isBottom) {
+                            logError(ast, MergeIncompatibleError(x, t1, t2))
+                        }
                 }
             }
 
