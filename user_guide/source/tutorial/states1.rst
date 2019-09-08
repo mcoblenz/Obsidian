@@ -58,7 +58,7 @@ The compiler checks transaction invocations to make sure they are safe:
       s.turnOff(); // COMPILE ERROR: turnOff() requires that s is On, but here s is Off
    }
   
-*NOTE: there is never a need to specify both *ownership* and *state* at the same time; if a field is in any state, it must be Owned, and if Unowned, the field cannot have a state.*
+NOTE: there is never a need to specify both *ownership* and *state* at the same time; if a field is in any state, it must be Owned, and if Unowned, the field cannot have a state.
 
 
 
