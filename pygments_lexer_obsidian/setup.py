@@ -7,7 +7,7 @@ def read(fname):
 
 setup(
     name='pygments-lexer-obsidian',
-    version='0.1',
+    version='0.1.1',
     description='Obsidian lexer for Pygments',
     long_description=read('README.rst'),
     license="BSD",

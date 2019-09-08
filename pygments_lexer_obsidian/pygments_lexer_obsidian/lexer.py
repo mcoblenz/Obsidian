@@ -104,7 +104,7 @@ class ObsidianLexer(RegexLexer):
             include('whitespace'),
 
             (r'>>|@|\*\*|\?|:|~|&&|\|\||=>|==?|!=?|->', Operator),
-            (r'(<<|[\-<>+*%&/])', Operator),
+            (r'(<<|[\-<>+*%&/\|])', Operator),
 
             (r'[{(\[;,]', Punctuation),
             (r'[})\].]', Punctuation),
