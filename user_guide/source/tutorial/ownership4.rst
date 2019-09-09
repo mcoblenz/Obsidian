@@ -3,9 +3,10 @@ Ownership -- Miscellaneous
 
 Ownership checks
 -----------------
+
 Ownership can be documented and checked by writing the ownership in brackets. For example, ``[m@Owned]`` indicates 
-    that ``m`` is an owning reference at that particular point in the code. The compiler will generate an error if this 
-    might not be the case. For example:
+that ``m`` is an owning reference at that particular point in the code. The compiler will generate an error if this 
+might not be the case. For example:
 
 
 ::

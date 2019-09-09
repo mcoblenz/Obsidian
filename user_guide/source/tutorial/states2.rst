@@ -73,3 +73,4 @@ Testing states with ``in``
 
 Within the scope of the ``if...in`` block, the compiler requires that if there *is* an owner of the object referenced by ``s``, then the owner's state specification is never violated. If it is, then the program is terminated; it is up to the programmer to make sure the body of the ``if in`` block does not change the state inappropriately.
 
+For now, tests like ``s in On`` cannot be used like general Boolean expressions. If you need to test more than one condition (with `&&`, etc.), you will need to nest `if` statements instead.
