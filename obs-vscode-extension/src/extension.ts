@@ -314,6 +314,7 @@ export function activate(context: vscode.ExtensionContext) {
             return projectConfig
          }
          catch (e) {
+            console.log("Unable to find  project.json file at path " + path.resolve(workspacePath, "project.json"))
             return undefined
          }
       }
@@ -327,6 +328,7 @@ export function activate(context: vscode.ExtensionContext) {
    // If there's a config file, use that. Otherwise, assume the current text editor has a client in it.
    function clientContractPath(): string | undefined {
       let activeEditor = vscode.window.activeTextEditor
+
       if (activeEditor != undefined) {
          let config = projectConfig()
          if (config != undefined) {

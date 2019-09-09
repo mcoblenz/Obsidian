@@ -8,8 +8,10 @@
 
 ## Usage
 
-* Copy this folder into the `<user home>/.vscode/extensions` folder and restart VSCode
-* Syntax highlighting should be applied once new VSCode window is scopeName
+* tsc
+* vsce package
+* code --install-extension obsidian-0.0.1.vsix 
+* Restart VSCode.
 
 ## Citations
 
