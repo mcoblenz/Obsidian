@@ -191,7 +191,7 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
              * the root object.) */
             __restoreObject(serializationState);
 
-            System.out.println("Invoking transaction " + function);
+            System.out.println("Invoking transaction " + function + " on " + invocationReceiver);
             byte result[] = invocationReceiver.run(serializationState, function, paramsBytes);
             __saveModifiedData(stub, invocationReceiver);
             serializationState.transactionSucceeded();

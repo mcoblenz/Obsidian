@@ -1256,8 +1256,15 @@ class CodeGen (val target: Target, table: SymbolTable) {
             *          C c = new C(); c.initFromArchive(archive.getC().toByteArray());
             *
             *          The constructor is also used when initializing main contracts.
-            */
-            newClass.constructor(JMod.PUBLIC)
+            *
+            * If the constructor is used in preparation for unarchiving an object that was sent over the wire,
+            * we need to mark this object as modified so that the archiving system will save it.
+            * __modified = true;
+            * __loaded = false;
+             */
+            val noArgsConstructor = newClass.constructor(JMod.PUBLIC)
+            noArgsConstructor.body().assign(JExpr.ref(modifiedFieldName), JExpr.TRUE)
+            noArgsConstructor.body().assign(JExpr.ref(loadedFieldName), JExpr.FALSE)
         }
 
         if (aContract.params.nonEmpty && !aContract.isInterface) {
