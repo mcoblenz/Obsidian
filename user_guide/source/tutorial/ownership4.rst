@@ -25,15 +25,19 @@ Ownership checks in ``[]`` *never* change ownership; they only document and chec
 
 Getting rid of ownership
 --------------------------
-If ownership is no longer desired, ``disown`` can be used to relinquish ownership. For example:
+If ownership is no longer desired, ``disown`` can be used to discard ownership. For example:
 ::
 
    contract Money {
        int amount;
 
        transaction merge(Money@Owned >> Unowned mergeFrom) {
-           amount = amount + mergeFrom.amount;
-           disown mergeFrom; // We absorbed the value of mergeFrom, so the owner doesn't own it anymore.
+            amount = amount + mergeFrom.amount;
+            [mergeFrom@Owned]; // As per declaration
+            disown mergeFrom; 
+            // We absorbed the value of mergeFrom, so we need to actually throw it away.
+            // Since 'mergeFrom' is no longer an owning reference, it satisfies the 'Unowned' specification above
+            // and we don't get an error about losing an owned asset.
        }
    }
 
@@ -68,20 +72,6 @@ Errors can be flagged with ``revert``. A description of the error can be provide
      if (m.getAmount() < 0) {
          revert("Money must have an amount greater than 0");
      }
-   }
-
-Getting rid of ownership
---------------------------
-If ownership is no longer desired, ``disown`` can be used to relinquish ownership. For example:
-::
-
-   contract Money {
-       int amount;
-
-       transaction merge(Money@Owned >> Unowned mergeFrom) {
-           amount = amount + mergeFrom.amount;
-           disown mergeFrom; // We absorbed the value of mergeFrom, so the owner doesn't own it anymore.
-       }
    }
 
 Return

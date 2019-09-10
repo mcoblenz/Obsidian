@@ -43,6 +43,13 @@ If ``>>`` is not specified for a certain parameter, then the ownership of that p
       // body not shown
    }
 
+The figure below shows how `m` is an owned reference before `spend()` is called, but afterward, `m` is no longer an owner. The code above doesn't specify which reference is the new owner, since we can't see the implementation of `spend()`.
+
+.. figure:: aliasing-before-after.png
+   :alt: Ownership before and after calling spend()
+   :width: 600
+
+
 If a transaction expects an argument that is ``Unowned``, this means that the transaction cannot take ownership. 
 As a result, it is safe to pass an ``Owned`` reference as an argument to a transaction that expects an ``Unowned`` argument. 
 After the transaction returns, the caller still holds ownership. For example:
@@ -69,7 +76,7 @@ and is not an actual parameter. For example:
 
    contract Money {
       transaction discard(Money@Owned >> Unowned this) {
-         disown this;
+         // implementation not shown
       }
    }
 
