@@ -1141,7 +1141,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     inOnlyContext1.foreach((x: String) => errorIfNotDisposable(x, map1(x), context1, ast))
                 }
                 else {
-                    inOnlyContext1.foreach((x: String) => logError(ast, FieldTypesIncompatibleAcrossBranches(x)))
+                    inOnlyContext1.foreach((x: String) => logError(ast, FieldTypesIncompatibleAcrossBranches(x, map1(x), "true")))
                 }
             }
             if (!context2IsThrown) {
@@ -1151,23 +1151,26 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     inOnlyContext2.foreach((x: String) => errorIfNotDisposable(x, map2(x), context2, ast))
                 }
                 else {
-                    inOnlyContext2.foreach((x: String) => logError(ast, FieldTypesIncompatibleAcrossBranches(x)))
+                    inOnlyContext2.foreach((x: String) => logError(ast, FieldTypesIncompatibleAcrossBranches(x, map2(x), "false")))
                 }
             }
 
             mergedMap
         }
 
-        val mergedVariableMap = mergeMaps(context1.underlyingVariableMap, context2.underlyingVariableMap, context1.isThrown, context2.isThrown, true)
-        val mergedThisFieldMap = mergeMaps(context1.thisFieldTypes, context2.thisFieldTypes, context1.isThrown, context2.isThrown, false)
+        val packedContext1 = packFieldTypes(context1)
+        val packedContext2 = packFieldTypes(context2)
+
+        val mergedVariableMap = mergeMaps(packedContext1.underlyingVariableMap, packedContext2.underlyingVariableMap, packedContext2.isThrown, context2.isThrown, true)
+        val mergedThisFieldMap = mergeMaps(packedContext1.thisFieldTypes, packedContext2.thisFieldTypes, packedContext2.isThrown, context2.isThrown, false)
 
         Context(context1.contractTable,
             mergedVariableMap,
-            context1.isThrown,
-            context1.transitionFieldsInitialized.intersect(context2.transitionFieldsInitialized),
-            context1.localFieldsInitialized.intersect(context2.localFieldsInitialized),
+            packedContext1.isThrown,
+            packedContext1.transitionFieldsInitialized.intersect(packedContext2.transitionFieldsInitialized),
+            packedContext1.localFieldsInitialized.intersect(packedContext2.localFieldsInitialized),
             mergedThisFieldMap,
-            context1.valVariables.intersect(context2.valVariables))
+            packedContext1.valVariables.intersect(packedContext2.valVariables))
     }
 
     /* if [e] is of the form ReferenceIdentifier(x), This(), or if [e] is a sequence of
@@ -1793,7 +1796,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val contextIfFalse = pruneContext(s,
                     falseContext,
                     contextPrime)
-                (mergeContext(s, contextIfFalse, contextIfTrue), IfThenElse(ePrime, checkedTrueStatements, checkedFalseStatements).setLoc(s))
+                (mergeContext(s, contextIfTrue, contextIfFalse), IfThenElse(ePrime, checkedTrueStatements, checkedFalseStatements).setLoc(s))
 
             case IfInState(e, ePerm, state, body1, body2) =>
 

@@ -457,6 +457,6 @@ case class GenericParamShadowError(param1Binder: String, param1: GenericType,
     override val msg: String = s"$param1 in $param1Binder shadows $param2 of $param2Binder."
 }
 
-case class FieldTypesIncompatibleAcrossBranches(fieldName: String) extends Error {
-    override val msg: String = s"Field $fieldName must have compatible types in both branches."
+case class FieldTypesIncompatibleAcrossBranches(fieldName: String, typ: ObsidianType, branch: String) extends Error {
+    override val msg: String = s"Field $fieldName must have compatible types in both branches, but it was given incompatible type $typ in the $branch branch."
 }
