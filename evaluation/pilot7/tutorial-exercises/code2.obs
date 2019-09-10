@@ -1,0 +1,23 @@
+
+//Fill in the code in the /* TODO */ below
+//Note: s is a Share owned by another ShareHolder that is passed as a parameter to the receiveShare transaction, and will be set to the field "share"
+
+contract Share {
+
+}
+
+main contract ShareHolder {
+    Share@Owned share;
+
+    ShareHolder@Owned() {
+        share = new Share();
+    }
+
+    transaction receiveShare(Share@Owned s) {
+        
+    }
+
+    transaction checkShareValue(Share@Owned s) {
+        //...
+    }
+}
