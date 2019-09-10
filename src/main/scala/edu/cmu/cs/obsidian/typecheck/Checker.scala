@@ -1635,6 +1635,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     var newUpdates = Seq.empty[(ReferenceIdentifier, Expression)]
 
                     for ((ReferenceIdentifier(f), e) <- updates.get) {
+                        // Check to make sure we're not going to lose an owned asset by overwriting it
+                        val currentFieldType = contextPrime.lookupCurrentFieldTypeInThis(f).getOrElse(BottomType())
+                        if (currentFieldType.isAssetReference(thisTable) != No() && currentFieldType.isOwned) {
+                            logError(s, OverwrittenOwnershipError(f))
+                        }
+
+                        // Check to make sure the new value is type-appropriate for the field's declaration
                         val fieldAST = newStateTable.lookupField(f)
                         if (fieldAST.isDefined) {
                             val (t, contextPrime2, ePrime) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))

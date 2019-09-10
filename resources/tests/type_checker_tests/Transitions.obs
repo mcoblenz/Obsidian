@@ -27,3 +27,22 @@ main contract Test {
         bar();
     }
 }
+
+asset contract Coin {}
+
+contract BadCoinUser {
+    asset state HasCoin {
+        Coin@Owned c;
+    }
+    state NoCoin {
+    }
+
+    BadCoinUser@NoCoin() {
+        ->NoCoin;
+    }
+
+    transaction t(BadCoinUser@HasCoin this) {
+        // ERROR: losing c
+        ->HasCoin(c = new Coin());
+    }
+}

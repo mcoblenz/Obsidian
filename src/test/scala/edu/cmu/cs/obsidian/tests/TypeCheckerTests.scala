@@ -510,6 +510,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def transitionTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Transitions.obs",
+            (OverwrittenOwnershipError("c"), 46)::
             Nil
         )
     }
