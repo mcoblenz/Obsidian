@@ -41,13 +41,13 @@ case class Context(table: DeclarationTable,
             thisFieldTypes,
             valVariables)
 
-    def updatedAfterTransition(): Context =
+    def updatedAfterTransition(newThisFieldTypes: Map[String, ObsidianType]): Context =
         Context(contractTable,
             underlyingVariableMap,
             isThrown,
             Set.empty,
             localFieldsInitialized,
-            Map.empty,
+            newThisFieldTypes,
             valVariables)
 
     def updatedWithFieldInitialization(fieldName: String): Context = {
@@ -1002,6 +1002,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         resultContext
     }
 
+    private def checkFieldTypeConsistencyAfterConstructor(context: Context, constr: Constructor): Unit = {
+        // First check fields that may be of inconsistent type with their declarations to make sure they match
+        // either the declarations or the specified final types.
+        for ((field, typ) <- context.thisFieldTypes) {
+            val requiredFieldType = context.lookupDeclaredFieldTypeInThis(field)
+
+            requiredFieldType match {
+                case None =>
+                    assert(false, "Bug: invalid field in field type context")
+                case Some(declaredFieldType) =>
+                    if (isSubtype(context.contractTable, typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
+                        logError(constr, InvalidInconsistentFieldType(field, typ, declaredFieldType))
+                    }
+            }
+        }
+    }
+
     private def checkFieldTypeConsistencyAfterTransaction(context: Context, tx: Transaction): Unit = {
         // First check fields that may be of inconsistent type with their declarations to make sure they match
         // either the declarations or the specified final types.
@@ -1631,6 +1648,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 var contextPrime = context
                 var newUpdatesOption: Option[Seq[(ReferenceIdentifier, Expression)]] = None
 
+                // First transform the context according to all the update expressions. Afterward, update field types.
+
                 if (updates.isDefined) {
                     var newUpdates = Seq.empty[(ReferenceIdentifier, Expression)]
 
@@ -1653,7 +1672,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     newUpdatesOption = Some(newUpdates)
                 }
 
-
                 // Check for potentially-dropped resources.
                 val toCheckForDroppedAssets = possibleCurrentFields -- newFields // fields that we might currently have minus fields we're initializing now
                 for (oldField <- toCheckForDroppedAssets) {
@@ -1662,6 +1680,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         logError(s, PotentiallyUnusedOwnershipError(oldField.name))
                     }
                 }
+
+                var newThisFieldTypes = contextPrime.thisFieldTypes
+
+                // Discard records for any this-field types that are not in the new state.
+                val newFieldNames = newFields.map((f: Field) => f.name)
+                newThisFieldTypes = newThisFieldTypes.filter((fieldType: (String, ObsidianType)) => newFieldNames.contains(fieldType._1))
+
+                // Discard records for any this-field types that we're about to assign to.
+                for ((ReferenceIdentifier(f), e) <- updates.getOrElse(Seq())) {
+                    newThisFieldTypes = newThisFieldTypes - f
+                }
+
 
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
                 val newSimpleType =
@@ -1674,7 +1704,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
 
                 // Any initialization checking that will happen later can assume all the state fields have been initialized.
-                var contextAfterTransition = contextPrime.updated("this", newSimpleType).updatedAfterTransition()
+                var contextAfterTransition = contextPrime.updated("this", newSimpleType).updatedAfterTransition(newThisFieldTypes)
                 if (updates.isDefined) {
                     for (update <- updates.get) {
                         contextAfterTransition = contextAfterTransition.updatedWithFieldInitialization(update._1.name)
@@ -2458,6 +2488,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
         checkForUnusedStateInitializers(outputContext)
+        checkFieldTypeConsistencyAfterConstructor(outputContext, constr)
 
         // if the contract contains states, its constructor must contain a state transition
         if (hasStates && !hasTransition(constr.body)) {

@@ -216,8 +216,9 @@ main asset contract Auction {
 
     transaction setCurrentBid(Auction@Open this, Bid@Owned >> Unowned b) {
         //6. TODO: fill this in. You may call any other transactions as needed.
+        maxBidder.receiveBidMoney(bid);
         ->Open(item=seller.giveItem(), bid = b);
-        
+        [seller@Unsold];
 
 
     }

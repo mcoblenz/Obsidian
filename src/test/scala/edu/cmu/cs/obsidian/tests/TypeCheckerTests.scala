@@ -936,4 +936,11 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/DuplicateContractDecl.obs",
             (DuplicateContractError("Contract"), 2) :: Nil)
     }
+
+    @Test def constructorFieldTypes(): Unit = {
+        runTest("resources/tests/type_checker_tests/ConstructorFieldTypes.obs",
+            (InvalidInconsistentFieldType("seller",
+                StateType(ContractType("Seller", Nil),  "InAuction", NotRemoteReferenceType()),
+                StateType(ContractType("Seller", Nil),  "Unsold", NotRemoteReferenceType())), 11) :: Nil)
+    }
 }

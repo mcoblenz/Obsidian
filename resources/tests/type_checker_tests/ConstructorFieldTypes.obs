@@ -1,0 +1,33 @@
+contract Item {
+}
+
+
+main asset contract Auction {
+   Seller@Unsold seller;
+   Item@Owned item available in Open, BiddingDone;
+
+   state Open;
+
+    Auction@Owned() {
+       seller = new Seller();
+       -> Open(item = seller.giveItem());
+       // ERROR: giveItem() caused seller to be in state InAuction instead of Unsold
+   }
+}
+
+asset contract Seller {
+    state Unsold {
+        Item@Owned item;
+    };
+    state InAuction;
+
+    Seller@Unsold() {
+        -> Unsold(item = new Item());
+    }
+
+    transaction giveItem(Seller@Unsold >> InAuction this) returns Item@Owned {
+        Item temp = item;
+        -> InAuction;
+        return temp;
+    }
+}
