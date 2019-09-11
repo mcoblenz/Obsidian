@@ -24,3 +24,7 @@ To instantiate a Obsidian contract directly on the blockchain, it must be a `mai
 If the `Bank` contract is instantiated on the blockchain, the blockchain itself ensures that the Bank is never lost, and clients can execute transactions via their `Shared` references to the `Bank`.
 
 If you need to understand how clients work, you can refer to :doc:`../reference/clients`, but that is not necessary on your first read of this tutorial.
+
+Concurrency
+------------
+On the blockchain, all transactions execute sequentially. As a result, you do not have to worry about concurrency in Obsidian; if your transaction is executing, no other transactions are executing concurrently.
