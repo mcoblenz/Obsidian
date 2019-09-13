@@ -48,7 +48,7 @@ class ObsidianLexer(RegexLexer):
         ],
         'keywords-other': [
             (words(( 'Owned', 'Unowned', 'Shared', 'asset', 'interface', 
-                    'owned', 'unowned', 'shared'),
+                    'owned', 'unowned', 'shared', 'available in', 'in'),
                    suffix=r'\b'), Keyword),
 
             (words(('contract', 'transaction', 'state'),
