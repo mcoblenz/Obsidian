@@ -1,0 +1,51 @@
+import "betting_utils.obs"
+
+main asset contract Casino {
+    Money@Owned money;
+    Game@Owned currentGame; //The game that is currently being played
+    BetList@Shared bets; //The bets for the current game being played
+
+    Casino@Owned() {
+        money = new Money(100000);
+        currentGame = new Game();
+        bets = new BetList();
+    }
+
+    //TODO: Add your code here.
+
+    // new game
+    transaction newGame(Casino@Owned this) {
+        currentGame = new Game();
+        bets = new BetList();
+    }
+
+    //finish game
+    transaction finishGame(Casino@Owned this) {
+        currentGame.finishPlaying();
+        string outcome = currentGame.calculateOutcome();
+        if (bets in HasItems) {
+            BetPrediction bp = bets.getNext().getBetPrediction();
+            if(bp.getPredOutcome() == outcome) {
+                // casino loses
+                Money payout = money.splitMoney(bp.getBetAmount);
+                b.getBettor().receiveMoney(Money(2 * payout.getAmount()));
+            }
+        }
+    }
+
+    //new bet
+    transaction newBet(Casino@Owned this, Bet@Unowned bet) {
+        if (currentGame in BeforePlay) {
+            oldBettor = bet.getBettor();
+            if bets.contains(oldBettor) {
+                oldBet = bets.popSpecific(oldBettor);
+                oldBettor.receiveMoney(oldBet.getBetPrediction().getBetAmount());
+            }
+            bets.append(bet);
+            int amount = bet.getBetPrediction.getBetAmount();
+            money.mergeMoney(Money(amount));
+            bet.getBettor().withdrawMoney();
+        }
+    }
+
+}
