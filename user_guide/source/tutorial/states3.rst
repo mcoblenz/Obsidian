@@ -27,6 +27,6 @@ In the above situation, the programmer might need to check the state dynamically
 
 Implicit casts
 ---------------
-When a ``Shared`` reference is needed, an ``Owned`` suffices as long as the reference is NOT to an asset. For example, an ``Owned`` reference can be passed as an argument to a transaction that expects a ``Shared`` reference to a non-resource object. However, the caller is left with a ``Shared`` reference.
+When a ``Shared`` reference is needed, an ``Owned`` suffices as long as the reference is NOT to an asset. For example, an ``Owned`` reference can be passed as an argument to a transaction that expects a ``Shared`` reference to a non-asset object. However, the caller is left with a ``Shared`` reference.
 
 When an ``Unowned`` reference is needed, any reference suffices, and the caller is left with their original kind of reference.
