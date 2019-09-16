@@ -222,8 +222,6 @@ In the Auction contract below, uncomment the code and finish all the TODO statem
 //       }
 //     }
 
-//     /* 7. TODO: Assuming this transaction should be called after the "finishBidding" transaction,
-//                 finish the transaction declaration below. */
 //     transaction giveItem(Auction@BiddingDone >> Closed this) {
 //         maxBidder.won(item);
 //         sellerInAuction.receiveBid(maxBid);
