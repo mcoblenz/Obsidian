@@ -11,7 +11,8 @@ might not be the case. For example:
 
 ::
 
-   transaction spend(Money@Owned >> Unowned m) { // m is Owned initially but must be Unowned at the end.
+   // m is Owned initially but must be Unowned at the end.
+   transaction spend(Money@Owned >> Unowned m) { 
        // implementation not shown
    }
 
@@ -35,8 +36,9 @@ If ownership is no longer desired, ``disown`` can be used to discard ownership. 
             amount = amount + mergeFrom.amount;
             [mergeFrom@Owned]; // As per declaration
             disown mergeFrom; 
-            // We absorbed the value of mergeFrom, so we need to actually throw it away.
-            // Since 'mergeFrom' is no longer an owning reference, it satisfies the 'Unowned' specification above
+            // We absorbed the value of mergeFrom, so we need to throw it away.
+            // Since 'mergeFrom' is no longer an owning reference, 
+            // it satisfies the 'Unowned' specification above
             // and we don't get an error about losing an owned asset.
        }
    }
