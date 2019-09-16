@@ -1,4 +1,4 @@
-import "resources/sample_programs/pilot4/prescription-exercises/Collections.obs"
+import "Collections.obs"
 
 // Prescriptions are immutable by design; pharmacies that want to record information about
 // prescriptions must do so in a separate data structure.
