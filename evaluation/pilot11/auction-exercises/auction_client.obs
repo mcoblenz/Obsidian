@@ -1,0 +1,29 @@
+import "auction.obs"
+import "IO.obs"
+
+main contract AuctionClient {
+   transaction main (remote Auction@Shared auction) {
+      if (auction in Open) {
+         Bidder bidder1 = new Bidder("Bidder1", 100); // Start with $100
+         Bid bid1 = bidder1.createBid(10); // Bid $10 for the item
+         remote Bidder remoteBidder1 = auction.makeBid(bid1, bidder1);
+
+         Bidder bidder2 = new Bidder("Bidder2", 100);
+         Bid bid2 = bidder2.createBid(20);
+         remote Bidder remoteBidder2 = auction.makeBid(bid2, bidder2);
+
+         auction.finishBidding();
+
+         IO io = new IO();
+         io.print("bidder 1 money: ");
+         io.printInt(remoteBidder1.seeMoney().getAmount());
+
+         io.println("");
+         io.print("bidder 2 money: ");
+         io.printInt(remoteBidder2.seeMoney().getAmount());
+
+         disown bidder1;
+         disown bidder2;
+      }
+   }
+}

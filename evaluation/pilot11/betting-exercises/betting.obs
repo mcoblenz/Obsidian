@@ -1,0 +1,69 @@
+import "betting_utils.obs"
+
+main asset contract Casino {
+    Money@Owned money;
+    Game@Owned currentGame; //The game that is currently being played
+    BetList@Shared bets; //The bets for the current game being played
+    string gameOutcome;
+
+    Casino@Owned() {
+        money = new Money(100000);
+        currentGame = new Game();
+        bets = new BetList();
+        disown bets;
+        gameOutcome = "";
+    }
+
+    transaction makeBet(Bettor@Unowned b, string prediction, Money@Owned >> Unowned m) {
+        if (currentGame in BeforePlay) {
+            // If there is an existing bet, remove it and return the money:
+            if (bets.contains(b)) {
+                Bet exBet = bets.popSpecific(b);
+                b.receiveMoney(money.splitMoney(exBet.getBetPrediction().getBetAmount()));
+            }
+            // Record the bet
+            bets.append(new Bet(b, new BetPrediction(prediction, m.getAmount())));
+            // Add the total money to the pool.
+            money.mergeMoney(m);
+        } else {
+            revert "Attempting to make bet after currentGame has started";
+        }
+    }
+
+    transaction doGame() {
+        if (currentGame in BeforePlay) {
+            currentGame.startPlaying();
+            currentGame.finishPlaying();
+            gameOutcome = currentGame.calculateOutcome();
+            [currentGame@FinishedPlaying];
+        } else  {
+            revert "Attempting to start game not in BeforePlay";
+        }
+    }
+
+
+    transaction collectWinnings(Bettor@Unowned b) {
+        if (currentGame in FinishedPlaying) {
+            if (bets.contains(b)) {
+                Bet exBet = bets.popSpecific(b);
+                int winnings = 0;
+                if (exBet.getBetPrediction().getPredOutcome() == gameOutcome) {
+                    winnings = 2*exBet.getBetPrediction().getBetAmount();
+                }
+                b.receiveMoney(money.splitMoney(winnings));
+            }
+        }
+    }
+
+    transaction resetGame() {
+        if (currentGame in FinishedPlaying) {
+            bets = new BetList();
+            disown bets;
+        }
+        if (bets in Empty) {
+            currentGame = new Game();
+        }
+    }
+
+
+}

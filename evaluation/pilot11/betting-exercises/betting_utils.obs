@@ -1,0 +1,489 @@
+
+//Represents the money being traded in this program
+asset contract Money {
+    int amount; //Amount that this Money object holds
+
+    //Constructor
+    Money@Owned(int amt) {
+        amount = amt;
+    }
+
+    //Add additional Money
+    transaction mergeMoney(Money@Owned this, Money@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    //Returns the amount of this Money
+    transaction getAmount(Money@Owned this) returns int {
+        return amount;
+    }
+
+    //Use some amount of this Money
+    transaction splitMoney(Money@Owned this, int amt) returns Money@Owned {
+        if (amt > amount) {
+            revert "Can't split out more money than is available in a given Money object.";
+        } else {
+            amount = amount - amt;
+            return new Money(amt);
+        }
+    }
+}
+
+
+//Represents the bet prediction of a Bettor
+contract BetPrediction {
+    string predictedOutcome; //the Bettor's prediction of the winning outcome
+    int betAmount; //the amount of money the Bettor put down on this BetPrediction
+
+    //Constructor
+    BetPrediction@Owned(string predOut, int amount) {
+        predictedOutcome = predOut;
+        betAmount = amount;
+    }
+
+    //Returns the predicted outcome
+    transaction getPredOutcome(BetPrediction@Unowned this) returns string {
+        return predictedOutcome;
+    }
+
+    //Returns the betAmount
+    transaction getBetAmount(BetPrediction@Unowned this) returns int {
+        return betAmount;
+    }
+}
+
+
+//Represents a collection of BetPredictions
+// contract BetPredictionList {
+//     state Empty;
+//     state HasItems {
+//         BetPredictionList@Shared next;
+//         BetPrediction@Unowned pred;
+//     }
+
+//     //Constructor
+//     BetPredictionList@Empty() {
+//         ->Empty;
+//     }
+
+//     transaction getNext(BetPredictionList@HasItems this) returns BetPredictionList@Shared {
+//         return next;
+//     }
+
+//     transaction getValue(BetPredictionList@HasItems this) returns BetPrediction@Unowned {
+//         return pred;
+//     }
+
+//     //Add a new BetPrediction to the end of the list
+//     transaction append(BetPrediction@Unowned p) {
+        
+//         if (this in Empty) {
+//             BetPredictionList pList = new BetPredictionList();
+//             -> HasItems(pred = p, next = pList);
+//         }
+//         else {
+//             next.append(p);
+//         }
+//     }
+
+//     //remove a BetPrediction from the end of the list and return that BetPrediction
+//     transaction popBack(BetPredictionList@HasItems >> (Empty | HasItems) this) returns BetPrediction@Unowned {
+//         if (next in Empty) {           
+//             BetPrediction temp = pred;           
+//             disown next;
+//             ->Empty;
+//             return temp;
+//         }
+//         else {
+//             popBack();
+//         }
+//         revert; //should never get here
+//     }
+
+//     //remove a BetPrediction with a given BettorID, and return that BetPrediction
+//     transaction popSpecific(int givenId) returns BetPrediction@Unowned {
+//         if (this in HasItems) {
+//             if (pred.getBettorId() == givenId) {
+//                 BetPrediction temp = pred; 
+//                 if (next in Empty) {                   
+//                     disown next;
+//                     ->Empty;
+//                 }
+//                 else {
+//                     BetPrediction newP = next.getValue();
+//                     BetPredictionList pList = next.getNext();
+//                     -> HasItems(pred = newP, next = pList);
+//                 }
+//                 return temp;
+//             }
+//             else {
+//                 return next.popSpecific(givenId);
+//             }
+//         }
+//         else {
+//             revert("No bettors in list");
+//         }
+//     }
+
+//     //returns true if a BetPrediction with BettorID id is in the list
+//     transaction contains(int id) returns bool {
+//         if (this in HasItems) {
+//             if (pred.getBettorId() == id) {
+//                 return true;
+//             }
+//             else {
+//                 return next.contains(id);
+//             }
+//         }
+//         else {
+//             return false;
+//         }
+//     }
+// }
+
+
+//Represents a person betting on a game
+asset contract Bettor {
+    Money@Owned money; //Total Money the Bettor owns
+
+    //Constructor
+    Bettor@Owned() {
+        money = new Money(100);
+    }
+    
+    //Take some Money out of the Bettor's total money
+    transaction withdrawMoney(Bettor@Owned this, int amount) returns Money@Owned {
+        Money m = money.splitMoney(amount);
+        return m;
+    }
+
+    //Adds Money to the Bettor's total money
+    transaction receiveMoney(Bettor@Unowned this, Money@Owned >> Unowned m) {
+        money.mergeMoney(m);
+    }
+}
+
+
+//Represents a collection of Bettors
+// contract BettorList {
+//     state Empty;
+//     state HasItems {
+//         BettorList@Shared next;
+//         Bettor@Unowned b;
+//     }
+
+//     //Constructor
+//     BettorList@Empty() {
+//         ->Empty;
+//     }
+
+//     transaction getNext(BettorList@HasItems this) returns BettorList@Shared {
+//         return next;
+//     }
+
+//     transaction getValue(BettorList@HasItems this) returns Bettor@Unowned {
+//         return b;
+//     }
+
+//     //Add a new Bettor to the end of the list
+//     transaction append(Bettor@Unowned newB) {
+        
+//         if (this in Empty) {
+//             BettorList bList = new BettorList();
+//             -> HasItems(b = newB, next = bList);
+//         }
+//         else {
+//             next.append(newB);
+//         }
+//     }
+
+//     //remove a Bettor from the end of the list and return that Bettor
+//     transaction popBack(BettorList@HasItems >> (Empty | HasItems) this) returns Bettor@Unowned {
+//         if (next in Empty) {           
+//             Bettor temp = b;           
+//             disown next;
+//             ->Empty;
+//             return temp;
+//         }
+//         else {
+//             popBack();
+//         }
+//         revert; //Should never get here
+//     }
+
+//     //remove a Bettor with a given BettorID, and return that Bettor
+//     transaction popSpecific(int givenId) returns Bettor@Unowned {
+//         if (this in HasItems) {
+//             if (b.getID() == givenId) {
+//                 Bettor temp = b; 
+//                 if (next in Empty) {                   
+//                     disown next;
+//                     ->Empty;
+//                 }
+//                 else {
+//                     Bettor newB = next.getValue();
+//                     BettorList bList = next.getNext();
+//                     -> HasItems(b = newB, next = bList);
+//                 }
+//                 return temp;
+//             }
+//             else {
+//                 return next.popSpecific(givenId);
+//             }
+//         }
+//         else {
+//             revert("No bettors in list");
+//         }
+//     }
+
+//     //returns true if a Bettor with BettorID id is in the list
+//     transaction contains(int id) returns bool {
+//         if (this in HasItems) {
+//             if (b.getID() == id) {
+//                 return true;
+//             }
+//             else {
+//                 return next.contains(id);
+//             }
+//         }
+//         else {
+//             return false;
+//         }
+//     }
+// }
+
+//Represents a single bet
+contract Bet {
+    Bettor@Unowned bettor; //The Bettor making the bet
+    BetPrediction@Unowned prediction; //The BetPrediction for the winner
+
+    //Constructor
+    Bet@Owned(Bettor@Unowned b, BetPrediction@Unowned p) {
+        bettor = b;
+        prediction = p;
+    }
+
+    //Returns a reference to the Bettor making the bet
+    transaction getBettor(Bet@Unowned this) returns Bettor@Unowned {
+        return bettor;
+    }
+
+    //Returns a reference to the BetPrediction the Bettor made
+    transaction getBetPrediction(Bet@Unowned this) returns BetPrediction@Unowned {
+        return prediction;
+    }
+}
+
+//Represents a container of Bets
+contract BetList {
+    state Empty;
+    state HasItems {
+        BetList@Shared next;
+        Bet@Unowned b;
+    }
+
+    //Constructor
+    BetList@Empty() {
+        ->Empty;
+    }
+
+    transaction getNext(BetList@HasItems this) returns BetList@Shared {
+        return next;
+    }
+
+    transaction getValue(BetList@HasItems this) returns Bet@Unowned {
+        return b;
+    }
+
+    //Add a new Bet to the end of the list
+    transaction append(Bet@Unowned newB) {
+        
+        if (this in Empty) {
+            BetList bList = new BetList();
+            -> HasItems(b = newB, next = bList);
+        }
+        else {
+            next.append(newB);
+        }
+    }
+
+    //remove a Bet with a given Bettor reference, and return that Bet
+    transaction popSpecific(BetList@Shared this, Bettor@Unowned bettor) returns Bet@Unowned {
+        if (this in HasItems) {
+            if (b.getBettor() == bettor) {
+                Bet temp = b; 
+                if (next in Empty) {                   
+                    disown next;
+                    ->Empty;
+                }
+                else {
+                    Bet newB = next.getValue();
+                    BetList bList = next.getNext();
+                    -> HasItems(b = newB, next = bList);
+                }
+                return temp;
+            }
+            else {
+                return next.popSpecific(bettor);
+            }
+        }
+        else {
+            revert("No bets in list");
+        }
+    }
+
+    //returns true if a Bet has been placed by a Bettor
+    transaction contains(Bettor@Unowned bettor) returns bool {
+        if (this in HasItems) {
+            if (b.getBettor() == bettor) {
+                return true;
+            }
+            else {
+                return next.contains(bettor);
+            }
+        }
+        else {
+            return false;
+        }
+    }
+}
+
+//Represents a record of a Game and its corresponding Bets
+// contract GameRecord {
+//     Game@Unowned game; //the Game
+//     BetList@Shared bets; //all the Bets on the Game
+
+//     GameRecord@Owned() {
+//         game = new Game();
+//         bets = new BetList();
+//     }
+
+//     //Returns the list of Bets
+//     transaction getBets(GameRecord@Unowned this) returns BetList@Shared {
+//         return bets;
+//     }
+
+//     //Returns a reference to the Game
+//     transaction getGame(GameRecord@Unowned this) returns Game@Unowned {
+//         return game;
+//     }
+// }
+
+//Represents a container of GameRecords
+// contract GameRecordList {
+//     state Empty;
+//     state HasItems {
+//         GameRecordList@Shared next;
+//         GameRecord@Unowned gamerec;
+//     }
+
+//     //Constructor
+//     GameRecordList@Empty() {
+//         ->Empty;
+//     }
+
+//     transaction getNext(GameRecordList@HasItems this) returns GameRecordList@Shared {
+//         return next;
+//     }
+
+//     transaction getValue(GameRecordList@HasItems this) returns GameRecord@Unowned {
+//         return gamerec;
+//     }
+
+//     //Add a new Game to the end of the list
+//     transaction append(GameRecord@Unowned newB) {
+        
+//         if (this in Empty) {
+//             GameRecordList bList = new GameRecordList();
+//             -> HasItems(gamerec = newB, next = bList);
+//         }
+//         else {
+//             next.append(newB);
+//         }
+//     }
+
+//     //remove a GameRecord from the end of the list and return that GameRecord
+//     transaction popBack(GameRecordList@HasItems >> (Empty | HasItems) this) returns GameRecord@Unowned {
+//         if (next in Empty) {           
+//             GameRecord temp = gamerec;           
+//             disown next;
+//             ->Empty;
+//             return temp;
+//         }
+//         else {
+//             popBack();
+//         }
+//         revert; //Should never get here
+//     }
+
+//     //remove a GameRecord with a given Game reference, and return that GameRecord
+//     transaction popSpecific(Game@Unowned g) returns GameRecord@Unowned {
+//         if (this in HasItems) {
+//             if (gamerec.getGame() == g) {
+//                 GameRecord temp = gamerec; 
+//                 if (next in Empty) {                   
+//                     disown next;
+//                     ->Empty;
+//                 }
+//                 else {
+//                     GameRecord newB = next.getValue();
+//                     GameRecordList bList = next.getNext();
+//                     -> HasItems(gamerec = newB, next = bList);
+//                 }
+//                 return temp;
+//             }
+//             else {
+//                 return next.popSpecific(g);
+//             }
+//         }
+//         else {
+//             revert("No games in list");
+//         }
+//     }
+
+//     //returns true if GameRecordList contains a Game, and returns the GameRecord
+//     transaction contains(Game@Unowned game) returns bool {
+//         if (this in HasItems) {
+//             if (gamerec.getGame() == game) {
+//                 return true;
+//             }
+//             else {
+//                 return next.contains(game);
+//             }
+//         }
+//         else {
+//             return false;
+//         }
+//     }
+
+// }
+
+//Represents a generic game
+contract Game {
+
+    state BeforePlay;
+    state Playing;
+    state FinishedPlaying;
+
+    //Constructor
+    Game@BeforePlay() {
+        -> BeforePlay;
+    }
+
+    //Start the game
+    transaction startPlaying(Game@BeforePlay >> Playing this) {
+        -> Playing;
+    }
+
+    //Finish the game
+    transaction finishPlaying(Game@Playing >> FinishedPlaying this) {
+        -> FinishedPlaying;
+    }
+
+    //Returns the outcome of the game
+    transaction calculateOutcome(Game@FinishedPlaying this) returns string {
+        //...
+        return ""; //Always returns empty string for now
+    }
+}
