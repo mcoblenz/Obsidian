@@ -87,6 +87,15 @@ case class Context(table: DeclarationTable,
             thisFieldTypes,
             valVariables + variableName)
 
+    def updatedClearingValVariable(variableName: String): Context =
+        Context(contractTable,
+            underlyingVariableMap,
+            isThrown,
+            transitionFieldsInitialized,
+            localFieldsInitialized,
+            thisFieldTypes,
+            valVariables - variableName)
+
     def get(s: String): Option[ObsidianType] = underlyingVariableMap.get(s)
 
     def apply(s: String): ObsidianType = underlyingVariableMap(s)
@@ -1829,6 +1838,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val allStates = contractTable.possibleStates
 
                 var resetOwnership: Option[(String, NonPrimitiveType)] = None
+                var valVariableToClear: Option[String] = None
 
                 val (contextForCheckingTrueBranch, ePermPrime, contextForCheckingFalseBranch) =
                     t match {
@@ -1844,8 +1854,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 case _ => None
                             }
 
+
+
                             ident match {
                                 case Some(x) =>
+                                    if (!contextPrime.valVariables.contains(x)) {
+                                        valVariableToClear = Some(x)
+                                    }
+
                                     np.permission match {
                                         case Owned() =>
                                             state match {
@@ -1931,9 +1947,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     contextPrime)
 
                 val mergedContext = mergeContext(s, contextIfFalse, contextIfTrue)
+                val finalContext = valVariableToClear match {
+                    case None => mergedContext
+                    case Some(x) => mergedContext.updatedClearingValVariable (x)
+                }
                 val newStatement = IfInState(ePrime, ePermPrime, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
 
-                (mergedContext, newStatement)
+                (finalContext, newStatement)
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val (tryContext, checkedTryStatements) = checkStatementSequence(decl, context, s1)
                 val (catchContext, checkedCatchStatements) = checkStatementSequence(decl, context, s2)

@@ -943,4 +943,12 @@ class TypeCheckerTests extends JUnitSuite {
                 StateType(ContractType("Seller", Nil),  "InAuction", NotRemoteReferenceType()),
                 StateType(ContractType("Seller", Nil),  "Unsold", NotRemoteReferenceType())), 11) :: Nil)
     }
+
+    @Test def vals(): Unit = {
+        runTest("resources/tests/type_checker_tests/Vals.obs",
+            (InvalidValAssignmentError(), 21)::
+                (InvalidValAssignmentError(), 28)::
+                Nil
+        )
+    }
 }

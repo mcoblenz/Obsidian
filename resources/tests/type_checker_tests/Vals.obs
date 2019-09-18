@@ -1,0 +1,51 @@
+contract LightSwitch {
+    state On;
+    state Off;
+
+    LightSwitch@Off() {
+        ->Off;
+    }
+
+    transaction turnOn(LightSwitch@Off >> On this) {
+        ->On;
+    }
+
+    transaction turnOff(LightSwitch@On >> Off this) {
+        ->Off;
+    }
+}
+
+main contract Vals {
+    transaction t1(int x) {
+        // ERROR: can't reassign to parameters
+        x = 2;
+    }
+
+    transaction t2() {
+        LightSwitch s = new LightSwitch();
+        if (s in On) {
+            // ERROR: can't reassign to variables used in dynamic state checks
+            s = new LightSwitch();
+        }
+
+        // OK
+        s = new LightSwitch();
+    }
+}
+
+contract ValsShared {
+    LightSwitch@Shared sharedSwitch;
+
+    ValsShared@Owned() {
+        sharedSwitch = new LightSwitch();
+        disown sharedSwitch; // TODO: remove this
+    }
+
+    transaction t() {
+        if (sharedSwitch in Off) {
+        }
+
+        sharedSwitch = new LightSwitch();
+        disown sharedSwitch; // TODO: remove this
+    }
+}
