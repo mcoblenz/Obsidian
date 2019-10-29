@@ -55,14 +55,14 @@ case class SubtypingError(t1: ObsidianType, t2: ObsidianType, isThis : Boolean) 
 
                     t2 match {
                         case np2: NonPrimitiveType =>
-                            s"'this' is $np at the end of the transaction, but the transaction signature requires that it be $np2"
-                        case _ => s"Found type '$t1', but expected something of type '$t2'"
+                            s"'this' is $np at the end of the transaction, but the transaction signature requires that it be $np2."
+                        case _ => s"Found type '$t1', but expected something of type '$t2'."
                     }
                 }
                 else {
-                    s"Found type '$t1', but expected something of type '$t2'"
+                    s"Found type '$t1', but expected something of type '$t2'."
                 }
-            case _ => s"Found type '$t1', but expected something of type '$t2'"
+            case _ => s"Found type '$t1', but expected something of type '$t2'."
         }
 
 }

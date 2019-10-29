@@ -360,8 +360,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     /* returns [t1] if [t1 <: t2], logs an error and returns [BottomType] otherwise */
-    private def checkIsSubtype(table: ContractTable, ast: AST, t1: ObsidianType, t2: ObsidianType): ObsidianType = {
-        val errorOpt = isSubtype(table, t1, t2, ast.isInstanceOf[This])
+    private def checkIsSubtype(table: ContractTable, ast: AST, t1: ObsidianType, t2: ObsidianType, thisAtEndOfTransaction: Boolean = false): ObsidianType = {
+        val errorOpt = isSubtype(table, t1, t2, thisAtEndOfTransaction)
         if (errorOpt.isDefined) {
             logError(ast, errorOpt.get)
             BottomType()
@@ -2241,7 +2241,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // Only need to check the output context type on this if we're actually implementing the interface
                 // (otherwise, with no body, it will always default to not typechecking correctly)
                 if (!impl.isInterface) {
-                    checkIsSubtype(context.contractTable, tx, outputContext("this"), expectedType)
+                    checkIsSubtype(context.contractTable, tx, outputContext("this"), expectedType, thisAtEndOfTransaction = true)
                 }
 
                 // Don't need to check interface methods to make sure they return
@@ -2507,7 +2507,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         val expectedThisType: NonPrimitiveType = constr.resultType
         val thisAST = This().setLoc(constr.loc) // Make a fake "this" AST so we generate the right error message.
-        checkIsSubtype(table, thisAST, outputContext("this"), expectedThisType)
+        checkIsSubtype(table, thisAST, outputContext("this"), expectedThisType, true)
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
         checkForUnusedStateInitializers(outputContext)

@@ -401,7 +401,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (SubtypingError(
                     StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()),
-                    StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), false), 8
+                    StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), true), 8
                 )
                 ::
                 Nil
@@ -417,7 +417,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (SubtypingError(
                     StateType(ContractType("C1", Nil), Set("S1", "S2"), NotRemoteReferenceType()),
-                    StateType(ContractType("C1", Nil), Set("S1", "S3"), NotRemoteReferenceType()), false), 17
+                    StateType(ContractType("C1", Nil), Set("S1", "S3"), NotRemoteReferenceType()), true), 17
                 )
                 ::
                 (SubtypingError(
@@ -585,7 +585,7 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def typeSpecificationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/TypeSpecification.obs",
             (SubtypingError(StateType(ContractType("C", Nil), Set("S3", "S2"), NotRemoteReferenceType()),
-                StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), false), 24)
+                StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), true), 24)
                 ::
                 (ArgumentSpecificationError("a", "badChangeA",
                     StateType(ContractType("A", Nil), "Unavailable", NotRemoteReferenceType()),
@@ -894,11 +894,11 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def allPermissions(): Unit = {
         runTest("resources/tests/type_checker_tests/AllPermissions.obs",
             (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
-                ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), false), 19) ::
+                ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), true), 19) ::
                 (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), false), 25) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), true), 25) ::
                 (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
-                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()), false), 29) ::
+                    ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()), true), 29) ::
                 (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x2")), 41) ::
                 (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x7")), 63) ::
                 (ReceiverTypeIncompatibleError("t1",
