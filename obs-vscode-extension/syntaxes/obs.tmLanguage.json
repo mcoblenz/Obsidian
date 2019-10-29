@@ -1063,15 +1063,15 @@
 		"object-types": {
 			"patterns": [
                 {
-                    "match": "([A-Z_]\\w*)",
+                    "match": "\\b([A-Z_]\\w*)",
                     "name": "storage.type.bare.obs"
                 },
                 {
-                    "match": "([A-Z_]\\w*)\\s*@\\s*(\\w+)",
+                    "match": "\\b([A-Z_]\\w*)\\s*@\\s*(\\w+)",
                     "name": "storage.type.annotated.obs"
                 },
                 {
-                    "match": "([A-Z_]\\w*)\\s*@\\s*(\\w+)\\s*>>\\s*(\\w+)",
+                    "match": "\\b([A-Z_]\\w*)\\s*@\\s*(\\w+)\\s*>>\\s*(\\w+)",
                     "name": "storage.type.annotated.transition.obs"
                 }
 				
