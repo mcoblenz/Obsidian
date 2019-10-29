@@ -1,0 +1,241 @@
+/*
+The following program simulates an English auction; there are multiple Bidders 
+who each make a Bid for a single Item being sold by a Seller.
+The highest Bidder will receive the Item for the price of the highest Bid.
+
+NOTE: Unlike in a normal English auction, when a Bidder makes a Bid, they give the Money to the 
+Auction house IMMEDIATELY, and the Money is returned to that Bidder if another Bidder makes a higher Bid.
+*/
+
+
+
+
+
+/*
+Below is the Bid contract, which represents a single bid in our Auction. 
+Please answer the questions below.
+
+
+TODO: What state is a Bid in at:
+    1. First instantiation? Open______________________
+    2. The beginning of the bidSurpassed transaction? Open______________________
+    3. The end of the bidSurpassed transaction? Stale______________________
+*/
+
+asset contract Bid {
+    Money@Owned money;
+
+    state Open;
+    state Stale;
+
+    Bid@Open(Money@Owned >> Unowned m) {
+        money = m;
+        ->Open;
+    }
+
+    transaction getMoney(Bid@Owned this) returns Money@Owned {
+        Money temp = new Money(money.getAmount());
+        -> Stale;
+        return temp;
+    }
+
+    transaction getAmount(Bid@Owned this) returns int {
+        return money.getAmount();
+    }
+
+    transaction bidSurpassed(Bid@Open >> Stale this) {
+        -> Stale;
+    }
+}
+
+
+/*
+Below is the Bidder contract, which represents a bidder in our Auction.
+Uncomment the code and answer all the TODO statements below.
+*/
+
+asset contract Bidder {
+    string name; //Bidder's name
+    Money@Owned money; //The total money owned by the bidder
+    ItemList@Owned inventory; // can add infinite items to inventory
+
+    Bidder@Owned(string n, int m) {
+        name = n;
+        money = new Money(m);
+        inventory = new ItemList();
+    }
+
+    transaction createBid(Bidder@Owned this, int bidAmount) returns Bid@Owned {  
+        Money m = money.splitMoney(bidAmount);
+        //4. TODO: Finish this transaction by creating a new bid with the given bidAmount.
+        return new Bid(m);
+    }
+
+    transaction getName(Bidder@Unowned this) returns string {
+        return name;
+    }
+
+    transaction won(Bidder@Unowned this, Item@Owned >> Unowned i) {
+        inventory.append(i);
+    }
+
+    transaction receiveBidMoney(Bidder@Unowned this, Bid@Owned >> Unowned bid) {
+        money.mergeMoney(bid.getMoney());
+        disown bid;
+    }
+
+    transaction seeMoney(Bidder@Unowned this) returns Money@Unowned {
+       return money;
+    }
+}
+
+/*
+Below are the Seller, Item, ItemList, and Money contracts. Refer to these (as well as the Bid and Bidder contracts above) to complete
+the rest of the Auction exercise.
+*/
+
+contract Seller {
+    asset state Sold {
+        Bid@Owned bid;
+    }
+    asset state Unsold {
+        Item@Owned item;
+    }
+
+    state InAuction;
+
+    Seller@Unsold() {
+        -> Unsold(item = new Item());
+    }
+
+    transaction giveItem(Seller@Unsold >> InAuction this) returns Item@Owned {
+        Item temp = item;
+        -> InAuction;
+        return temp;
+    }
+
+    transaction receiveBid(Seller@InAuction >> Sold this, Bid@Owned >> Unowned b) {
+        -> Sold(bid = b);
+    }
+}
+
+contract Item {
+}
+
+contract ItemList {
+    state Empty;
+    state HasItems {
+        Item@Owned item;
+        ItemList@Owned next;
+    }
+
+    ItemList@Empty() {
+        ->Empty;
+    }
+
+    transaction append(ItemList@Owned this, Item@Owned >> Unowned it) {
+        ItemList ilist = new ItemList();
+        -> HasItems(item = it, next = ilist);
+    }
+}
+
+asset contract Money {
+    int amount;
+
+    Money@Owned(int amt) {
+        amount = amt;
+    }
+
+    transaction mergeMoney(Money@Owned this, Money@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    transaction getAmount(Money@Unowned this) returns int {
+        return amount;
+    }
+
+    transaction splitMoney(Money@Owned this, int amt) returns Money@Owned {
+        if (amt > amount) {
+            revert "Can't split out more money than is available in a given Money object.";
+        } else {
+            amount = amount - amt;
+            return new Money(amt);
+        }
+    }
+}
+
+/*
+In the Auction contract below, uncomment the code and finish all the TODO statements.
+*/
+
+main asset contract Auction {
+    Item@Owned item available in Open, BidsMade, BiddingDone; // "available in" means the field is defined in several states
+    
+    Bidder@Unowned maxBidder available in BidsMade, BiddingDone; // the bidder who made the highest bid so far
+    Bid@Owned maxBid available in BidsMade, BiddingDone;
+    
+    Seller@InAuction sellerInAuction available in Open, BidsMade, BiddingDone;
+
+    state Open;
+    state BidsMade;
+
+    state BiddingDone;
+   
+    state Closed {
+        Seller@Sold sellerInSold;
+    };
+
+    Auction@Open() {
+        Seller s = new Seller();
+        Item item = s.giveItem();
+        -> Open(item = item, sellerInAuction = s);
+    }
+
+    transaction makeBid(Auction@Shared this, Bid@Owned >> Unowned newBid, Bidder@Unowned bidder) returns Bidder@Unowned {
+        if (this in Open) {
+            ->BidsMade(maxBidder = bidder, maxBid = newBid);
+        }
+        else {    
+            if (this in BidsMade) {
+                if (newBid.getAmount() > maxBid.getAmount()) { //if the newBid is higher than the current Bid
+                    //5. TODO: fill this in. You may call any other transactions as needed.
+                    // maxBid.bidSurpassed();
+                    Bid tempBid = maxBid;
+                    maxBidder.receiveBidMoney(tempBid);
+                    maxBid = newBid;
+
+                    Bidder tempBidder = bidder;
+                    maxBidder = tempBidder;
+                    return tempBidder;
+                }
+                else {
+                    //6. TODO: return the newBid money to the bidder, since the newBid wasn't high enough. 
+                    //You may call any other transactions as needed.
+                    bidder.receiveBidMoney(newBid);
+                }
+            }
+            else {
+                revert ("Can only make a bid on an open auction.");
+            }
+        }   
+        return bidder;
+    }
+
+    transaction finishBidding(Auction@Shared this) {
+      if (this in BidsMade) {
+        -> BiddingDone();
+      }
+      else {
+         revert("Can only finishBidding in state BidsMade");
+      }
+    }
+
+    transaction giveItem(Auction@BiddingDone >> Closed this) {
+        maxBidder.won(item);
+        sellerInAuction.receiveBid(maxBid);
+
+        -> Closed(sellerInSold = sellerInAuction);
+    }
+
+}

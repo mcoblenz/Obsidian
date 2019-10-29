@@ -173,7 +173,6 @@ contract BetList {
 
 //Represents a generic game
 contract Game {
-
     state BeforePlay;
     state Playing;
     state FinishedPlaying;

@@ -1,0 +1,89 @@
+/*
+The following program simulates an English auction; there are multiple Bidders
+who each make a Bid for a single Item being sold by a Seller.
+The highest Bidder will receive the Item for the price of the highest Bid.
+
+NOTE: Unlike in a normal English auction, when a Bidder makes a Bid, they give the Money to the
+Auction house IMMEDIATELY, and the Money is returned to that Bidder if another Bidder makes a higher Bid.
+*/
+
+main asset contract Auction {
+    Participant@Unowned seller;
+
+    state Open;
+    state BidsMade {
+        Participant@Unowned maxBidder; // the bidder who made the highest bid so far
+        Money@Owned maxBid;
+    }
+    state Closed;
+
+    Auction@Owned(Participant@Unowned s) {
+        ->Open(seller = s);
+    }
+
+    transaction bid(Auction@Shared this, Money@Owned >> Unowned money, Participant@Unowned bidder) {
+        if (this in Open) {
+            ->BidsMade(maxBidder = bidder, maxBid = money);
+        }
+        else {
+            if (this in BidsMade) {
+                if (money.getAmount() > maxBid.getAmount()) { //if the newBid is higher than the current Bid
+                    //5. TODO: fill this in. You may call any other transactions as needed.
+                }
+                else {
+                    //6. TODO: return the money to the bidder, since the new bid wasn't high enough. 
+                    //You may call any other transactions as needed.
+                }
+            }
+            else {
+                revert ("Can only make a bid on an open auction.");
+            }
+        }
+    }
+
+    // This gets called by an administrator when the auction is closed.
+    transaction finishBidding(Auction@Shared this) {
+      if (this in BidsMade) {
+        seller.receivePayment(maxBid);
+        ->Closed;
+      }
+      else {
+         revert("Can only finishBidding in state BidsMade");
+      }
+    }
+}
+
+asset contract Participant {
+    Money@Owned money;
+
+    transaction receivePayment(Participant@Unowned this, Money@Owned >> Unowned m) {
+        money.mergeMoney(m);
+    }
+
+}
+
+asset contract Money {
+    int amount;
+
+    Money@Owned(int amt) {
+        amount = amt;
+    }
+
+    transaction mergeMoney(Money@Owned this, Money@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    transaction getAmount(Money@Unowned this) returns int {
+        return amount;
+    }
+
+    transaction splitMoney(Money@Owned this, int amt) returns Money@Owned {
+        if (amt > amount) {
+            revert "Can't split out more money than is available in a given Money object.";
+        } else {
+            amount = amount - amt;
+            return new Money(amt);
+        }
+    }
+}
