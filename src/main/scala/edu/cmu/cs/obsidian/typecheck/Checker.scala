@@ -753,7 +753,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
                  val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
                  if (t1 == t2) (BoolType(), c2, Equals(e1Prime, e2Prime).setLoc(e)) else {
-                     logError(e, DifferentTypeError(e1, t1, e2, t2))
+                     if (!t1.isBottom && !t2.isBottom) {
+                         logError(e, DifferentTypeError(e1, t1, e2, t2))
+                     }
                      (BottomType(), c2, Equals(e1Prime, e2Prime).setLoc(e))
                  }
              case GreaterThan(e1: Expression, e2: Expression) =>
@@ -772,7 +774,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
                  val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
                  if (t1 == t2) (BoolType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e)) else {
-                     logError(e, DifferentTypeError(e1, t1, e2, t2))
+                     if (!t1.isBottom && !t2.isBottom) {
+                         logError(e, DifferentTypeError(e1, t1, e2, t2))
+                     }
                      (BottomType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e))
                  }
 
@@ -999,7 +1003,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             requiredFieldType match {
                 case None =>
-                    assert(false, "Bug: invalid field in field type context")
+                    // The field doesn't exist, so there would have been another error generated previously.
+                    // Nothing to do here.
                 case Some(declaredFieldType) =>
                     if (isSubtype(context.contractTable, typ, declaredFieldType, false).isEmpty &&
                         (typ.isOwned == declaredFieldType.isOwned || declaredFieldType.isBottom)) {

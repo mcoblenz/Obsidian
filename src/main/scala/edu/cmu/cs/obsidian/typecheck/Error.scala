@@ -80,8 +80,8 @@ case class VariableUndefinedError(x: String, context: String) extends Error {
 
 }
 case class DifferentTypeError(e1: Expression, t1: ObsidianType, e2: Expression, t2: ObsidianType) extends Error {
-    val msg: String = s"Expression '$e1' has type '$t1', and expression '$e2' has type '$t2'," +
-        s"but these expressions must have the same type"
+    val msg: String = s"Expression '$e1' has type '$t1', and expression '$e2' has type '$t2', " +
+        s"but these expressions must have the same type."
 }
 case class FieldUndefinedError(fieldOf: NonPrimitiveType, fName: String) extends Error {
     val msg: String = fieldOf match {
