@@ -2575,7 +2575,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // Should always (?) fail, since we grouped on type name (e.g., int is never distinguishable from another int)
                 case (t1: PrimitiveType, t2: PrimitiveType) =>
                     if (t1.toString != t2.toString) { None } else { Some(t1.toString) }
-
+                case (BottomType(), _) => None
+                case (_, BottomType()) => None
                 // This case should never happen, since we already grouped the constructor arguments on type
                 case _ => assert(false, s"Unexpected distinguishability test: $arg1, $arg2"); None
             }).map(example => AmbiguousConstructorExample(example, arg1, arg2))
