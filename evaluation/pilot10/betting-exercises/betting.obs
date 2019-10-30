@@ -5,17 +5,64 @@ main asset contract Casino {
     Game@Owned currentGame; //The game that is currently being played
     BetList@Shared bets; //The bets for the current game being played
 
+    state OpenBetting;
+    state ClosedBetting;
+
     Casino@Owned() {
         money = new Money(100000);
         currentGame = new Game();
         bets = new BetList();
+        ->OpenBetting;
     }
 
     //TODO: Add your code here.
-    transaction startGame(Game@BeforePlay g) {
+    transaction startNewGame(Game@BeforePlay >> Unowned g) {
+        if (currentGame in FinishedPlaying) {
+            
+        }
+        else {
+            revert "Game not finished playing";
+        }
         disown currentGame;
-        currentGame g;
+        currentGame = g;
+        
+    }
+
+    transaction openBetting() {
+        ->OpenBetting;
+    }
+
+    transaction makeBet(Bet@Owned >> Unowned bet) {
+
+    }
+
+    transaction closeBetting() {
+        ->ClosedBetting;
+        currentGame.finishPlaying();
+
 
 
     }
+
+    transaction payWinner(Bet@Owned bet) {
+        if (currentGame in FinishedPlaying) {
+            if (bets.contains(bet)) {
+                Bettor bettor = bet.bettor;
+                BetPrediction predict = bet.prediction;
+
+                bets.popSpecific(bettor);
+                
+                // check if bettor actually won
+                if (currentGame.calculateOutcome() == predict.predictedOutcome) {
+                    Money wonMoney = money.splitMoney(predict.betAmount);
+                    bettor.receiveMoney(wonMoney);
+                }
+                
+            }
+        }
+        
+
+    }
+
+
 }
