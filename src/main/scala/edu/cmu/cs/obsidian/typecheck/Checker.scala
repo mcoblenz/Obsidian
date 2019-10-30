@@ -885,7 +885,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                  // If e is a variable, then we need to update the context to indicate that it's no longer owned.
                  val finalContext = e match {
-                     case ReferenceIdentifier(x) => contextPrime.updated(x, newTyp)
+                     case ReferenceIdentifier(x) =>
+                         if (contextPrime.lookupCurrentFieldTypeInThis(x).isDefined) {
+                             // This is a field.
+                             contextPrime.updatedThisFieldType(x, newTyp)
+                         }
+                         else {
+                             contextPrime.updated(x, newTyp)
+                         }
                      case _ => contextPrime
                  }
                  (newTyp, finalContext, ePrime)
