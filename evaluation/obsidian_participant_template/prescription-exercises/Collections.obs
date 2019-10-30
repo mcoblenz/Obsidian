@@ -1,73 +1,24 @@
-contract MaybeRecord {
-    asset state Something {
-        PharmacyPrescriptionRecord@HasFills record;
-    }
-
-    state Nothing;
-
-    MaybeRecord@Nothing() {
-        ->Nothing;
-    }
-
-    MaybeRecord@Something(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) {
-        ->Something(record = newRecord);
-    }
-
-    transaction getRecord(MaybeRecord@Something >> Nothing this) returns PharmacyPrescriptionRecord@HasFills {
-        PharmacyPrescriptionRecord result = record;
-        ->Nothing;
-        return result;
-    }
-}
-
 contract PharmacyPrescriptionRecordList {
     state Nil;
     asset state Cons {
-        PharmacyPrescriptionRecord@HasFills record;
+        int ID;
+        PharmacyPrescriptionRecord@Owned record;
         PharmacyPrescriptionRecordList@Shared next;
     }
 
-    PharmacyPrescriptionRecordList@Nil() {
+    PharmacyPrescriptionRecordList@Shared() {
         ->Nil;
     }
 
-    PharmacyPrescriptionRecordList@Cons(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
-                                        PharmacyPrescriptionRecordList@Shared tail) {
-        ->Cons(record = newRecord, next = tail);
+    PharmacyPrescriptionRecordList@Shared(int id, 
+                                        PharmacyPrescriptionRecord@Owned >> Unowned r, 
+                                        PharmacyPrescriptionRecordList@Shared n) {
+        ->Cons(ID = id, record = r, next = n);
     }
 
-    transaction cons(PharmacyPrescriptionRecordList@Nil >> Cons this,
-                     PharmacyPrescriptionRecord@HasFills >> Unowned newRecord,
-                     PharmacyPrescriptionRecordList@Shared tail) {
-        ->Cons(record = newRecord, next = tail);
-    }
-
-    transaction prepend(PharmacyPrescriptionRecord@HasFills >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
-        PharmacyPrescriptionRecordList list = new PharmacyPrescriptionRecordList();
-        list.cons(newRecord, this);
-        return list;
-    }
-
-    transaction prependIfNotEmpty(PharmacyPrescriptionRecord@Owned >> Unowned newRecord) returns PharmacyPrescriptionRecordList@Shared {
-        if (newRecord in HasFills) {
-            return prepend(newRecord);
-        } else {
-            disown newRecord;
-            return this;
-        }
-    }
-
-    transaction contains(Prescription@Unowned prescription) returns bool {
+    transaction removeRecord(PharmacyPrescriptionRecordList@Shared this, int id) returns PharmacyPrescriptionRecord@Owned {
         if (this in Cons) {
-            return (record.getPrescription() == prescription) || next.contains(prescription);
-        } else {
-            return false;
-        }
-    }
-
-    transaction removeIfExists(Prescription@Unowned prescription) returns MaybeRecord@Owned {
-        if (this in Cons) {
-            if (record.getPrescription() == prescription) {
+            if (ID == id) {
                 PharmacyPrescriptionRecord oldRecord = record;
 
                 if (next in Nil) {
@@ -77,16 +28,16 @@ contract PharmacyPrescriptionRecordList {
                     ->Cons(record = next.getRecord(), next = newNext);
                 }
 
-                return new MaybeRecord(oldRecord);
+                return oldRecord;
             } else {
-                return next.removeIfExists(prescription);
+                return next.removeRecord(id);
             }
         } else {
-            return new MaybeRecord();
+            revert "Can't find record with given ID to remove.";
         }
     }
 
-    transaction getRecord(PharmacyPrescriptionRecordList@Cons >> Nil this) returns PharmacyPrescriptionRecord@HasFills {
+    transaction getRecord(PharmacyPrescriptionRecordList@Cons >> Nil this) returns PharmacyPrescriptionRecord@Owned {
         PharmacyPrescriptionRecord res = record;
         ->Nil;
         return res;
@@ -94,6 +45,11 @@ contract PharmacyPrescriptionRecordList {
 
     transaction getNext(PharmacyPrescriptionRecordList@Cons this) returns PharmacyPrescriptionRecordList@Shared {
         return next;
+    }
+
+    transaction put(PharmacyPrescriptionRecordList@Shared this, int id, PharmacyPrescriptionRecord@Owned >> Unowned r) returns PharmacyPrescriptionRecordList@Shared {
+        PharmacyPrescriptionRecordList newHead = new PharmacyPrescriptionRecordList(id, r, this);
+        return newHead;
     }
 }
 

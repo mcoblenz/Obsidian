@@ -1,97 +1,90 @@
+/*
+ * This system is intended to reflect the following rule on prescriptions:
+ *    A prescription cannot be filled more times than the designated number of refills specifies.
+ *    Prescription-filling is implemented in Prescription.doFill().
+ *
+ * However, the Drug Enforcement Agency is worried that the code below might allow violations of the rule by
+ * malevolent patients, who might modify or subclass the Patient contract.
+ * Specifically, it is possible for a caller to call depositPrescription() several times 
+ * with the same prescription object. 
+ * 
+ * TASK 1: Please use what you have learned today to fix this problem (avoiding runtime checks if possible).
+ */
+
 import "Collections.obs"
 
 // Prescriptions are immutable by design; pharmacies that want to record information about
 // prescriptions must do so in a separate data structure.
 contract Prescription {
-	string prescriptionText; // specifies the drug, dosage, etc.
-	int refills;
-	string patientName; // Assume that patient names are unique.
+    string prescriptionText; // specifies the drug, dosage, etc.
+    int refills;
+    string patientName; // Assume that patient names are unique.
 
-	Prescription@Owned(string prescriptionText, int refills, string patientName) {
-		this.prescriptionText = prescriptionText;
-		this.refills = refills;
-		this.patientName = patientName;
-	}
+    Prescription@Owned(string text, int r, string patient) {
+        prescriptionText = text;
+        refills = r;
+        patientName = patient;
+    }
 
-	transaction getRefills(Prescription@Unowned this) returns int {
-		return refills;
-	}
-
-	transaction getPatientName(Prescription@Unowned this) returns string {
-		return patientName;
-	}
+    transaction getRefills() returns int {
+        return refills;
+    }
 }
 
-asset contract PharmacyPrescriptionRecord {
-    state Empty;
+contract PharmacyPrescriptionRecord {
+    int fillsLeft;
+    Prescription@Shared prescription;
 
-    state HasFills {
-        int fillsLeft;
-        Prescription@Owned prescription;
+    PharmacyPrescriptionRecord@Owned(int f, Prescription@Shared p) {
+        fillsLeft = f;
+        prescription = p;
     }
 
-    PharmacyPrescriptionRecord@Owned(Prescription@Owned >> Unowned _prescription) {
-        if (_prescription.getRefills() > 0) {
-            ->HasFills(fillsLeft = _prescription.getRefills(), prescription = _prescription);
-        } else {
-            ->Empty;
-        }
+    transaction getFillsLeft(PharmacyPrescriptionRecord@Unowned this) returns int {
+        return fillsLeft;
     }
 
-    transaction getPrescription(PharmacyPrescriptionRecord@HasFills this) returns Prescription@Unowned {
-        return prescription;
-    }
-
-    // TODO TASK 2: Fill in the type signature of this transaction.
-    transaction consumeRefill(/* YOUR CODE HERE */ this) {
-        if (fillsLeft > 1) {
-            fillsLeft = fillsLeft - 1;
-        } else {
-            disown prescription;
-            ->Empty;
-        }
+    transaction decrementFillsLeft(PharmacyPrescriptionRecord@Unowned this) {
+        fillsLeft = fillsLeft - 1;
     }
 }
 
 /* A Pharmacy keeps a record of all the prescriptions that patients have submitted as well as how many times each prescription has been filled.
  * Before filling a prescription, the pharmacy must make sure that there is at least one refill available.
  */
-main contract Pharmacy {
-    PharmacyPrescriptionRecordList@Shared prescriptionList;
+main asset contract Pharmacy {
+    PharmacyPrescriptionRecordList@Shared prescriptionRecords;
+    int nextID;
+
+    Pharmacy@Owned() {
+        nextID = 0;
+        prescriptionRecords = new PharmacyPrescriptionRecordList();
+    }
 
 	// Must be called before the patient can fill a new prescription.
-    // TODO TASK 1: Fill in the type signature of this transaction.
-	transaction depositPrescription(/* YOUR CODE HERE */ prescription) {
-		if (prescriptionList.contains(prescription)) {
-            revert "PrescriptionAlreadyDepositedException";
-		}
-
-		prescriptionList = prescriptionList.prependIfNotEmpty(new PharmacyPrescriptionRecord(prescription));
+    // Assumes that the prescription was not already deposited in this Pharmacy.
+    // Returns the new ID of the prescription so it can be looked up later.
+	transaction depositPrescription(Prescription@Shared prescription) returns int {
+        int origFills = prescription.getRefills();
+        int thisID = nextID;
+        PharmacyPrescriptionRecord newRecord = new PharmacyPrescriptionRecord(origFills, prescription);
+        prescriptionRecords = prescriptionRecords.put(thisID, newRecord);
+        nextID = nextID + 1;
+        return thisID;
 	}
 
-	transaction fillPrescription(Prescription@Unowned prescription) {
+	transaction fillPrescription(int prescriptionID) {
         // The prescription list can only contain records in HasFills, so we remove the record, as we need to decrement the fills counter.
-		MaybeRecord maybeRecord = prescriptionList.removeIfExists(prescription);
 
-        // TODO TASK 3: Fill in the rest of this transaction. You will need to call the doFill transaction in this class (Pharmacy) on the appropriate PharmacyPrescriptionRecord.
-        //              Be sure to record that the prescription has been filled.
+        // TODO TASK 2: Fill in the rest of this transaction. You will need to call requestFillFromPharmacist
+        // on the appropriate PharmacyPrescriptionRecord.
+        // Start by uncommenting this line:
+        // PharmacyPrescriptionRecord record = prescriptionRecords.removeRecord(prescriptionID);
+
+        requestFillFromPharmacist(prescriptionID);
 	}
 
-	private transaction doFill(PharmacyPrescriptionRecord@HasFills record) {
+	transaction requestFillFromPharmacist(int prescriptionID) {
 		// This code, which is not shown, notifies the pharmacist to actually fill the prescription.
 	}
 }
-
-contract Patient {
-	string name;
-
-    transaction depositPrescription(Pharmacy@Shared pharmacy, Prescription@Owned >> Unowned prescription) {
-        pharmacy.depositPrescription(prescription);
-    }
-
-	// Assume that this prescription is for this patient; no separate checking is needed.
-	transaction fillPrescription(Pharmacy@Shared pharmacy, Prescription@Unowned prescription) {
-		pharmacy.fillPrescription(prescription);
-	}
-}
-
