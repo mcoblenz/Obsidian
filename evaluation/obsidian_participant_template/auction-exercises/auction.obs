@@ -28,10 +28,10 @@ main asset contract Auction {
         else {
             if (this in BidsMade) {
                 if (money.getAmount() > maxBid.getAmount()) { //if the newBid is higher than the current Bid
-                    //5. TODO: fill this in. You may call any other transactions as needed.
+                    //1. TODO: fill this in. You may call any other transactions as needed.
                 }
                 else {
-                    //6. TODO: return the money to the bidder, since the new bid wasn't high enough. 
+                    //2. TODO: return the money to the bidder, since the new bid wasn't high enough. 
                     //You may call any other transactions as needed.
                 }
             }
