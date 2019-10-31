@@ -129,7 +129,7 @@ contract StatesWithFields {
         ->S1;
     }
 
-    transaction t() {
+    transaction t(StatesWithFields@Shared this) {
         if (this in S2) {
             x = new StatesWithFields();
         }

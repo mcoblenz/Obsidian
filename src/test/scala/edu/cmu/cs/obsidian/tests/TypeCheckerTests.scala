@@ -215,13 +215,13 @@ class TypeCheckerTests extends JUnitSuite {
                     IntType()), 21)
                 ::
                 (MethodUndefinedError(
-                    ContractReferenceType(ContractType("Invocation", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("Invocation", Nil), Unowned(), NotRemoteReferenceType()),
                     "otherMethod"), 23)
                 ::
                 (NonInvokeableError(IntType()), 25)
                 ::
                 (MethodUndefinedError(
-                    ContractReferenceType(ContractType("OtherContract", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("OtherContract", Nil), Owned(), NotRemoteReferenceType()),
                     "anotherMethod"), 32)
                 ::
                 (ArgumentSubtypingError("otherMethod", "x",
@@ -236,7 +236,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def dereferenceTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Dereference.obs",
-            (FieldUndefinedError(ContractReferenceType(ContractType("Construct", Nil), Shared(), NotRemoteReferenceType()), "x"), 30)
+            (FieldUndefinedError(ContractReferenceType(ContractType("Construct", Nil), Unowned(), NotRemoteReferenceType()), "x"), 30)
                 ::
                 (DereferenceError(StringType()), 22)
                 ::
@@ -604,14 +604,14 @@ class TypeCheckerTests extends JUnitSuite {
             (TransitionNotAllowedError(), 11) ::
                 (ReceiverTypeIncompatibleError("changeStateShared",
                     ContractReferenceType(ContractType("C", Nil), Unowned(), NotRemoteReferenceType()),
-                    ContractReferenceType(ContractType("C", Nil), Shared(), NotRemoteReferenceType())), 39) ::
+                    ContractReferenceType(ContractType("C", Nil), Shared(), NotRemoteReferenceType())), 38) ::
                 (ReceiverTypeIncompatibleError("changeStateOwned",
                     ContractReferenceType(ContractType("C", Nil), Shared(), NotRemoteReferenceType()),
-                    ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType())), 42) ::
+                    ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType())), 41) ::
                 (ReceiverTypeIncompatibleError("changeStateStateSpecified",
                     ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
-                    StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 45) ::
-                (InvalidInconsistentFieldType("s1C", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 48) ::
+                    StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 44) ::
+                (InvalidInconsistentFieldType("s1C", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 47) ::
                 Nil
         )
     }

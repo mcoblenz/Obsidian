@@ -60,7 +60,7 @@ contract A {
         ->S2;
     }
 
-    transaction share() {}
+    transaction share(A@Shared this) {}
 
     transaction unown(A@Shared >> Unowned this) {}
 }

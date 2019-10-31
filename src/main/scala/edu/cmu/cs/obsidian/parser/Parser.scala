@@ -597,12 +597,12 @@ object Parser extends Parsers {
                 val thisContractType = ContractType(contractName, contractParams)
 
                 val finalType = thisArg match {
-                    case None => ContractReferenceType(thisContractType, Shared(), NotRemoteReferenceType())
+                    case None => ContractReferenceType(thisContractType, Unowned(), NotRemoteReferenceType())
                     case Some(v) => makeRemoteTypeTopLevelIfNeeded(v.typOut.withParams(contractParams))
                 }
 
                 val thisType = thisArg match {
-                    case None => ContractReferenceType(ContractType(contractName, contractParams), Shared(), NotRemoteReferenceType())
+                    case None => ContractReferenceType(ContractType(contractName, contractParams), Unowned(), NotRemoteReferenceType())
                     case Some(variableDecl) => makeRemoteNonPrimitiveTypeTopLevelIfNeeded(variableDecl.typIn.asInstanceOf[NonPrimitiveType].withParams(contractParams))
                 }
 

@@ -11,8 +11,7 @@ main contract C {
         ->S2;
     }
 
-    // OK because by default, 'this' is Shared.
-    transaction changeStateShared() {
+    transaction changeStateShared(C@Shared this) {
         ->S2;
     }
 

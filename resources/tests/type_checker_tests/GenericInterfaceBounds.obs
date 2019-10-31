@@ -15,7 +15,7 @@ contract C[A where A implements Validatable] {
         ->Empty;
     }
 
-    transaction store(A@Invalid >> Unowned a) {
+    transaction store(C@Shared this, A@Invalid >> Unowned a) {
         a.validate();
         if (a in Valid) {
             ->Full(val = a);
