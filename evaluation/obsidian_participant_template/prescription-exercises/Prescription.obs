@@ -1,14 +1,13 @@
 /*
  * This system is intended to reflect the following rule on prescriptions:
  *    A prescription cannot be filled more times than the designated number of refills specifies.
- *    Prescription-filling is implemented in Prescription.doFill().
  *
  * However, the Drug Enforcement Agency is worried that the code below might allow violations of the rule by
  * malevolent patients, who might modify or subclass the Patient contract.
- * Specifically, it is possible for a caller to call depositPrescription() several times 
- * with the same prescription object. 
- * 
- * TASK 1: Please use what you have learned today to fix this problem (avoiding runtime checks if possible).
+ * Specifically, it is possible for a caller to call depositPrescription() several times
+ * on different Pharmacy objects with the same Prescription object. See getMedicine() below for an example.
+ *
+ * YOUR TASK: Please use what you have learned today to fix this problem (avoiding runtime checks if possible).
  */
 
 import "Collections.obs"
@@ -74,17 +73,27 @@ main asset contract Pharmacy {
 	}
 
 	transaction fillPrescription(int prescriptionID) {
-        // The prescription list can only contain records in HasFills, so we remove the record, as we need to decrement the fills counter.
-
-        // TODO TASK 2: Fill in the rest of this transaction. You will need to call requestFillFromPharmacist
-        // on the appropriate PharmacyPrescriptionRecord.
-        // Start by uncommenting this line:
-        // PharmacyPrescriptionRecord record = prescriptionRecords.removeRecord(prescriptionID);
-
-        requestFillFromPharmacist(prescriptionID);
+        PharmacyPrescriptionRecord record = prescriptionRecords.removeRecord(prescriptionID);
+        if (record.getFillsLeft() > 0) {
+            record.decrementFillsLeft();
+            prescriptionRecords.put(prescriptionID, record);
+            requestFillFromPharmacist(prescriptionID);
+        }
 	}
 
 	transaction requestFillFromPharmacist(int prescriptionID) {
 		// This code, which is not shown, notifies the pharmacist to actually fill the prescription.
 	}
+}
+
+contract Patient {
+    transaction getMedicine(Pharmacy@Shared pharmacy1, Pharmacy@Shared pharmacy2, Prescription@Shared prescription) {
+        int prescriptionID1 = pharmacy1.depositPrescription(prescription);
+        pharmacy1.fillPrescription(prescriptionID1);
+        
+        // Uh oh: the patient should not be able to deposit the prescription 
+        // a second time, obtaining more refills than authorized!
+        int prescriptionID2 = pharmacy2.depositPrescription(prescription);
+        pharmacy2.fillPrescription(prescriptionID2);
+    }
 }
