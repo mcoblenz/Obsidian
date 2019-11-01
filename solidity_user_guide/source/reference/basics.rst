@@ -3,7 +3,7 @@ Solidity Language Basics
 
 Contracts, functions, and main contracts
 ----------------------------------------------
-Solidity is object-oriented. A ``contract`` is like a class: it can be instantiated as many times as needed. Each contract supports operations; each one is called a ``function``. Functions are akin to methods in traditional object-oriented languages. However, unlike methods, functions either completely finish or revert. If a function reverts (via the ``revert`` statement), then all changes that the function made will be discarded.
+Solidity is object-oriented. A ``contract`` is like a class: it can be instantiated as many times as needed. Each contract supports operations; each one is called a ``function``. Functions are akin to methods in traditional object-oriented languages. However, unlike methods, functions either completely finish or revert. If a function reverts (via the ``revert`` function), then all changes that the function made will be discarded.
 
 Visibility
 --------------

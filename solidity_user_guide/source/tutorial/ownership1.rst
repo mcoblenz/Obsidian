@@ -9,7 +9,7 @@ Ownership -- Introduction
 Solidity is object-oriented. It includes *contracts*, which are like classes, and can have *fields* 
 and *functions*, analogous to Java fields and methods respectively. 
 
-In order to use Solidity effectively, we suggest applying *ownership* to clarify the relationships between objects. In this section of the tutorial, you will learn about ownership.
+In order to use Solidity effectively, we suggest applying *ownership* to clarify the relationships between objects. In this section of the tutorial, you will learn Solidity and ownership at the same time.
 
 Objects can be *owned*, in which *one of the references* to the object is owned. An owned object can have any number of unowned references. Alternatively, if the object is not owned, 
 it can have any number of shared references (shown in *(b)* below). An object with shared references can also have unowned references,
@@ -35,7 +35,7 @@ that has one owned reference:
 
 ::
 
-   pragma solidity ^0.5.1;
+   pragma solidity ^0.5.1; // Solidity files should specify a minimum compiler version.
 
    contract Money {
    }
