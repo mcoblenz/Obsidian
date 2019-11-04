@@ -11,10 +11,11 @@ See http://obsidian-lang.com.
 1. Install IntelliJ and the Scala plugin (https://www.jetbrains.com/idea/download/).
 2. Install protoc (https://github.com/protocolbuffers/protobuf). On macOS: `brew install protobuf`.
 3. Install sbt (https://www.scala-sbt.org/release/docs/Setup.html).
+4. Install gradle. On macOS: `brew install gradle`.
 
 ###### Compiler setup
 1. In a terminal, go to the root of the Obsidian project folder.
-2. Run: `sbt assembly`. This will build the compiler, generating a Jar file in target/scala-2.12/.
+2. Run: `make`. This will build the compiler, generating a Jar file in target/scala-2.12/.
 
 ###### Editor setup
 1. Install nodejs (https://nodejs.org/en/).
