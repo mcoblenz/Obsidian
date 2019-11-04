@@ -1,3 +1,4 @@
+pragma solidity >=0.5.11;
 
 //Write a constructor for the Money object shown above so that it accepts an integer as a parameter and sets "amount" to that integer value. 
 
@@ -6,23 +7,25 @@ contract Money {
 
     //TODO: write your constructor here
 
-    transaction getAmount() returns int {
+    function getAmount() public returns (int) {
         return amount;
     }
 }
 
-main contract Wallet {
-    Money@Owned m;
+contract Wallet {
+    Money m; // m is owned
 
-    Wallet@Owned() {
+    constructor() public {
         m = new Money(); //TODO: you will have to change this once you make your new constructor
     }
 
-    transaction spendMoney() {
+    function spendMoney() public {
         //...
     }
 
-    transaction receiveMoney(Money@Owned >> Unowned mon) returns Money@Owned {
+    // mon is owned at the beginning but unowned at the end
+    // Returns an owned reference.
+    function receiveMoney(Money mon) public returns (Money) {
         Money temp = m;
         m = mon;
         return temp;

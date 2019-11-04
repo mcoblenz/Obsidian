@@ -1,3 +1,4 @@
+pragma solidity >=0.5.11;
 
 //Fill in the code in the /* TODO */ below
 //Note: s is a Share owned by another ShareHolder that is passed as a parameter to the receiveShare transaction, and will be set to the field "share"
@@ -6,18 +7,18 @@ contract Share {
 
 }
 
-main contract ShareHolder {
-    Share@Owned share;
+contract ShareHolder {
+    Share share; // owned
 
-    ShareHolder@Owned() {
+    constructor() public {
         share = new Share();
     }
 
-    transaction receiveShare( /* TODO */ s) {
+    function receiveShare(Share s) public { // TODO
         //...
     }
 
-    transaction checkShareValue(Share@Owned s) {
+    function checkShareValue(Share s) public {
         //...
     }
 }
