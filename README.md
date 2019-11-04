@@ -9,7 +9,7 @@ See http://obsidian-lang.com.
 
 ###### Preliminary setup
 1. Install IntelliJ and the Scala plugin (https://www.jetbrains.com/idea/download/).
-2. Install protoc (https://github.com/protocolbuffers/protobuf). On macOS: `brew install protoc`.
+2. Install protoc (https://github.com/protocolbuffers/protobuf). On macOS: `brew install protobuf`.
 3. Install sbt (https://www.scala-sbt.org/release/docs/Setup.html).
 
 ###### Compiler setup
