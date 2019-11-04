@@ -5,10 +5,11 @@ Ownership -- Functions
 Function return types
 ------------------------
 
-When functions return objects, the type of the returned object must be annotated in the function declaration. For example:
+When functions return objects, the type of the returned object must be annotated in the function declaration. If the returned reference is owned, a comment should indicate that. For example:
 
 ::
 
+    // returns owned Money 
     function withdraw() public returns (Money) {
       // body not shown
       return m; //where m is of type Money
