@@ -87,7 +87,7 @@ If you are using the Remix environment (linked above), messages are created auto
 
 Security
 ----------
-*Important*: for security reasons, it is only safe to transfer money to whoever invoked the present function. This leads to the *withdrawal pattern*: if you want to send money to someone else, do not do it directly. Instead, record in a data structure the fact that your contract owes money to a particular address, and provide a ``withdraw`` function that can be called to withdraw the money. Typically, you record a mapping from address to an amount you owe, and then ``withdraw`` checks ``msg.sender`` to transfer the right amount of money (e.g. ``msg.sender.transfer(amount)``).
+*Important*: for security reasons, it is only safe to transfer money to whoever invoked the present function. This leads to the *withdrawal pattern*: if you want to send money to someone else, do not do it directly. Instead, record in a data structure the fact that your contract owes money to a particular address, and provide a ``withdraw`` function that the *recipient* can call to withdraw the money. Typically, you record a mapping from address to an amount you owe, and then ``withdraw`` checks ``msg.sender`` to transfer the right amount of money (e.g. ``msg.sender.transfer(amount)``).
 
 Storage types
 -------------
