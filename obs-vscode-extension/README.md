@@ -6,6 +6,11 @@
 * `syntaxes/obs.tmLanguage.json` - Text mate grammar file used for tokenization
 * `language-configuration.json` - defines the tokens used for comments and brackets
 
+## Setup
+* Install Node.js: http://nodejs.org
+* npm install -g typescript
+* npm install -g vsce
+
 ## Usage
 
 * tsc
