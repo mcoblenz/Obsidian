@@ -23,14 +23,7 @@ Built-in types
             bar(addresses[0]); // call bar(), passing the 0th element of addresses
         }
     }
-    
-Constructors
-------------
-Constructors are defined with the ``constructor`` keyword: ::
-    
-    constructor(/* parameters go here */) public {
-        // initialize fields as needed
-    }
+
 
 Enumerated types
 -----------------
@@ -44,11 +37,32 @@ As in C, use the ``enum`` keyword to define an enumerated type: ::
         }
     }
 
+Structs
+-------------
+To define a data structure, use ``struct``: ::
+
+    struct Point {
+        int x;
+        int y;
+    }
+
+Constructors
+------------
+Constructors are defined with the ``constructor`` keyword: ::
+    
+    constructor(/* parameters go here */) public {
+        // initialize fields as needed
+    }
 
 Visibility
 ----------
 Each function and field can be annotated with ``public``, which indicates that it can be accessed from anywhere, or ``private``, which means that it can only be accessed from within the same contract.
 
+Some functions read fields but never change them. These functions can be marked ``view`` (after the parameter list, as with ``public``).
+
+Assertions
+----------
+``require(condition, "error message")`` is like an assertion, but it aborts execution if the condition is not met.
 
 Money
 ------
