@@ -1,15 +1,11 @@
 pragma solidity >=0.5.11;
 
-//Write a constructor for the Money object shown above so that it accepts an integer as a parameter and sets "amount" to that integer value. 
+//Write a constructor for the Money object shown above so that it accepts an integer as a parameter and sets "amount" to that integer value.
 
 contract Money {
-    int amount;
+    int public amount;
 
     //TODO: write your constructor here
-
-    function getAmount() public returns (int) {
-        return amount;
-    }
 }
 
 contract Wallet {

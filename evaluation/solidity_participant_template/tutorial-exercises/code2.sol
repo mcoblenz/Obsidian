@@ -18,7 +18,8 @@ contract ShareHolder {
         //...
     }
 
-    function checkShareValue(Share s) public {
+    // s is owned
+    function checkShareValue(Share s) public { 
         //...
     }
 }

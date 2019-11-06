@@ -35,11 +35,11 @@ contract Auction {
         else {
             if (state == State.BidsMade) {
                 if (msg.value > maxBidAmount) { //if the newBid is higher than the current Bid
-                    //1. TODO: fill this in. You may call any other transactions as needed.
+                    //1. TODO: fill this in. You may call any other functions as needed.
                 }
                 else {
                     //2. TODO: return the newBid money to the bidder, since the newBid wasn't high enough. 
-                    //You may call any other transactions as needed.
+                    //You may call any other functions as needed.
                 }
             }
             else {

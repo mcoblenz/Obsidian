@@ -1,3 +1,5 @@
+pragma solidity >=0.5.11;
+
 /*
 Write a contract Restaurant that has two transactions: dineIn and takeOut. 
 You do NOT need to fill in the bodies of these transactions, only write the transaction declarations. 
