@@ -38,7 +38,7 @@ transition to that state as follows:
 
    transaction turnOn(LightSwitch@Off >> On this, int b) // turnOn() can only be called on objects that are in Off state.
    {
-    ->On (brightness = b);
+    ->On (brightness = b); // initializes the brightness field to b
    }
 
 In addition, a transaction can begin or end in multiple possible states. This is specified with the ``|`` operator. An example is shown below:
@@ -55,6 +55,15 @@ In addition, a transaction can begin or end in multiple possible states. This is
       }
    }
 
+Alternative field initialization
+--------------------------------
+Rather than initializing fields at the moment of the transition (e.g., ``->On (brightness = b)``), you can initialize fields before transitioning: ::
+
+    transaction turnOn(LightSwitch@Off >> On this, int b) // turnOn() can only be called on objects that are in Off state.
+    {
+        On::brightness = b; // prepare to initialize field in the next transition to On
+        ->On;
+    }
 
 Optional compiler checks
 -------------------------
