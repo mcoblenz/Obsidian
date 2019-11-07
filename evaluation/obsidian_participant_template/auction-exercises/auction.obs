@@ -18,12 +18,17 @@ main asset contract Auction {
     state Closed;
 
     Auction@Owned(Participant@Unowned s) {
-        ->Open(seller = s);
+        // Initialize destination state, and then transition to it.
+        Open::seller = s;
+        ->Open;
     }
 
     transaction bid(Auction@Shared this, Money@Owned >> Unowned money, Participant@Unowned bidder) {
         if (this in Open) {
-            ->BidsMade(maxBidder = bidder, maxBid = money);
+            // Initialize destination state, and then transition to it.
+            BidsMade::maxBidder = bidder;
+            BidsMade::maxBid = money;
+            ->BidsMade;
         }
         else {
             if (this in BidsMade) {
