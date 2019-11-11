@@ -11,7 +11,8 @@ If ownership is no longer desired, you can write that ownership is being disowne
    contract Money {
        int amount;
 
-       function merge(Money@Owned >> Unowned mergeFrom) public {
+       // mergeFrom is initially owned but unowned afterward.
+       function merge(Money mergeFrom) public {
            amount = amount + mergeFrom.amount;
            // disown mergeFrom
        }
@@ -41,7 +42,7 @@ Invoking functions
 
 Handling Errors
 -----------------
-Errors can be flagged with ``revert``. A description of the error can be provided as well. An example of usage is given below.
+Errors can be flagged with ``revert``, which stops execution and discards all of the changes that have occurred since the outermost transaction started. A description of the error can be provided as well. An example of usage is given below.
 ::
 
    function checkAmount(Money m) public { // m is unowned
