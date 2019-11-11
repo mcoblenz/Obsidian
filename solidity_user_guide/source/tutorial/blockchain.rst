@@ -23,6 +23,7 @@ Built-in types
             bar(addresses[0]); // call bar(), passing the 0th element of addresses
         }
     }
+* Arrays can be declared with any element type.
 
 
 Enumerated types
