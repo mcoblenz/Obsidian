@@ -100,6 +100,7 @@ contract Pharmacy {
 	}
 }
 
+// Do not change the code below here. Instead, change the code ABOVE to defend against the code below.
 contract Patient {
     function getMedicine(Pharmacy pharmacy1, Pharmacy pharmacy2, Prescription prescription) public {
         int prescriptionID1 = pharmacy1.depositPrescription(prescription);
