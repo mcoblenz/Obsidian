@@ -11,7 +11,7 @@ In Solidity, contracts can define *enum* s. For example, a ``LightSwitch`` is al
     State state; // this field is always either State.On or State.Off
    }
 
-Sometimes, fields should be available only within certain states. To implement this, use assertions. For example: 
+Sometimes, fields should be available only within certain states. For example, it doesn't make sense to refer to ``brightness`` when the switch is off. To implement this, use assertions. For example: 
 
 ::
 
