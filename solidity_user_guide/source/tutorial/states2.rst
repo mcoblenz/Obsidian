@@ -23,19 +23,19 @@ Functions can document what states the object must be in before they can be invo
 ::
 
    constructor() public { // always ends in Off state
-         state = State.Off;
+      state = State.Off;
    }
 
    function turnOn() public // turnOn() can only be called on objects that are in Off state.
    {
       assert(state == State.Off);
-      ->On;
+      state = State.On;
    }
 
    function turnOff() public // turnOff() can only be called on objects that are in On state.
    {
       assert(state == State.On);
-      ->Off;
+      state = State.Off;
    }
 
 
