@@ -4,8 +4,6 @@ pragma solidity >=0.5.11;
 //transaction that takes in a Money parameter and passes it to its Wallet's receiveMoney() transaction.
 //addMoney() should return the old money that was replaced
 
-//Note: the Person contract MUST be main
-
 contract Money {
     int public amount;
 }

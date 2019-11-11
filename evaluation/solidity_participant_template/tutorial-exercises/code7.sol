@@ -32,10 +32,10 @@ contract TinyVendingMachine {
     // Consumes ownership of c.
     function restock(Candy c) public {
         require(state == State.Empty, "Can only restock in Empty state.");
-        //2. TODO
+        // TODO
     }
 
-    // 3. TODO: write what happens to the ownership of c.
+    // TODO: write what happens to the ownership of c.
     // Returns Candy owned by the caller.
     function buy(Coin c) public returns (Candy) {
         require(state == State.Full, "Can only buy in Full state.");

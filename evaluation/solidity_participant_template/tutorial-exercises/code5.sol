@@ -7,8 +7,6 @@ pragma solidity >=0.5.11;
 //Write the Drink contract below with the necessary states and fields for the situation described above.
 //The contracts for IceCube and CupSleeve are given below.
 
-//Note: the Drink contract MUST be main
-
 
 contract IceCube {
     //...
