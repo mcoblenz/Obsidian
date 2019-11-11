@@ -11,7 +11,7 @@ and *functions*, analogous to Java fields and methods respectively.
 
 In order to use Solidity effectively, we suggest applying *ownership* to clarify the relationships between objects. In this section of the tutorial, you will learn Solidity and ownership at the same time.
 
-Objects can be *owned*, in which *one of the references* to the object is owned. An owned object can have any number of unowned references. Alternatively, if the object is not owned, 
+Objects can be *owned*, in which case *one of the references* to the object is an owned reference. An owned object can have any number of unowned references. Alternatively, if the object is not owned, 
 it can have any number of shared references (shown in *(b)* below). An object with shared references can also have unowned references,
 but not owned ones.
 
