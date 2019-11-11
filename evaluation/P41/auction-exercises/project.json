@@ -1,0 +1,4 @@
+{
+   "chaincode": "auction.obs",
+   "client": "auction_client.obs"
+}
