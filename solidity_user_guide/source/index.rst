@@ -12,8 +12,6 @@ The Solidity Smart Contract Language
 
    Getting Started <getting_started>
    Solidity Language Tutorial <tutorial/tutorial>
-   Solidity Reference <reference/reference>
-
 
 
 Solidity is an object-oriented language for smart contracts.
