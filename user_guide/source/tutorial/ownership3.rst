@@ -23,7 +23,8 @@ This means that at the END of each transaction, the permission (ownership status
    contract Wallet {
      Money@Owned money; // Note that this annotation is on a field declaration!
 
-     // exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
+     // exchange removes (and returns) the current contents of the Wallet,
+     // replacing it with the input Money.
      transaction exchange(Money@Owned >> Unowned otherMoney) returns Money@Owned {
          Money temporaryMoney = money;
          money = otherMoney;

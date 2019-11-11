@@ -20,8 +20,10 @@ Fields
    contract Wallet {
      Money money; // money is owned
 
-     // exchange removes (and returns) the current contents of the Wallet, replacing it with the input Money.
-     function exchange(Money otherMoney) public returns (Money) { // takes ownership of otherMoney; returns an owned reference
+     // Removes (and returns) the current contents of the Wallet, 
+     // replacing it with the input Money.
+     // Takes ownership of otherMoney and returns an owned reference.
+     function exchange(Money otherMoney) public returns (Money) { 
          Money temporaryMoney = money;
          money = otherMoney;
          return temporaryMoney;
