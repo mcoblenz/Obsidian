@@ -24,6 +24,7 @@ Built-in types
         }
     }
 * Arrays can be declared with any element type.
+* Hash maps and arrays are automatically initialized so that all their elements are 0 (or equivalent according to the contained type).
 
 
 Enumerated types
@@ -63,7 +64,11 @@ Some functions read fields but never change them. These functions can be marked 
 
 Assertions
 ----------
-``require(condition, "error message")`` is like an assertion, but it aborts execution if the condition is not met.
+``assert(condition)`` can be used for checking assumptions; the condition should only be false if there is a bug in your code.
+
+``require(condition, "error message")`` is like an assertion, but it is for ensuring valid conditions, e.g. to make sure that functions are only called when appropriate.
+
+Both ``assert`` and ``require`` terminate execution and discard all changes if the conditions are not met.
 
 Money
 ------
