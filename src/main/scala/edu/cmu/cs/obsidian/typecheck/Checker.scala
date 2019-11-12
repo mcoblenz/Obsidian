@@ -1031,7 +1031,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             requiredFieldType match {
                 case None =>
-                    assert(false, "Bug: invalid field in field type context")
+                    // Nothing to do; there was an assignment to a field type that may not be in scope, so there will be a separate error message.
                 case Some(declaredFieldType) =>
                     if (isSubtype(context.contractTable, typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
                         logError(constr, InvalidInconsistentFieldType(field, typ, declaredFieldType))
