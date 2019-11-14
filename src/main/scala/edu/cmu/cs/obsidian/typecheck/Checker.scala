@@ -2077,18 +2077,26 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                 }
 
-                val typToCheck = typ match {
+                def allValidStates(contractName: String) : Set[String] = {
+                    val contractType = context.contractTable.lookupContract(contractName).get
+                    contractType.possibleStates
+                }
+
+                val currentType = typ match {
                     case InterfaceContractType(name, realTyp) => realTyp
                     case _ => typ
                 }
 
-                typToCheck match {
+                currentType match {
                     case b: BottomType => ()
                     case p: PrimitiveType => logError(s, StaticAssertOnPrimitiveError(e))
                     case ContractReferenceType(contractType, permission, _) =>
                         allowedStatesOrPermissions match {
                             case States(states) =>
                                 states.foreach(stateName => checkStateOrPermissionValid(contractType.contractName, stateName))
+                                if (!allValidStates(contractType.contractName).subsetOf(states)) {
+                                    logError(s, StaticAssertFailed(e, allowedStatesOrPermissions, typ))
+                                }
                             case checkPerm: Permission =>
                                 if (checkPerm != permission) {
                                     logError(s, StaticAssertFailed(e, allowedStatesOrPermissions, typ))
