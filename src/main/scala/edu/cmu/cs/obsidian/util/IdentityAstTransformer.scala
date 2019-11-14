@@ -253,7 +253,7 @@ class IdentityAstTransformer {
                 (np, transformedType._2)
 
             case t =>
-                (originalType, List(ErrorRecord(NonPrimitiveTypeTransformError(originalType, t), pos, lexicallyInsideOf.contract.sourcePath)))
+                (originalType, Nil)
         }
     }
 

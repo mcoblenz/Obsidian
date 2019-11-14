@@ -412,9 +412,6 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/EndsInStateUnion.obs",
             (StateUndefinedError("C1", "OtherState"), 12)
                 ::
-                (NonPrimitiveTypeTransformError(StateType(ContractType("C1", Nil), Set("S2", "OtherState"), NotRemoteReferenceType()),
-                    BottomType()), 12)
-                ::
                 (SubtypingError(
                     StateType(ContractType("C1", Nil), Set("S1", "S2"), NotRemoteReferenceType()),
                     StateType(ContractType("C1", Nil), Set("S1", "S3"), NotRemoteReferenceType()), true), 17
