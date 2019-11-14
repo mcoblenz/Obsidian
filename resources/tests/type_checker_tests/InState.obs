@@ -69,3 +69,41 @@ main contract InState {
         }
     }
 }
+
+contract TestFieldShared {
+     TestFieldShared@S0() {
+         ->S0;
+     }
+
+     state S0;
+     asset state S1 {
+         TestFieldShared@Shared next;
+     }
+
+     transaction foo(TestFieldShared@S1 this) {
+         if (next in S1) {
+             TestFieldShared temp = next;
+             ->S1(next = temp);
+         }
+         [next @ S1]; // Should fail.
+     }
+ }
+
+ contract TestFieldOwned {
+     TestFieldOwned@S0() {
+         ->S0;
+     }
+
+     state S0;
+     asset state S1 {
+         TestFieldOwned@Owned next;
+     }
+
+     transaction foo(TestFieldOwned@S1 this) {
+         if (next in S1) {
+             TestFieldOwned temp = next;
+             // No error in transition, since ownership of next has been given away.
+             ->S1(next = temp);
+         }
+     }
+ }

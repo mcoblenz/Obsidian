@@ -672,6 +672,8 @@ class TypeCheckerTests extends JUnitSuite {
                 ReferenceIdentifier("s"), Owned(),
                 StateType(ContractType("LightSwitch", Nil), "On", NotRemoteReferenceType())), 62) ::
               (StateCheckRedundant(), 67) ::
+                (StaticAssertFailed(ReferenceIdentifier("next"), States(Set("S1")),
+                    ContractReferenceType(ContractType("TestFieldShared", Nil), Shared(), NotRemoteReferenceType())), 88) ::
               Nil)
 
     }

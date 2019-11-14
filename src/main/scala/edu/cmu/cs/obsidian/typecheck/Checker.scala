@@ -1851,6 +1851,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 var resetOwnership: Option[(String, NonPrimitiveType)] = None
                 var valVariableToClear: Option[String] = None
+                var exprIsField = false
 
                 val (contextForCheckingTrueBranch, ePermPrime, contextForCheckingFalseBranch) =
                     t match {
@@ -1866,70 +1867,65 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 case _ => None
                             }
 
-
-
                             ident match {
                                 case Some(x) =>
+                                    exprIsField = contextPrime.get(x).isEmpty
+
                                     if (!contextPrime.valVariables.contains(x)) {
                                         valVariableToClear = Some(x)
                                     }
+                                    val newType = np.withTypeState(state)
 
-                                    np.permission match {
-                                        case Owned() =>
-                                            state match {
-                                                case States(states) =>
-                                                    val newType = np.withTypeState(state)
-                                                    t match {
-                                                        case StateType(_, specificStates, _) =>
-                                                            if (specificStates == states) {
-                                                                logError(e, StateCheckRedundant())
-                                                            }
-                                                            val typeFalse =
-                                                                StateType(np.contractType, specificStates -- states, np.remoteReferenceType)
-                                                            (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
-                                                                np.permission,
-                                                                contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
-                                                        case _ =>
-                                                            if (allStates == states) {
-                                                                logError(e, StateCheckRedundant())
-                                                            }
-                                                            val typeFalse = StateType(np.contractType, allStates -- states, np.remoteReferenceType)
-                                                            (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
-                                                                np.permission,
-                                                                contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
-                                                    }
-                                                case permission: Permission =>
-                                                    logError(e, PermissionCheckRedundant(np.permission, permission, isSubpermission(np.permission, permission)))
-                                                    return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
-                                                case permVar: PermVar =>
-                                                    val newType = np.withTypeState(permVar)
-                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
-                                                        np.permission,
-                                                        contextPrime)
-                                            }
-                                        case Unowned() => (contextPrime, np.permission, contextPrime)
-                                        case Shared() | Inferred() =>
-                                            // If it's Inferred(), there's going to be another error later. For now, be optimistic.
-                                            state match {
-                                                case States(states) =>
-                                                    if (allStates == states) {
-                                                        logError(e, StateCheckRedundant())
-                                                    }
-                                                    val newType = np.withTypeState(state)
-                                                    val typeFalse = StateType(np.contractType, allStates -- states, np.remoteReferenceType)
+
+                                    val trueBranchContext =
+                                        if (exprIsField) {
+                                            contextPrime.updatedThisFieldType(x, newType).updatedMakingVariableVal(x)
+                                        }
+                                        else {
+                                            // This is a local variable, so just update it.
+                                            contextPrime.updated(x, newType).updatedMakingVariableVal(x)
+                                        }
+                                    def falseBranchContext(typeFalse: ObsidianType) =
+                                        if (exprIsField) {
+                                            contextPrime.updatedThisFieldType(x, typeFalse).updatedMakingVariableVal(x)
+                                        }
+                                        else {
+                                            contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x)
+                                        }
+
+                                    if (np.permission == Unowned()) {
+                                        (contextPrime, np.permission, contextPrime)
+                                    }
+                                    else {
+                                        state match {
+                                            case States(states) =>
+                                                if (np.permission == Shared() || np.permission == Inferred()) {
                                                     resetOwnership = Some((x, np))
-                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
-                                                        np.permission,
-                                                        contextPrime.updated(x, typeFalse).updatedMakingVariableVal(x))
-                                                case permission: Permission =>
-                                                    logError(e, PermissionCheckRedundant(np.permission, permission, isSubpermission(np.permission, permission)))
-                                                    return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
-                                                case permVar: PermVar =>
-                                                    val newType = np.withTypeState(permVar)
-                                                    (contextPrime.updated(x, newType).updatedMakingVariableVal(x),
-                                                        np.permission,
-                                                        contextPrime)
-                                            }
+                                                }
+
+                                                val typeForFalseBranch = np match {
+                                                    case StateType(_, specificStates, _) =>
+                                                        if (specificStates == states) {
+                                                            logError(e, StateCheckRedundant())
+                                                        }
+                                                        StateType(np.contractType, specificStates -- states, np.remoteReferenceType)
+
+                                                    case _ =>
+                                                        if (allStates == states) {
+                                                            logError(e, StateCheckRedundant())
+                                                        }
+                                                        StateType(np.contractType, allStates -- states, np.remoteReferenceType)
+                                                }
+                                                (trueBranchContext, np.permission, falseBranchContext(typeForFalseBranch))
+                                            case permission: Permission =>
+                                                logError(e, PermissionCheckRedundant(np.permission, permission, isSubpermission(np.permission, permission)))
+                                                return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
+                                            case permVar: PermVar =>
+                                                val newType = np.withTypeState(permVar)
+                                                (trueBranchContext,
+                                                    np.permission,
+                                                    contextPrime)
+                                        }
                                     }
                                 case None => (contextPrime, np.permission, contextPrime)
                             }
@@ -1944,10 +1940,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val (resetTrueContext, resetFalseContext) = resetOwnership match {
                     case None => (packedTrueContext, packedFalseContext)
-                    case Some((x, oldType)) => (packedTrueContext.updated(x, oldType), packedFalseContext.updated(x, oldType))
+                    case Some((x, oldType)) =>
+                        if (exprIsField) {
+                            (packedTrueContext.updatedThisFieldType(x, oldType),
+                            packedFalseContext.updatedThisFieldType(x, oldType))
+                        }
+                        else {
+                            (packedTrueContext.updated(x, oldType), packedFalseContext.updated(x, oldType))
+                        }
                 }
-
-                // The resulting contexts may have modified versions of the
 
                 // Throw out (prune) any variables that were local to the branches.
                 val contextIfTrue = pruneContext(s,
@@ -1958,7 +1959,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     resetFalseContext,
                     contextPrime)
 
-                val mergedContext = mergeContext(s, contextIfFalse, contextIfTrue)
+                val mergedContext = mergeContext(s, contextIfTrue, contextIfFalse)
                 val finalContext = valVariableToClear match {
                     case None => mergedContext
                     case Some(x) => mergedContext.updatedClearingValVariable (x)
