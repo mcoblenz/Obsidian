@@ -194,6 +194,10 @@ export function activate(context: vscode.ExtensionContext) {
       return path.resolve(path.dirname(filename), "build");
    }
 
+   function logPathForFile(filename: string) {
+       return path.resolve(path.dirname(filename), "logs");
+   }
+
    function getCompilationTask(): vscode.Task | undefined {
       let chaincodePath = chaincodeContractPath()
       if (chaincodePath == undefined) {
@@ -206,6 +210,16 @@ export function activate(context: vscode.ExtensionContext) {
       }
    
       let buildPath = buildPathForFile(chaincodePath)
+
+      // Copy the source code for future analysis.
+      let logDir = logPathForFile(buildPath);
+      fs.mkdir(logDir, (err) => {if (err) throw err;} )
+
+      let logPath = path.resolve(logDir, (new Date).toUTCString() + ".obs");
+      fs.copyFile(chaincodePath, logPath, (err) => {
+        if (err) throw err;
+        console.log('${chaincodePath} was copied to /tmp/test.obs');
+      });
       
       fs.mkdir(buildPath, (err) => {if (err) throw err;} )
       let execution = new vscode.ShellExecution(`obsidianc --output-path ${buildPath} ${chaincodePath}`);
