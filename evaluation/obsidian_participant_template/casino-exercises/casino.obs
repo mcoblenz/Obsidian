@@ -1,0 +1,45 @@
+import "casino_utils.obs"
+
+main asset contract Casino {
+    Tokens@Owned casinoPot;
+    Game@Owned currentGame; //The game that is currently being played
+    BetList@Owned bets; //The bets for the current game being played
+
+    Casino@Owned(Game@BeforePlay >> Unowned game) {
+        casinoPot = new Tokens(1000);
+        currentGame = game;
+        bets = new BetList();
+    }
+
+    //TODO: Add your code here.
+}
+
+//Represents a generic game
+contract Game {
+    state BeforePlay;
+    state Playing;
+    state FinishedPlaying {
+        int outcome;
+    };
+
+    //Constructor
+    Game@BeforePlay() {
+        -> BeforePlay;
+    }
+
+    //Start the game
+    transaction startPlaying(Game@BeforePlay >> Playing this) {
+        -> Playing;
+    }
+
+    //Finish the game
+    transaction finishPlaying(Game@Playing >> FinishedPlaying this) {
+        -> FinishedPlaying(outcome = 42); // just have a simple outcome for now.
+    }
+
+    //Returns the outcome of the game
+    transaction predictionMatchesOutcome(Game@FinishedPlaying this, int prediction) returns bool {
+        //...
+        return  prediction == outcome; //Always returns empty string for now
+    }
+}

@@ -1,0 +1,150 @@
+//Represents the Tokens being traded in this program
+asset contract Tokens {
+    int amount; //Amount that this Tokens object holds
+
+    //Constructor
+    Tokens@Owned(int amt) {
+        amount = amt;
+    }
+
+    //Add additional Tokens
+    transaction mergeTokens(Tokens@Owned this, Tokens@Owned >> Unowned m) {
+         amount = amount + m.getAmount();
+         disown m;
+    }
+
+    //Returns the amount of this Tokens
+    transaction getAmount(Tokens@Owned this) returns int {
+        return amount;
+    }
+
+    //Use some amount of this Tokens
+    transaction splitTokens(Tokens@Owned this, int amt) returns Tokens@Owned {
+        if (amt > amount) {
+            revert "Can't split out more Tokens than is available in a given Tokens object.";
+        } else {
+            amount = amount - amt;
+            return new Tokens(amt);
+        }
+    }
+}
+
+
+//Represents a single bet
+contract Bet {
+    int prediction;
+
+    asset state Full {
+        Tokens@Owned wager;
+    }
+    state Empty;
+
+    //Constructor
+    Bet@Full(int _prediction, Tokens@Owned >> Unowned _wager) {
+        ->Full(prediction = _prediction, wager = _wager);
+    }
+
+    //Returns a reference to the BetPrediction the Bettor made
+    transaction getPrediction(Bet@Unowned this) returns int {
+        return prediction;
+    }
+
+    transaction removeWager(Bet@Full >> Empty this) returns Tokens@Owned {
+        Tokens result = wager;
+        ->Empty;
+        return result;
+    }
+}
+
+//Represents a container of Bets
+contract BetList {
+    state Empty;
+    asset state HasItems {
+        BetList@Owned next;
+        int bettorID;
+    }
+    asset state OnlyHasBet;
+
+    Bet@Full bet available in HasItems, OnlyHasBet;
+
+    //Constructor
+    BetList@Owned() {
+        ->Empty;
+    }
+
+    //Add a new bet to the end of the list
+    transaction append(BetList@Owned this, int _bettorID, Bet@Full >> Unowned _bet) {
+        if (this in Empty) {
+            BetList bList = new BetList();
+            -> HasItems(bettorID = _bettorID, 
+                        bet = _bet, 
+                        next = bList);
+        }
+        else {
+            if (this in HasItems) {
+                next.append(_bettorID, _bet);
+            }
+            else {
+                revert("Inconsistent state.");
+            }
+        }
+    }
+
+    private transaction removeNext(BetList@HasItems >> OnlyHasBet this) returns BetList@Owned {
+        BetList result = next;
+        ->OnlyHasBet;
+        return result;
+    }
+
+    private transaction removeBet(BetList@OnlyHasBet >> Empty this) returns Bet@Full {
+        Bet result = bet;
+        ->Empty;
+        return result;
+    }
+
+    //remove a Bet with a given Bettor reference, and return that Bet
+    transaction removeBetForBettor(BetList@Owned this, int bettorToRemove) returns Bet@Full {
+        if (this in HasItems) {
+            if (bettorID == bettorToRemove) {
+                Bet temp = bet; 
+                if (next in Empty) {                   
+                    disown next;
+                    ->Empty;
+                }
+                else {
+                    if (next in HasItems) {
+                        BetList newNext = next.removeNext();
+                        Bet newBet = next.removeBet();
+                        [next @ Empty];
+                        ->HasItems(next = newNext, bet = newBet, bettorID = bettorID);
+                    }
+                    else {
+                        revert("Inconsistent state for list node.");
+                    }
+                }
+                return temp;
+            }
+            else {
+                return next.removeBetForBettor(bettorToRemove);
+            }
+        }
+        else {
+            revert("No matching bets in list");
+        }
+    }
+
+    //returns true if a Bet has been placed by a Bettor
+    transaction contains(BetList@Owned this, int bettor) returns bool {
+        if (this in HasItems) {
+            if (bettorID == bettor) {
+                return true;
+            }
+            else {
+                return next.contains(bettor);
+            }
+        }
+        else {
+            return false;
+        }
+    }
+}

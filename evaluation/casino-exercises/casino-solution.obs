@@ -1,0 +1,96 @@
+import "betting_utils.obs"
+
+main asset contract Casino {
+    Tokens@Owned casinoPot;
+    //Game@Owned currentGame; //The game that is currently being played
+
+    state BeforePlay {
+        Game@BeforePlay gameBeforePlay;
+    }
+    state Playing {
+        Game@Playing gamePlaying;
+    }
+    state FinishedPlaying {
+        Game@FinishedPlaying gameFinishedPlaying;
+    }
+
+    BetList@Owned bets; //The bets for the current game being played
+
+    Casino@BeforePlay(Game@BeforePlay >> Unowned game) {
+        casinoPot = new Tokens(1000);
+        ->BeforePlay(gameBeforePlay = game);
+        bets = new BetList();
+    }
+
+    //TODO: Add your code here.
+
+    transaction placeBet(Casino@BeforePlay this, int bettor, int prediction, Tokens@Owned >> Unowned wager) returns Tokens@Owned {
+        if (bets.contains(bettor)) {
+            // Need to refund old bet.
+            Bet oldBet = bets.removeBetForBettor(bettor);
+            Tokens oldTokens = oldBet.removeWager();
+            Bet newBet = new Bet(prediction, wager);
+            bets.append(bettor, newBet);
+            return oldTokens;
+        }
+        else {
+            Bet newBet = new Bet(prediction, wager);
+            bets.append(bettor, newBet);
+            return new Tokens(0);
+        }
+    }
+
+    transaction startGame(Casino@BeforePlay >> Playing this) {
+        gameBeforePlay.startPlaying();
+        ->Playing(gamePlaying = gameBeforePlay);
+    }
+
+    transaction endGame(Casino@Playing >> FinishedPlaying this) {
+        gamePlaying.finishPlaying();
+        ->FinishedPlaying(gameFinishedPlaying = gamePlaying);
+    }
+
+    transaction collectWinnings(Casino@FinishedPlaying this, int bettor) returns Tokens@Owned {
+        Bet bet = bets.removeBetForBettor(bettor);
+        Tokens wager = bet.removeWager();
+
+        if (gameFinishedPlaying.predictionMatchesOutcome(bet.getPrediction()) {
+            wager.mergeTokens(casinoPot.splitTokens(wager.getAmount()));
+            return (wager);
+        }
+        else {
+            casinoPot.mergeTokens(wager);
+            return new Tokens(0);
+        }
+    }
+}
+
+//Represents a generic game
+contract Game {
+    state BeforePlay;
+    state Playing;
+    state FinishedPlaying {
+        int outcome;
+    };
+
+    //Constructor
+    Game@BeforePlay() {
+        -> BeforePlay;
+    }
+
+    //Start the game
+    transaction startPlaying(Game@BeforePlay >> Playing this) {
+        -> Playing;
+    }
+
+    //Finish the game
+    transaction finishPlaying(Game@Playing >> FinishedPlaying this) {
+        -> FinishedPlaying(outcome = 42); // just have a simple outcome for now.
+    }
+
+    //Returns the outcome of the game
+    transaction predictionMatchesOutcome(Game@FinishedPlaying this, int prediction) returns bool {
+        //...
+        return  prediction == outcome; //Always returns empty string for now
+    }
+}

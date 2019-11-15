@@ -1,0 +1,68 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Gambling</title>
+    <meta charset="utf-8"  />
+    <link rel="stylesheet" href="../stylesheet.css"/>
+    <link href="../prism.css" rel="stylesheet" />
+</head>
+<body class="language-obsidian">
+<script src="../prism.js"></script>
+<center><h1>Casino</h1></center>
+
+<h3>Instructions</h3>
+<p><img style="float: right" src="CasinoSequence.png" alt="Casino" > </img></p>
+
+<p>
+    You will need to implement a <code>Casino</code> in in which <code>Bettor</code>s will make bets.
+    Bets are conducted in tokens (sometimes called <em>chips</em>); you can assume that there is a separate mechanism by which Bettors can exchange money for tokens.
+    
+    To make a bet, Betters put down some 
+    tokens and make a prediction for the outcome of a <code>Game</code>). Afterward, tokens are given to the <code>Bettor</code>s who bet correctly.
+</p><p>
+    Note that the logic of the game itself doesn't matter; a generic <code>Game</code> is given in the starter code below.
+    However, keep in mind that a <code>Game</code> has certain states in which certain actions can take place. 
+    After the game is finished, <code>predictionMatchesOutcome()</code> can tell you whether the game's outcome matches a given prediction.
+</p><p>
+
+    This is a very small <code>Casino</code>; it concerns only <b>one</b> <code>Game</code>, and bets will 
+    be taken for that <code>game</code>. This Casino does not need to support starting a new game after the first game is done.
+    An example sequence of events over the course of one <code>Game</code>
+    is given to you in the Figure I below (more explanation about making a <code>Bet</code> is given in the <b>Requirements</b>).
+</p>
+    
+
+<p>
+    <br/><br/>
+    The <code>Casino</code> contains the current <code>Game</code> being played and keeps track of the bets made on that game. To see the details, refer to the code.
+    <br/><br/>
+
+    
+    Implement the <code>Casino</code> contract according to the following requirements. You can make any changes you need to the starter code.
+    <br/><br/>
+    <b>Requirements:</b>
+    <ul>
+        <li> If a <code>Bettor</code> predicts the outcome correctly, the <code>Bettor</code> gets <b>twice</b> the <code>Money</code> they put down. 
+            For example, if <code>Bettor</code> b puts down 5 tokens on the correct outcome, they should receive 10 tokens after the <code>Game</code> is played. </li>
+        <li> If the <code>Bettor</code> predicted incorrectly, the <code>Casino</code> keeps their tokens.</li>
+        <li> Bets can only be made before the <code>Game</code> starts.</li>
+        <li> Winnings can only be distributed after the <code>Game</code> is finished.</li>
+        <li> Individual <code>Bettor</code>s must collect winnings themselves from the <code>Casino</code> after a <code>Game</code> by calling code, which you need to write. Until winnings are collected, the <code>Casino</code> keeps track of them. </li>
+        <li> A <code>Bettor</code> can have one active bet per game. If a <code>Bettor</code> bets more than once, their original bet 
+            should be replaced by the new one and any previous bet should be refunded. </li>
+        <li>A <code>Bettor</code> MUST put down tokens at the same time that they're making a <code>Bet</code>.</li>
+        <li>If the Casino does not have enough tokens available to pay out winnings, then the invocation to collect winnings can fail. (You can assume the client is likely to sue the Casino afterward, though!)
+    </ul>
+
+    <code>Bettor</code>s do not need to be registered; you can assume any <code>Bettor</code> can make a Bet.
+
+</p>
+
+    <p>
+    You might start by writing an outline of the contract, including any additional fields, states, and transaction declarations. Then fill in the transactions
+    to implement the program. Helper code declarations for the objects described above are given below. </p>
+    
+
+
+</body>
+</html>
