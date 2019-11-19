@@ -2,10 +2,8 @@
 
 : ${CHANNEL_NAME:="mychannel"}
 : ${DELAY:="3"}
-: ${LANGUAGE:="java"}
 : ${TIMEOUT:="10"}
 : ${VERBOSE:="false"}
-LANGUAGE="$(echo "$LANGUAGE" | tr [:upper:] [:lower:])"
 
 PEER="$1"
 ORG="$2"
@@ -87,7 +85,7 @@ echo "===================== Upgrading chaincode on peer${PEER}.org${ORG} =======
 setGlobals $PEER $ORG
 set -x
 peer chaincode upgrade -o orderer.example.com:7050 -C "$CHANNEL_NAME" -n mycc\
-    --tls "$CORE_PEER_TLS_ENABLED" --cafile "$ORDERER_CA" -l "${LANGUAGE}"\
+    --tls "$CORE_PEER_TLS_ENABLED" --cafile "$ORDERER_CA" -l java\
     -v "${VERSION}" -c "{\"Args\":${INIT}}" -p "${CC_SRC_PATH}"\
     -P "AND ('Org1MSP.peer','Org2MSP.peer')" >&log.txt
 res=$?

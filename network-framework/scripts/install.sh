@@ -2,13 +2,11 @@
 
 CHANNEL_NAME="mychannel"
 : ${CHANNEL_NAME:="mychannel"}
-: ${LANGUAGE:="java"}
 : ${TIMEOUT:="10"}
 : ${VERBOSE:="false"}
-LANGUAGE="$(echo "$LANGUAGE" | tr [:upper:] [:lower:])"
 TIMEOUT="10"
 VERBOSE="false"
-
+LANGUAGE="java"
 PEER="$1"
 ORG="$2"
 CC_SRC_PATH=$CC_SRC_PATH

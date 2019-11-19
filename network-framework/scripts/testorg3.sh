@@ -29,7 +29,6 @@ VERBOSE="$5"
 : ${TIMEOUT:="10"}
 : ${LANGUAGE:="golang"}
 : ${VERBOSE:="false"}
-LANGUAGE=`echo "$LANGUAGE" | tr [:upper:] [:lower:]`
 COUNTER=1
 MAX_RETRY=5
 
