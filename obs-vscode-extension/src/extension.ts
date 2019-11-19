@@ -198,10 +198,18 @@ export function activate(context: vscode.ExtensionContext) {
        return path.resolve(path.dirname(filename), "logs");
    }
 
+// Assumes logPath is an existing directory.
+    function copyFileToLogDir(sourcePath: string, logPath: string, timestamp: Date) {
+        const logInputPath = path.resolve(logPath, timestamp.toISOString() + '-' + path.basename(sourcePath));
+        fs.copyFile(sourcePath, logInputPath, (err) => {
+            if (err) { console.log('failed to copy file: ' + err); throw err; }
+        });
+    }
+
    function getCompilationTask(): vscode.Task | undefined {
-      let chaincodePath = chaincodeContractPath()
+      const chaincodePath = chaincodeContractPath()
       if (chaincodePath == undefined) {
-         return undefined
+         return undefined;
       }
 
       let kind: ObsidianCompilationTaskDefinition = {
@@ -209,23 +217,28 @@ export function activate(context: vscode.ExtensionContext) {
             file: chaincodePath
       }
    
-      let buildPath = buildPathForFile(chaincodePath)
+      const buildPath = buildPathForFile(chaincodePath)
 
       // Copy the source code for future analysis.
-      let logDir = logPathForFile(buildPath);
-      fs.mkdir(logDir, (err) => {if (err) throw err;} )
-
-      let logPath = path.resolve(logDir, (new Date).toUTCString() + ".obs");
-      fs.copyFile(chaincodePath, logPath, (err) => {
-        if (err) throw err;
-        console.log('${chaincodePath} was copied to /tmp/test.obs');
-      });
+      const logPath = logPathForFile(buildPath);
+      const timestamp = new Date();
       
+      // This needs to be synchronous so that the directory will be there when the task below runs.
+      if (!fs.existsSync(logPath)) {
+            fs.mkdirSync(logPath);
+      }
+        
+      copyFileToLogDir(chaincodePath, logPath, timestamp);
+    
+      const logOutputPath = path.resolve(logPath, timestamp.toISOString() + '-' + path.basename(chaincodePath) + '.out');
+
+
       fs.mkdir(buildPath, (err) => {if (err) throw err;} )
-      let execution = new vscode.ShellExecution(`obsidianc --output-path ${buildPath} ${chaincodePath}`);
+      let execution = new vscode.ShellExecution(`obsidianc --output-path ${buildPath} ${chaincodePath} | tee '${logOutputPath}'`);
       let task = new vscode.Task(kind, chaincodePath, 'obsidian-compile', execution, ["$obsidian"]);
       task.presentationOptions.clear = true
       task.presentationOptions.showReuseMessage = false
+      task.presentationOptions.echo = false
       task.problemMatchers = ["ObsidianProblemMatcher"]
       task.group = vscode.TaskGroup.Build;
       return (task);
