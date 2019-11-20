@@ -1935,6 +1935,22 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (trueContext, checkedTrueStatements) = checkStatementSequence(decl, contextForCheckingTrueBranch, body1)
                 val (falseContext, checkedFalseStatements) = checkStatementSequence(decl, contextForCheckingFalseBranch, body2)
 
+                // Ensure that the variable that was checked retains ownership (was not given away) in the true branch.
+                resetOwnership match {
+                    case None => () // Nothing to do
+                    case Some ((x, oldType)) =>
+                        val newType = if (exprIsField) trueContext.thisFieldTypes.get(x) else trueContext.get(x)
+                        newType match {
+                        case None => () // OK; fields that are consistent with their declarations may not be in here anymore.
+                        case Some(newType) => newType match {
+                            case np: NonPrimitiveType => if (np.permission == Unowned()) {
+                                logError(s, InvalidOwnershipLossInDynamicCheck(x))
+                            }
+                            case _ => assert(false, "Nonprimitive type should not become primitive in branch.");
+                        }
+                    }
+                }
+
                 val packedTrueContext = packFieldTypes(trueContext)
                 val packedFalseContext = packFieldTypes(falseContext)
 

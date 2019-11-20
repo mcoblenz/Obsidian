@@ -950,4 +950,9 @@ class TypeCheckerTests extends JUnitSuite {
                 Nil
         )
     }
+
+    @Test def inStateOwnershipChange(): Unit = {
+        runTest("resources/tests/type_checker_tests/InStateOwnershipChange.obs",
+            (InvalidOwnershipLossInDynamicCheck("k"), 11) :: Nil)
+    }
 }

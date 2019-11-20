@@ -348,6 +348,10 @@ case class InvalidValAssignmentError() extends Error {
     val msg: String = s"Can't reassign to variables that are formal parameters or which are used in a dynamic state check."
 }
 
+case class InvalidOwnershipLossInDynamicCheck(variableName: String) extends Error {
+    val msg: String = s"Dynamic state tests must not give away ownership of the variable being tested (${variableName})."
+}
+
 case class AmbiguousConstructorExample(example: String, arg1: VariableDeclWithSpec, arg2: VariableDeclWithSpec) {
     val msg: String =
         s"Cannot distinguish the type of the argument ${arg1.varName} of type ${arg1.typIn} from ${arg2.varName} of type ${arg2.typIn}.\n" +

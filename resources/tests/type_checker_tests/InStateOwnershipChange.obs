@@ -1,0 +1,16 @@
+contract Key {}
+
+contract Lock {
+    transaction unlock (Key @ Owned >> Unowned k) returns Key @ Owned {
+        return new Key();
+    }
+}
+
+main contract Thief {
+    transaction unlock(Lock@Shared l, Key@Shared k) {
+        if (k in Owned) {
+            Key newKey = l.unlock(k);
+            // ERROR: k is no longer owned.
+        }
+    }
+}
