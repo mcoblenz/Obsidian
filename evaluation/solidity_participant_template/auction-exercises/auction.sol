@@ -58,6 +58,7 @@ contract Auction {
     }
 
     // This gets called by an administrator when the auction is closed.
+    // Assume it is restricted so that only a trusted administrator can call it.
     function finishBidding() public {
       if (state == State.BidsMade) {
         state = State.Closed;
