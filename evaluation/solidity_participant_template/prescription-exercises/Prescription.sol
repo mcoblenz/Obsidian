@@ -12,24 +12,6 @@ pragma solidity >=0.5.11;
  * YOUR TASK: Please use what you have learned today to fix this problem (avoiding runtime checks if possible).
  */
 
-contract DoctorRegistry {
-    mapping(address => bool) approvedDoctors; // Only these doctors can sign a prescription.
-    address owner;
-
-    constructor () public {
-        owner = msg.sender;
-    }
-
-    function doctorIsApproved(address doctor) public view returns (bool) {
-        return approvedDoctors[doctor];
-    }
-
-    function addApprovedDoctor(address doctor) public {
-        require(msg.sender == owner, "Only the owner can approve a doctor.");
-        approvedDoctors[doctor] = true;
-    }
-}
-
 // Prescriptions are immutable by design; pharmacies that want to record information about
 // prescriptions must do so in a separate data structure.
 // Only approved doctors can create new prescriptions.
@@ -37,12 +19,10 @@ contract Prescription {
     string public prescriptionText; // specifies the drug, dosage, etc.
     int public refills;
     string public patientName; // Assume that patient names are unique.
-    address authorizingDoctor;
 
-    constructor (DoctorRegistry dr, string memory text, int r, string memory patient) public {
-        require (dr.doctorIsApproved(msg.sender), "Only approved doctors can create prescriptions.");
+    constructor (string memory text, int r, string memory patient) public {
+        // Assume there is code to prevent unauthorized creation of prescriptions.
 
-        authorizingDoctor = msg.sender;
         prescriptionText = text;
         refills = r;
         patientName = patient;

@@ -8,7 +8,7 @@ To run transactions, then, we need both a client and the blockchain:
    #. First, instantiate a contract on a blockchain.
    #. Then, clients can invoke transactions that were defined by the contract.
 
-You can use https://remix.ethereum.org to test your code in a test environment. Click "Solidity"; then click "New File"; then paste the code you want to test. In the sidebar, click the third icon to use the compiler, and click the fourth icon to deploy your contract and invoke transactions. When a contract is deployed, it is given an *address* at which it can receive invocations. 
+You can use https://remix.ethereum.org to test your code in a test environment. Click "Solidity"; then click "New File"; then paste the code you want to test. In the sidebar, click the third icon to use the compiler, and click the fourth icon to deploy your contract and invoke transactions. When a contract is deployed, it is given an *address* at which it can receive invocations. In fact, every object reference is actually just an address. 
 
 Built-in types
 ---------------
@@ -48,6 +48,8 @@ To define a data structure, use ``struct``: ::
         int y;
     }
 
+Unlike contract instances, structs do not have addresses.
+
 Constructors
 ------------
 Constructors are defined with the ``constructor`` keyword: ::
@@ -72,7 +74,7 @@ Both ``assert`` and ``require`` terminate execution and discard all changes if t
 
 Money
 ------
-Solidity has a built-in cryptocurrency, known as *ether*. Function invocations can send ether, but ether is not a normal parameter to functions. Instead, ether accompanies invocations in metadata. Functions that can *receive* ether must be annotated ``payable``. The system will automatically track how much money each contract has received (every contract can automatically hold money).
+Solidity has a built-in cryptocurrency, known as *ether*. Function invocations can send ether, but ether is not a normal parameter to functions. Instead, ether accompanies invocations in metadata. For now, you don't need to worry about how to do this from outside the blockchain. Functions that can *receive* ether must be annotated ``payable``. The system will automatically track how much money each contract has received (every contract can automatically hold money).
 
 To transfer money to a given address, invoke ``transfer`` on the recipient's address, passing a quantity of money: ::
 
@@ -112,6 +114,7 @@ The compiler automatically generates getters for ``public`` fields. For example:
     string public foo;
     // Now you can call foo().
 
+The compiler never automatically creates setters.
 
 Concurrency
 ------------

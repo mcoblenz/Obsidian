@@ -20,6 +20,8 @@ contract Prescription {
     string patientName; // Assume that patient names are unique.
 
     Prescription@Owned(string text, int r, string patient) {
+        // Assume there is code to prevent unauthorized creation of prescriptions.
+
         prescriptionText = text;
         refills = r;
         patientName = patient;

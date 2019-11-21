@@ -13,7 +13,7 @@ Auction house IMMEDIATELY, and the Money is returned to that Bidder if another B
 contract Auction {
     address maxBidder; // the bidder who made the highest bid so far
     uint maxBidAmount;
-    address payable seller;
+    address payable seller; // 'payable' indicates that we can transfer money to this address
 
     // Allow withdrawing previous bid money for bids that were outbid
     mapping(address => uint) pendingReturns;
