@@ -18,7 +18,8 @@ import scala.collection.immutable.TreeMap
 case class Context(table: DeclarationTable,
                    underlyingVariableMap: Map[String, ObsidianType],
                    isThrown: Boolean,
-                   transitionFieldsInitialized: Set[(String, String, AST)],
+                   transitionFieldsDefinitelyInitialized: Set[(String, String, AST)],
+                   transitionFieldsMaybeInitialized: Set[(String, String, AST)],
                    localFieldsInitialized: Set[String],
                    thisFieldTypes: Map[String, ObsidianType],
                    valVariables : Set[String]) {
@@ -28,7 +29,8 @@ case class Context(table: DeclarationTable,
         Context(contractTable,
             underlyingVariableMap.updated(s, t),
             isThrown,
-            transitionFieldsInitialized,
+            transitionFieldsDefinitelyInitialized,
+            transitionFieldsMaybeInitialized,
             localFieldsInitialized,
             thisFieldTypes,
             valVariables)
@@ -36,7 +38,8 @@ case class Context(table: DeclarationTable,
         Context(contractTable,
             underlyingVariableMap,
             isThrown,
-            transitionFieldsInitialized + ((stateName, fieldName, ast)),
+            transitionFieldsDefinitelyInitialized + ((stateName, fieldName, ast)),
+            transitionFieldsMaybeInitialized + ((stateName, fieldName, ast)),
             localFieldsInitialized,
             thisFieldTypes,
             valVariables)
@@ -46,6 +49,7 @@ case class Context(table: DeclarationTable,
             underlyingVariableMap,
             isThrown,
             Set.empty,
+            Set.empty,
             localFieldsInitialized,
             newThisFieldTypes,
             valVariables)
@@ -54,7 +58,8 @@ case class Context(table: DeclarationTable,
         Context(contractTable,
             underlyingVariableMap,
             isThrown,
-            transitionFieldsInitialized,
+            transitionFieldsDefinitelyInitialized,
+            transitionFieldsMaybeInitialized,
             localFieldsInitialized + fieldName,
             thisFieldTypes,
             valVariables)
@@ -64,7 +69,8 @@ case class Context(table: DeclarationTable,
         Context(contractTable,
             underlyingVariableMap,
             isThrown,
-            transitionFieldsInitialized,
+            transitionFieldsDefinitelyInitialized,
+            transitionFieldsMaybeInitialized,
             localFieldsInitialized,
             thisFieldTypes.updated(fieldName, newType),
             valVariables)
@@ -73,7 +79,8 @@ case class Context(table: DeclarationTable,
         Context(contractTable,
             underlyingVariableMap,
             isThrown,
-            transitionFieldsInitialized,
+            transitionFieldsDefinitelyInitialized,
+            transitionFieldsMaybeInitialized,
             localFieldsInitialized,
             thisFieldTypes - fieldName,
             valVariables)
@@ -82,7 +89,8 @@ case class Context(table: DeclarationTable,
         Context(contractTable,
             underlyingVariableMap,
             isThrown,
-            transitionFieldsInitialized,
+            transitionFieldsDefinitelyInitialized,
+            transitionFieldsMaybeInitialized,
             localFieldsInitialized,
             thisFieldTypes,
             valVariables + variableName)
@@ -91,7 +99,8 @@ case class Context(table: DeclarationTable,
         Context(contractTable,
             underlyingVariableMap,
             isThrown,
-            transitionFieldsInitialized,
+            transitionFieldsDefinitelyInitialized,
+            transitionFieldsMaybeInitialized,
             localFieldsInitialized,
             thisFieldTypes,
             valVariables - variableName)
@@ -99,9 +108,6 @@ case class Context(table: DeclarationTable,
     def get(s: String): Option[ObsidianType] = underlyingVariableMap.get(s)
 
     def apply(s: String): ObsidianType = underlyingVariableMap(s)
-
-    def fieldIsInitialized(stateName: String, fieldName: String): Boolean =
-        transitionFieldsInitialized.exists(e => e._1 == stateName && e._2 == fieldName)
 
     def makeThrown: Context = this.copy(isThrown = true)
 
@@ -997,7 +1003,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     private def checkForUnusedStateInitializers(context: Context) = {
-        for (remainingInitialization <- context.transitionFieldsInitialized) {
+        for (remainingInitialization <- context.transitionFieldsMaybeInitialized) {
             logError(remainingInitialization._3, InvalidStateFieldInitialization(remainingInitialization._1, remainingInitialization._2))
         }
     }
@@ -1105,7 +1111,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         Context(oldContext.contractTable,
             newContext.underlyingVariableMap,
             isThrown = branchContext.isThrown,
-            branchContext.transitionFieldsInitialized,
+            branchContext.transitionFieldsDefinitelyInitialized,
+            branchContext.transitionFieldsMaybeInitialized,
             branchContext.localFieldsInitialized,
             branchContext.thisFieldTypes,
             branchContext.valVariables)
@@ -1188,7 +1195,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         Context(context1.contractTable,
             mergedVariableMap,
             packedContext1.isThrown,
-            packedContext1.transitionFieldsInitialized.intersect(packedContext2.transitionFieldsInitialized),
+            packedContext1.transitionFieldsDefinitelyInitialized.intersect(packedContext2.transitionFieldsDefinitelyInitialized),
+            packedContext1.transitionFieldsMaybeInitialized.union(packedContext2.transitionFieldsMaybeInitialized),
             packedContext1.localFieldsInitialized.intersect(packedContext2.localFieldsInitialized),
             mergedThisFieldMap,
             packedContext1.valVariables.intersect(packedContext2.valVariables))
@@ -1648,10 +1656,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
                 val testStateMatch = (updateInfo: (String, String, AST)) => updateInfo._1 == newStateName
 
-                val updatedViaAssignment: Set[String] = context.transitionFieldsInitialized.filter(testStateMatch).map(_._2)
+                val updatedViaAssignment: Set[String] = context.transitionFieldsDefinitelyInitialized.filter(testStateMatch).map(_._2)
 
 
-                val updatedViaAssignmentToWrongState = context.transitionFieldsInitialized.filterNot(testStateMatch)
+                val updatedViaAssignmentToWrongState = context.transitionFieldsMaybeInitialized.filterNot(testStateMatch)
                 for (invalidAssignment <- updatedViaAssignmentToWrongState) {
                     logError(invalidAssignment._3, InvalidStateFieldInitialization(invalidAssignment._1, invalidAssignment._2))
                 }
@@ -2366,6 +2374,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                   isThrown = false,
                                   Set.empty,
                                   Set.empty,
+                                  Set.empty,
                                   tx.initialFieldTypes,
                                   tx.args.map((v: VariableDeclWithSpec) => v.varName).toSet)
         initContext = initContext.updated("this", thisType)
@@ -2482,6 +2491,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         var initContext = Context(table,
                                   new TreeMap[String, ObsidianType](),
                                   isThrown = false,
+                                  Set.empty,
                                   Set.empty,
                                   Set.empty,
                                   Map.empty,

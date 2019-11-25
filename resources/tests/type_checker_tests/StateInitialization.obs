@@ -28,4 +28,10 @@ main contract Test {
         S1::x1 = 45;
         shared = 2;
     }
+
+    transaction t1(Test@S1 this) {
+        if (true) {
+            S1::x1 = 43; // Error: can't assign to x1 without transitioning to state S1.
+        }
+    }
 }

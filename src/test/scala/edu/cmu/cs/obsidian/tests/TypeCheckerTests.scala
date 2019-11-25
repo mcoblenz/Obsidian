@@ -493,6 +493,8 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (InvalidStateFieldInitialization("S1", "x1"), 28)
                 ::
+                (InvalidStateFieldInitialization("S1", "x1"), 34)
+                ::
                 Nil
         )
     }
