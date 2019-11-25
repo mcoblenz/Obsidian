@@ -495,6 +495,12 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (InvalidStateFieldInitialization("S1", "x1"), 34)
                 ::
+                (OverwrittenOwnershipError("m"), 47)
+                ::
+                (StateInitializerOverwritesOwnership("m"), 49)
+                ::
+                (RedundantFieldInitializationError("m"), 55)
+                ::
                 Nil
         )
     }

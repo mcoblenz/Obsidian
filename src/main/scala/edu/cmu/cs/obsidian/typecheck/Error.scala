@@ -194,6 +194,14 @@ case class OverwrittenOwnershipError(name: String) extends Error {
     val msg: String = s"Variable '$name' is an owning reference to an asset, so it cannot be overwritten."
 }
 
+case class StateInitializerOverwritesOwnership(name: String) extends Error {
+    val msg: String = s"Field '$name' was initialized in a state initializer, but at the time of the transition, it is an owning reference to an asset, so it cannot be overwritten."
+}
+
+case class RedundantFieldInitializationError(name: String) extends Error {
+    val msg: String = s"Field '$name' was initialized in both a state initializer as well as this transition. Remove one of the two initializations."
+}
+
 case class ConstructorNameError(contractName: String) extends Error {
     val msg: String = s"Invalid constructor name for contract '$contractName'"
 }

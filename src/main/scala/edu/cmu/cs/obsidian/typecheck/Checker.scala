@@ -18,8 +18,8 @@ import scala.collection.immutable.TreeMap
 case class Context(table: DeclarationTable,
                    underlyingVariableMap: Map[String, ObsidianType],
                    isThrown: Boolean,
-                   transitionFieldsDefinitelyInitialized: Set[(String, String, AST)],
-                   transitionFieldsMaybeInitialized: Set[(String, String, AST)],
+                   transitionFieldsDefinitelyInitialized: Set[(String, String, AST)], // stateName, fieldName, AST
+                   transitionFieldsMaybeInitialized: Set[(String, String, AST)], // stateName, fieldName, AST
                    localFieldsInitialized: Set[String],
                    thisFieldTypes: Map[String, ObsidianType],
                    valVariables : Set[String]) {
@@ -1663,6 +1663,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 for (invalidAssignment <- updatedViaAssignmentToWrongState) {
                     logError(invalidAssignment._3, InvalidStateFieldInitialization(invalidAssignment._1, invalidAssignment._2))
                 }
+                for (updateInAssignment <- updatedViaAssignment) {
+                    // Make sure these don't overwrite owned references.
+                    val currentFieldType = context.lookupCurrentFieldTypeInThis(updateInAssignment).getOrElse(BottomType())
+                    if (currentFieldType.isAssetReference(thisTable) != No() && currentFieldType.isOwned) {
+                        logError(s, StateInitializerOverwritesOwnership(updateInAssignment))
+                    }
+                }
+
+                // Give an error for fields that are initialized BOTH in this transition AND in an assignment statement.
+                for (redundantlyInitializedField <- updatedInTransition.intersect(updatedViaAssignment)) {
+                    logError(s, RedundantFieldInitializationError(redundantlyInitializedField))
+                }
 
                 val updatedFieldNames = updatedInTransition ++ updatedViaAssignment // Fields updated by either assignment or transition initialization
                 val uninitializedFieldNames = fieldsToInitialize.map((f: Field) => f.name) -- updatedFieldNames
@@ -1713,16 +1725,17 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                 }
 
-                var newThisFieldTypes = contextPrime.thisFieldTypes
-
+                // Compute new this-field types.
                 // Discard records for any this-field types that are not in the new state.
                 val newFieldNames = newFields.map((f: Field) => f.name)
-                newThisFieldTypes = newThisFieldTypes.filter((fieldType: (String, ObsidianType)) => newFieldNames.contains(fieldType._1))
+                var newThisFieldTypes = contextPrime.thisFieldTypes.filter((fieldType: (String, ObsidianType)) => newFieldNames.contains(fieldType._1))
 
                 // Discard records for any this-field types that we're about to assign to.
                 for ((ReferenceIdentifier(f), e) <- updates.getOrElse(Seq())) {
                     newThisFieldTypes = newThisFieldTypes - f
                 }
+                // Discard records for any this-field types for which there were initializers (S::x = ...)
+                newThisFieldTypes = newThisFieldTypes -- updatedViaAssignment
 
 
                 val newTypeTable = thisTable.contractTable.state(newStateName).get
@@ -1763,7 +1776,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
             case Assignment(StateInitializer(stateName, fieldIdentifier), e) =>
                 val stateOption = context.contractTable.state(stateName._1)
-                val fieldType = stateOption match {
+                val declaredFieldType = stateOption match {
                     case None => logError(s, StateUndefinedError(context.contractTable.name, stateName._1)); BottomType()
                     case Some(stateTable) =>
                         stateTable.lookupField(fieldIdentifier._1) match {
@@ -1772,10 +1785,17 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         }
                 }
 
-                val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, consumptionModeForType(fieldType))
+                val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, consumptionModeForType(declaredFieldType))
 
-                checkIsSubtype(contextPrime.contractTable, s, t, fieldType)
-                if (fieldType == BottomType()) {
+                // If there might have been a prior initialization, make sure this initialization doesn't discard a
+                // nondisposable reference.
+                if (declaredFieldType.isOwned && declaredFieldType.isAssetReference(context.contractTable) != No() &&
+                    context.transitionFieldsMaybeInitialized.exists({ case (sn, fn, _) => sn == stateName._1 && fn == fieldIdentifier._1})) {
+                    logError(s, OverwrittenOwnershipError(fieldIdentifier._1))
+                }
+
+                checkIsSubtype(contextPrime.contractTable, s, t, declaredFieldType)
+                if (declaredFieldType == BottomType()) {
                     (contextPrime, s)
                 }
                 else {

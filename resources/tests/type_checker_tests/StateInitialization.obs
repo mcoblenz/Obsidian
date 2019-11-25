@@ -35,3 +35,23 @@ main contract Test {
         }
     }
 }
+
+asset contract Money {}
+main asset contract Wallet {
+    state S1 {
+        Money @ Owned m;
+    }
+
+    Wallet@Owned() {
+        S1::m = new Money();
+        S1::m = new Money(); // Error: overwriting owned field
+        m = new Money();
+        ->S1; // Error: line 8 overwrote line 10
+    }
+
+    transaction t(Wallet@S1 this) {
+        disown m;
+        S1::m = new Money();
+        ->S1(m = new Money()); // Error: double initialization
+    }
+}
