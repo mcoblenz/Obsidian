@@ -12,4 +12,5 @@ Obsidian Tutorial
    states3
    states-assets
    blockchain
+   capabilities
    
