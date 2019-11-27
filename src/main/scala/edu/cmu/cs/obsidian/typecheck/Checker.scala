@@ -1008,7 +1008,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    // Removes any field types from thisFieldTypes that are already consisten with their declarations.
+    // Removes any field types from thisFieldTypes that are already consistent with their declarations.
     private def packFieldTypes(context: Context): Context = {
         var resultContext = context
         for ((field, typ) <- context.thisFieldTypes) {
@@ -1986,8 +1986,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case None => (packedTrueContext, packedFalseContext)
                     case Some((x, oldType)) =>
                         if (exprIsField) {
-                            (packedTrueContext.updatedThisFieldType(x, oldType),
-                            packedFalseContext.updatedThisFieldType(x, oldType))
+                            // Only reset the tested field in the context if it is still in scope (since the type of this may have changed)
+                            val revisedTrueContext = if (packedTrueContext.lookupDeclaredFieldTypeInThis(x).isDefined) {
+                                packedTrueContext.updatedThisFieldType(x, oldType)
+                            } else {
+                                packedTrueContext
+                            }
+                            val revisedFalseContext = if (packedFalseContext.lookupDeclaredFieldTypeInThis(x).isDefined) {
+                                packedFalseContext.updatedThisFieldType(x, oldType)
+                            } else {
+                                packedFalseContext
+                            }
+                            (revisedTrueContext, revisedFalseContext)
                         }
                         else {
                             (packedTrueContext.updated(x, oldType), packedFalseContext.updated(x, oldType))

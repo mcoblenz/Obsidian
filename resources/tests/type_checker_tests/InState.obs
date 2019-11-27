@@ -107,3 +107,22 @@ contract TestFieldShared {
          }
      }
  }
+
+ contract TestTransition {
+    state S1;
+    state S2 {
+        TestTransition@Shared x;
+    }
+
+    TestTransition@S1() {
+        ->S1;
+    }
+
+    transaction t1(TestTransition@Shared this) {
+        if (this in S2) {
+            if (x in S2) {
+                ->S1;
+            }
+        }
+    }
+}
