@@ -289,7 +289,7 @@ object Main {
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val (typecheckingErrors, checkedTable) = checker.checkProgram()
 
-            val allSortedErrors = (duplicateErrors ++ importErrors ++ transformErrors ++ typecheckingErrors)//.sorted
+            val allSortedErrors = (duplicateErrors ++ importErrors ++ transformErrors ++ typecheckingErrors).sorted
 
             if (!allSortedErrors.isEmpty) {
                 val errorCount = allSortedErrors.size

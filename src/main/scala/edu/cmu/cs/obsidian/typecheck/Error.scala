@@ -16,7 +16,9 @@ case class ErrorRecord (error: Error, pos: scala.util.parsing.input.Position, sr
     }
 
     def compare(that: ErrorRecord): Int = {
-        if (this.pos < that.pos) -1
+        if (this.srcPath < that.srcPath) -1
+        else if (this.srcPath > that.srcPath) 1
+        else if (this.pos < that.pos) -1
         else if (this.pos == that.pos) 0
         else 1
     }
