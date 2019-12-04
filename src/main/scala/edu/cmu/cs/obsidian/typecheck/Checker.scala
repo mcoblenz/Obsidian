@@ -294,7 +294,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             return Right(ContractUndefinedError(c1.contractName))
         }
 
-        if (c1Lookup.isEmpty) {
+        if (c2Lookup.isEmpty) {
             return Right(ContractUndefinedError(c2.contractName))
         }
 
