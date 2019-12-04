@@ -12,6 +12,18 @@ When there may be an owner of an object, other references cannot be used to modi
       s.turnOff(); // COMPILE ERROR: can't change state of s through an unowned reference
    }
 
+When Unowned references are used in dynamic state tests, the body of the test does NOT have additional state information. For example:
+
+::
+
+   transaction foo(LightSwitch@Unowned s) {
+      if (s in On) {
+         s.turnOff(); // STILL GET A COMPILE ERROR: can't change state of s through an unowned reference
+      }
+   }
+
+If you need to call a transaction that needs the referenced object to be in a particular state, you need to start with at least a ``Shared`` reference (if not an ``Owned`` or state-specifying reference).
+
 Shared references
 ------------------
 If there is no owner of an object, then all references to the object are annotated ``Shared``. These references can be used to change the state of the referenced object, but invoking transactions that can only be called in some states requires a runtime check. For example:
