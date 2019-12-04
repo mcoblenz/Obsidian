@@ -55,3 +55,14 @@ main asset contract Wallet {
         ->S1(m = new Money()); // Error: double initialization
     }
 }
+
+contract HasField {
+    int x;
+
+    state S{}
+
+    HasField@Owned() {
+        S::x = 2;
+        ->S;
+    }
+}

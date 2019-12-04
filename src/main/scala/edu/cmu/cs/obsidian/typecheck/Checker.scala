@@ -1755,6 +1755,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         contextAfterTransition = contextAfterTransition.updatedWithFieldInitialization(update._1.name)
                     }
                 }
+                for (assignmentUpdate <- updatedViaAssignment) {
+                    contextAfterTransition = contextAfterTransition.updatedWithFieldInitialization(assignmentUpdate)
+                }
 
                 (contextAfterTransition, Transition(newStateName, newUpdatesOption, context.thisType.permission).setLoc(s))
 
