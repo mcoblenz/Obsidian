@@ -135,3 +135,49 @@ contract StatesWithFields {
         }
     }
 }
+
+contract States {
+    state S1;
+    state S2;
+
+    States@Owned() {
+        ->S1;
+    }
+}
+
+contract ReturnBranch {
+
+    transaction t1(LinearContract@Owned >> Unowned x) {
+        if (true) {
+            disown x;
+            return;
+        }
+        // No error here despite different types of 'x' in different branches,
+        // since the only branch there returns.
+        disown x;
+    }
+
+    transaction t2(LinearContract@Owned >> Unowned x) {
+        if (true) {
+            disown x;
+            return;
+        }
+        else {
+        }
+        // No error here despite different types of 'x' in different branches,
+        // since the true branch returns.
+        disown x;
+    }
+
+    transaction t3(LinearContract@Owned >> Unowned x) {
+        States y = new States();
+
+        if (y in S1) {
+            disown x;
+            return;
+        }
+        // No error here despite different types of 'x' and 'y' in different branches,
+        // since both branches return.
+        disown x;
+    }
+}

@@ -67,3 +67,20 @@ main contract C {
         return c;
     }
 }
+
+contract HasField {
+    HasField@Owned h;
+
+    HasField@Owned() {
+        h = new HasField(); // Ignore infinite recursion for now!
+    }
+
+    transaction t() {
+        if (true) {
+            disown h;
+            return;
+        }
+        disown h;
+        h = new HasField();
+    }
+}

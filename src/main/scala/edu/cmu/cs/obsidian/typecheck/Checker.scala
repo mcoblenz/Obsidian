@@ -1830,11 +1830,36 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
                 checkIsSubtype(contextPrime.contractTable, s, t, BoolType())
                 val (newContext, checkedStatements) = checkStatementSequence(decl, contextPrime, body)
-                val contextIfTrue = pruneContext(s,
-                    newContext,
-                    contextPrime)
-                (mergeContext(s, contextPrime, contextIfTrue), If(ePrime, checkedStatements).setLoc(s))
+                val newIf = If(ePrime, checkedStatements).setLoc(s)
+                if (hasReturnStatementDontLog(body)) {
+                    // The body definitely returns, so the body has no impact
+                    // on the context following this if. Put another way:
 
+                    /*
+                    if (e) {
+                        return;
+                    }
+                    s
+
+                    is equivalent to:
+
+                    if (e) {
+                        return;
+                    }
+                    else {
+                        // check s in the same context as the body of the if
+                        s
+                    }
+
+                    */
+                    (contextPrime, newIf)
+                }
+                else {
+                    val contextIfTrue = pruneContext(s,
+                        newContext,
+                        contextPrime)
+                    (mergeContext(s, contextPrime, contextIfTrue), newIf)
+                }
             case IfThenElse(eCond: Expression, body1: Seq[Statement], body2: Seq[Statement]) =>
                 val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
                 checkIsSubtype(contextPrime.contractTable, s, t, BoolType())
@@ -1848,7 +1873,27 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val contextIfFalse = pruneContext(s,
                     falseContext,
                     contextPrime)
-                (mergeContext(s, contextIfTrue, contextIfFalse), IfThenElse(ePrime, checkedTrueStatements, checkedFalseStatements).setLoc(s))
+
+                val newIf = IfThenElse(ePrime, checkedTrueStatements, checkedFalseStatements).setLoc(s)
+
+                val trueBranchReturns = hasReturnStatementDontLog(body1)
+                val falseBranchReturns = hasReturnStatementDontLog(body2)
+
+                if (trueBranchReturns && falseBranchReturns) {
+                    // If they both return, then the two bodies have no impact on the context afterward.
+                    (contextPrime, newIf)
+                }
+                else if (trueBranchReturns) {
+                    // The true branch returns, so its context changes are irrelevant
+                    (contextIfFalse, newIf)
+                }
+                else if (falseBranchReturns) {
+                    // The false branch returns, so its context changes are irrelevant
+                    (contextIfTrue, newIf)
+                }
+                else {
+                    (mergeContext(s, contextIfTrue, contextIfFalse), newIf)
+                }
 
             case IfInState(e, ePerm, state, body1, body2) =>
 
@@ -2007,6 +2052,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         }
                 }
 
+                val newStatement = IfInState(ePrime, ePermPrime, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
+
                 // Throw out (prune) any variables that were local to the branches.
                 val contextIfTrue = pruneContext(s,
                     resetTrueContext,
@@ -2016,14 +2063,30 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     resetFalseContext,
                     contextPrime)
 
-                val mergedContext = mergeContext(s, contextIfTrue, contextIfFalse)
-                val finalContext = valVariableToClear match {
-                    case None => mergedContext
-                    case Some(x) => mergedContext.updatedClearingValVariable (x)
-                }
-                val newStatement = IfInState(ePrime, ePermPrime, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
+                val trueBranchReturns = hasReturnStatementDontLog(body1)
+                val falseBranchReturns = hasReturnStatementDontLog(body2)
 
-                (finalContext, newStatement)
+                if (trueBranchReturns && falseBranchReturns) {
+                    // If they both return, then the two bodies have no impact on the context afterward.
+                    (contextPrime, newStatement)
+                }
+                else if (trueBranchReturns) {
+                    // The true branch returns, so its context changes are irrelevant
+                    (contextIfFalse, newStatement)
+                }
+                else if (falseBranchReturns) {
+                    // The false branch returns, so its context changes are irrelevant
+                    (contextIfTrue, newStatement)
+                }
+                else {
+                    val mergedContext = mergeContext(s, contextIfTrue, contextIfFalse)
+                    val finalContext = valVariableToClear match {
+                        case None => mergedContext
+                        case Some(x) => mergedContext.updatedClearingValVariable(x)
+                    }
+
+                    (finalContext, newStatement)
+                }
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val (tryContext, checkedTryStatements) = checkStatementSequence(decl, context, s1)
                 val (catchContext, checkedCatchStatements) = checkStatementSequence(decl, context, s2)
