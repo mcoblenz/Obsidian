@@ -1029,24 +1029,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         resultContext
     }
 
-    private def checkFieldTypeConsistencyAfterConstructor(context: Context, constr: Constructor): Unit = {
-        // First check fields that may be of inconsistent type with their declarations to make sure they match
-        // either the declarations or the specified final types.
-        for ((field, typ) <- context.thisFieldTypes) {
-            val requiredFieldType = context.lookupDeclaredFieldTypeInThis(field)
-
-            requiredFieldType match {
-                case None =>
-                    // Nothing to do; there was an assignment to a field type that may not be in scope, so there will be a separate error message.
-                case Some(declaredFieldType) =>
-                    if (isSubtype(context.contractTable, typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
-                        logError(constr, InvalidInconsistentFieldType(field, typ, declaredFieldType))
-                    }
-            }
-        }
-    }
-
-    private def checkFieldTypeConsistencyAfterTransaction(context: Context, tx: Transaction): Unit = {
+    private def checkFieldTypeConsistencyAfterTransaction(context: Context, tx: InvokableDeclaration, exitLocation: AST): Unit = {
         // First check fields that may be of inconsistent type with their declarations to make sure they match
         // either the declarations or the specified final types.
         for ((field, typ) <- context.thisFieldTypes) {
@@ -1067,10 +1050,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             requiredFieldType match {
                 case None =>
-                    assert(false, "Bug: invalid field in field type context")
+                    // Nothing to do; there was an assignment to a field type that may not be in scope, so there will be a separate error message.
                 case Some(declaredFieldType) =>
                     if (isSubtype(context.contractTable, typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
-                        logError(tx, InvalidInconsistentFieldType(field, typ, declaredFieldType))
+                        logError(exitLocation, InvalidInconsistentFieldType(field, typ, declaredFieldType))
                     }
             }
         }
@@ -1537,6 +1520,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 (contextPrime.updated(name, declaredType), VariableDeclWithInit(typ, name, ePrime))
 
             case Return() =>
+                checkFieldTypeConsistencyAfterTransaction(context, decl, s)
+
                 decl match {
                     /* the tx/function must have no return type */
                     case tx: Transaction if tx.retType.isEmpty =>
@@ -1579,6 +1564,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
 
                 checkForUnusedOwnershipErrors(s, contextPrime, thisSetToExclude ++ argsSetToExclude)
+                checkFieldTypeConsistencyAfterTransaction(context, decl, s)
+
 
                 if (retTypeOpt.isDefined && !retTypeOpt.get.isBottom) {
                     checkIsSubtype(context.contractTable, s, typ, retTypeOpt.get)
@@ -2387,13 +2374,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 // Don't need to check interface methods to make sure they return
                 if (!hasReturnStatement(tx.body) && !impl.isInterface && tx.retType.isDefined) {
-                    val ast =
-                        if (tx.body.nonEmpty) {
-                            tx.body.last
-                        } else {
-                            tx
-                        }
-                    logError(ast, MustReturnError(tx.name))
+                    logError(tx.bodyEnd, MustReturnError(tx.name))
                 } else if (tx.retType.isEmpty) {
                     // We check for unused ownership errors at each return; if there isn't guaranteed to be one at the end, check separately.
                     // Every arg whose output type is owned should be owned at the end.
@@ -2413,7 +2394,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // Check to make sure all the field types are consistent with their declarations.
-        checkFieldTypeConsistencyAfterTransaction(outputContext, tx)
+        checkFieldTypeConsistencyAfterTransaction(outputContext, tx, tx.bodyEnd)
 
         // todo: check that every declared variable is initialized before use
         tx.copy(body = newStatements)
@@ -2654,7 +2635,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         checkForUnusedOwnershipErrors(constr, outputContext, Set("this"))
         checkForUnusedStateInitializers(outputContext)
-        checkFieldTypeConsistencyAfterConstructor(outputContext, constr)
+
+        checkFieldTypeConsistencyAfterTransaction(outputContext, constr, constr.bodyEnd)
 
         // if the contract contains states, its constructor must contain a state transition
         if (hasStates && !hasTransition(constr.body)) {

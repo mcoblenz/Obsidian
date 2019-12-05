@@ -75,12 +75,18 @@ contract HasField {
         h = new HasField(); // Ignore infinite recursion for now!
     }
 
-    transaction t() {
+    transaction t2() {
         if (true) {
             disown h;
-            return;
+            return; // Error: h needs to be owned here.
         }
-        disown h;
-        h = new HasField();
+    }
+
+    transaction t3() returns int {
+        if (true) {
+            disown h;
+            return 3; // Error: h needs to be owned here.
+        }
+        return 4;
     }
 }

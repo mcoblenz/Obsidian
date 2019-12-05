@@ -286,7 +286,7 @@ case class InvalidNonThisFieldAccess() extends Error {
 
 
 case class InvalidInconsistentFieldType(fieldName: String, actualType: ObsidianType, expectedType: ObsidianType) extends Error {
-    val msg: String = s"At the ends of transactions, all fields must reference objects consistent with their declared types. " +
+    val msg: String = s"When transactions exit, all fields must reference objects consistent with their declared types. " +
         s" Field '$fieldName' is of type $actualType but was declared as $expectedType."
 }
 

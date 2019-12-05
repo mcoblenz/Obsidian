@@ -51,6 +51,15 @@ sealed abstract class InvokableDeclaration() extends Declaration {
     val thisType: ObsidianType
     val thisFinalType: ObsidianType
     val isStatic: Boolean
+    val initialFieldTypes: Map[String, ObsidianType] = Map.empty
+    val finalFieldTypes: Map[String, ObsidianType] = Map.empty
+
+    def bodyEnd : AST =
+        if (body.nonEmpty) {
+            body.last
+        } else {
+            this
+        }
 }
 
 // Expressions not containing other expressions
@@ -306,8 +315,9 @@ case class Transaction(name: String,
                        isPrivate: Boolean,
                        thisType: NonPrimitiveType,
                        thisFinalType: NonPrimitiveType,
-                       initialFieldTypes: Map[String, ObsidianType] = Map.empty, // populated after parsing
-                       finalFieldTypes: Map[String, ObsidianType] = Map.empty // populated after parsing
+                       override val initialFieldTypes: Map[String, ObsidianType] = Map.empty,
+                       override val finalFieldTypes: Map[String, ObsidianType] = Map.empty
+                       // will populate initial and final field types after parsing
                       ) extends InvokableDeclaration with IsAvailableInStates {
     val tag: DeclarationTag = TransactionDeclTag
 

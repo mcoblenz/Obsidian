@@ -180,6 +180,14 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (MustReturnError("branching_return2"), 58)
                 ::
+                (InvalidInconsistentFieldType("h",
+                    ContractReferenceType(ContractType("HasField", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("HasField", Nil), Owned(), NotRemoteReferenceType())), 81)
+                ::
+                (InvalidInconsistentFieldType("h",
+                    ContractReferenceType(ContractType("HasField", Nil), Shared(), NotRemoteReferenceType()),
+                    ContractReferenceType(ContractType("HasField", Nil), Owned(), NotRemoteReferenceType())), 88)
+                ::
                 Nil
         )
     }
@@ -448,7 +456,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (InvalidInconsistentFieldType("money",
                     ContractReferenceType(ContractType("Money", Nil), Unowned(), NotRemoteReferenceType()),
-                    ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType())), 26)
+                    ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType())), 27)
                 ::
                 (OverwrittenOwnershipError("money"), 27)
                 ::
@@ -479,7 +487,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/Ownership.obs",
             (InvalidInconsistentFieldType("prescription",
                 ContractReferenceType(ContractType("Prescription", Nil), Unowned(), NotRemoteReferenceType()),
-                ContractReferenceType(ContractType("Prescription", Nil), Owned(), NotRemoteReferenceType())), 15)
+                ContractReferenceType(ContractType("Prescription", Nil), Owned(), NotRemoteReferenceType())), 16)
                 ::
                 Nil
         )
@@ -616,14 +624,14 @@ class TypeCheckerTests extends JUnitSuite {
                 (ReceiverTypeIncompatibleError("changeStateStateSpecified",
                     ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
                     StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 44) ::
-                (InvalidInconsistentFieldType("s1C", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 47) ::
+                (InvalidInconsistentFieldType("s1C", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 51) ::
                 Nil
         )
     }
 
     @Test def fieldTypeMismatchTest(): Unit = {
         runTest("resources/tests/type_checker_tests/FieldTypeMismatch.obs",
-            (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 24) ::
+            (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), Set("S2"), NotRemoteReferenceType()), StateType(ContractType("C", Nil), Set("S1"), NotRemoteReferenceType())), 25) ::
             Nil
         )
     }
@@ -640,7 +648,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/PrivateTransactions.obs",
             (InvalidFinalFieldTypeDeclarationError("bogus"), 30)::
                 (FieldTypesDeclaredOnPublicTransactionError("t2"), 33)::
-                (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()), StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType())), 42)::
+                (InvalidInconsistentFieldType("c", StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType()), StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType())), 43)::
                 (FieldSubtypingError("c", StateType(ContractType("C", Nil), "S1", NotRemoteReferenceType()), StateType(ContractType("C", Nil), "S2", NotRemoteReferenceType())), 48)::
             Nil)
     }
@@ -784,7 +792,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/GenericsOwnership.obs",
             (InvalidInconsistentFieldType("x",
                 GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType.topContractType, Unowned())),
-                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType.topContractType, Owned()))), 12) ::
+                GenericType(GenericVar(isAsset = false,"T",None),GenericBoundPerm(false, false, ContractType.topContractType, Owned()))), 14) ::
             Nil)
     }
 
@@ -854,7 +862,7 @@ class TypeCheckerTests extends JUnitSuite {
                 GenericType(GenericVar(isAsset = false,"X",None),
                     GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Unowned())),
                 GenericType(GenericVar(isAsset = false,"X",Some("s")),
-                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Unowned()))), 16) ::
+                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Unowned()))), 17) ::
             (ReceiverTypeIncompatibleError("getX",
                 StateType(ContractType("A", Nil), "S2", NotRemoteReferenceType()),
                 StateType(ContractType("A", Nil), "S1", NotRemoteReferenceType())), 66) ::
@@ -881,7 +889,7 @@ class TypeCheckerTests extends JUnitSuite {
             (InvalidInconsistentFieldType("c",
                 ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType()),
                 ContractReferenceType(ContractType("C", Nil), Unowned(), NotRemoteReferenceType()))
-            , 8) :: Nil)
+            , 9) :: Nil)
     }
 
     @Test def genericsLinkedList(): Unit = {
@@ -948,7 +956,7 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/ConstructorFieldTypes.obs",
             (InvalidInconsistentFieldType("seller",
                 StateType(ContractType("Seller", Nil),  "InAuction", NotRemoteReferenceType()),
-                StateType(ContractType("Seller", Nil),  "Unsold", NotRemoteReferenceType())), 11) :: Nil)
+                StateType(ContractType("Seller", Nil),  "Unsold", NotRemoteReferenceType())), 13) :: Nil)
     }
 
     @Test def vals(): Unit = {
