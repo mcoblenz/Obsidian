@@ -923,7 +923,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     /* returns true if the sequence of statements includes a return statement, or an if/else statement
      * where both branches have return statements, and false otherwise
      */
-    private def hasReturnStatement(tx: Transaction, statements: Seq[Statement]) : Boolean = {
+    private def hasReturnStatement(statements: Seq[Statement]) : Boolean = {
         var hasRet = false
 
         for (statement <- statements) {
@@ -935,11 +935,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             statement match {
                 case Return() | ReturnExpr(_) | Revert(_) => hasRet = true
                 case IfThenElse(_, s1, s2) =>
-                    hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
+                    hasRet = hasReturnStatement(s1) && hasReturnStatement(s2)
                 case IfInState(e, ePerm, state, s1, s2) =>
-                    hasRet = hasReturnStatement(tx, s1) && hasReturnStatement(tx, s2)
+                    hasRet = hasReturnStatement(s1) && hasReturnStatement(s2)
                 case Switch(e, cases) =>
-                    hasRet = cases.forall(aCase => hasReturnStatement(tx, aCase.body))
+                    hasRet = cases.forall(aCase => hasReturnStatement(aCase.body))
                 case _ => ()
             }
         }
@@ -2323,7 +2323,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 // Don't need to check interface methods to make sure they return
-                if (!hasReturnStatement(tx, tx.body) && !impl.isInterface && tx.retType.isDefined) {
+                if (!hasReturnStatement(tx.body) && !impl.isInterface && tx.retType.isDefined) {
                     val ast =
                         if (tx.body.nonEmpty) {
                             tx.body.last
