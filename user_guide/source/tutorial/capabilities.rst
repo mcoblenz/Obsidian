@@ -28,7 +28,7 @@ Suppose we have a ``Key`` contract, which can be used to open a ``Lock``:
     contract Key {
         int whichLock;
 
-        transaction getLockID() returns whichLock {
+        transaction getLockID() returns int {
             return whichLock;
         }
     }
