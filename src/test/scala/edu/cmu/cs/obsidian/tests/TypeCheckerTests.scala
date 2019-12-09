@@ -509,6 +509,8 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (RedundantFieldInitializationError("m"), 55)
                 ::
+                (StateInitializerUninitialized("S", "x"), 80)
+                ::
                 Nil
         )
     }

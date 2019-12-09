@@ -904,6 +904,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                  (newTyp, finalContext, ePrime)
              case StateInitializer(stateName, fieldName) =>
                  // A state initializer expression has its field's type.
+                 if (!context.transitionFieldsDefinitelyInitialized.exists(
+                     {
+                         case (stateNameInitialized, fieldNameInitialized, _) =>
+                             (stateName._1 == stateNameInitialized && fieldName._1 == fieldNameInitialized)
+                     }))
+                     {
+                         logError(e, StateInitializerUninitialized(stateName._1, fieldName._1))
+                     }
 
                  val stateOption = context.contractTable.state(stateName._1)
                  val fieldType = stateOption match {

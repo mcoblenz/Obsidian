@@ -66,3 +66,17 @@ contract HasField {
         ->S;
     }
 }
+
+contract ImproperUse {
+    state S {
+        int x;
+    }
+
+    ImproperUse@S() {
+        ->S(x = 1);
+    }
+
+    transaction t(ImproperUse@S this) returns int {
+        return S::x; // Error: state initializer has not been intialized!
+    }
+}

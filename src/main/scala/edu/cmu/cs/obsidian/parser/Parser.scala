@@ -338,7 +338,8 @@ object Parser extends Parsers {
     }
 
     private def parseExpr = parseDisown
-    private def parseDisown = parseUnary(DisownT(), Disown.apply, parseAnd)
+    private def parseDisown = parseUnary(DisownT(), Disown
+        .apply, parseAnd)
     private def parseAnd = parseBinary(AndT(), Conjunction.apply, parseOr)
     private def parseOr = parseBinary(OrT(), Disjunction.apply, parseEq)
 
@@ -410,7 +411,7 @@ object Parser extends Parsers {
         val parseVar = parseId ^^ { (id: Identifier) => ReferenceIdentifier(id._1).setLoc(id) }
 
         val parseStateInitializer = parseId ~ ColonColonT() ~! parseId ^^ {
-            case stateName ~ _ ~ fieldName => StateInitializer(stateName, fieldName)
+            case stateName ~ _ ~ fieldName => StateInitializer(stateName, fieldName).setLoc(stateName)
         }
 
         val parseNumLiteral = {

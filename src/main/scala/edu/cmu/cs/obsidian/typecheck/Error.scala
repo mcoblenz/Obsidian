@@ -469,3 +469,9 @@ case class GenericParamShadowError(param1Binder: String, param1: GenericType,
 case class FieldTypesIncompatibleAcrossBranches(fieldName: String, typ: ObsidianType, branch: String) extends Error {
     override val msg: String = s"Field $fieldName must have compatible types in both branches, but it was given incompatible type $typ in the $branch branch."
 }
+
+case class StateInitializerUninitialized(stateName: String, fieldName: String) extends Error {
+    override val msg: String = s"$stateName::$fieldName has not been initialized. Perhaps you are " +
+        s"trying to use a field initializer for general-purpose field access instead of only for " +
+        s"preparing for a transition."
+}
