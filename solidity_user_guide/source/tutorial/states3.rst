@@ -17,7 +17,7 @@ When unowned references are used in dynamic state tests, the body of the test do
 ::
 
    transaction foo(LightSwitch s) { // s is unowned
-      if (s in On) {
+      if (s.state() == LightSwitch.State.On) {
          s.turnOff(); // STILL can't change state of s through an unowned reference
       }
    }

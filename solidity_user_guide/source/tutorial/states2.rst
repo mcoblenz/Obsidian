@@ -11,7 +11,7 @@ Methods, including constructors, can change the state of ``this`` by assignment 
    contract LightSwitch {
       enum State {On, Off}
     
-      State state; // this field is always either State.On or State.Off
+      State public state; // this field is always either State.On or State.Off
 
       constructor() public {
          state = State.Off;
