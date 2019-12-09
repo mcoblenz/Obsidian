@@ -14,7 +14,7 @@ Built-in types
 ---------------
 * ``uint`` and ``int`` represent unsigned and signed 256-bit integers, respectively.
 * The ``address`` type represents addresses on the blockchain.
-* Solidity has built-in hash maps. For example, ``mapping(address => bool)`` is a map from ``address`` to ``bool``. The keys must be primitive types (not objects or structs). You can use a map with [] syntax, e.g. ``map[key]`` looks up ``key`` in the hash map ``map``. 
+* Solidity has built-in hash maps. For example, ``mapping(address => bool)`` is a map from ``address`` to ``bool``. The keys must be primitive types (not objects or structs). You can use a map with [] syntax, e.g. ``map[key]`` looks up ``key`` in the hash map ``map``.  There is no way to check to see if a key is in the mapping.
 * Dynamically-sized arrays are supported; the length is stored in a ``length`` property. For example: ::
 
     address[] addresses;
