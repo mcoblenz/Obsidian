@@ -657,8 +657,8 @@ object Parser extends Parsers {
 
     private def parseContractModifier = {
         val mainP: Parser[ContractModifier] = MainT() ^^ (t => IsMain().setLoc(t))
-        val resourceP: Parser[ContractModifier] = AssetT() ^^ (t => IsAsset().setLoc(t))
-        mainP | resourceP
+        val assetP: Parser[ContractModifier] = AssetT() ^^ (t => IsAsset().setLoc(t))
+        mainP | assetP
     }
 
     private def parseFSMEdgeLine: Parser[Seq[FSMEdge]] = {
