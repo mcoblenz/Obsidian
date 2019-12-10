@@ -52,7 +52,6 @@ object Lexer extends RegexParsers {
         case "requires" => RequiresT()
         case "const" => ConstT()
         case "available" => AvailableT()
-        case "ends" => EndsT()
         case "in" => InT()
         case "asset" => AssetT()
         case "disown" => DisownT()

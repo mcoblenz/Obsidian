@@ -474,17 +474,6 @@ object Parser extends Parsers {
         case ors ~ last => ors.map(_._1).toSet + last
     }
 
-    private def parseEndsInState: Parser[Set[Identifier]] =
-        EndsT() ~! InT() ~! parseStatesList ^^ {
-            case _ ~ s => s
-        }
-
-
-    private def parseEndsInStateAlt: Parser[EndsInState] =
-        EndsT() ~! InT() ~! parseStatesList ^^ {
-            case _ ~ s => EndsInState(s)
-        }
-
     private def parseEnsures = {
         EnsuresT() ~! parseExpr ~! SemicolonT() ^^ {
             case ensures ~ expr ~ _ => Ensures(expr).setLoc(ensures)
@@ -496,17 +485,6 @@ object Parser extends Parsers {
             case _ ~ s => s
         }
     }
-
-    private def parseAvailableInAlt: Parser[AvailableIn] = {
-        AvailableT() ~! InT() ~! parseStatesList ^^ {
-            case _ ~ s => AvailableIn(s)
-        }
-    }
-
-
-    case class AvailableIn (val identifiers: Set[Identifier])
-    case class EndsInState (val identifiers: Set[Identifier])
-
 
     private def parseTransBody(isInterface:Boolean) =  {
         if(isInterface) SemicolonT() ^^ {

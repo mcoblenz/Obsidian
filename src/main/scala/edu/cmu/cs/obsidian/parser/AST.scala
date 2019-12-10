@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.parser
 
 import scala.util.parsing.input.{NoPosition, Position}
 import edu.cmu.cs.obsidian.lexer.Token
-import edu.cmu.cs.obsidian.parser.Parser.{EndsInState, Identifier}
+import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.typecheck._
 
 trait HasLocation {
