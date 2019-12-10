@@ -437,12 +437,11 @@ object Parser extends Parsers {
             parseTrue | parseFalse | parseNumLiteral | parseStringLiteral
 
         val parseThis = { ThisT() ^^ (t => This().setLoc(t))}
-        val parseParent = { ParentT() ^^ (p => Parent().setLoc(p))}
 
         val fail = failure("expression expected")
 
         val simpleExpr: Parser[Expression] =
-            parseThis | parseParent | parseNew | parseLocalInv |
+            parseThis | parseNew | parseLocalInv |
             parseLiterals | parseStateInitializer | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
