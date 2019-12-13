@@ -21,3 +21,7 @@ script:
   - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++2.12.4 test
   - bash travis_specific/tests.sh
+
+cache:
+  directories:
+  - $HOME/.m2
