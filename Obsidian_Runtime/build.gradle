@@ -6,6 +6,9 @@ plugins {
 
 repositories {
     mavenCentral()
+    maven {
+        url 'https://repository.mulesoft.org/nexus/content/repositories/public/'
+    }
 }
 
 targetCompatibility = 1.8
