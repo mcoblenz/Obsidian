@@ -6,6 +6,9 @@ scalaVersion := "2.12.6"
 
 organization := "edu.cmu.cs.obsidian"
 
+// For dependencies of fabric-chaincode.
+resolvers += "Jitpack" at "https://www.jitpack.io"
+
 scalacOptions := Seq("-unchecked", "-deprecation")
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
