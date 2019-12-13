@@ -16,13 +16,13 @@ When unowned references are used in dynamic state tests, the body of the test do
 
 ::
 
-   transaction foo(LightSwitch s) { // s is unowned
+   function foo(LightSwitch s) { // s is unowned
       if (s.state() == LightSwitch.State.On) {
          s.turnOff(); // STILL can't change state of s through an unowned reference
       }
    }
 
-If you need to call a transaction that needs the referenced object to be in a particular state, you need to start with at least a ``shared`` reference (if not an ``owned`` or state-specifying reference).
+If you need to call a function that needs the referenced object to be in a particular state, you need to start with at least a ``shared`` reference (if not an ``owned`` or state-specifying reference).
 
 Shared references
 ------------------

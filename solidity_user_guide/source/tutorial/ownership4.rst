@@ -42,7 +42,7 @@ Invoking functions
 
 Handling Errors
 -----------------
-Errors can be flagged with ``revert``, which stops execution and discards all of the changes that have occurred since the outermost transaction started. A description of the error can be provided as well. An example of usage is given below.
+Errors can be flagged with ``revert``, which stops execution and discards all of the changes that have occurred since the outermost function started. A description of the error can be provided as well. An example of usage is given below.
 ::
 
    function checkAmount(Money m) public { // m is unowned
