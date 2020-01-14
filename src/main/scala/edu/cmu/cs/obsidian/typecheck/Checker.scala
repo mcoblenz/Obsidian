@@ -2770,6 +2770,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    // Checks to make sure that a contract actually implements all the declarations in the interface it claims to implement.
     def implementOk(table: ContractTable, contract: Contract, interfaceName: String,
                     declarations: Seq[Declaration], boundDecls: Seq[Declaration]): Unit = {
         var toImplStates = boundDecls.flatMap {
@@ -2841,6 +2842,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
                 }
 
+                var newDecls = obsContract.declarations
+
                 if (!obsContract.isInterface) {
                     val boundDecls = globalTable.contract(obsContract.bound.contractName) match {
                         case Some(interface) => interface.contract match {
@@ -2855,11 +2858,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
 
                     implementOk(table, obsContract, obsContract.bound.contractName, obsContract.declarations, boundDecls)
+                    newDecls = obsContract.declarations.map(checkDeclaration(table))
+                    checkConstructors(table.constructors, obsContract, table)
                 }
-
-                val newDecls = obsContract.declarations.map(checkDeclaration(table))
-
-                checkConstructors(table.constructors, obsContract, table)
 
                 obsContract.copy(declarations = newDecls)
             case ffiContract: JavaFFIContractImpl => ffiContract
