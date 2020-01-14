@@ -1,4 +1,4 @@
-Obsidian Tutorial
+Solidity Tutorial
 ==================
 
 .. toctree::

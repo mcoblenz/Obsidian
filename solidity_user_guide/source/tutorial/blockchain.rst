@@ -118,4 +118,4 @@ The compiler never automatically creates setters.
 
 Concurrency
 ------------
-On the blockchain, all transactions execute sequentially. As a result, you do not have to worry about concurrency in Obsidian; if your transaction is executing, no other transactions are executing concurrently.
+On the blockchain, all transactions execute sequentially. As a result, you do not have to worry about concurrency in Solidity; if your transaction is executing, no other transactions are executing concurrently.
