@@ -190,9 +190,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val connectionManager = constructor.param(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientConnectionManager"), "connectionManager")
         val uuid = constructor.param(classOf[String], "uuid")
 
-        val superConstructorInvocation = constructor.body().invoke("super")
+        val superConstructorInvocation = JExpr.invoke("super")
         superConstructorInvocation.arg(connectionManager)
         superConstructorInvocation.arg(uuid)
+        constructor.body().add(superConstructorInvocation)
 
         generateStateEnumAndFields(contract, contractClass, true)
 
@@ -367,7 +368,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     cond._else(), unarchivedObjDecl, JExpr._null(),
                     Nil, Nil)
 
-                cond._else().invoke(unarchivedObjDecl, "initFromArchive").arg(archiveToUse).arg(JExpr.ref(serializationParamName))
+                val initInvocation = JExpr.invoke(unarchivedObjDecl, "initFromArchive").arg(archiveToUse).arg(JExpr.ref(serializationParamName))
+                cond._else().add(initInvocation)
                 unarchivedObjDecl
             case BottomType() =>
                 assert(false)
@@ -436,8 +438,9 @@ class CodeGen (val target: Target, table: SymbolTable) {
             val unmarshalledArg = argExpressions(i)
 
             val marshalledArg = marshallExprWithFullObjects(unmarshalledArg, transaction.args(i).typIn)
-            val setInvocation = body.invoke(argArray, "add")
+            val setInvocation = JExpr.invoke(argArray, "add")
             setInvocation.arg(marshalledArg)
+            body.add(setInvocation)
         }
 
         //connectionManager.doTransaction(transaction.name, args)
@@ -740,9 +743,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 stateMeth._throws(model.parseType("com.google.protobuf.InvalidProtocolBufferException").asInstanceOf[AbstractJClass])
 
                 if (!isStub) {
+                    val restoreInvocation = JExpr.invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
                     stateMeth.body()
                         ._if(JExpr.ref(serializationParamName).neNull())
-                        ._then().invoke(JExpr._this(), "__restoreObject").arg(JExpr.ref(serializationParamName))
+                        ._then().add(restoreInvocation)
                     stateMeth.body()._return(JExpr.ref(stateField))
                 } else {
                     stateMeth._throws(model.ref("edu.cmu.cs.obsidian.client.ChaincodeClientAbortTransactionException"))
@@ -868,7 +872,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         getModifiedMeth.param(obsidianSerializedSetType, "checked")
         val modBody = getModifiedMeth.body()
 
-        modBody.invoke(JExpr.ref("checked"), "add").arg(JExpr._this())
+        val addThisToChecked = JExpr.ref("checked").invoke("add").arg(JExpr._this())
+        modBody.add(addThisToChecked)
 
         val returnSet = modBody.decl(obsidianSerializedSetType, "result", JExpr._new(obsidianSerializedHashSetType))
 
@@ -889,17 +894,22 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 /* But we have to make sure it wasn't already checked!
                  * Otherwise we'll be foiled by circular data structures. */
 
-                modBody._if(JExpr.invoke(fieldInScopeMethodName(field.name)))._then()._if(JExpr.ref("checked").invoke("contains").arg(JExpr.ref(field.name)).not())
-                  ._then()
-                  .invoke(returnSet, "addAll").arg(
-                    JExpr.ref(field.name).invoke("__resetModified").arg(JExpr.ref("checked")))
+                val fieldInScope = JExpr.invoke(fieldInScopeMethodName(field.name))
+                val checkedDoesntContainField = JExpr.ref("checked").invoke("contains").arg(JExpr.ref(field.name)).not()
+                val addAllInvocation = JExpr.invoke(returnSet, "addAll")
+                addAllInvocation.arg(JExpr.ref(field.name).invoke("__resetModified").arg(JExpr.ref("checked")))
+
+                modBody._if(fieldInScope)._then()
+                    ._if(checkedDoesntContainField)
+                    ._then().add(addAllInvocation)
 
             }
         }
 
         /* return ourselves if we were modified */
-        modBody._if(JExpr._this().ref(modifiedFieldName))._then()
-          .invoke(returnSet, "add").arg(JExpr._this())
+        val addThisToReturnSet = JExpr.invoke(returnSet, "add").arg(JExpr._this())
+        modBody._if(JExpr._this().ref(modifiedFieldName))._then().add(addThisToReturnSet)
+
 
         /* once we call this (at the end of a transaction), we can assume
          * this thing is going to be written out, so mark it as no longer
@@ -932,7 +942,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         if (target.generateDebugOutput) {
             ifNotLoaded.directStatement("System.out.println(\"Loading data: \"+__archive_string);")
         }
-        ifNotLoaded.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes")).arg(JExpr.ref(serializationParamName))
+        val initInvocation = JExpr.invoke("__initFromArchiveBytes").arg(JExpr.ref("__archive_bytes")).arg(JExpr.ref(serializationParamName))
+        ifNotLoaded.add(initInvocation)
         ifNotLoaded.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
     }
 
@@ -1056,19 +1067,20 @@ class CodeGen (val target: Target, table: SymbolTable) {
         newDispatcher.body().assign(newClass.fields get loadedFieldName, JExpr.lit(true))
 
         // Put the entry in the GUID map so we can find it later.
-        val putEntryInvocation = newDispatcher.body().invoke(JExpr.ref(serializationParamName), "putEntry")
-
+        val putEntryInvocation = JExpr.ref(serializationParamName).invoke("putEntry")
         putEntryInvocation.arg(newClass.fields get guidFieldName)
         putEntryInvocation.arg(JExpr._this())
+        newDispatcher.body().add(putEntryInvocation)
 
         // Put the class in the returned object map so we can invoke transaction with -receiver on it
         target match {
             case Client(mainContract, _) => ()
             case Server(mainContract, _) =>
                 if (translationContext.contract == mainContract) {
-                    val mapReturnedObjectInvocation = newDispatcher.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+                    val mapReturnedObjectInvocation = JExpr.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
                     mapReturnedObjectInvocation.arg(JExpr._this())
                     mapReturnedObjectInvocation.arg(JExpr.FALSE)
+                    newDispatcher.body().add(mapReturnedObjectInvocation)
                 }
         }
 
@@ -1077,7 +1089,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val constructor = newClass.constructor(JMod.PUBLIC)
         addTransactionExceptions(constructor, translationContext)
 
-        val invocation = constructor.body().invoke(name)
+        val invocation = JExpr.invoke(name)
 
         /* add args to method and collect them in a list */
         for (arg <- mainArgs) {
@@ -1087,6 +1099,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         constructor.param(serializationStateType(), serializationParamName)
         invocation.arg(JExpr.ref(serializationParamName))
+
 
         aContract.params.foreach(p => {
             constructor.param(javaStringType, genericParamName(p))
@@ -1099,6 +1112,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 case None => ()
             }
         })
+        constructor.body().add(invocation)
 
         if (!newClass.fields().containsKey(constructorReturnsOwnedFieldName)) {
             newClass.field(JMod.PRIVATE, model.BOOLEAN, constructorReturnsOwnedFieldName, JExpr.FALSE)
@@ -1303,10 +1317,12 @@ class CodeGen (val target: Target, table: SymbolTable) {
             decl match {
                 case iv: Transaction =>
                     if (iv.thisType.isOwned) {
-                        beginInitTest._then().invoke(beginningField, "add").arg(decl.name)
+                        val addArg = JExpr.invoke(beginningField, "add").arg(decl.name)
+                        beginInitTest._then().add(addArg)
                     }
                     if (iv.thisFinalType.isOwned) {
-                        endInitTest._then().invoke(beginningField, "add").arg(decl.name)
+                        val addArg = JExpr.invoke(beginningField, "add").arg(decl.name)
+                        endInitTest._then().add(addArg)
                     }
                 case _ => ()
             }
@@ -1559,8 +1575,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         runMeth.param(stubType, serializationParamName)
         runMeth.param(model.ref("String"), "transName")
         val runArgs = runMeth.param(model.BYTE.array().array(), "args")
-
-        runMeth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+        val restoreObject = JExpr.invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+        runMeth.body().add(restoreObject)
 
         // Put the class in the returned object map so we can invoke transaction with -receiver on it
         target match {
@@ -1568,9 +1584,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 ()
             case Server(mainContract, _) =>
                 if (translationContext.contract == mainContract) {
-                    val mapReturnedObjectInvocation = runMeth.body().invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+                    val mapReturnedObjectInvocation = JExpr.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
                     mapReturnedObjectInvocation.arg(JExpr._this())
                     mapReturnedObjectInvocation.arg(JExpr.FALSE)
+                    runMeth.body().add(mapReturnedObjectInvocation)
                 }
         }
 
@@ -1645,7 +1662,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 val notEnoughArgs = enoughArgsTest._else()
 
                 // TODO: report the error to the client more directly
-                notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
+                val errInvocation = JExpr.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
+                notEnoughArgs.add(errInvocation)
 
                 val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
                 exception.arg(txName)
@@ -1709,9 +1727,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     // Record the UUID of this object (if it is one).
                     tx.retType.get match {
                         case np: NonPrimitiveType =>
-                            val mapInvocation = enoughArgs.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
+                            val mapInvocation = JExpr.invoke(JExpr.ref(serializationParamName), "mapReturnedObject")
                             mapInvocation.arg(returnObj)
                             mapInvocation.arg(np.isOwned)
+                            enoughArgs.add(mapInvocation)
                         case _ => ()
                     }
 
@@ -1734,8 +1753,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
                                 // For now, do the simple thing, and send class information for all object references.
                                 val wrapperBuilderClass = model.ref("org.hyperledger.fabric.example.InterfaceImplementerWrapperOuterClass.InterfaceImplementerWrapper.Builder")
                                 val wrapperBuilder = enoughArgs.decl(wrapperBuilderClass, "returnWrapperBuilder", interfaceWrapperType().staticInvoke("newBuilder"))
-                                enoughArgs.invoke(wrapperBuilder, "setGuid").arg(returnObj.invoke("__getGUID"))
-                                enoughArgs.invoke(wrapperBuilder, "setClassName").arg(returnObj.invoke("getClass").invoke("getName"))
+                                val setGuid = JExpr.invoke(wrapperBuilder, "setGuid").arg(returnObj.invoke("__getGUID"))
+                                enoughArgs.add(setGuid)
+                                val setClassName = JExpr.invoke(wrapperBuilder, "setClassName").arg(returnObj.invoke("getClass").invoke("getName"))
+                                enoughArgs.add(setClassName)
 
                                 val encoder = model.directClass("java.util.Base64").staticInvoke("getEncoder")
                                 val bytes = wrapperBuilder.invoke("build").invoke("toByteArray")
@@ -1746,7 +1767,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
                     )
                 } else {
-                    txInvoke = enoughArgs.invokeThis(txMethName)
+                    txInvoke = JExpr.invokeThis(txMethName)
+                    enoughArgs.add(txInvoke)
                 }
 
                 for (txArg <- txArgsList.reverse) {
@@ -1784,8 +1806,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
             val enoughArgsTest = transCondBody._if(argsTest)
             val enoughArgs = enoughArgsTest._then()
             val notEnoughArgs = enoughArgsTest._else()
-
-            notEnoughArgs.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
+            val printlnInvocation = JExpr.invoke(model.ref("System").staticRef("err"), "println").arg("Wrong number of arguments in invocation.")
+            notEnoughArgs.add(printlnInvocation)
 
             val exception = JExpr._new(model.ref("edu.cmu.cs.obsidian.chaincode.WrongNumberOfArgumentsException"))
             exception.arg(getStateMeth)
@@ -1833,8 +1855,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         constructorInvocation.arg(newClass.name()) // The name of the class suffices as a GUID for the top level contract.
         val instance = body.decl(newClass, "instance", constructorInvocation)
 
-        val invocation = body.invoke(instance, "delegatedMain")
-        invocation.arg(args)
+        val invocation = JExpr.invoke(instance, "delegatedMain").arg(args)
+        body.add(invocation)
     }
 
     private def generateClientMainMethod(newClass: JDefinedClass) = {
@@ -1845,8 +1867,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         // instance.delegatedMain(args);
         val body = mainMeth.body()
         val instance = body.decl(newClass, "instance", JExpr._new(newClass))
-        val invocation = body.invoke(instance, "delegatedMain")
-        invocation.arg(args)
+        val invocation = JExpr.invoke(instance, "delegatedMain").arg(args)
+        body.add(invocation)
     }
 
     /* The "invokeClientMain" method is called from delegatedMain.
@@ -1895,8 +1917,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val stubVariable = method.body().decl(stubJavaType, "stub", newStubExpr)
         // generate a new serialization state to be compatible
         val serializationState = method.body.decl(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientSerializationState"), serializationParamName, JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientSerializationState")))
-        val clientMainInvocation = method.body.invoke("main")
-        clientMainInvocation.arg(stubVariable).arg(serializationState)
+        val clientMainInvocation = JExpr.invoke("main").arg(stubVariable).arg(serializationState)
+        method.body.add(clientMainInvocation)
 
         None
     }
@@ -2001,8 +2023,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 // generate: builder.setField(field);
                 val setterName: String = setterNameForField(field.name)
 
-                val invocation: JInvocation = nonNullBody.invoke(builderVar, setterName)
-                invocation.arg(archiveVariable)
+                val invocation: JInvocation = JExpr.invoke(builderVar, setterName).arg(archiveVariable)
+                nonNullBody.add(invocation)
             }
         }
 
@@ -2028,16 +2050,16 @@ class CodeGen (val target: Target, table: SymbolTable) {
             }
             case BoolType() => {
                 val setterName: String = setterNameForField(field.name)
-                val setInvocation = body.invoke(builderVar, setterName)
-                setInvocation.arg(fieldVar)
+                val setInvocation = JExpr.invoke(builderVar, setterName).arg(fieldVar)
+                body.add(setInvocation)
             }
             case StringType() => {
                 val ifNonNull: JConditional = body._if(fieldVar.ne(JExpr._null()))
                 val nonNullBody = ifNonNull._then()
 
                 val setterName: String = setterNameForField(field.name)
-                val setInvocation = nonNullBody.invoke(builderVar, setterName)
-                setInvocation.arg(fieldVar)
+                val setInvocation = JExpr.invoke(builderVar, setterName).arg(fieldVar)
+                nonNullBody.add(setInvocation)
             }
             case n: NonPrimitiveType => handleNonPrimitive(field.name, n)
             case _ => () // TODO handle other types
@@ -2099,19 +2121,21 @@ class CodeGen (val target: Target, table: SymbolTable) {
         // val builderVariable: JVar = archiveBody.decl(builderType, "builder", archiveType.staticInvoke("newBuilder"))
         // Iterate through fields of this class and archive each one by calling setters on a builder.
 
-        archiveBody.invoke(builderVariable, "setGuid").arg(inClass.fields().get("__guid"))
+        val setGuidInvocation = JExpr.invoke(builderVariable, "setGuid").arg(inClass.fields().get("__guid"))
+        archiveBody.add(setGuidInvocation)
 
         // Archive the type variables
         for (param <- contract.params) {
-            archiveBody.invoke(builderVariable, "setGeneric" + param.gVar.varName)
-                .arg(refGenericParam(param))
+            val setGenericInvocation = JExpr.invoke(builderVariable, "setGeneric" + param.gVar.varName).arg(refGenericParam(param))
+            archiveBody.add(setGenericInvocation)
 
             param.gVar.permissionVar match {
                 case Some(pVar) =>
-                    archiveBody.invoke(builderVariable, "setGenericPerm" + pVar)
+                    val setGenericPermInvocation = JExpr.invoke(builderVariable, "setGenericPerm" + pVar)
                         .arg(javaStringType().staticInvoke("join")
-                                .arg(JExpr.lit(","))
-                                .arg(refGenericPermParam(pVar)))
+                            .arg(JExpr.lit(","))
+                            .arg(refGenericPermParam(pVar)))
+                    archiveBody.add(setGenericPermInvocation)
                 case None => ()
             }
         }
@@ -2135,9 +2159,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 val thisStateBody = archiveBody._if(cond)._then()
 
                 val stateField = translationContext.states(st.name).innerClassField
-                val builtState = thisStateBody.invoke(stateField, "archive")
-                thisStateBody.invoke(builderVariable, "setState" + st.name)
-                             .arg(builtState)
+                val builtState = JExpr.invoke(stateField, "archive")
+                
+                val setStateInvocation : JInvocation = JExpr.invoke(builderVariable, "setState" + st.name)
+                setStateInvocation.arg(builtState)
+                thisStateBody.add(setStateInvocation)
             }
         }
 
@@ -2177,7 +2203,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
           protobufClassName + "OrGUID" + ".newBuilder();")
         val builderVariable = JExpr.ref("builder")
 
-        archiveBody.invoke(builderVariable, "setObj").arg(JExpr._this().invoke("archive"))
+        val setObjInvocation = JExpr.invoke(builderVariable, "setObj").arg(JExpr._this().invoke("archive"))
+        archiveBody.add(setObjInvocation)
         val archiveType = model.directClass(protobufClassName + "OrGUID")
 
         archiveBody.decl(archiveType, "wrappedObject", builderVariable.invoke("build"))
@@ -2339,9 +2366,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
                 // We also need to put this thing in the map of loaded objects,
                 // so if someone else references it later, we get the same reference.
-                checkForObj._else().invoke(JExpr.ref(serializationParamName), "putEntry")
+                val putEntryInvocation = JExpr.invoke(JExpr.ref(serializationParamName), "putEntry")
                     .arg(JExpr.ref(javaFieldName + "ID"))
                     .arg(fieldVar)
+                checkForObj._else().add(putEntryInvocation)
             }
         }
 
@@ -2430,7 +2458,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
 
-        fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
+        val fromArchiveInvocation = JExpr.invoke(fromArchiveMeth).arg(parsedArchive)
+        fromBytesBody.add(fromArchiveInvocation)
         fromBytesBody._return(JExpr._this())
     }
 
@@ -2469,9 +2498,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val parseInvocation: JInvocation = archiveType.staticInvoke("parseFrom")
         parseInvocation.arg(archiveBytes)
         val parsedArchive = fromBytesBody.decl(archiveType, "archive", parseInvocation)
-        val archiveInv = fromBytesBody.invoke(fromArchiveMeth).arg(parsedArchive)
-
-        archiveInv.arg(JExpr.ref(serializationParamName))
+        val archiveInv = JExpr.invoke(fromArchiveMeth).arg(parsedArchive).arg(JExpr.ref(serializationParamName))
+        fromBytesBody.add(archiveInv)
         // If lazy loading, note that we loaded this object.
         fromBytesBody.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
 
@@ -2923,9 +2951,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
         } else {
             body.assign(JExpr.ref(loadedFieldName), JExpr.lit(true))
             body.assign(JExpr.ref(modifiedFieldName), JExpr.lit(true))
-            val putEntryInvocation = body.invoke(JExpr.ref(serializationParamName), "putEntry")
+            val putEntryInvocation = JExpr.invoke(JExpr.ref(serializationParamName), "putEntry")
             putEntryInvocation.arg(JExpr.ref(guidFieldName))
             putEntryInvocation.arg(JExpr._this())
+            body.add(putEntryInvocation)
         }
 
         // -----------------------------------------------------------------------------
@@ -2933,7 +2962,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val constructor = newClass.constructor(JMod.PUBLIC)
         constructor._throws(model.directClass("edu.cmu.cs.obsidian.chaincode.ObsidianRevertException"))
 
-        val invocation = constructor.body().invoke(methodName)
+        val invocation = JExpr.invoke(methodName)
 
         /* add args to method and collect them in a list */
 
@@ -2951,6 +2980,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 case None => ()
             }
         })
+        constructor.body().add(invocation)
     }
 
     private def refGenericPermParam(pVar: String) = {
@@ -3027,11 +3057,13 @@ class CodeGen (val target: Target, table: SymbolTable) {
             target match {
                 case Client(mainContract, _) =>
                     if (translationContext.contract != mainContract) {
-                        meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+                        val restoreInvocation = JExpr.invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+                        meth.body().add(restoreInvocation)
 
                     }
                 case Server(_, _) =>
-                    meth.body().invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+                    val restoreInvocation = JExpr.invoke("__restoreObject").arg(JExpr.ref(serializationParamName))
+                    meth.body().add(restoreInvocation)
             }
 
             // Dynamically check the state of the receiver and the arguments.
@@ -3303,9 +3335,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
                 if (shouldStateLock) {
                     val tryBlock = jIf._then()._try()
-                    tryBlock.body().invoke(JExpr.ref(serializationParamName), "beginStateLock").arg(jEx)
+                    val beginStateLockInvocation = JExpr.invoke(JExpr.ref(serializationParamName), "beginStateLock").arg(jEx)
+                    tryBlock.body().add(beginStateLockInvocation)
                     translateBody(tryBlock.body(), s1, translationContext, localContext)
-                    tryBlock._finally().invoke(JExpr.ref(serializationParamName), "endStateLock").arg(jEx)
+                    val endStateLockInvocation = JExpr.invoke(JExpr.ref(serializationParamName), "endStateLock").arg(jEx)
+                    tryBlock._finally().add(endStateLockInvocation)
                 }
                 else {
                     translateBody(jIf._then(), s1, translationContext, localContext)

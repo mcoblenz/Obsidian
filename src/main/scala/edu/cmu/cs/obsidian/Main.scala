@@ -8,6 +8,7 @@ import org.apache.commons.io.FileUtils
 
 import scala.collection.mutable.HashSet
 import com.helger.jcodemodel.JCodeModel
+import com.helger.jcodemodel.writer.JCMWriter
 import edu.cmu.cs.obsidian.codegen._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.protobuf._
@@ -321,7 +322,8 @@ object Main {
                     return false
                 }
                 case Right(javaModel) =>
-                    javaModel.build(srcDir.toFile, srcDir.toFile, null)
+                    val writer = new JCMWriter(javaModel)
+                    writer.build(srcDir.toFile)
             }
 
 

@@ -79,7 +79,9 @@ case class TranslationContext(
              * this makes shadowing of this variable impossible */
                 case (None, GlobalFieldInfo(_)) => body.assign(JExpr._this().ref(name), assignExpr)
                 case (Some(_), GlobalFieldInfo(_)) => body.assign(contractClass.staticRef("this").ref(name), assignExpr)
-                case (_, StateSpecificFieldInfo(_, _, setFunc)) => body.invoke(setFunc).arg(assignExpr)
+                case (_, StateSpecificFieldInfo(_, _, setFunc)) =>
+                    val setFuncInvocation = JExpr.invoke(setFunc).arg(assignExpr)
+                    body.add(setFuncInvocation)
             }
         }
     }
