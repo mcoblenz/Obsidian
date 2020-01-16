@@ -28,9 +28,8 @@ libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.1" % "test"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 
 libraryDependencies += "junit" % "junit" % "4.12" % "test"
-libraryDependencies += "com.google.protobuf" % "protobuf-java" % "3.10.0"
+libraryDependencies += "com.google.protobuf" % "protobuf-java" % "3.5.1"
 libraryDependencies += "org.hyperledger.fabric-chaincode-java" % "fabric-chaincode-shim" % "1.4.4"
-libraryDependencies += "org.hyperledger.fabric-chaincode-java" % "fabric-chaincode-protos" % "1.4.4"
 libraryDependencies += "com.helger" % "jcodemodel" % "3.3.0"
 libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2"
 
@@ -39,6 +38,7 @@ libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2"
 // don't get confused about multiple META-INF/MANIFEST.MF
 assemblyMergeStrategy in assembly := {
     case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+    case x if x.contains("module-info.class") => MergeStrategy.discard // https://stackoverflow.com/questions/54834125/sbt-assembly-deduplicate-module-info-class
     case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard
     case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
