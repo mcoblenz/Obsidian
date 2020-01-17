@@ -1183,10 +1183,24 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val mergedVariableMap = mergeMaps(packedContext1.underlyingVariableMap, packedContext2.underlyingVariableMap, packedContext2.isThrown, context2.isThrown, true)
         val mergedThisFieldMap = mergeMaps(packedContext1.thisFieldTypes, packedContext2.thisFieldTypes, packedContext2.isThrown, context2.isThrown, false)
 
+        // This is an intersect operation that only depends on the state and field names, not on the ASTs.
+        def mergeTransitionFieldsInitialized(fields1: Set[(String, String, AST)], fields2: Set[(String, String, AST)]) : Set[(String, String, AST)] = {
+            var resultingFields = Set[(String, String, AST)]()
+            for (fieldInitialized <- fields1) {
+                if (fields2.exists( (otherFieldInitialized: (String, String, AST)) =>
+                    otherFieldInitialized._1 == fieldInitialized._1 &&
+                    otherFieldInitialized._2 == fieldInitialized._2))
+                {
+                    resultingFields = resultingFields + fieldInitialized
+                }
+            }
+            resultingFields
+        }
+
         Context(context1.contractTable,
             mergedVariableMap,
             packedContext1.isThrown,
-            packedContext1.transitionFieldsDefinitelyInitialized.intersect(packedContext2.transitionFieldsDefinitelyInitialized),
+            mergeTransitionFieldsInitialized(packedContext1.transitionFieldsDefinitelyInitialized, packedContext2.transitionFieldsDefinitelyInitialized),
             packedContext1.transitionFieldsMaybeInitialized.union(packedContext2.transitionFieldsMaybeInitialized),
             packedContext1.localFieldsInitialized.intersect(packedContext2.localFieldsInitialized),
             mergedThisFieldMap,
