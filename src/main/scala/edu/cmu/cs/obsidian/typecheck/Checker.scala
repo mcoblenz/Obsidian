@@ -529,6 +529,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             if (isSubtype(table, actualArg, substitutedParam, isThis = false).isDefined) {
                 logError(ast, GenericParameterError(param, actualArg))
             }
+
+            actualArg match {
+                case nonPrimitiveActualArg: NonPrimitiveType =>
+                    if (nonPrimitiveActualArg.permission == Inferred() && param.gVar.permissionVar.isDefined) {
+                        logError(ast, GenericParameterPermissionMissingError(param, param.gVar.permissionVar.get, nonPrimitiveActualArg))
+                    }
+                case _ =>
+                    // Nothing to do here.
+            }
         }
     }
 
@@ -2678,7 +2687,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         constr.copy(body = newBody)
     }
 
-    private def checkConstructors(constructors: Seq[Constructor], contract: ObsidianContractImpl, table: ContractTable): Unit = {
+    private def checkConstructorDistinguishibility(constructors: Seq[Constructor], contract: ObsidianContractImpl, table: ContractTable): Unit = {
         if (constructors.isEmpty && table.stateLookup.nonEmpty && !contract.isInterface) {
             logError(contract, NoConstructorError(contract.name))
         }
@@ -2873,7 +2882,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                     implementOk(table, obsContract, obsContract.bound.contractName, obsContract.declarations, boundDecls)
                     newDecls = obsContract.declarations.map(checkDeclaration(table))
-                    checkConstructors(table.constructors, obsContract, table)
+                    checkConstructorDistinguishibility(table.constructors, obsContract, table)
                 }
 
                 obsContract.copy(declarations = newDecls)

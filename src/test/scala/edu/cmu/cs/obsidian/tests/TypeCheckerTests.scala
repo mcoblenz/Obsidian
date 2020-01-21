@@ -871,6 +871,10 @@ class TypeCheckerTests extends JUnitSuite {
             (ReceiverTypeIncompatibleError("getX",
                 ContractReferenceType(ContractType("A", Nil), Unowned(), NotRemoteReferenceType()),
                 StateType(ContractType("A", Nil), "S1", NotRemoteReferenceType())), 72) ::
+                (GenericParameterPermissionMissingError(GenericType(GenericVar(isAsset = false,"X",Some("s")),
+                    GenericBoundPerm(interfaceSpecified = false, permSpecified = false, ContractType.topContractType, Unowned())),
+                "s",
+                    ContractReferenceType(ContractType("A", Nil), Inferred(), NotRemoteReferenceType())), 77)::
                 Nil)
     }
 

@@ -180,6 +180,7 @@ case class ReturnExpr(e: Expression) extends Statement {
 }
 
 // We distinguish between no update clause given and an empty update clause for a clean separation between syntax and semantics.
+// thisPermission is the permission of 'this' at the time of the transition. It is used for enforcing state locks caused by dynamic state checks.
 case class Transition(newStateName: String, updates: Option[Seq[(ReferenceIdentifier, Expression)]], thisPermission: Permission) extends Statement {
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Transition = {
         def doSubstitute: ((ReferenceIdentifier, Expression)) => (ReferenceIdentifier, Expression) = {

@@ -71,5 +71,10 @@ main contract C {
         // This should also fail, because peek() returns an Unowned reference
         return maybeA.peek().getX();
     }
+
+    transaction missingPermission() {
+        // Error: missing parameter s (Maybe[X@s])
+        Maybe[A] m = new Maybe[A](new A(4));
+    }
 }
 

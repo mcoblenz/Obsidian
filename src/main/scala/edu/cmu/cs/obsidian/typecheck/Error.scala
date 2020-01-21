@@ -437,6 +437,10 @@ case class GenericParameterAssetError(paramName: String, argTypeName: String) ex
         s"Argument type $argTypeName is an asset, but the type parameter $paramName is not allowed to be an asset. Add the 'asset' modifier to $paramName to allow the parameter to be an asset."
 }
 
+case class GenericParameterPermissionMissingError(param: GenericType, permVariable: String, actualArg: ObsidianType) extends Error {
+    val msg: String = s"Missing specification for a value for the permission variable $permVariable in $param in type parameter $actualArg."
+}
+
 case class PermissionCheckRedundant(actualPerm: Permission, testPermission: Permission,
                                     isSubperm: Boolean) extends Error {
     private val isSubpermStr: String =
