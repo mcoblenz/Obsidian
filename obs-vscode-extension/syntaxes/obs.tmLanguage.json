@@ -34,7 +34,7 @@
 					"name": "invalid.deprecated.package_name_not_lowercase.obs"
 				},
 				{
-					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|bool|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
+					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|bool|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
 					"name": "invalid.illegal.character_not_allowed_here.obs"
 				},
 				{
@@ -78,7 +78,7 @@
 					"name": "invalid.illegal.character_not_allowed_here.obs"
 				},
 				{
-					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|bool|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|extends|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
+					"match": "(?x)\\b(?<!\\$)\n(abstract|assert|bool|break|byte|case|catch|char|class|\nconst|continue|default|do|double|string|else|in|enum|final|\nfinally|float|for|goto|if|implements|import|instanceof|int|\ninterface|long|native|new|package|private|protected|main|asset|transaction|state|public|\nreturn|returns|short|static|strictfp|super|switch|syncronized|this|\nthrow|throws|transient|try|void|volatile|while|available|\ntrue|false|null)\\b",
 					"name": "invalid.illegal.character_not_allowed_here.obs"
 				},
 				{
@@ -238,24 +238,6 @@
 					},
 					"match": "(contract|(?<!@)interface|enum)\\s+(\\w+)",
 					"name": "meta.class.identifier.obs"
-				},
-				{
-					"begin": "extends",
-					"beginCaptures": {
-						"0": {
-							"name": "storage.modifier.extends.obs"
-						}
-					},
-					"end": "(?={|implements)",
-					"name": "meta.definition.class.inherited.classes.obs",
-					"patterns": [
-						{
-							"include": "#object-types-inherited"
-						},
-						{
-							"include": "#comments"
-						}
-					]
 				},
 				{
 					"begin": "(implements)\\s",
@@ -574,146 +556,6 @@
 				}
 			]
 		},
-		"enums": {
-			"begin": "^\\s*([\\w\\s]*)(enum)\\s+(\\w+)",
-			"beginCaptures": {
-				"1": {
-					"patterns": [
-						{
-							"include": "#storage-modifiers"
-						},
-						{
-							"include": "#return-modifier"
-						}
-					]
-				},
-				"2": {
-					"name": "storage.modifier.obs"
-				},
-				"3": {
-					"name": "entity.name.type.enum.obs"
-				}
-			},
-			"end": "}",
-			"endCaptures": {
-				"0": {
-					"name": "punctuation.section.enum.end.bracket.curly.obs"
-				}
-			},
-			"name": "meta.enum.obs",
-			"patterns": [
-				{
-					"begin": "\\b(extends)\\b",
-					"beginCaptures": {
-						"1": {
-							"name": "storage.modifier.extends.obs"
-						}
-					},
-					"end": "(?={|\\bimplements\\b)",
-					"name": "meta.definition.class.inherited.classes.obs",
-					"patterns": [
-						{
-							"include": "#object-types-inherited"
-						},
-						{
-							"include": "#comments"
-						}
-					]
-				},
-				{
-					"begin": "\\b(implements)\\b",
-					"beginCaptures": {
-						"1": {
-							"name": "storage.modifier.implements.obs"
-						}
-					},
-					"end": "(?={|\\bextends\\b)",
-					"name": "meta.definition.class.implemented.interfaces.obs",
-					"patterns": [
-						{
-							"include": "#object-types-inherited"
-						},
-						{
-							"include": "#comments"
-						}
-					]
-				},
-				{
-					"begin": "{",
-					"beginCaptures": {
-						"0": {
-							"name": "punctuation.section.enum.begin.bracket.curly.obs"
-						}
-					},
-					"end": "(?=})",
-					"patterns": [
-						{
-							"begin": "(?<={)",
-							"end": "(?=;|})",
-							"patterns": [
-								{
-									"include": "#comments-obsdoc"
-								},
-								{
-									"include": "#comments"
-								},
-								{
-									"begin": "(\\w+)\\s*({)",
-									"beginCaptures": {
-										"1": {
-											"name": "constant.other.enum.obs"
-										},
-										"2": {
-											"name": "punctuation.bracket.curly.obs"
-										}
-									},
-									"end": "\\}",
-									"endCaptures": {
-										"0": {
-											"name": "punctuation.bracket.curly.obs"
-										}
-									},
-									"patterns": [
-										{
-											"include": "#class-body"
-										}
-									]
-								},
-								{
-									"begin": "(\\w+)\\s*(\\()",
-									"beginCaptures": {
-										"1": {
-											"name": "constant.other.enum.obs"
-										},
-										"2": {
-											"name": "punctuation.bracket.round.obs"
-										}
-									},
-									"end": "\\)",
-									"endCaptures": {
-										"0": {
-											"name": "punctuation.bracket.round.obs"
-										}
-									},
-									"patterns": [
-										{
-											"include": "#code"
-										}
-									]
-								},
-								{
-									"match": "\\b\\w+\\b",
-									"name": "constant.other.enum.obs"
-								}
-							]
-						},
-						{
-							"include": "#class-body"
-						}
-					]
-				}
-			]
-		},
 		"function-call": {
 			"begin": "([A-Za-z_$][\\w$]*)\\s*(\\()",
 			"beginCaptures": {
@@ -734,66 +576,6 @@
 			"patterns": [
 				{
 					"include": "#code"
-				}
-			]
-		},
-		"generics": {
-			"begin": "<",
-			"beginCaptures": {
-				"0": {
-					"name": "punctuation.bracket.angle.obs"
-				}
-			},
-			"end": ">",
-			"endCaptures": {
-				"0": {
-					"name": "punctuation.bracket.angle.obs"
-				}
-			},
-			"patterns": [
-				{
-					"match": "\\b(extends|super)\\b",
-					"name": "storage.modifier.$1.obs"
-				},
-				{
-					"match": "(?<!\\.)([a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\s*<)",
-					"captures": {
-						"1": {
-							"name": "storage.type.obs"
-						}
-					}
-				},
-				{
-					"include": "#primitive-arrays"
-				},
-				{
-					"match": "[a-zA-Z$_][a-zA-Z0-9$_]*",
-					"name": "storage.type.generic.obs"
-				},
-				{
-					"match": "\\?",
-					"name": "storage.type.generic.wildcard.obs"
-				},
-				{
-					"match": "&",
-					"name": "punctuation.separator.types.obs"
-				},
-				{
-					"match": ",",
-					"name": "punctuation.separator.delimiter.obs"
-				},
-				{
-					"match": "\\.",
-					"name": "punctuation.separator.period.obs"
-				},
-				{
-					"include": "#parens"
-				},
-				{
-					"include": "#generics"
-				},
-				{
-					"include": "#comments"
 				}
 			]
 		},
