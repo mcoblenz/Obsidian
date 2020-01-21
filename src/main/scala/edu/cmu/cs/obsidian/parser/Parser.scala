@@ -781,7 +781,7 @@ object Parser extends Parsers {
         val reader = new TokenReader(tokens)
         parseProgram(srcPath)(reader) match {
             case Success(result, _) => Right(result)
-            case Failure(msg , _) => Left(s"PARSER FAILURE: $msg")
+            case Failure(msg, reader) => Left(s"Parser failure at ${reader.pos}: $msg")
             case Error(msg , next) =>
                 if (next.atEnd) {
                     Left(s"Parser Error: $msg at end of file")
