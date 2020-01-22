@@ -587,7 +587,7 @@ case class GenericVar(isAsset: Boolean, varName: String, permissionVar: Option[S
 
 case class GenericType(gVar: GenericVar, bound: GenericBound) extends NonPrimitiveType {
     override def toString: String =
-        s"$gVar${bound.show(gVar)}"
+        s"${gVar}@${permission}${bound.show(gVar)}"
 
     def hasPermissionVar(stateName: String): Boolean = gVar.hasPermissionVar(stateName)
 
