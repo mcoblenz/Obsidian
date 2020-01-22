@@ -1643,16 +1643,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         f.availableIn.isEmpty || f.availableIn.get.contains(stateName))
                 }
 
-                // For each state that we might be in, compute the set of fields that could be available.
-                val allContractFields = thisTable.allFields
-                val possibleCurrentFields =
-                    if (possibleCurrentStates.isEmpty) {
-                        Set.empty[Field]
-                    }
-                    else {
-                        possibleCurrentStates.map(fieldsAvailableInState).reduce(
-                            (s1: Set[Field], s2: Set[Field]) => s1 union s2)
-                    }
+
 
                 val definiteCurrentFields = // These are definitely available now.
                     if (possibleCurrentStates.isEmpty) {
@@ -1738,6 +1729,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 // Check for potentially-dropped resources.
+                // For each state that we might be in, compute the set of fields that could be available.
+                val possibleCurrentFields: Set[Field] =
+                if (possibleCurrentStates.isEmpty) {
+                    Set.empty[Field]
+                }
+                else {
+                    // All the fields from all the possible states, BUT if this is a constructor, some of those
+                    // fields will not have been initialized yet, so that's fine.
+                    val fieldsFromPossibleStates = possibleCurrentStates.map(fieldsAvailableInState).reduce(
+                        (s1: Set[Field], s2: Set[Field]) => s1 union s2)
+                    val uninitializedConstructorFieldNames = context.thisFieldTypes.filter( (field: (String, ObsidianType)) =>
+                        field._2 match {
+                            case np: NonPrimitiveType => np.permission == Inferred()
+                            case _ => false
+                        }).keys
+                    fieldsFromPossibleStates.filter( (f: Field) => !uninitializedConstructorFieldNames.exists(f.name.equals))
+                }
                 val toCheckForDroppedAssets = possibleCurrentFields -- newFields // fields that we might currently have minus fields we're initializing now
                 for (oldField <- toCheckForDroppedAssets) {
                     val fieldType = contextPrime.thisFieldTypes.getOrElse(oldField.name, oldField.typ)
@@ -2618,15 +2626,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         // Check as if all the nonprimitive fields were of Inferred permission initially so that we can track ownership correctly.
 
         for (field <- table.allFields) {
-            field.typ match {
-                case ContractReferenceType(contractType, permission, isRemote) =>
-                    val inferredType = ContractReferenceType(contractType, Inferred(), isRemote)
-                    initContext = initContext.updatedThisFieldType(field.name, inferredType)
-                case StateType(contractType, stateNames, isRemote) =>
-                    val inferredType = ContractReferenceType(contractType, Inferred(), isRemote)
-                    initContext = initContext.updatedThisFieldType(field.name, inferredType)
-                case _ => () // Nothing to do
-            }
+            val inferredType = field.typ.withTypeState(Inferred())
+            initContext = initContext.updatedThisFieldType(field.name, inferredType)
         }
 
         val (outputContext, newBody) = checkStatementSequence(constr, initContext, constr.body)
