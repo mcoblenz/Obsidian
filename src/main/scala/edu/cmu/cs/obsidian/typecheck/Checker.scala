@@ -443,7 +443,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 Some(StateType(ct, unionStates, NotRemoteReferenceType()))
 
             case (g1@GenericType(gVar1, gBound1), g2@GenericType(gVar2, gBound2)) =>
-                if (gVar1.permissionVar.isDefined && gVar2.permissionVar.isDefined) {
+                if (g1 == g2) {
+                    Some(g1)
+                }
+                else if (gVar1.permissionVar.isDefined && gVar2.permissionVar.isDefined) {
                     Some(t1)
                 } else {
                     val typeForMismatchedPermissions =
