@@ -1,0 +1,113 @@
+import "Dict.obs"
+import "Integer.obs"
+
+asset interface ObsidianToken {
+    transaction getValue() returns int;
+    transaction merge(ObsidianToken@Owned >> Unowned other);
+    transaction split(int val) returns ObsidianToken@Owned;
+}
+
+asset contract ExampleToken implements ObsidianToken {
+    int value;
+
+    ExampleToken@Owned(int v) {
+        value = v;
+    }
+    
+    transaction getValue() returns int {
+        return value;
+    }
+
+    transaction merge(ObsidianToken@Owned >> Unowned other) {
+        value = value + other.getValue();
+        disown other;
+    }
+
+    transaction split(int val) returns ExampleToken@Owned {
+        if (val > value) {
+            revert ("Can't split off more than the existing value");
+        }
+        ExampleToken other = new ExampleToken(val);
+        value = value - val;
+        return other;
+    }
+
+}
+
+asset interface ObsidianTokenBank {
+    transaction totalSupply() returns int;
+}
+
+
+
+main asset contract ExampleTokenBank implements ObsidianTokenBank {
+    int totalSupply;
+    Dict[Integer, ExampleToken@Owned]@(Empty | HasNext) balances;
+
+    ExampleTokenBank@Owned() {
+        totalSupply = 0;
+        balances = new Dict[Integer@Unowned, ExampleToken@Owned](new IntComparator());
+    }
+
+    transaction totalSupply() returns int {
+        return totalSupply;
+    }
+
+    transaction balanceOf(Integer ownerAddress) returns int {
+        Option[ExampleToken@Unowned] balance = balances.peek(ownerAddress);
+        if (balance in None) {
+            return 0;
+        }
+        else {
+            return balance.unpack().getValue();
+        }
+    }
+
+    transaction transfer(Integer fromAddress, Integer toAddress, int value) returns bool {
+         Option[ExampleToken@Owned] fromBalance = balances.remove(fromAddress);
+         if (fromBalance in None) {
+             return false;
+         }
+         else {
+            ExampleToken fromTokens = fromBalance.unpack();
+            if (value <= fromTokens.getValue()) {
+                Option[ExampleToken@Owned] toBalance = balances.remove(toAddress);
+                ExampleToken toTokens = new ExampleToken(0); // 0 value
+                if (toBalance in Some) {
+                    toTokens = toBalance.unpack();
+                }
+
+                ExampleToken tokensToMove = fromTokens.split(value);
+                toTokens.merge(tokensToMove);
+                Option[ExampleToken] emptyToTokens = balances.replace(toAddress, toTokens);
+                Option[ExampleToken] emptyFromTokens = balances.replace(fromAddress, fromTokens); // Must be None because we just removed it.
+
+                return true;
+            }
+            else {
+                Option[ExampleToken] emptyFromTokens = balances.replace(fromAddress, fromTokens); // Must be None because we just removed it.
+                return false;
+            }
+         }
+    }
+
+}
+
+/*
+asset contract ERC20Token {
+
+    transaction totalSupply() returns int {
+
+    }
+
+    transaction balanceOf(address _owner) returns int { //get the balance of account with address _owner
+    }
+    
+    transaction transfer(address _to, uint256 _value) public returns (bool success) - send _value amount of tokens to address _to
+
+    transaction transferFrom(address _from, address _to, uint256 _value) public returns (bool success) - send _value amount of tokens from address _from to address _to
+5. approve(address _spender, uint256 _value) public returns (bool success) - allow _spender to withdraw from your account, multiple times, up to the _value amount
+6. allowance(address _owner, address _spender) public view returns (uint256 remaining)
+
+}
+*/
