@@ -2188,11 +2188,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (mergedContext, newCases) = cases.headOption match {
                     case None => (contextPrime, cases)
                     case Some(switchCase) =>
-                        val (initialContext, newCase) = checkSwitchCase(switchCase)
+                        // If a given switch case is guaranteed to return, then if it DID run, then the code BELOW this will NEVER run, so
+                        // we need not merge the case's output context in.
+                        val (firstCaseOutputContext, newCase) = checkSwitchCase(switchCase)
+
+                        val initialContextToMerge = if (hasReturnStatementDontLog(switchCase.body)) contextPrime else firstCaseOutputContext
                         val restCases = cases.tail
-                        restCases.foldLeft((initialContext, Seq(newCase)))((prev: (Context, Seq[SwitchCase]), sc: SwitchCase) => {
+                        restCases.foldLeft((initialContextToMerge, Seq(newCase)))((prev: (Context, Seq[SwitchCase]), sc: SwitchCase) => {
                             val (newContext, newCase) = checkSwitchCase(sc)
-                            (mergeContext(s, prev._1, newContext), newCase +: prev._2)
+                            if (hasReturnStatementDontLog(sc.body))
+                                (prev._1, newCase +: prev._2)
+                            else
+                                (mergeContext(s, prev._1, newContext), newCase +: prev._2)
                         })
                 }
 
