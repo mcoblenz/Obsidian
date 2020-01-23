@@ -1510,6 +1510,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                 logError(s, ContractUndefinedError(declaredContractName))
                                 BottomType()
                             case Some(table) =>
+                                checkGenericArgLength(table, s, np)
+
                                 exprType match {
                                     case exprNonPrimitiveType: NonPrimitiveType =>
                                         if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
