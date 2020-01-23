@@ -268,14 +268,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     //-------------------------------------------------------------------------
     /* Subtyping definitions */
 
-    def checkArgCompat: ((ObsidianType, ObsidianType)) => Boolean = {
+    def checkArgCompat(table: ContractTable): ((ObsidianType, ObsidianType)) => Boolean = {
         case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
             if (np1.permission == Inferred()) {
                 np1.withTypeState(np2.permission) == np2
             } else if (np2.permission == Inferred()) {
                 np2.withTypeState(np1.permission) == np1
             } else {
-                np1 == np2
+                isSubtype(table, np1, np2, false).isEmpty
             }
         case (c1Arg, c2Arg) => c1Arg == c2Arg
     }
@@ -304,11 +304,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     val interfaceMatches = obs1.bound.contractName == obs2.name
 
                     val subsParams = obs1.bound.substitute(obs1.params, c1.typeArgs).typeArgs
-                    val argChecks = subsParams.zip(c2.typeArgs).forall(checkArgCompat)
+                    val argChecks = subsParams.zip(c2.typeArgs).forall(checkArgCompat(table))
 
                     interfaceMatches && argChecks
                 } else {
-                   obs1 == obs2 && c1.typeArgs.zip(c2.typeArgs).forall(checkArgCompat)
+                   obs1 == obs2 && c1.typeArgs.zip(c2.typeArgs).forall(checkArgCompat(table))
                 }
             case (jvcon1: JavaFFIContractImpl, jvcon2: JavaFFIContractImpl) => jvcon1 == jvcon2
             case (obs: ObsidianContractImpl, jvcon: JavaFFIContractImpl) => false
@@ -1403,8 +1403,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-    def contractTypeCompat(ct1: ContractType, ct2: ContractType): Boolean =
-        ct1.contractName == ct2.contractName && ct1.typeArgs.zip(ct2.typeArgs).forall(checkArgCompat)
+    def contractTypeCompat(table: ContractTable, ct1: ContractType, ct2: ContractType): Boolean =
+        ct1.contractName == ct2.contractName && ct1.typeArgs.zip(ct2.typeArgs).forall(checkArgCompat(table))
 
     private def checkStatement(
                                   decl: InvokableDeclaration,
@@ -1463,7 +1463,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
 
                     // This should be just on the contract name/params, since assignment is allowed to change permission
-                    if (!contractTypeCompat(exprNPType.contractType, variableNPType.contractType)) {
+                    if (!contractTypeCompat(context.contractTable, exprNPType.contractType, variableNPType.contractType)) {
                         logError(s, InconsistentContractTypeError(variableNPType.contractType, exprNPType.contractType))
                         contextWithAssignmentUpdate
                     }
@@ -1502,7 +1502,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val declaredType = typ match {
                     case np: NonPrimitiveType =>
                         val declaredContractName = np.contractName
-
                         val tableLookup = context.contractTable.lookupContract(declaredContractName)
 
                         val resolvedType = tableLookup match {
