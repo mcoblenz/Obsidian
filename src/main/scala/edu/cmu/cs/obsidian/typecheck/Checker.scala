@@ -1598,11 +1598,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     }
 
                 checkForUnusedOwnershipErrors(s, contextPrime, thisSetToExclude ++ argsSetToExclude)
-                checkFieldTypeConsistencyAfterTransaction(context, decl, s)
+                checkFieldTypeConsistencyAfterTransaction(contextPrime, decl, s)
 
 
                 if (retTypeOpt.isDefined && !retTypeOpt.get.isBottom) {
-                    checkIsSubtype(context.contractTable, s, typ, retTypeOpt.get)
+                    checkIsSubtype(contextPrime.contractTable, s, typ, retTypeOpt.get)
                 }
                 (contextPrime, ReturnExpr(ePrime))
 
@@ -2443,7 +2443,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         // Check to make sure all the field types are consistent with their declarations.
-        checkFieldTypeConsistencyAfterTransaction(outputContext, tx, tx.bodyEnd)
+        // But don't bother checking if the body is guaranteed to return, in which case this check was already done.
+        if (!hasReturnStatementDontLog(tx.body)) {
+            checkFieldTypeConsistencyAfterTransaction(outputContext, tx, tx.bodyEnd)
+        }
 
         // todo: check that every declared variable is initialized before use
         tx.copy(body = newStatements)
