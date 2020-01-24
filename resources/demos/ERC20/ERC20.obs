@@ -154,40 +154,20 @@ main asset contract ExampleTokenBank implements ERC20 {
     // This requires that an allowance have been set up in advance and that fromAddress has enough tokens.
     transaction transferFrom(int senderAddress, int fromAddress, int toAddress, int value) returns bool 
     {
-        Option[Dict[Integer, Integer]@(Empty | HasNext)] senderAllowancesOption = allowed.remove(new Integer(senderAddress));
-        switch(senderAllowancesOption) {
-            case None {
+        int allowance = allowance(senderAddress, fromAddress);
+        if (allowance >= value) {
+            int newAllowance = allowance - value;
+            bool transferSucceeded = transfer(fromAddress, toAddress, value);
+            if (!transferSucceeded) {
+                // Perhaps not enough tokens were available to transfer.
                 return false;
             }
-            case Some {
-                Dict[Integer, Integer@Owned] senderAllowances = senderAllowancesOption.unpack();
-                Option[Integer@Unowned] fromAddressAllowance = senderAllowances.remove(new Integer(fromAddress));
-                if (fromAddressAllowance in None) {
-                    Option[Dict[Integer, Integer]@(Empty | HasNext)] nothing = allowed.replace(new Integer(senderAddress), senderAllowances);
-                    disown nothing;
-                    return false;
-                }
-                else {
-                    int allowance = fromAddressAllowance.unpack().getValue();
-                    if (allowance >= value) {
-                        int newAllowance = allowance - value;
-                        transfer(fromAddress, toAddress, value);
-                        Option[Integer] nothing = senderAllowances.replace(new Integer(fromAddress), new Integer(newAllowance));
-                        disown nothing;
-                        Option[Dict[Integer, Integer]@(Empty | HasNext)] nothing2 = allowed.replace(new Integer(senderAddress), senderAllowances);
-                        disown nothing2;
-                        return true;
-                    }
-                    else {
-                        Option[Dict[Integer, Integer]@(Empty | HasNext)] nothing2 = allowed.replace(new Integer(senderAddress), senderAllowances);
-                        disown nothing2;
+            approve(senderAddress, fromAddress, newAllowance);
 
-                        return false;
-                    }
-                }
-            }
+            return true;
+        }
+        else {
+            return false;
         }
     }
-
-
 }
