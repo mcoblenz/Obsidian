@@ -21,16 +21,13 @@ contract Option[asset T@s] {
     }
 }
 
-
-
-
-main contract Dict[KeyType, asset ValueType] {    
+main contract Dict[KeyType, asset ValueType@s where s is Owned] {    
     state Empty;
     asset state HasNext;
 
-    Dict[KeyType, ValueType]@(Empty | HasNext) next available in HasNext;
+    Dict[KeyType, ValueType@s]@(Empty | HasNext) next available in HasNext;
     KeyType@Unowned key available in HasNext, PrivateHasKeyAndValue;
-    ValueType@Owned value available in HasNext, PrivateHasKeyAndValue, PrivateHasValue;
+    ValueType@s value available in HasNext, PrivateHasKeyAndValue, PrivateHasValue;
 
     Comparator[KeyType]@Unowned comparator;
 
@@ -45,35 +42,35 @@ main contract Dict[KeyType, asset ValueType] {
     // Puts the given key/value pair into the dictionary.
     // If the key was already in the dictionary, returns an Option containing the old value.
     // Otherwise, returns None.
-    transaction replace(Dict@(Empty | HasNext) this, KeyType@Unowned _key, ValueType@Owned >> Unowned _value) returns Option[ValueType@Owned]@Owned {
+    transaction replace(Dict@(Empty | HasNext) this, KeyType@Unowned _key, ValueType@s >> Unowned _value) returns Option[ValueType@s]@Owned {
         switch this {
             case HasNext {
                 if (comparator.equals(key, _key)) {
                     ValueType oldValue = value;
                     value = _value;
-                    return new Option[ValueType@Owned](oldValue);
+                    return new Option[ValueType@s](oldValue);
                 }
                 else {
                     return next.replace(_key, _value);
                 }
             }
             case Empty {
-                ->HasNext(key = _key, value = _value, next = new Dict[KeyType, ValueType](comparator));
-                return new Option[ValueType@Owned]();
+                ->HasNext(key = _key, value = _value, next = new Dict[KeyType, ValueType@s](comparator));
+                return new Option[ValueType@s]();
             }
         }
     }
 
 
     // Attempts to remove the key/value pair for the given key, returning the value. If the key is not found, returns None.
-    transaction remove(Dict@(Empty | HasNext) this, KeyType@Unowned _key) returns Option[ValueType@Owned]@Owned {
+    transaction remove(Dict@(Empty | HasNext) this, KeyType@Unowned _key) returns Option[ValueType@s]@Owned {
         switch this {
             case HasNext {
                 if (comparator.equals(key, _key)) {
                     
                     ValueType oldValue = value;
                     if (next in HasNext) {
-                        Dict[KeyType, ValueType] newNext = next.extractNext();
+                        Dict[KeyType, ValueType@s] newNext = next.extractNext();
                         KeyType newKey = next.extractKey();
                         ValueType newValue = next.extractValue();
                         // next is now Empty, so we can discard it implicitly.
@@ -85,7 +82,7 @@ main contract Dict[KeyType, asset ValueType] {
                         ->Empty;
                     }
                     
-                    return new Option[ValueType@Owned](oldValue);
+                    return new Option[ValueType@s](oldValue);
 
                 }
                 else {
@@ -93,13 +90,13 @@ main contract Dict[KeyType, asset ValueType] {
                 }
             }
             case Empty {
-                return new Option[ValueType@Owned]();
+                return new Option[ValueType@s]();
             }
         }
     }
 
     private transaction extractNext(Dict@HasNext >> PrivateHasKeyAndValue this) returns Dict@(HasNext | Empty) {
-        Dict[KeyType, ValueType] result = next;
+        Dict[KeyType, ValueType@s] result = next;
         ->PrivateHasKeyAndValue;
         return result;
     }
@@ -110,13 +107,13 @@ main contract Dict[KeyType, asset ValueType] {
         return result;
     }
 
-    private transaction extractValue(Dict@PrivateHasValue >> Empty this) returns ValueType@Owned {
+    private transaction extractValue(Dict@PrivateHasValue >> Empty this) returns ValueType@s {
         ValueType result = value;
         ->Empty;
         return result;
     }
     
-    transaction peek (Dict@(Empty | HasNext) this, KeyType@Unowned _key) returns Option[ValueType@Unowned]@Owned {
+    transaction peek (Dict@Unowned this, KeyType@Unowned _key) returns Option[ValueType@Unowned]@Owned {
          switch this {
             case HasNext {
                 if (comparator.equals(key, _key)) {
@@ -129,25 +126,13 @@ main contract Dict[KeyType, asset ValueType] {
             case Empty {
                 return new Option[ValueType@Unowned]();
             }
-        }
-    }
-
-/*
-    transaction find(Dict@Unowned this, int ownerAddress) returns T@Unowned {
-        switch this {
-            case HasNext {
-                if (value.getOwnerAddress() == ownerAddress) {
-                    return value;
-                }
-                else {
-                    return next.find(obj);
-                }
+            // These additional cases are here so that peek can be called with unowned references.
+            case PrivateHasValue {
+                revert "Do not call peek on inconsistent dictionaries.";
             }
-            case Empty {
-                revert "Can't find the given item.";
+            case PrivateHasKeyAndValue {
+                revert "Do not call peek on inconsistent dictionaries.";
             }
         }
     }
-    */
-
 }

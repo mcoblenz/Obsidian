@@ -13,7 +13,7 @@ main contract Integer {
 }
 
 
-contract IntComparator implements Comparator[Integer] {
+contract IntegerComparator implements Comparator[Integer] {
     transaction equals(Integer@Unowned a, Integer@Unowned b) returns bool {
         return a.getValue() == b.getValue();
     }
