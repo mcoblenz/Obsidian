@@ -1109,7 +1109,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             newContext = newContext.updated(x, t)
         }
 
-        checkForUnusedOwnershipErrors(ast, branchContext, oldContext.keys.toSet)
+        // Anything we threw out (relative to the branch context) needs to be checked for non-disposable references.
+        val discardedVariables = branchContext.keys.toSet -- newContext.keys.toSet
+        for (discardedVariable <- discardedVariables) {
+            errorIfNotDisposable(discardedVariable, branchContext.get(discardedVariable).get, branchContext, ast)
+        }
 
         Context(oldContext.contractTable,
             newContext.underlyingVariableMap,
@@ -1131,21 +1135,20 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    // If a context exits, then allow discrepancies between variables, and take the version from the OTHER context.
+    // If both contexts exit, and there is a discrepancy, just use the version from context 1, since the code below will be unreachable anyway.
     private def mergeContext(
             ast: AST,
             context1: Context,
-            context2: Context): Context = {
+            context2: Context,
+            context1Exits: Boolean,
+            context2Exits: Boolean): Context = {
         /* If we're merging with a context from a "throw", just take the other context
         * emit no errors */
         assert(context1.contractTable == context2.contractTable)
 
-        if (context1.isThrown && !context2.isThrown) return context2
-        if (!context1.isThrown && context2.isThrown) return context1
-
         def mergeMaps(map1: Map[String, ObsidianType],
                       map2: Map[String, ObsidianType],
-                      context1IsThrown: Boolean,
-                      context2IsThrown: Boolean,
                       dropDisposableReferences: Boolean): Map[String, ObsidianType] = {
             var mergedMap = new TreeMap[String, ObsidianType]()
 
@@ -1157,15 +1160,23 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 mergeTypes(t1, t2, context1.contractTable) match {
                     case Some(u) => mergedMap = mergedMap.updated(x, u)
                     case None =>
-                        mergedMap = mergedMap.updated(x, BottomType())
-                        if (!t1.isBottom && !t2.isBottom) {
+                        if (context2Exits) {
+                            mergedMap = mergedMap.updated(x, t1)
+                        }
+                        else if (context1Exits) {
+                            mergedMap = mergedMap.updated(x, t2)
+                        }
+                        else if (context1Exits && context2Exits) {
+                            mergedMap = mergedMap.updated(x, t1)
+                        }
+                        else if (!t1.isBottom && !t2.isBottom) {
                             logError(ast, MergeIncompatibleError(x, t1, t2))
                         }
                 }
             }
 
             // Make sure anything that is not in both is disposable (if disposing of them is allowed; otherwise error).
-            if (!context1IsThrown) {
+            if (!context1Exits) {
                 val inOnlyContext1 = map1.keys.toSet -- inBoth
 
                 if (dropDisposableReferences) {
@@ -1175,7 +1186,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     inOnlyContext1.foreach((x: String) => logError(ast, FieldTypesIncompatibleAcrossBranches(x, map1(x), "true")))
                 }
             }
-            if (!context2IsThrown) {
+            if (!context2Exits) {
                 val inOnlyContext2 = map2.keys.toSet -- inBoth
 
                 if (dropDisposableReferences) {
@@ -1192,8 +1203,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         val packedContext1 = packFieldTypes(context1)
         val packedContext2 = packFieldTypes(context2)
 
-        val mergedVariableMap = mergeMaps(packedContext1.underlyingVariableMap, packedContext2.underlyingVariableMap, packedContext2.isThrown, context2.isThrown, true)
-        val mergedThisFieldMap = mergeMaps(packedContext1.thisFieldTypes, packedContext2.thisFieldTypes, packedContext2.isThrown, context2.isThrown, false)
+        val mergedVariableMap = mergeMaps(packedContext1.underlyingVariableMap, packedContext2.underlyingVariableMap, true)
+        val mergedThisFieldMap = mergeMaps(packedContext1.thisFieldTypes, packedContext2.thisFieldTypes, false)
 
         // This is an intersect operation that only depends on the state and field names, not on the ASTs.
         def mergeTransitionFieldsInitialized(fields1: Set[(String, String, AST)], fields2: Set[(String, String, AST)]) : Set[(String, String, AST)] = {
@@ -1209,12 +1220,19 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             resultingFields
         }
 
+        val mergedLocalFieldsInitialized = (context1Exits, context2Exits) match {
+            case (false, false) => packedContext1.localFieldsInitialized.intersect(packedContext2.localFieldsInitialized)
+            case (true, false) => packedContext2.localFieldsInitialized
+            case (false, true) => packedContext1.localFieldsInitialized
+            case (true, true) => packedContext1.localFieldsInitialized.intersect(packedContext2.localFieldsInitialized) // not sure what's right here
+        }
+
         Context(context1.contractTable,
             mergedVariableMap,
             packedContext1.isThrown,
             mergeTransitionFieldsInitialized(packedContext1.transitionFieldsDefinitelyInitialized, packedContext2.transitionFieldsDefinitelyInitialized),
             packedContext1.transitionFieldsMaybeInitialized.union(packedContext2.transitionFieldsMaybeInitialized),
-            packedContext1.localFieldsInitialized.intersect(packedContext2.localFieldsInitialized),
+            mergedLocalFieldsInitialized,
             mergedThisFieldMap,
             packedContext1.valVariables.intersect(packedContext2.valVariables))
     }
@@ -1861,35 +1879,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 checkIsSubtype(contextPrime.contractTable, s, t, BoolType())
                 val (newContext, checkedStatements) = checkStatementSequence(decl, contextPrime, body)
                 val newIf = If(ePrime, checkedStatements).setLoc(s)
-                if (hasReturnStatementDontLog(body)) {
-                    // The body definitely returns, so the body has no impact
-                    // on the context following this if. Put another way:
+                val contextIfTrue = pruneContext(s, newContext, contextPrime)
+                (mergeContext(s, contextPrime, contextIfTrue, false, hasReturnStatementDontLog(body) || contextIfTrue.isThrown), newIf)
 
-                    /*
-                    if (e) {
-                        return;
-                    }
-                    s
-
-                    is equivalent to:
-
-                    if (e) {
-                        return;
-                    }
-                    else {
-                        // check s in the same context as the body of the if
-                        s
-                    }
-
-                    */
-                    (contextPrime, newIf)
-                }
-                else {
-                    val contextIfTrue = pruneContext(s,
-                        newContext,
-                        contextPrime)
-                    (mergeContext(s, contextPrime, contextIfTrue), newIf)
-                }
             case IfThenElse(eCond: Expression, body1: Seq[Statement], body2: Seq[Statement]) =>
                 val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, eCond, NoOwnershipConsumption())
                 checkIsSubtype(contextPrime.contractTable, s, t, BoolType())
@@ -1906,27 +1898,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val newIf = IfThenElse(ePrime, checkedTrueStatements, checkedFalseStatements).setLoc(s)
 
-                val trueBranchReturns = hasReturnStatementDontLog(body1)
-                val falseBranchReturns = hasReturnStatementDontLog(body2)
+                val trueBranchExits = hasReturnStatementDontLog(body1) || contextIfTrue.isThrown
+                val falseBranchExits = hasReturnStatementDontLog(body2) || contextIfFalse.isThrown
 
-                if (trueBranchReturns && falseBranchReturns) {
-                    // If they both return, then the two bodies have no impact on the context afterward.
-                    (contextPrime, newIf)
-                }
-                else if (trueBranchReturns) {
-                    // The true branch returns, so its context changes are irrelevant
-                    (contextIfFalse, newIf)
-                }
-                else if (falseBranchReturns) {
-                    // The false branch returns, so its context changes are irrelevant
-                    (contextIfTrue, newIf)
-                }
-                else {
-                    (mergeContext(s, contextIfTrue, contextIfFalse), newIf)
-                }
+                (mergeContext(s, contextIfTrue, contextIfFalse, trueBranchExits, falseBranchExits), newIf)
 
             case IfInState(e, ePerm, state, body1, body2) =>
-
                 val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
 
                 val contractName = t match {
@@ -2084,39 +2061,21 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 val newStatement = IfInState(ePrime, ePermPrime, state, checkedTrueStatements, checkedFalseStatements).setLoc(s)
 
-                // Throw out (prune) any variables that were local to the branches.
-                val contextIfTrue = pruneContext(s,
-                    resetTrueContext,
-                    contextForCheckingTrueBranch)
-
-                val contextIfFalse = pruneContext(s,
-                    resetFalseContext,
-                    contextPrime)
-
                 val trueBranchReturns = hasReturnStatementDontLog(body1)
                 val falseBranchReturns = hasReturnStatementDontLog(body2)
 
-                if (trueBranchReturns && falseBranchReturns) {
-                    // If they both return, then the two bodies have no impact on the context afterward.
-                    (contextPrime, newStatement)
-                }
-                else if (trueBranchReturns) {
-                    // The true branch returns, so its context changes are irrelevant
-                    (contextIfFalse, newStatement)
-                }
-                else if (falseBranchReturns) {
-                    // The false branch returns, so its context changes are irrelevant
-                    (contextIfTrue, newStatement)
-                }
-                else {
-                    val mergedContext = mergeContext(s, contextIfTrue, contextIfFalse)
-                    val finalContext = valVariableToClear match {
-                        case None => mergedContext
-                        case Some(x) => mergedContext.updatedClearingValVariable(x)
-                    }
+                // Throw out (prune) any variables that were local to the branches.
+                val contextIfTrue = pruneContext(s, resetTrueContext, contextForCheckingTrueBranch)
+                val contextIfFalse = pruneContext(s, resetFalseContext, contextPrime)
 
-                    (finalContext, newStatement)
+                val mergedContext = mergeContext(s, contextIfTrue, contextIfFalse, trueBranchReturns, falseBranchReturns)
+                val finalContext = valVariableToClear match {
+                    case None => mergedContext
+                    case Some(x) => mergedContext.updatedClearingValVariable(x)
                 }
+
+                (finalContext, newStatement)
+
             case TryCatch(s1: Seq[Statement], s2: Seq[Statement]) =>
                 val (tryContext, checkedTryStatements) = checkStatementSequence(decl, context, s1)
                 val (catchContext, checkedCatchStatements) = checkStatementSequence(decl, context, s2)
@@ -2128,7 +2087,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val contextIfCatch = pruneContext(s,
                     catchContext,
                     context)
-                (mergeContext(s, contextIfTry, contextIfCatch), TryCatch(checkedTryStatements, checkedCatchStatements).setLoc(s))
+                (mergeContext(s, contextIfTry, contextIfCatch,
+                    hasReturnStatementDontLog(s1) || tryContext.isThrown,
+                    hasReturnStatementDontLog(s2) || catchContext.isThrown),
+                    TryCatch(checkedTryStatements, checkedCatchStatements).setLoc(s))
 
             case Switch(e: Expression, cases: Seq[SwitchCase]) =>
                 val (t, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, NoOwnershipConsumption())
@@ -2197,10 +2159,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val restCases = cases.tail
                         restCases.foldLeft((initialContextToMerge, Seq(newCase)))((prev: (Context, Seq[SwitchCase]), sc: SwitchCase) => {
                             val (newContext, newCase) = checkSwitchCase(sc)
-                            if (hasReturnStatementDontLog(sc.body))
-                                (prev._1, newCase +: prev._2)
-                            else
-                                (mergeContext(s, prev._1, newContext), newCase +: prev._2)
+                            val caseExits = hasReturnStatementDontLog(sc.body) || newContext.isThrown
+                            (mergeContext(s, prev._1, newContext, false, caseExits), newCase +: prev._2)
                         })
                 }
 
