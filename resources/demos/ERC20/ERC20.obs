@@ -53,7 +53,9 @@ asset interface ERC20 {
 main asset contract ExampleTokenBank implements ERC20 {
     int totalSupply;
     Dict[Integer, ExampleToken]@(Empty | HasNext) balances;
-    Dict[Integer, Dict[Integer, Integer]@(Empty | HasNext)]@(Empty | HasNext) allowed; // map from fromAddress to (map from spender to amount)
+
+    // map from fromAddress to (map from spender to amount)
+    Dict[Integer, Dict[Integer, Integer]@(Empty | HasNext)]@(Empty | HasNext) allowed; 
 
     ExampleTokenBank@Owned() {
         totalSupply = 0;
@@ -77,11 +79,11 @@ main asset contract ExampleTokenBank implements ERC20 {
 
     transaction transfer(int fromAddress, int toAddress, int value) returns bool {
         Integer fromIntegerAddress = new Integer(fromAddress);
-            Option[ExampleToken@Owned] fromBalance = balances.remove(fromIntegerAddress);
-            if (fromBalance in None) {
-                return false;
-            }
-            else {
+        Option[ExampleToken@Owned] fromBalance = balances.remove(fromIntegerAddress);
+        if (fromBalance in None) {
+            return false;
+        }
+        else {
             ExampleToken fromTokens = fromBalance.unpack();
             if (value <= fromTokens.getValue()) {
                 Option[ExampleToken@Owned] toBalance = balances.remove(fromIntegerAddress);
@@ -110,7 +112,7 @@ main asset contract ExampleTokenBank implements ERC20 {
                 disown emptyFromTokens;
                 return false;
             }
-         }
+        }
     }
 
     // Records a new allowance. Replaces any previous allowance.
