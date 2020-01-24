@@ -2112,14 +2112,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 def checkSwitchCase(sc: SwitchCase) : (Context, SwitchCase) = {
-                    val newType: ObsidianType =
-                        contractTable.state(sc.stateName) match {
-                            case Some(stTable) =>
-                                StateType(contractTable.contractType, stTable.name, NotRemoteReferenceType())
-                            case None =>
-                                logError(sc, StateUndefinedError(contractTable.name, sc.stateName))
-                                ContractReferenceType(contractTable.contractType, Owned(), NotRemoteReferenceType())
-                        }
+                    val newType: ObsidianType = t.withTypeState(States(Set(sc.stateName)))
 
                     /* special case to allow types to change in the context if we match on a variable */
                     val startContext = e match {
