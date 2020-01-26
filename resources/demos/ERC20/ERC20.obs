@@ -86,7 +86,8 @@ main asset contract ExampleTokenBank implements ERC20 {
         else {
             ExampleToken fromTokens = fromBalance.unpack();
             if (value <= fromTokens.getValue()) {
-                Option[ExampleToken@Owned] toBalance = balances.remove(fromIntegerAddress);
+                Integer toIntegerAddress = new Integer(toAddress);
+                Option[ExampleToken@Owned] toBalance = balances.remove(toIntegerAddress);
                 ExampleToken toTokens;
                 if (toBalance in Some) {
                     toTokens = toBalance.unpack();
@@ -97,19 +98,14 @@ main asset contract ExampleTokenBank implements ERC20 {
 
                 ExampleToken tokensToMove = fromTokens.split(value);
                 toTokens.merge(tokensToMove);
-                Option[ExampleToken] emptyToTokens = balances.replace(new Integer(toAddress), toTokens);
-                Option[ExampleToken] emptyFromTokens = balances.replace(fromIntegerAddress, fromTokens); // Must be None because we just removed it.
-
-                // These must be None (and are therefore not assets), but the compiler can't know this.
-                disown emptyToTokens;
-                disown emptyFromTokens;
+                balances.insert(toIntegerAddress, toTokens); // OK because we just removed it.
+                balances.insert(fromIntegerAddress, fromTokens); // OK because we just removed it.
 
                 return true;
             }
             else {
-                Option[ExampleToken] emptyFromTokens = balances.replace(fromIntegerAddress, fromTokens); // Must be None because we just removed it.
-                [fromTokens@Unowned];
-                disown emptyFromTokens;
+                // Insufficient funds available.
+                balances.insert(fromIntegerAddress, fromTokens); // // OK because we just removed it.
                 return false;
             }
         }
@@ -117,7 +113,8 @@ main asset contract ExampleTokenBank implements ERC20 {
 
     // Records a new allowance. Replaces any previous allowance.
     transaction approve(int ownerAddress, int fromAddress, int value) returns bool {
-        Option[Dict[Integer, Integer]@Owned] ownerAllowancesOption = allowed.remove(new Integer(ownerAddress));
+        Integer ownerAddressInteger = new Integer(ownerAddress);
+        Option[Dict[Integer, Integer]@Owned] ownerAllowancesOption = allowed.remove(ownerAddressInteger);
 
         Dict[Integer, Integer] ownerAllowances;
         if (ownerAllowancesOption in None) {
@@ -127,9 +124,9 @@ main asset contract ExampleTokenBank implements ERC20 {
             ownerAllowances = ownerAllowancesOption.unpack();
         }
 
-        Option[Integer@Owned] oldDict = ownerAllowances.replace(new Integer(fromAddress), new Integer(value));
-        disown ownerAllowances;
-        disown oldDict; // Options are assets because they CAN hold assets, but this one doesn't happen to do so.
+        Option[Integer@Owned] oldAllowance = ownerAllowances.replace(new Integer(fromAddress), new Integer(value));
+        allowed.insert(ownerAddressInteger, ownerAllowances);
+        disown oldAllowance; // Options are assets because they CAN hold assets, but this one doesn't happen to do so.
         return true;
     }
 
