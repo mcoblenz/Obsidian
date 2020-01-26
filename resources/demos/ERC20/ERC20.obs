@@ -52,15 +52,15 @@ asset interface ERC20 {
 
 main asset contract ExampleTokenBank implements ERC20 {
     int totalSupply;
-    Dict[Integer, ExampleToken]@(Empty | HasNext) balances;
+    Dict[Integer, ExampleToken]@Owned balances;
 
     // map from fromAddress to (map from spender to amount)
-    Dict[Integer, Dict[Integer, Integer]@(Empty | HasNext)]@(Empty | HasNext) allowed; 
+    Dict[Integer, Dict[Integer, Integer]@Owned]@Owned allowed; 
 
     ExampleTokenBank@Owned() {
         totalSupply = 0;
         balances = new Dict[Integer, ExampleToken@Owned](new IntegerComparator());
-        allowed = new Dict[Integer, Dict[Integer, Integer]@(Empty | HasNext)](new IntegerComparator());
+        allowed = new Dict[Integer, Dict[Integer, Integer]@Owned](new IntegerComparator());
     }
 
     transaction totalSupply() returns int {
@@ -117,7 +117,7 @@ main asset contract ExampleTokenBank implements ERC20 {
 
     // Records a new allowance. Replaces any previous allowance.
     transaction approve(int ownerAddress, int fromAddress, int value) returns bool {
-        Option[Dict[Integer, Integer]@(Empty | HasNext)] ownerAllowancesOption = allowed.remove(new Integer(ownerAddress));
+        Option[Dict[Integer, Integer]@Owned] ownerAllowancesOption = allowed.remove(new Integer(ownerAddress));
 
         Dict[Integer, Integer] ownerAllowances;
         if (ownerAllowancesOption in None) {

@@ -21,11 +21,38 @@ contract Option[asset T@s] {
     }
 }
 
-main contract Dict[KeyType, asset ValueType@s where s is Owned] {    
+main asset contract Dict[KeyType, asset ValueType@s where s is Owned] {
+    DictImpl[KeyType, ValueType@s]@(Empty | HasNext) dictImpl;
+
+    Dict@Owned(Comparator@Unowned _comparator) {
+        dictImpl = new DictImpl[KeyType, ValueType@s](_comparator);
+    }
+
+    transaction replace(Dict@Unowned this, KeyType@Unowned _key, ValueType@s >> Unowned _value) returns Option[ValueType@s]@Owned {
+        return dictImpl.replace(_key, _value);
+    }
+
+    transaction remove(Dict@Unowned this, KeyType@Unowned _key) returns Option[ValueType@s]@Owned {
+        return dictImpl.remove(_key);
+    }
+
+    transaction peek(Dict@Unowned this, KeyType@Unowned _key) returns Option[ValueType@Unowned]@Owned {
+        return dictImpl.peek(_key);
+    }
+
+    transaction insert(Dict@Unowned this, KeyType@Unowned _key, ValueType@s >> Unowned _value) {
+        Option[ValueType@s] existingValue = replace(_key, _value);
+        if (existingValue in Some) {
+            revert ("insert operation is only permitted when there is no existing value for the given key.");
+        }
+    }
+}
+
+contract DictImpl[KeyType, asset ValueType@s where s is Owned] {    
     state Empty;
     asset state HasNext;
 
-    Dict[KeyType, ValueType@s]@(Empty | HasNext) next available in HasNext;
+    DictImpl[KeyType, ValueType@s]@(Empty | HasNext) next available in HasNext;
     KeyType@Unowned key available in HasNext, PrivateHasKeyAndValue;
     ValueType@s value available in HasNext, PrivateHasKeyAndValue, PrivateHasValue;
 
@@ -34,15 +61,15 @@ main contract Dict[KeyType, asset ValueType@s where s is Owned] {
     asset state PrivateHasKeyAndValue;
     asset state PrivateHasValue;
 
-    Dict@Empty(Comparator@Unowned _comparator) {
+    DictImpl@Empty(Comparator@Unowned _comparator) {
         comparator = _comparator;
         ->Empty;
     }
 
-    // Puts the given key/value pair into the dictionary.
-    // If the key was already in the dictionary, returns an Option containing the old value.
+    // Puts the given key/value pair into the DictImplionary.
+    // If the key was already in the DictImplionary, returns an Option containing the old value.
     // Otherwise, returns None.
-    transaction replace(Dict@(Empty | HasNext) this, KeyType@Unowned _key, ValueType@s >> Unowned _value) returns Option[ValueType@s]@Owned {
+    transaction replace(DictImpl@(Empty | HasNext) this, KeyType@Unowned _key, ValueType@s >> Unowned _value) returns Option[ValueType@s]@Owned {
         switch this {
             case HasNext {
                 if (comparator.equals(key, _key)) {
@@ -55,7 +82,7 @@ main contract Dict[KeyType, asset ValueType@s where s is Owned] {
                 }
             }
             case Empty {
-                ->HasNext(key = _key, value = _value, next = new Dict[KeyType, ValueType@s](comparator));
+                ->HasNext(key = _key, value = _value, next = new DictImpl[KeyType, ValueType@s](comparator));
                 return new Option[ValueType@s]();
             }
         }
@@ -63,14 +90,14 @@ main contract Dict[KeyType, asset ValueType@s where s is Owned] {
 
 
     // Attempts to remove the key/value pair for the given key, returning the value. If the key is not found, returns None.
-    transaction remove(Dict@(Empty | HasNext) this, KeyType@Unowned _key) returns Option[ValueType@s]@Owned {
+    transaction remove(DictImpl@(Empty | HasNext) this, KeyType@Unowned _key) returns Option[ValueType@s]@Owned {
         switch this {
             case HasNext {
                 if (comparator.equals(key, _key)) {
                     
                     ValueType oldValue = value;
                     if (next in HasNext) {
-                        Dict[KeyType, ValueType@s] newNext = next.extractNext();
+                        DictImpl[KeyType, ValueType@s] newNext = next.extractNext();
                         KeyType newKey = next.extractKey();
                         ValueType newValue = next.extractValue();
                         // next is now Empty, so we can discard it implicitly.
@@ -95,25 +122,25 @@ main contract Dict[KeyType, asset ValueType@s where s is Owned] {
         }
     }
 
-    private transaction extractNext(Dict@HasNext >> PrivateHasKeyAndValue this) returns Dict@(HasNext | Empty) {
-        Dict[KeyType, ValueType@s] result = next;
+    private transaction extractNext(DictImpl@HasNext >> PrivateHasKeyAndValue this) returns DictImpl@(HasNext | Empty) {
+        DictImpl[KeyType, ValueType@s] result = next;
         ->PrivateHasKeyAndValue;
         return result;
     }
 
-    private transaction extractKey(Dict@PrivateHasKeyAndValue >> PrivateHasValue this) returns KeyType@Unowned {
+    private transaction extractKey(DictImpl@PrivateHasKeyAndValue >> PrivateHasValue this) returns KeyType@Unowned {
         KeyType result = key;
         ->PrivateHasValue;
         return result;
     }
 
-    private transaction extractValue(Dict@PrivateHasValue >> Empty this) returns ValueType@s {
+    private transaction extractValue(DictImpl@PrivateHasValue >> Empty this) returns ValueType@s {
         ValueType result = value;
         ->Empty;
         return result;
     }
     
-    transaction peek (Dict@Unowned this, KeyType@Unowned _key) returns Option[ValueType@Unowned]@Owned {
+    transaction peek(DictImpl@Unowned this, KeyType@Unowned _key) returns Option[ValueType@Unowned]@Owned {
          switch this {
             case HasNext {
                 if (comparator.equals(key, _key)) {
@@ -128,10 +155,10 @@ main contract Dict[KeyType, asset ValueType@s where s is Owned] {
             }
             // These additional cases are here so that peek can be called with unowned references.
             case PrivateHasValue {
-                revert "Do not call peek on inconsistent dictionaries.";
+                revert "Do not call peek on inconsistent DictImplionaries.";
             }
             case PrivateHasKeyAndValue {
-                revert "Do not call peek on inconsistent dictionaries.";
+                revert "Do not call peek on inconsistent DictImplionaries.";
             }
         }
     }
