@@ -1157,21 +1157,22 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             for (x <- inBoth) {
                 val t1 = map1(x)
                 val t2 = map2(x)
-                mergeTypes(t1, t2, context1.contractTable) match {
+                if (context2Exits) {
+                    mergedMap = mergedMap.updated(x, t1)
+                }
+                else if (context1Exits) {
+                    mergedMap = mergedMap.updated(x, t2)
+                }
+                else if (context1Exits && context2Exits) {
+                    mergedMap = mergedMap.updated(x, t1)
+                }
+                else mergeTypes(t1, t2, context1.contractTable) match {
                     case Some(u) => mergedMap = mergedMap.updated(x, u)
                     case None =>
-                        if (context2Exits) {
-                            mergedMap = mergedMap.updated(x, t1)
-                        }
-                        else if (context1Exits) {
-                            mergedMap = mergedMap.updated(x, t2)
-                        }
-                        else if (context1Exits && context2Exits) {
-                            mergedMap = mergedMap.updated(x, t1)
-                        }
-                        else if (!t1.isBottom && !t2.isBottom) {
+                        if (!t1.isBottom && !t2.isBottom) {
                             logError(ast, MergeIncompatibleError(x, t1, t2))
                         }
+                        // Otherwise, one is BottomType, so we can ignore the failure to merge for now.
                 }
             }
 
@@ -2068,7 +2069,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val contextIfTrue = pruneContext(s, resetTrueContext, contextForCheckingTrueBranch)
                 val contextIfFalse = pruneContext(s, resetFalseContext, contextPrime)
 
-                val mergedContext = mergeContext(s, contextIfTrue, contextIfFalse, trueBranchReturns, falseBranchReturns)
+                val mergedContext = mergeContext(s,
+                    contextIfTrue,
+                    contextIfFalse,
+                    trueBranchReturns || trueContext.isThrown,
+                    falseBranchReturns || falseContext.isThrown)
                 val finalContext = valVariableToClear match {
                     case None => mergedContext
                     case Some(x) => mergedContext.updatedClearingValVariable(x)
