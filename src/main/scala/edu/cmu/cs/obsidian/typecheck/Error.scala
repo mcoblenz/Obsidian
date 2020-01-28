@@ -457,7 +457,7 @@ case class PermissionCheckRedundant(actualPerm: Permission, testPermission: Perm
 
 case class AssetStateImplError(implState: State, interfaceState: State) extends Error {
     override val msg: String =
-        s"State ${implState.name} is an asset state but it implements a state which is not an asset state."
+        s"State ${implState.name} is an asset state but it implements a state that is not an asset state."
 }
 
 case class BadFFIInterfaceBoundError(name: String) extends Error {
@@ -478,4 +478,12 @@ case class StateInitializerUninitialized(stateName: String, fieldName: String) e
     override val msg: String = s"$stateName::$fieldName has not been initialized. Perhaps you are " +
         s"trying to use a field initializer for general-purpose field access instead of only for " +
         s"preparing for a transition."
+}
+
+case class DuplicateArgName(argName: String) extends Error {
+    override val msg: String = s"All argument names must be different from each other, but '$argName' occurs more than once."
+}
+
+case class FieldsNotAllowedInInterfaces(fieldName: String, interfaceName: String) extends Error {
+    override val msg: String = s"Field '$fieldName' cannot be defined on interface '$interfaceName' because interfaces cannot define fields."
 }

@@ -44,7 +44,7 @@ asset interface ERC20 {
     transaction approve(int ownerAddress, int fromAddress, int value) returns bool;
 
     // Returns the amount of allowance still available.
-    transaction allowance(int ownerAddress, int ownerAddress) returns int;
+    transaction allowance(int ownerAddress, int fromAddress) returns int;
 
     // Transfers tokens from an allowance that has already been granted.
     transaction transferFrom(int senderAddress, int fromAddress, int toAddress, int value) returns bool;

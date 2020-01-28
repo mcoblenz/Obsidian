@@ -1,0 +1,9 @@
+main contract Names {
+    // Shouldn't have duplicate names
+    transaction duplicateNames(int y, int y) {
+    }
+}
+
+interface Duplicates {
+    transaction duplicateNames(int y, int y);
+}

@@ -977,4 +977,11 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/InStateOwnershipChange.obs",
             (InvalidOwnershipLossInDynamicCheck("k"), 11) :: Nil)
     }
+
+    @Test def duplicateNames(): Unit = {
+        runTest("resources/tests/type_checker_tests/DuplicateArgs.obs",
+            (DuplicateArgName("y"), 3) ::
+                (DuplicateArgName("y"), 8) ::
+                Nil)
+    }
 }

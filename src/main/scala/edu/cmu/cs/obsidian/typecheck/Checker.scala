@@ -4,6 +4,8 @@ import edu.cmu.cs.obsidian.parser.Parser.Identifier
 import edu.cmu.cs.obsidian.parser._
 
 import scala.collection.immutable.TreeMap
+import scala.collection.mutable
+import scala.collection.mutable.HashSet
 
 
 /* We define a custom type to store a special flag for if a context in after a "throw".
@@ -2310,6 +2312,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         field
     }
 
+    private def checkDuplicateArgNames(tx: Transaction): Unit = {
+        val argNames = mutable.HashSet[String]()
+        for (arg <- tx.args) {
+            if (argNames.exists(arg.varName.equals)) {
+                logError(tx, DuplicateArgName(arg.varName))
+            }
+            argNames.add(arg.varName)
+        }
+    }
+
     private def checkTransactionInState(tx: Transaction,
                                         lexicallyInsideOf: DeclarationTable,
                                         initContext: Context): Transaction = {
@@ -2331,6 +2343,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             }
         }
 
+        checkDuplicateArgNames(tx);
         var context = initContext
 
         for (arg <- tx.args) {
@@ -2823,6 +2836,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    private def checkInterfaceDeclaration(decl: Declaration): Unit = {
+        decl match {
+            case t: Transaction =>
+                checkDuplicateArgNames(t)
+            case s: State => ()
+            case f: Field => logError(f, FieldsNotAllowedInInterfaces(f.name, decl.name))
+            case c: Constructor => logError(c, InterfaceConstructorError())
+            case c: Contract => assert(false, "Contract nesting is no longer supported.")
+            case d: TypeDecl => assert(false, "Type declarations are not supported yet.")
+        }
+    }
+
     private def checkContract(contract: Contract): Contract = {
         currentContractSourcePath = contract.sourcePath
 
@@ -2840,7 +2865,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 var newDecls = obsContract.declarations
 
-                if (!obsContract.isInterface) {
+                if (obsContract.isInterface) {
+                    obsContract.declarations.map(checkInterfaceDeclaration)
+                }
+                else {
                     val boundDecls = globalTable.contract(obsContract.bound.contractName) match {
                         case Some(interface) => interface.contract match {
                             case impl: ObsidianContractImpl => impl.substitute(impl.params, obsContract.bound.typeArgs).declarations
