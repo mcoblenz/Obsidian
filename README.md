@@ -39,7 +39,7 @@ To generate the Fabric structure elsewhere, pass `--output-path` with the path t
 ###### Fabric deployment
 To use the chaincode on Fabric, some pre-requisites have to be met. First of all, you should have Docker installed on your machine. Then:
 1. In a terminal, go to the root of the Obsidian project folder.
-2. Run the following command: `curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s`
+2. Run the following command: `curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.4 -s`
 
 This installs all the platform-specific binaries you need to run a Fabric network and places them in the `bin` sub-directory of the Obsidian project.
 It also downloads all the required Docker images and places them in your local Docker registry, tagged as `latest`.
