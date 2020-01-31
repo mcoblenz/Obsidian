@@ -1519,62 +1519,67 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 (context.updated(name, typ), s)
 
             case VariableDeclWithInit(typ: ObsidianType, name, e: Expression) =>
-                val (exprType, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
-                val declaredType = typ match {
-                    case np: NonPrimitiveType =>
-                        val declaredContractName = np.contractName
-                        val tableLookup = context.contractTable.lookupContract(declaredContractName)
-
-                        val resolvedType = tableLookup match {
-                            case None =>
-                                logError(s, ContractUndefinedError(declaredContractName))
-                                BottomType()
-                            case Some(table) =>
-                                checkGenericArgLength(table, s, np)
-
-                                exprType match {
-                                    case exprNonPrimitiveType: NonPrimitiveType =>
-                                        if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
-                                            // We only want the permission/states from the expr, not the whole thing
-                                            val tempTyp = np.withTypeState(exprNonPrimitiveType.permission)
-                                            exprNonPrimitiveType match {
-                                                case stateType: StateType => tempTyp.withTypeState(States(stateType.stateNames))
-                                                case GenericType(gVar, bound) => bound match {
-                                                    case perm: GenericBoundPerm =>
-                                                        tempTyp
-                                                    case states: GenericBoundStates =>
-                                                        tempTyp.withTypeState(States(states.states))
-                                                }
-                                                case _ => tempTyp
-                                            }
-                                        } else {
-                                            logError(s, InconsistentContractTypeError(np.contractType, exprNonPrimitiveType.contractType))
-                                            np // Just go with the declaration
-                                        }
-                                    case BottomType() =>
-                                        // Don't emit an extra error message.
-                                        BottomType()
-                                    case _ =>
-                                        logError(s, InconsistentTypeAssignmentError(typ, exprType))
-                                        np // Just go with the declaration
-
-                                }
-                        }
-
-                        np.permission match {
-                            case Inferred() => resolvedType
-                            case _ =>
-                                logError(s, InvalidLocalVariablePermissionDeclarationError())
-                                BottomType()
-                        }
-                    case BottomType() => BottomType()
-                    case _ =>
-                        checkIsSubtype(context.contractTable, s, exprType, typ)
-                        typ
+                if (context.get(name).isDefined) {
+                    logError(s, VariableShadowingDisallowed(name))
+                    (context, s)
                 }
+                else {
+                    val (exprType, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesUnowned())
+                    val declaredType = typ match {
+                        case np: NonPrimitiveType =>
+                            val declaredContractName = np.contractName
+                            val tableLookup = context.contractTable.lookupContract(declaredContractName)
 
-                (contextPrime.updated(name, declaredType), VariableDeclWithInit(typ, name, ePrime))
+                            val resolvedType = tableLookup match {
+                                case None =>
+                                    logError(s, ContractUndefinedError(declaredContractName))
+                                    BottomType()
+                                case Some(table) =>
+                                    checkGenericArgLength(table, s, np)
 
+                                    exprType match {
+                                        case exprNonPrimitiveType: NonPrimitiveType =>
+                                            if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
+                                                // We only want the permission/states from the expr, not the whole thing
+                                                val tempTyp = np.withTypeState(exprNonPrimitiveType.permission)
+                                                exprNonPrimitiveType match {
+                                                    case stateType: StateType => tempTyp.withTypeState(States(stateType.stateNames))
+                                                    case GenericType(gVar, bound) => bound match {
+                                                        case perm: GenericBoundPerm =>
+                                                            tempTyp
+                                                        case states: GenericBoundStates =>
+                                                            tempTyp.withTypeState(States(states.states))
+                                                    }
+                                                    case _ => tempTyp
+                                                }
+                                            } else {
+                                                logError(s, InconsistentContractTypeError(np.contractType, exprNonPrimitiveType.contractType))
+                                                np // Just go with the declaration
+                                            }
+                                        case BottomType() =>
+                                            // Don't emit an extra error message.
+                                            BottomType()
+                                        case _ =>
+                                            logError(s, InconsistentTypeAssignmentError(typ, exprType))
+                                            np // Just go with the declaration
+
+                                    }
+                            }
+
+                            np.permission match {
+                                case Inferred() => resolvedType
+                                case _ =>
+                                    logError(s, InvalidLocalVariablePermissionDeclarationError())
+                                    BottomType()
+                            }
+                        case BottomType() => BottomType()
+                        case _ =>
+                            checkIsSubtype(context.contractTable, s, exprType, typ)
+                            typ
+                    }
+
+                    (contextPrime.updated(name, declaredType), VariableDeclWithInit(typ, name, ePrime))
+                }
             case Return() =>
                 checkFieldTypeConsistencyAfterTransaction(context, decl, s)
 

@@ -573,6 +573,8 @@ class TypeCheckerTests extends JUnitSuite {
         runTest("resources/tests/type_checker_tests/ArgumentShadowing.obs",
             (ArgShadowingError("x", "t", 6), 10)
                 ::
+                (VariableShadowingDisallowed("a"), 17)
+                ::
                 Nil
         )
     }

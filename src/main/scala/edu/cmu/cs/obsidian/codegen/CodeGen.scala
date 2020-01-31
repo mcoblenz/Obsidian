@@ -2284,7 +2284,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
                 if (idx >= 0) {
                     // We need this because you can't write 'new T()' where T is generic, because of erasure
-                    // Instead, we store the fully qualified class name that got passed in, and use reflection to invoke it's constructor
+                    // Instead, we store the fully qualified class name that got passed in, and use reflection to invoke its constructor
                     val typeVar = translationContext.contractClass.typeParams.toList(idx).wildcardExtends()
 
                     reflectionConstruct(block, assignTo, default, typeVar, constructorTypeParams,

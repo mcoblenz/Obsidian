@@ -5,5 +5,5 @@ main contract Names {
 }
 
 interface Duplicates {
-    transaction duplicateNames(int y, int y);
-}
+     transaction duplicateNames(int y, int y);
+ }

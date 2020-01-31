@@ -14,7 +14,7 @@ main contract C {
 
         // test as recipient of a call
         d.t();
-        int i = d.t();
+        int j = d.t();
     }
 
     transaction t2(int i) returns int {

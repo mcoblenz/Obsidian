@@ -11,4 +11,17 @@ main contract C {
         ->S(x = 3, y = 4);
     }
 
+    transaction t2(A@Owned >> Unowned a) {
+        if (this in S) {
+            if (true) {
+                A a = new A(); // shadow parameter a
+            }
+        }
+        disown a;
+    }
+
+}
+
+asset contract A {
+    A@Owned() {}
 }

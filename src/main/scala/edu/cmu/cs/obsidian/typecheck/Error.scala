@@ -487,3 +487,8 @@ case class DuplicateArgName(argName: String) extends Error {
 case class FieldsNotAllowedInInterfaces(fieldName: String, interfaceName: String) extends Error {
     override val msg: String = s"Field '$fieldName' cannot be defined on interface '$interfaceName' because interfaces cannot define fields."
 }
+
+case class VariableShadowingDisallowed(variableName: String) extends Error {
+    override val msg: String = s"Variable '$variableName' shadows or redeclares a variable already in scope, which is not allowed." +
+                                " Choose a different name for one of the variables."
+}
