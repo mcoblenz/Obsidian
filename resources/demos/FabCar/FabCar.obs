@@ -1,0 +1,119 @@
+contract Car {
+  string color;
+  string make;
+  string model;
+  string owner;
+
+  Car@Owned(string color, string make, string model, string owner) {
+    this.color = color;
+    this.make = make;
+    this.model = model;
+    this.owner = owner;
+  }
+
+  transaction getColor() returns string { return color; }
+  transaction getMake() returns string { return make; }
+  transaction getModel() returns string { return model; }
+  transaction getOwner() returns string { return owner; }
+}
+
+// I couldn't find anything about maps or arrays
+// in the documentation, but we can make linked lists!
+contract CarList {
+  state HasValue {
+    int id; 
+    Car@Owned car;
+
+    CarList@Owned next;
+  }
+  state Nothing;
+
+  CarList@Owned() {
+    ->Nothing;
+  }
+
+  transaction setValue(CarList@Owned >> HasValue this, int theId, Car@Owned >> Unowned theCar) {
+    HasValue::id = theId;
+    HasValue::car = theCar; 
+    HasValue::next = new CarList();
+    ->HasValue;
+  }
+
+  transaction setNext(CarList@HasValue this, CarList@Owned >> Unowned nextCar) {
+    this.next = nextCar; 
+  }
+
+  /** Returns a copy of the Car data stored */
+  transaction getValue(CarList@HasValue this) returns Car@Owned {
+    return new Car(car.getColor(), car.getMake(), car.getModel(), car.getOwner());
+  }
+
+  // I tried having this return an owned Maybe[Car]
+  // but that caused a ReentrancyException.
+  transaction search(int targetId) returns Car@Unowned {
+    switch this {
+      case HasValue {
+        if (id == targetId) {
+          return car;
+        }
+        return next.search(targetId);
+      }
+
+      case Nothing {
+        revert "Car ID not found";
+      }
+    }
+  }
+
+  transaction exists(CarList@Owned this, int targetId) returns bool {
+    switch this {
+      case HasValue {
+        return id == targetId || next.exists(targetId);
+      }
+
+      case Nothing {
+        return false;
+      }
+    }
+  } 
+}
+
+main contract FabCar {
+  CarList@Owned cars;
+
+  FabCar@Owned() {     
+    // Add some sample data
+    CarList tomoko = new CarList();
+    tomoko.setValue(1, new Car("blue", "toyota", "prius", "tomoko"));
+
+    CarList brad = new CarList();
+    brad.setValue(2, new Car("red", "ford", "mustang", "brad"));
+
+    CarList jinsoo = new CarList();
+    jinsoo.setValue(3, new Car("green", "hyundai", "tucson", "jinsoo"));
+
+    brad.setNext(jinsoo);
+    tomoko.setNext(brad);
+
+    cars = tomoko;
+  }
+
+  // The result of this query will show up as 
+  // a base64 encoded string with the class name.
+  // This is because I can't figure out how to 
+  transaction queryCar(int id) returns string {
+    return cars.search(id).getOwner();
+  }
+
+  transaction addCar(int id, string color, string make, string model, string owner) {
+    if (cars.exists(id)) {
+      revert "ID already exists";
+    }
+
+    CarList nextNode = new CarList();
+    nextNode.setValue(id, new Car(color, make, model, owner));
+
+    nextNode.setNext(cars);
+    cars = nextNode;
+  }
+}
