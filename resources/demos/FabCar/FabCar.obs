@@ -17,7 +17,7 @@ contract Car {
   transaction getOwner() returns string { return owner; }
 
   transaction toString() returns string {
-    return "{" + color + "," + make + "," + model + "," + owner + "}";
+    return "{color='" + color + "',make='" + make + "',model='" + model + "'',owner='" + owner + "'}";
   }
 }
 
@@ -79,6 +79,18 @@ contract CarList {
         return false;
       }
     }
+  }
+
+  transaction toString() returns string {
+    switch this {
+      case HasValue {
+        return car.toString() + "," + next.toString();
+      }
+
+      case Nothing {
+        return "";
+      }
+    }
   } 
 }
 
@@ -102,9 +114,10 @@ main contract FabCar {
     cars = tomoko;
   }
 
-  // The result of this query will show up as 
-  // a base64 encoded string with the class name.
-  // This is because I can't figure out how to 
+  transaction queryAllCars() returns string {
+    return cars.toString();
+  }
+
   transaction queryCar(int id) returns string {
     return cars.search(id).toString();
   }
