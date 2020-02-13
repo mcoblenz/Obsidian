@@ -60,6 +60,7 @@ contract CarList {
         if (id == targetId) {
           return car;
         }
+
         return next.search(targetId);
       }
 
@@ -84,9 +85,18 @@ contract CarList {
   transaction toString() returns string {
     switch this {
       case HasValue {
-        return car.toString() + "," + next.toString();
+        // This avoids a trailing comma at the end of the list :)
+        switch next {
+          case HasValue {
+            return car.toString() + "," + next.toString();
+          }
+          case Nothing {
+            return car.toString();
+          }
+        }
       }
 
+      // Only possible in the event that this list is empty 
       case Nothing {
         return "";
       }
