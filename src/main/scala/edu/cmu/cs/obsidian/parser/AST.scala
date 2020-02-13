@@ -98,6 +98,7 @@ case class Conjunction(e1: Expression, e2: Expression) extends BinaryExpression(
 case class Disjunction(e1: Expression, e2: Expression) extends BinaryExpression(Disjunction, e1, e2)
 case class LogicalNegation(e: Expression) extends UnaryExpression(LogicalNegation, e)
 case class Add(e1: Expression, e2: Expression) extends BinaryExpression(Add, e1, e2)
+case class StringConcat(e1: Expression, e2: Expression) extends BinaryExpression(StringConcat, e1, e2)
 case class Subtract(e1: Expression, e2: Expression) extends BinaryExpression(Subtract, e1, e2)
 case class Divide(e1: Expression, e2: Expression) extends BinaryExpression(Divide, e1, e2)
 case class Multiply(e1: Expression, e2: Expression) extends BinaryExpression(Multiply, e1, e2)
