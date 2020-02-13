@@ -15,6 +15,10 @@ contract Car {
   transaction getMake() returns string { return make; }
   transaction getModel() returns string { return model; }
   transaction getOwner() returns string { return owner; }
+
+  transaction toString() returns string {
+    return "{" + color + "," + make + "," + model + "," + owner + "}";
+  }
 }
 
 // I couldn't find anything about maps or arrays
@@ -102,7 +106,7 @@ main contract FabCar {
   // a base64 encoded string with the class name.
   // This is because I can't figure out how to 
   transaction queryCar(int id) returns string {
-    return cars.search(id).getOwner();
+    return cars.search(id).toString();
   }
 
   transaction addCar(int id, string color, string make, string model, string owner) {
