@@ -988,6 +988,6 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def stringConcatenation(): Unit = {
-        ???
+        runTest("resources/tests/type_checker_tests/StringConcat.obs", Nil)
     }
 }

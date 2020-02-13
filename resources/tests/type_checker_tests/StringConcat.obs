@@ -1,0 +1,18 @@
+main contract StringConcat {
+    transaction mkString() returns string {
+        return "Hello world";
+    }
+
+    transaction foo(string x, string y) returns string { return x + y; }
+    transaction bar() returns string {
+        return foo(mkString(), mkString() + mkString());
+    }
+
+    transaction local_vars() {
+        string x = "Hello ";
+        string y = "world";
+
+        string z = x + y;
+        string w = x + mkString();
+    }
+}
