@@ -43,7 +43,7 @@ If ownership is no longer desired, ``disown`` can be used to discard ownership. 
        }
    }
 
-*IMPORTANT*: `disown` is should be used *only* when you really want to throw something out. Above, `disown` is required because of the manual arithmetic used to manipulate `amount` inside the implementation of `Money`, but it is *not* needed in most normal code.
+*IMPORTANT*: `disown` should be used *only* when you really want to throw something out. Above, `disown` is required because of the manual arithmetic used to manipulate `amount` inside the implementation of `Money`, but it is *not* needed in most normal code.
 
 Invoking transactions
 ----------------------
