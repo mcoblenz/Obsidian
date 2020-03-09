@@ -60,7 +60,7 @@ After the transaction returns, the caller still holds ownership. For example:
       ...
    }
 
-   transction callLogMoney(Money@Owned m) {
+   transaction callLogMoney(Money@Owned m) {
       logMoney(m);
       // OK; m is still an Owned reference.
    }
