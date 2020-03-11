@@ -21,6 +21,10 @@ contract Option[asset T@s] {
     }
 }
 
+interface Iterator[KeyType, ValueType] {
+    transaction performAction(KeyType@Unowned key, ValueType@Unowned value, bool last);
+}
+
 main asset contract Dict[KeyType, asset ValueType@s where s is Owned] {
     DictImpl[KeyType, ValueType@s]@(Empty | HasNext) dictImpl;
 
@@ -45,6 +49,10 @@ main asset contract Dict[KeyType, asset ValueType@s where s is Owned] {
         if (existingValue in Some) {
             revert ("insert operation is only permitted when there is no existing value for the given key.");
         }
+    }
+
+    transaction iterate(Dict@Unowned this, Iterator[KeyType, ValueType] iterator) {
+        dictImpl.iterate(iterator);
     }
 }
 
@@ -159,6 +167,26 @@ contract DictImpl[KeyType, asset ValueType@s where s is Owned] {
             }
             case PrivateHasKeyAndValue {
                 revert "Do not call peek on inconsistent DictImplionaries.";
+            }
+        }
+    }
+
+    transaction iterate(DictImpl@(Empty | HasNext) this, Iterator[KeyType, ValueType] iterator) {
+        switch this {
+            case HasNext {
+                bool last;
+                switch next {
+                    case HasNext {
+                        last = false;
+                    }
+                    case Empty {
+                        last = true;
+                    }
+                }
+
+                iterator.performAction(key, value, last);
+
+                next.iterate(iterator);
             }
         }
     }
