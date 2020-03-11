@@ -1,0 +1,20 @@
+import "Comparator.obs"
+
+main contract Integer {
+    int value;
+
+    Integer@Owned(int _value) {
+        value = _value;
+    }
+
+    transaction getValue() returns int {
+        return value;
+    }
+}
+
+
+contract IntegerComparator implements Comparator[Integer] {
+    transaction equals(Integer@Unowned a, Integer@Unowned b) returns bool {
+        return a.getValue() == b.getValue();
+    }
+}
