@@ -79,5 +79,6 @@
     <orderEntry type="library" name="sbt: com.google.protobuf:protobuf-java-util:3.5.1:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-cli:commons-cli:1.4:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-logging:commons-logging:1.2:jar" level="project" />
+    <orderEntry type="library" name="Bundled Protobuf Distribution" level="application" />
   </component>
 </module>

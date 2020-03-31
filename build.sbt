@@ -28,7 +28,7 @@ libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.1" % "test"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 
 libraryDependencies += "junit" % "junit" % "4.12" % "test"
-libraryDependencies += "com.google.protobuf" % "protobuf-java" % "3.5.1"
+libraryDependencies += "com.google.protobuf" % "protobuf-java" % "3.11.4"
 libraryDependencies += "org.hyperledger.fabric-chaincode-java" % "fabric-chaincode-shim" % "1.4.4"
 libraryDependencies += "com.helger" % "jcodemodel" % "3.3.0"
 libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2"
