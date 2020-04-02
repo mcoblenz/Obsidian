@@ -203,11 +203,6 @@ object Main {
         }
     }
 
-
-    private def protobufOuterClassNameForClass(className: String): String = {
-        className.substring(0, 1).toUpperCase(java.util.Locale.US) + className.substring(1) + "OuterClass"
-    }
-
     // For input foo.obs, we generate foo.proto, from which we generate FooOuterClass.java.
     //    We also generate a jar at the specified directory, containing the generated classes.
     // The compiler returns an exit status of 0 if everything went well, 1 if there was an error
