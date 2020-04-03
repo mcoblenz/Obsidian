@@ -158,6 +158,8 @@ class IdentityAstTransformer {
                transformUnary(table, lexicallyInsideOf, context, n.e, params, LogicalNegation(_).setLoc(n))
             case a: Add =>
                 transformBinary(table, lexicallyInsideOf, context, a.e1, a.e2, params, Add(_, _).setLoc(a))
+            case a: StringConcat =>
+                transformBinary(table, lexicallyInsideOf, context, a.e1, a.e2, params, StringConcat(_, _).setLoc(a))
             case s: Subtract =>
                 transformBinary(table, lexicallyInsideOf, context, s.e1, s.e2, params, Subtract(_, _).setLoc(s))
             case d: Divide =>
