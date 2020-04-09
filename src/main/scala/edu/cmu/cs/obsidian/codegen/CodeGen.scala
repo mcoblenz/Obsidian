@@ -363,13 +363,12 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 cond._then().assign(unarchivedObjDecl, JExpr.cast(resolveType(initialTyp, table), loadInvocation))
 
                 // If we have an object…
-                val archiveToUse = constructNew(translationContext, initialTyp,
+                constructNew(translationContext, initialTyp,
                     translationContext.contract, archive,
                     cond._else(), unarchivedObjDecl, JExpr._null(),
-                    Nil, Nil)
+                    Nil, Nil, true)
 
-                val initInvocation = JExpr.invoke(unarchivedObjDecl, "initFromArchive").arg(archiveToUse).arg(JExpr.ref(serializationParamName))
-                cond._else().add(initInvocation)
+
                 unarchivedObjDecl
             case BottomType() =>
                 assert(false)
@@ -1191,7 +1190,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val invocation = reflectionInvoke(param, getStateMeth, List(serializationStateType().dotclass()))
             .arg(serializationState).invoke("toString")
         // null is safe here because this result should only be used as a parameter to contains/the RHS of .equals
-        tryReflectAssign(lookupState.body(), result, invocation, JExpr._null(), reflectionExceptions)
+        assignInTryCatch(lookupState.body(), result, invocation, JExpr._null(), reflectionExceptions)
         lookupState.body()._return(result)
     }
 
@@ -2242,9 +2241,14 @@ class CodeGen (val target: Target, table: SymbolTable) {
         List(model.directClass(classOf[ClassNotFoundException].getCanonicalName)) ++ reflectionExceptions
 
     def reflectionConstructionExceptions: Seq[AbstractJClass] =
-        List(model.directClass(classOf[InstantiationException].getCanonicalName)) ++ reflectionClassLookupExceptions
+        List(model.directClass(classOf[InstantiationException].getCanonicalName)) ++ reflectionExceptions
 
-    def tryReflectAssign(block: JBlock, assignTo: IJAssignmentTarget, expr: IJExpression, default: IJExpression,
+    // Wraps an assignment in a try/catch with the given exceptions.
+    // Assigns 'default' in case of an exception.
+    def assignInTryCatch(block: JBlock,
+                         assignTo: IJAssignmentTarget,
+                         expr: IJExpression,
+                         default: IJExpression,
                          exceptionClasses: Seq[AbstractJClass]): Unit = {
         val tryBlock = block._try()
 
@@ -2257,25 +2261,34 @@ class CodeGen (val target: Target, table: SymbolTable) {
         }
     }
 
-    def reflectionConstruct(block: JBlock, assignTo: IJAssignmentTarget, default: IJExpression,
+    // Constructs an object via reflection, assigning the new object to 'assignTo'.
+    // If an exception occurs, assigns 'default' instead.
+    def reflectionConstruct(block: JBlock,
+                            assignTo: IJAssignmentTarget,
+                            default: IJExpression,
                             narrowing: AbstractJClass,
-                            constructorTypeParams: Seq[IJExpression], constructorParams: Seq[IJExpression],
-                            classNameVar: IJExpression): Unit = {
-        val classExpr = classForNameMeth.arg(classNameVar)
+                            constructorTypeParams: Seq[IJExpression],
+                            constructorParams: Seq[IJExpression],
+                            classToInstantiate: IJExpression): Unit = {
+        val narrowedClass = JExpr.cast(model.ref("java.lang.Class").narrow(narrowing), classToInstantiate)
+        val getConstructorInvoke = narrowedClass.invoke("getConstructor")
+        val constructorInvokeWithTypeParams = withArgs(getConstructorInvoke, constructorTypeParams)
+        val newInstance = withArgs(constructorInvokeWithTypeParams.invoke("newInstance"), constructorParams)
 
-        val getConstructorInvoke = JExpr.cast(model.ref("java.lang.Class").narrow(narrowing), classExpr)
-            .invoke("getConstructor")
-
-        val newInstance =
-            withArgs(withArgs(getConstructorInvoke, constructorTypeParams).invoke("newInstance"), constructorParams)
-
-        tryReflectAssign(block, assignTo, newInstance, default, reflectionConstructionExceptions)
+        assignInTryCatch(block, assignTo, newInstance, default, reflectionConstructionExceptions)
     }
 
-    def constructNew(translationContext: TranslationContext, typ: ObsidianType, contract: Contract,
+
+    def constructNew(translationContext: TranslationContext,
+                     typ: ObsidianType,
+                     contract: Contract,
                      archive: JVar,
-                     block : JBlock, assignTo : IJAssignmentTarget, default: IJExpression,
-                     constructorTypeParams: Seq[IJExpression], constructorParams: Seq[IJExpression]): IJExpression =
+                     block : JBlock,
+                     assignTo : IJAssignmentTarget,
+                     default: IJExpression,
+                     constructorTypeParams: Seq[IJExpression],
+                     constructorParams: Seq[IJExpression],
+                     initializeFromArchive: Boolean) =
         typ match {
             case np: NonPrimitiveType =>
                 val idx = contract.params.indexWhere(p => p.gVar.varName == np.codeGenName)
@@ -2286,36 +2299,71 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     // We need this because you can't write 'new T()' where T is generic, because of erasure
                     // Instead, we store the fully qualified class name that got passed in, and use reflection to invoke its constructor
                     val typeVar = translationContext.contractClass.typeParams.toList(idx).wildcardExtends()
+                    val classExpr = classForNameMeth.arg(JExpr.ref("__generic" + np.codeGenName))
+                    val objClassVar = block.decl(model.directClass("java.lang.Class"), "objClass")
+                    assignInTryCatch(block,
+                        objClassVar,
+                        classExpr,
+                        JExpr._null(),
+                        List(model.directClass(classOf[ClassNotFoundException].getCanonicalName)))
 
                     reflectionConstruct(block, assignTo, default, typeVar, constructorTypeParams,
-                        constructorParams, JExpr.ref("__generic" + np.codeGenName))
-                    archive.invoke("getObj")
+                        constructorParams, objClassVar)
                 } else if (isInterface) {
-                    val classNameVar = block.decl(javaStringType(), "className",
-                        archive.invoke("getObj").invoke("getImplementingClassName"))
-                    val classArchiveNameVar = block.decl(javaStringType(), "classArchiveName",
-                        archive.invoke("getObj").invoke("getImplementingClassArchiveName"))
-                    val archiveDataVar = block.decl(javaStringType, "archiveData",
-                        archive.invoke("getObj").invoke("getImplementingClassData"))
+                    val stub = JExpr.ref(serializationParamName).invoke("getStub")
+                    val guid = archive.invoke("getGuid")
+
+
+                    // Either get the class name from the archive or from the serialization state record for this GUID.
+
+                    val objClassVar = block.decl(model.directClass("java.lang.Class"), "objClass")
+
+                    if (initializeFromArchive) {
+                        // Get the class name from the archive, and then instantiate the Class object for that name.
+                        // Doing so may raise ClassNotFoundException, so catch it if necessary.
+                        val classNameVar = block.decl(javaStringType(), "className",
+                            archive.invoke("getObj").invoke("getImplementingClassName"))
+                        val classExpr = classForNameMeth.arg(classNameVar)
+                        assignInTryCatch(block,
+                            objClassVar,
+                            classExpr,
+                            JExpr._null(),
+                            List(model.directClass(classOf[ClassNotFoundException].getCanonicalName)))
+                    }
+                    else {
+                        // We can just look up the class by the GUID.
+                        block.assign(objClassVar, JExpr.ref(serializationParamName).invoke("getClassOfObject").arg(stub).arg(guid))
+                    }
+
 
                     reflectionConstruct(block, assignTo, default, resolveType(typ, table).boxify(),
-                        Nil, Nil, classNameVar)
+                        Nil, Nil, objClassVar)
 
-                    val tempArchive = block.decl(model.directClass("java.lang.Object"), "tempArchive")
-                    tryReflectAssign(block, tempArchive,
-                        reflectionStaticInvoke(classArchiveNameVar, "parseFrom", List(model.ref(classOf[Array[Byte]]).dotclass()))
-                            .arg(archiveDataVar.invoke("getBytes")),
-                        JExpr._null(), reflectionClassLookupExceptions)
-                    tempArchive
+                    if (initializeFromArchive) {
+                        val classArchiveNameVar = block.decl(javaStringType(), "classArchiveName",
+                            archive.invoke("getObj").invoke("getImplementingClassArchiveName"))
+                        val archiveDataVar = block.decl(javaStringType, "archiveData",
+                            archive.invoke("getObj").invoke("getImplementingClassData"))
+
+                        val tempArchive = block.decl(model.directClass("java.lang.Object"), "tempArchive")
+                        val invokeParseFrom = reflectionStaticInvoke(classArchiveNameVar, "parseFrom", List(model.ref(classOf[Array[Byte]]).dotclass()))
+                        val invokeParseFromWithArgs = invokeParseFrom.arg(archiveDataVar.invoke("getBytes"))
+
+                        assignInTryCatch(block,
+                            tempArchive,
+                            invokeParseFromWithArgs,
+                            JExpr._null(),
+                            reflectionClassLookupExceptions)
+                        val initInvocation = JExpr.invoke(assignTo, "initFromArchive").arg(tempArchive).arg(JExpr.ref(serializationParamName))
+                        block.add(initInvocation)
+                    }
                 } else {
                     val newObj = withArgs(JExpr._new(resolveType(typ, table)), constructorParams)
                     block.assign(assignTo, newObj) // If not a generic type
-                    archive.invoke("getObj")
                 }
 
             // This should never actually happen, since it would be caught by the typechecker
             case t => assert(false, "Attempting to code generate construction for primitive or bottom type.")
-                archive.invoke("getObj")
         }
 
     private def generateFieldInitializer(
@@ -2362,7 +2410,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 constructNew(translationContext, field.typ, inContract, archive,
                     checkForObj._else(), fieldVar, fieldVar,
                     List(javaStringType().dotclass()),
-                    List(guidVar))
+                    List(guidVar), false)
 
                 // We also need to put this thing in the map of loaded objects,
                 // so if someone else references it later, we get the same reference.

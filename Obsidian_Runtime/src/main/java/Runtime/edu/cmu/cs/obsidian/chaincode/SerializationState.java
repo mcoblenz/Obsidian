@@ -23,10 +23,18 @@ public class SerializationState {
     /* When we return an object to the client, we have to be able to look up that object later by its GUID.
      * On lookup, we need to be able to create a lazily-initialized object, which requires that we know the name of its class.
      *
+     * TODO: Only store whether the object is an owned reference, since allObjectClasses stores class names for all objects.
      * */
     private HashMap<String, ReturnedReferenceState> returnedObjectClassMapAtBeginningOfTransaction;
     private HashMap<String, ReturnedReferenceState> returnedObjectClassMap;
 
+    // When we unarchive an object that has a field that references another object,
+    // if the referenced object is a more specific type than the field type,
+    // we can't tell what object to instantiate.
+    // To solve this problem, we record type information for all objects in the heap.
+    // This map is from GUID to Java class.
+    // Some of this information is redundant with information in guidMap, but guidMap is not guaranteed to be populated for all reachable objects.
+    private HashMap<String, Class> allObjectClasses;
 
     private HashSet<Object> stateLockedObjects;
 
@@ -42,6 +50,7 @@ public class SerializationState {
     public SerializationState() {
         guidMap = new HashMap<String, ObsidianSerialized>();
         stateLockedObjects = new HashSet<Object>();
+        allObjectClasses = new HashMap<String, Class>();
     }
 
     public void setStub(ChaincodeStub newStub) {
@@ -59,6 +68,7 @@ public class SerializationState {
 
     public void putEntry(String guid, ObsidianSerialized obj) {
         guidMap.put(guid, obj);
+        allObjectClasses.put(guid, obj.getClass());
     }
 
     public void flushEntries() {
@@ -107,18 +117,17 @@ public class SerializationState {
     // If the returned reference is owned, record that so that we can re-claim ownership when we see the object again.
     public void mapReturnedObject(ObsidianSerialized obj, boolean returnedReferenceIsOwned) {
         loadReturnedObjectsMap(stub);
-        System.out.println("returnedObjectClassMap: " + returnedObjectClassMap);
-        System.out.println("obj: " + obj + "; ID = " + obj.__getGUID());
         returnedObjectClassMap.put(obj.__getGUID(), new ReturnedReferenceState(obj.getClass(), returnedReferenceIsOwned));
     }
 
     public ReturnedReferenceState getReturnedReferenceState(ChaincodeStub stub, String guid) {
         loadReturnedObjectsMap(stub);
-        for (Map.Entry<String, ReturnedReferenceState> item : returnedObjectClassMap.entrySet()) {
-            String key = item.getKey();
-            ReturnedReferenceState value = item.getValue();
-        }
         return returnedObjectClassMap.get(guid);
+    }
+
+    public Class getClassOfObject(ChaincodeStub stub, String guid) {
+        loadObjectClasses(stub);
+        return allObjectClasses.get(guid);
     }
 
     public void archiveReturnedObjectsMap (ChaincodeStub stub) {
@@ -185,53 +194,65 @@ public class SerializationState {
 
         }
     }
-/*
-        public void archiveReturnedObjectsMap (ChaincodeStub stub) {
-        // TODO: remove old, stale entries?
-        System.out.println("archiveReturnedObjectsMap");
 
-        if (returnedObjectClassMap != null) {
-            for (Map.Entry<String, ReturnedReferenceState> entry : returnedObjectClassMap.entrySet()) {
-                CompositeKey classKey = stub.createCompositeKey(s_returnedObjectsClassMapKey, entry.getKey());
-                // the class key is s_returnedObjectsClassMapKey + the ID of the object.
-                // Store the key -> canonical name of the class.
-                stub.putStringState(classKey.toString(), entry.getValue().getClassRef().getCanonicalName());
+    public void archiveObjectClasses(ChaincodeStub stub) {
+        if (allObjectClasses != null) {
+            // Archive the number of returned objects.
+            stub.putStringState("NumObjectClasses", Integer.toString(allObjectClasses.size()));
 
-                // The owned key is s_returnedObjectsIsOwnedMapKey + the ID of the object.
-                CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, entry.getKey());
-                boolean isOwned = entry.getValue().getIsOwnedReference();
-                byte[] isOwnedByteArray = isOwned ? TRUE_BYTE : FALSE_BYTE;
-                stub.putState(isOwnedKey.toString(), isOwnedByteArray);
-                System.out.println("archiving returned object: " + classKey + "->" + entry.getValue().getClassRef().getCanonicalName());
+            int i = 0;
+            for (Map.Entry<String, Class> entry : allObjectClasses.entrySet()) {
+                String objGuid = entry.getKey();
+                String guidKey = "ObjectClassGUID" + Integer.toString(i);
+                stub.putStringState(guidKey, objGuid);
+
+                String classNameKey = "ObjectClass" + Integer.toString(i);
+                stub.putStringState(classNameKey, entry.getValue().getCanonicalName());
+
+//                System.out.println("archived: obj " + objGuid + " has class " + entry.getValue().getCanonicalName());
+
+                i++;
             }
         }
     }
 
-    private void loadReturnedObjectsMap (ChaincodeStub stub) {
-        if (returnedObjectClassMap == null) {
-            returnedObjectClassMap = new HashMap<String, ReturnedReferenceState>();
 
-            QueryResultsIterator<KeyValue> results = stub.getStateByPartialCompositeKey(s_returnedObjectsClassMapKey);
+    private void loadObjectClasses (ChaincodeStub stub) {
+        if (allObjectClasses == null) {
+            allObjectClasses = new HashMap<String, Class>();
 
-            for (KeyValue kv : results) {
-                try {
-                    System.out.println("key to load: " + kv.getKey());
-                    System.out.println("class name: " + kv.getStringValue());
-                    Class c = Class.forName(kv.getStringValue());
-                    CompositeKey isOwnedKey = stub.createCompositeKey(s_returnedObjectsIsOwnedMapKey, kv.getKey().replace("\0", ""));
-                    byte[] isOwnedByteArray = stub.getState(isOwnedKey.toString());
-                    boolean isOwned = (isOwnedByteArray == TRUE_BYTE) ? true : false;
+            try {
+                String numAsString =  stub.getStringState("NumObjectClasses");
+                int numObjects = 0;
 
-                    returnedObjectClassMap.put(kv.getKey().replace(s_returnedObjectsClassMapKey, "").replace("\0", ""), new ReturnedReferenceState(c, isOwned));
-                    System.out.println("loading map: " + kv.getKey() + " -> " + c);
+                if (numAsString != null && numAsString.length() > 0) {
+                    numObjects = Integer.parseInt(numAsString);
                 }
-                catch (ClassNotFoundException e) {
-                    System.err.println("Failed to find a Class object for class name " + kv.getValue());
+
+                for (int i = 0; i < numObjects; i++) {
+                    String indexAsString = Integer.toString(i);
+
+                    String guidKey = "ObjectClassGUID" + indexAsString;
+                    String classNameKey = "ObjectClass" + indexAsString;
+
+                    String guid = stub.getStringState(guidKey);
+                    String objectClass = stub.getStringState(classNameKey);
+                    Class c = Class.forName(objectClass);
+
+                    allObjectClasses.put(guid, c);
+
+//                    System.out.println("loaded: obj " + guid + " has class " + c.getCanonicalName());
                 }
             }
+            catch (NumberFormatException e) {
+                System.err.println("Failed to parse the number of returned objects: " + e);
+            }
+            catch (ClassNotFoundException e) {
+                System.err.println("Failed to find a Class object for class name: " + e);
+            }
+
         }
     }
-    */
 
     public UUIDFactory getUUIDFactory() {
         return uuidFactory;

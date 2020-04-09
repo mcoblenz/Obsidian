@@ -294,6 +294,8 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
         }
 
         serializationState.archiveReturnedObjectsMap(stub);
+        serializationState.archiveObjectClasses(stub);
+
         __unload();
     }
 
