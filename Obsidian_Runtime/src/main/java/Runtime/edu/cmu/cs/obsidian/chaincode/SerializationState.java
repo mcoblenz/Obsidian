@@ -16,8 +16,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.logging.*;
 
 public class SerializationState {
+    private Logger logger;
     private Map<String, ObsidianSerialized> guidMap;
 
     /* When we return an object to the client, we have to be able to look up that object later by its GUID.
@@ -51,6 +53,7 @@ public class SerializationState {
         guidMap = new HashMap<String, ObsidianSerialized>();
         stateLockedObjects = new HashSet<Object>();
         allObjectClasses = new HashMap<String, Class>();
+        logger = Logger.getLogger("SerializationStateLogger");
     }
 
     public void setStub(ChaincodeStub newStub) {
@@ -67,6 +70,9 @@ public class SerializationState {
     }
 
     public void putEntry(String guid, ObsidianSerialized obj) {
+        Exception e = new Exception();
+        System.out.println("putEntry stack trace: ");
+        e.printStackTrace();
         guidMap.put(guid, obj);
         allObjectClasses.put(guid, obj.getClass());
     }
@@ -82,6 +88,7 @@ public class SerializationState {
         }
 
         returnedObjectClassMap = null;
+        allObjectClasses = null;
     }
 
     // TODO: move this to another class, since it pertains to clients too (and does not pertain to serialization).
@@ -126,7 +133,6 @@ public class SerializationState {
     }
 
     public Class getClassOfObject(ChaincodeStub stub, String guid) {
-        loadObjectClasses(stub);
         return allObjectClasses.get(guid);
     }
 
@@ -209,48 +215,42 @@ public class SerializationState {
                 String classNameKey = "ObjectClass" + Integer.toString(i);
                 stub.putStringState(classNameKey, entry.getValue().getCanonicalName());
 
-//                System.out.println("archived: obj " + objGuid + " has class " + entry.getValue().getCanonicalName());
-
                 i++;
             }
         }
     }
 
 
-    private void loadObjectClasses (ChaincodeStub stub) {
-        if (allObjectClasses == null) {
-            allObjectClasses = new HashMap<String, Class>();
+    public void loadObjectClasses (ChaincodeStub stub) {
+        // Load unconditionally so all peers load the same.
+        allObjectClasses = new HashMap<String, Class>();
 
-            try {
-                String numAsString =  stub.getStringState("NumObjectClasses");
-                int numObjects = 0;
+        try {
+            String numAsString =  stub.getStringState("NumObjectClasses");
+            int numObjects = 0;
 
-                if (numAsString != null && numAsString.length() > 0) {
-                    numObjects = Integer.parseInt(numAsString);
-                }
-
-                for (int i = 0; i < numObjects; i++) {
-                    String indexAsString = Integer.toString(i);
-
-                    String guidKey = "ObjectClassGUID" + indexAsString;
-                    String classNameKey = "ObjectClass" + indexAsString;
-
-                    String guid = stub.getStringState(guidKey);
-                    String objectClass = stub.getStringState(classNameKey);
-                    Class c = Class.forName(objectClass);
-
-                    allObjectClasses.put(guid, c);
-
-//                    System.out.println("loaded: obj " + guid + " has class " + c.getCanonicalName());
-                }
-            }
-            catch (NumberFormatException e) {
-                System.err.println("Failed to parse the number of returned objects: " + e);
-            }
-            catch (ClassNotFoundException e) {
-                System.err.println("Failed to find a Class object for class name: " + e);
+            if (numAsString != null && numAsString.length() > 0) {
+                numObjects = Integer.parseInt(numAsString);
             }
 
+            for (int i = 0; i < numObjects; i++) {
+                String indexAsString = Integer.toString(i);
+
+                String guidKey = "ObjectClassGUID" + indexAsString;
+                String classNameKey = "ObjectClass" + indexAsString;
+
+                String guid = stub.getStringState(guidKey);
+                String objectClass = stub.getStringState(classNameKey);
+                Class c = Class.forName(objectClass);
+
+                allObjectClasses.put(guid, c);
+            }
+        }
+        catch (NumberFormatException e) {
+            System.err.println("Failed to parse the number of returned objects: " + e);
+        }
+        catch (ClassNotFoundException e) {
+            System.err.println("Failed to find a Class object for class name: " + e);
         }
     }
 

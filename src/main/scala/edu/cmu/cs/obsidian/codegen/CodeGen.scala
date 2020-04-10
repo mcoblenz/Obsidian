@@ -827,6 +827,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         val guidConstructor = newClass.constructor(JMod.PUBLIC)
         guidConstructor.param(model.ref("String"), "__guid_")
+
         guidConstructor.body().assign(JExpr.ref(modifiedFieldName), JExpr.lit(false))
         guidConstructor.body().assign(JExpr.ref(loadedFieldName), JExpr.lit(false))
         guidConstructor.body().assign(JExpr.ref(guidFieldName), JExpr.ref("__guid_"))
@@ -1853,6 +1854,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val constructorInvocation = JExpr._new(newClass)
         constructorInvocation.arg(newClass.name()) // The name of the class suffices as a GUID for the top level contract.
         val instance = body.decl(newClass, "instance", constructorInvocation)
+
+        val putEntryInvocation = instance.ref("serializationState").invoke("putEntry")
+        putEntryInvocation.arg(instance.ref(newClass.fields get guidFieldName))
+        putEntryInvocation.arg(instance)
+        body.add(putEntryInvocation)
 
         val invocation = JExpr.invoke(instance, "delegatedMain").arg(args)
         body.add(invocation)
@@ -2907,6 +2913,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 }
 
                 addArgs(JExpr._new(resolvedType), args, contractParams, contractType.typeArgs, translationContext, localContext, isFFIInvocation)
+
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
             case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))

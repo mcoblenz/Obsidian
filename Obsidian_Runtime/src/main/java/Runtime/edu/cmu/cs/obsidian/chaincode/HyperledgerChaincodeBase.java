@@ -34,7 +34,7 @@ import edu.cmu.cs.obsidian.chaincode.SerializationState;
 
 
 public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements ObsidianSerialized {
-    SerializationState serializationState;
+    public SerializationState serializationState;
 
     public HyperledgerChaincodeBase() {
         serializationState = new SerializationState();
@@ -80,6 +80,10 @@ public abstract class HyperledgerChaincodeBase extends ChaincodeBase implements 
     @Override
     public Response invoke(ChaincodeStub stub) {
         serializationState.setStub(stub);
+
+        // We load the object classes to make sure that all the peers see the same object class state,
+        // regardless of whether they were the instantiating peer or not.
+        serializationState.loadObjectClasses(stub);
 
         final String function = stub.getFunction();
         List<byte[]> allArgs = stub.getArgs();
