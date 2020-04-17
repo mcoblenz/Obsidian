@@ -752,9 +752,30 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case LogicalNegation(e: Expression) =>
                  val (typ, con, ePrime) = assertTypeEquality(e, BoolType(), context)
                  (typ, con, LogicalNegation(ePrime).setLoc(e))
+
              case Add(e1: Expression, e2: Expression) =>
-                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
-                 (typ, con, Add(e1Prime, e2Prime).setLoc(e))
+                 val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
+                 val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
+
+                 (t1, t2) match {
+                     // Propagate BottomType up if we can't infer a type for + here
+                     case (_: BottomType, _: BottomType) =>
+                         (BottomType(), c2, Add(e1Prime, e2Prime).setLoc(e))
+                     // Regular BigInt addition
+                     case (_: IntType | _: BottomType, _: IntType | _: BottomType) =>
+                         (IntType(), c2, Add(e1Prime, e2Prime).setLoc(e))
+                     // String concatenation
+                     case (_: StringType | _: BottomType, _: StringType | _: BottomType) =>
+                         (StringType(), c2, StringConcat(e1Prime, e2Prime).setLoc(e))
+                     case _ => {
+                         logError(e, PlusTypeError(t1, t2))
+                         (BottomType(), c2, Add(e1Prime, e2Prime).setLoc(e))
+                     }
+                 }
+
+             // Impossible - Values of this type are only ever produced by the typechecker
+             case StringConcat(_, _) => throw new RuntimeException("Impossible case")
+
              case Subtract(e1: Expression, e2: Expression) =>
                  val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
                  (typ, con, Subtract(e1Prime, e2Prime).setLoc(e))

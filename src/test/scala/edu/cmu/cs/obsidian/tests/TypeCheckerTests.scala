@@ -56,7 +56,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def basicTest(): Unit = {
         runTest("resources/tests/type_checker_tests/ExampleTypeFailure.obs",
-            (SubtypingError(BoolType(), IntType(), false), 19)
+            (PlusTypeError(IntType(), BoolType()), 19)
                 ::
                 (WrongArityError(1, 0, "createC"), 21)
                 ::
@@ -68,7 +68,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def operationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleOperations.obs",
-            (SubtypingError(BoolType(), IntType(), false), 8)
+            (PlusTypeError(IntType(), BoolType()), 8)
                 ::
                 (SubtypingError(
                     StringType(),
@@ -985,5 +985,9 @@ class TypeCheckerTests extends JUnitSuite {
             (DuplicateArgName("y"), 3) ::
                 (DuplicateArgName("y"), 8) ::
                 Nil)
+    }
+
+    @Test def stringConcatenation(): Unit = {
+        runTest("resources/tests/type_checker_tests/StringConcat.obs", Nil)
     }
 }

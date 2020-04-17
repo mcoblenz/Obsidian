@@ -68,6 +68,16 @@ case class SubtypingError(t1: ObsidianType, t2: ObsidianType, isThis : Boolean) 
         }
 
 }
+
+/**
+  * Since we overload + to facilitate string concatenation, we have a special error case
+  * in the event that something of the wrong type is added, instead of assuming int addition
+  * was intended by default. This provides better error messages
+  */
+case class PlusTypeError(lhs: ObsidianType, rhs: ObsidianType) extends Error {
+    val msg: String = s"Found types '$lhs' and '$rhs', but expected 'int' or 'string' for both operands"
+}
+
 case class VariableUndefinedError(x: String, context: String) extends Error {
     val msg: String = s"Variable '$x' is undefined in '$context'."
 

@@ -1,0 +1,193 @@
+import "Comparator.obs"
+
+contract Option[asset T@s] {
+    state None;
+    asset state Some {
+        T@s val;
+    }
+
+    Option@None() {
+        ->None;
+    }
+
+    Option@Some(T@s >> Unowned v) {
+        ->Some(val = v);
+    }
+
+    transaction unpack(Option[T@s]@Some >> None this) returns T@s {
+        T result = val;
+        ->None;
+        return result;
+    }
+}
+
+interface Iterator[KeyType, ValueType] {
+    transaction performAction(KeyType@Unowned key, ValueType@Unowned value, bool last);
+}
+
+main asset contract Dict[KeyType, asset ValueType@s where s is Owned] {
+    DictImpl[KeyType, ValueType@s]@(Empty | HasNext) dictImpl;
+
+    Dict@Owned(Comparator@Unowned _comparator) {
+        dictImpl = new DictImpl[KeyType, ValueType@s](_comparator);
+    }
+
+    transaction replace(Dict@Unowned this, KeyType@Unowned _key, ValueType@s >> Unowned _value) returns Option[ValueType@s]@Owned {
+        return dictImpl.replace(_key, _value);
+    }
+
+    transaction remove(Dict@Unowned this, KeyType@Unowned _key) returns Option[ValueType@s]@Owned {
+        return dictImpl.remove(_key);
+    }
+
+    transaction peek(Dict@Unowned this, KeyType@Unowned _key) returns Option[ValueType@Unowned]@Owned {
+        return dictImpl.peek(_key);
+    }
+
+    transaction insert(Dict@Unowned this, KeyType@Unowned _key, ValueType@s >> Unowned _value) {
+        Option[ValueType@s] existingValue = replace(_key, _value);
+        if (existingValue in Some) {
+            revert ("insert operation is only permitted when there is no existing value for the given key.");
+        }
+    }
+
+    transaction iterate(Dict@Unowned this, Iterator[KeyType, ValueType] iterator) {
+        dictImpl.iterate(iterator);
+    }
+}
+
+contract DictImpl[KeyType, asset ValueType@s where s is Owned] {    
+    state Empty;
+    asset state HasNext;
+
+    DictImpl[KeyType, ValueType@s]@(Empty | HasNext) next available in HasNext;
+    KeyType@Unowned key available in HasNext, PrivateHasKeyAndValue;
+    ValueType@s value available in HasNext, PrivateHasKeyAndValue, PrivateHasValue;
+
+    Comparator[KeyType]@Unowned comparator;
+
+    asset state PrivateHasKeyAndValue;
+    asset state PrivateHasValue;
+
+    DictImpl@Empty(Comparator@Unowned _comparator) {
+        comparator = _comparator;
+        ->Empty;
+    }
+
+    // Puts the given key/value pair into the DictImplionary.
+    // If the key was already in the DictImplionary, returns an Option containing the old value.
+    // Otherwise, returns None.
+    transaction replace(DictImpl@(Empty | HasNext) this, KeyType@Unowned _key, ValueType@s >> Unowned _value) returns Option[ValueType@s]@Owned {
+        switch this {
+            case HasNext {
+                if (comparator.equals(key, _key)) {
+                    ValueType oldValue = value;
+                    value = _value;
+                    return new Option[ValueType@s](oldValue);
+                }
+                else {
+                    return next.replace(_key, _value);
+                }
+            }
+            case Empty {
+                ->HasNext(key = _key, value = _value, next = new DictImpl[KeyType, ValueType@s](comparator));
+                return new Option[ValueType@s]();
+            }
+        }
+    }
+
+
+    // Attempts to remove the key/value pair for the given key, returning the value. If the key is not found, returns None.
+    transaction remove(DictImpl@(Empty | HasNext) this, KeyType@Unowned _key) returns Option[ValueType@s]@Owned {
+        switch this {
+            case HasNext {
+                if (comparator.equals(key, _key)) {
+                    
+                    ValueType oldValue = value;
+                    if (next in HasNext) {
+                        DictImpl[KeyType, ValueType@s] newNext = next.extractNext();
+                        KeyType newKey = next.extractKey();
+                        ValueType newValue = next.extractValue();
+                        // next is now Empty, so we can discard it implicitly.
+
+                        ->HasNext(next = newNext, key = newKey, value = newValue);
+                    }
+                    else {
+                        // next is already Empty. We're going to be empty too.
+                        ->Empty;
+                    }
+                    
+                    return new Option[ValueType@s](oldValue);
+
+                }
+                else {
+                    return next.remove(_key);
+                }
+            }
+            case Empty {
+                return new Option[ValueType@s]();
+            }
+        }
+    }
+
+    private transaction extractNext(DictImpl@HasNext >> PrivateHasKeyAndValue this) returns DictImpl@(HasNext | Empty) {
+        DictImpl[KeyType, ValueType@s] result = next;
+        ->PrivateHasKeyAndValue;
+        return result;
+    }
+
+    private transaction extractKey(DictImpl@PrivateHasKeyAndValue >> PrivateHasValue this) returns KeyType@Unowned {
+        KeyType result = key;
+        ->PrivateHasValue;
+        return result;
+    }
+
+    private transaction extractValue(DictImpl@PrivateHasValue >> Empty this) returns ValueType@s {
+        ValueType result = value;
+        ->Empty;
+        return result;
+    }
+    
+    transaction peek(DictImpl@Unowned this, KeyType@Unowned _key) returns Option[ValueType@Unowned]@Owned {
+         switch this {
+            case HasNext {
+                if (comparator.equals(key, _key)) {
+                    return new Option[ValueType@Unowned](value);
+                }
+                else {
+                    return next.peek(_key);
+                }
+            }
+            case Empty {
+                return new Option[ValueType@Unowned]();
+            }
+            // These additional cases are here so that peek can be called with unowned references.
+            case PrivateHasValue {
+                revert "Do not call peek on inconsistent DictImplionaries.";
+            }
+            case PrivateHasKeyAndValue {
+                revert "Do not call peek on inconsistent DictImplionaries.";
+            }
+        }
+    }
+
+    transaction iterate(DictImpl@(Empty | HasNext) this, Iterator[KeyType, ValueType] iterator) {
+        switch this {
+            case HasNext {
+                bool last;
+                switch next {
+                    case HasNext {
+                        last = false;
+                    }
+                    case Empty {
+                        last = true;
+                    }
+                }
+
+                iterator.performAction(key, value, last);
+
+                next.iterate(iterator);
+            }
+        }
+    }
+}

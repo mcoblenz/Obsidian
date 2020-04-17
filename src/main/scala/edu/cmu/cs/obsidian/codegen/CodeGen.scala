@@ -2861,6 +2861,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             case Disjunction(e1, e2) => recurse(e1).cor(recurse(e2))
             case LogicalNegation(e1) => recurse(e1).not()
             case Add(e1, e2) => recurse(e1).invoke("add").arg(recurse(e2))
+            case StringConcat(e1, e2) => recurse(e1).plus(recurse(e2))
             case Subtract(e1, e2) => recurse(e1).invoke("subtract").arg(recurse(e2))
             case Multiply(e1, e2) => recurse(e1).invoke("multiply").arg(recurse(e2))
             case Mod(e1, e2) => recurse(e1).invoke("mod").arg(recurse(e2))

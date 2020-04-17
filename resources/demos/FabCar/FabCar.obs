@@ -1,0 +1,270 @@
+contract Car {
+  string color;
+  string make;
+  string model;
+  string owner;
+
+  Car@Owned(string color, string make, string model, string owner) {
+    this.color = color;
+    this.make = make;
+    this.model = model;
+    this.owner = owner;
+  }
+
+  transaction getColor() returns string { return color; }
+  transaction getMake() returns string { return make; }
+  transaction getModel() returns string { return model; }
+  transaction getOwner() returns string { return owner; }
+
+  transaction toString() returns string {
+    return "{color='" + color + "',make='" + make + "',model='" + model + "'',owner='" + owner + "'}";
+  }
+}
+
+// I couldn't find anything about maps or arrays
+// in the documentation, but we can make linked lists!
+contract CarList {
+  state HasValue {
+    int id;
+    Car@Owned car;
+
+    CarList@Owned next;
+  }
+  state Nothing;
+
+  CarList@Owned() {
+    ->Nothing;
+  }
+
+  transaction setValue(CarList@Owned >> HasValue this, int theId, Car@Owned >> Unowned theCar) {
+    HasValue::id = theId;
+    HasValue::car = theCar;
+    HasValue::next = new CarList();
+    ->HasValue;
+  }
+
+  transaction setNext(CarList@HasValue this, CarList@Owned >> Unowned nextCar) {
+    this.next = nextCar;
+  }
+
+  /** Returns a copy of the Car data stored */
+  transaction getValue(CarList@HasValue this) returns Car@Owned {
+    return new Car(car.getColor(), car.getMake(), car.getModel(), car.getOwner());
+  }
+
+  // I tried having this return an owned Maybe[Car]
+  // but that caused a ReentrancyException.
+  transaction search(int targetId) returns Car@Unowned {
+    switch this {
+      case HasValue {
+        if (id == targetId) {
+          return car;
+        }
+
+        return next.search(targetId);
+      }
+
+      case Nothing {
+        revert "Car ID not found";
+      }
+    }
+  }
+
+  transaction exists(CarList@Owned this, int targetId) returns bool {
+    switch this {
+      case HasValue {
+        return id == targetId || next.exists(targetId);
+      }
+
+      case Nothing {
+        return false;
+      }
+    }
+  }
+
+  transaction toString() returns string {
+    switch this {
+      case HasValue {
+        // This avoids a trailing comma at the end of the list :)
+        switch next {
+          case HasValue {
+            return car.toString() + "," + next.toString();
+          }
+          case Nothing {
+            return car.toString();
+          }
+        }
+      }
+
+      // Only possible in the event that this list is empty
+      case Nothing {
+        return "";
+      }
+    }
+  }
+}
+
+main contract FabCar {
+  CarList@Owned cars;
+
+  FabCar@Owned() {
+    // Add some sample data
+    CarList tomoko = new CarList();
+    tomoko.setValue(1, new Car("blue", "toyota", "prius", "tomoko"));
+
+    CarList brad = new CarList();
+    brad.setValue(2, new Car("red", "ford", "mustang", "brad"));
+
+    CarList jinsoo = new CarList();
+    jinsoo.setValue(3, new Car("green", "hyundai", "tucson", "jinsoo"));
+
+    brad.setNext(jinsoo);
+    tomoko.setNext(brad);
+
+    cars = tomoko;
+  }
+
+  transaction queryAllCars() returns string {
+    return cars.toString();
+  }
+
+  transaction queryCar(int id) returns string {
+    return cars.search(id).toString();
+  }
+
+  transaction addCar(int id, string color, string make, string model, string owner) {
+    if (cars.exists(id)) {
+      revert "ID already exists";
+    }
+
+    CarList nextNode = new CarList();
+    nextNode.setValue(id, new Car(color, make, model, owner));
+
+    nextNode.setNext(cars);
+    cars = nextNode;
+  }
+}
+
+// The following uses a polymorphic dictionary
+// but currently doesn't work due to an issue
+// in the protobuf code
+
+//import "Comparator.obs"
+//import "Integer.obs"
+//import "Dict.obs"
+//
+//contract CarComparator implements Comparator[Car] {
+//  transaction equals(Car@Unowned a, Car@Unowned b) returns bool {
+//    return a.getColor() == b.getColor()
+//        && a.getMake() == b.getMake()
+//        && a.getModel() == b.getModel()
+//        && a.getOwner() == b.getOwner();
+//  }
+//}
+//
+//contract CarListPrinter implements Iterator[Integer, Car] {
+//  string text;
+//
+//  CarListPrinter@Owned() {
+//    text = "{";
+//  }
+//
+//  transaction performAction(Integer key, Car val, bool last) {
+//    if (last) {
+//      text = text + val.toString();
+//    }
+//    else {
+//      text = text + val.toString() + ",";
+//    }
+//  }
+//
+//  transaction finalize() returns string {
+//    text = text + "}";
+//
+//    return text;
+//  }
+//
+//  transaction getText() returns string {
+//    return text;
+//  }
+//}
+//
+//contract Car {
+//  string color;
+//  string make;
+//  string model;
+//  string owner;
+//
+//  Car@Owned(string color, string make, string model, string owner) {
+//    this.color = color;
+//    this.make = make;
+//    this.model = model;
+//    this.owner = owner;
+//  }
+//
+//  transaction getColor() returns string { return color; }
+//  transaction getMake() returns string { return make; }
+//  transaction getModel() returns string { return model; }
+//  transaction getOwner() returns string { return owner; }
+//
+//  transaction toString() returns string {
+//    return "{color='" + color + "',make='" + make + "',model='" + model + "',owner='" + owner + "'}";
+//  }
+//}
+//
+//main asset contract FabCar {
+//  // Map from car IDs to cars
+//  Dict[Integer, Car]@Owned cars;
+//
+//  FabCar@Owned() {
+//    // Add some sample data
+//    Car tomoko = new Car("blue", "toyota", "prius", "tomoko");
+//    Car brad = new Car("red", "ford", "mustang", "brad");
+//    Car jinsoo = new Car("green", "hyundai", "tucson", "jinsoo");
+//
+//    cars = new Dict[Integer, Car@Owned](new IntegerComparator());
+//    insertCar(0, tomoko);
+//    insertCar(1, brad);
+//    insertCar(2, jinsoo);
+//  }
+//
+//  private transaction insertCar(int id, Car car) {
+//    cars.insert(new Integer(id), car);
+//  }
+//
+//  transaction queryAllCars() returns string {
+//    CarListPrinter printer = new CarListPrinter();
+//    cars.iterate(printer);
+//    return printer.finalize();
+//  }
+//
+//  transaction queryCar(int id) returns string {
+//    Option[Car] maybeCar = cars.peek(new Integer(id));
+//
+//    switch maybeCar {
+//      case Some {
+//        return maybeCar.unpack().toString();
+//      }
+//      case None {
+//        revert("No such car");
+//      }
+//    }
+//  }
+//
+//  transaction addCar(int id, string color, string make, string model, string owner) {
+//    Integer key = new Integer(id);
+//    Car car = new Car(color, make, model, owner);
+//
+//    Option[Car@Unowned] prevCar = cars.peek(key);
+//    switch prevCar {
+//      case Some {
+//        disown prevCar;
+//        revert("Car with that ID already exists");
+//      }
+//      case None {
+//        disown prevCar;
+//        cars.insert(key, car);
+//      }
+//    }
+//  }
+//}
