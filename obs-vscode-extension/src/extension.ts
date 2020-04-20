@@ -4,12 +4,22 @@ import * as vscode from 'vscode';
 import * as fs from 'fs'
 import * as path from 'path'
 
+import {
+   LanguageClient,
+   LanguageClientOptions,
+   ServerOptions,
+   TransportKind,
+   RevealOutputChannelOn
+} from 'vscode-languageclient';
+
+
 interface ProjectConfig {
    chaincode: string; // Path within this project to the main chaincode contract
    client: string; // Path within this project to the main client contract
 }
 
 let taskProvider: vscode.Disposable | undefined;
+let languageClient: LanguageClient | null = null;
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -168,7 +178,35 @@ export function activate(context: vscode.ExtensionContext) {
       }
    });
 
-   context.subscriptions.push(runClientCommand);
+   // Initialize the LSP server, written in node
+   const serverModule = context.asAbsolutePath(path.join("server", "out", "server.js"));
+   // The debug options for the server
+   // --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
+   const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
+
+   // If the extension is launched in debug mode then the debug server options are used
+   // Otherwise the run options are used
+   const serverOptions: ServerOptions = {
+      run: { module: serverModule, transport: TransportKind.ipc },
+      debug: {
+            module: serverModule,
+            transport: TransportKind.ipc,
+            options: debugOptions
+      }
+   };
+
+   const clientOptions: LanguageClientOptions = {
+      documentSelector: [{ scheme: "file", language: "obs" }],
+      synchronize: {
+         fileEvents: [vscode.workspace.createFileSystemWatcher("**/*.obs")]
+      }
+   };
+
+   languageClient = new LanguageClient(
+      "obs-lsp", "Obsidian Language Server", 
+      serverOptions, clientOptions);
+
+   languageClient.start();
 }
 
    interface ObsidianCompilationTaskDefinition extends vscode.TaskDefinition {
@@ -425,4 +463,6 @@ export function activate(context: vscode.ExtensionContext) {
    }
 
 // this method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+   return languageClient?.stop();
+}

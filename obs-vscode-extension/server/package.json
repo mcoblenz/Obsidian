@@ -1,0 +1,10 @@
+{
+  "name": "obsidian-lsp-server",
+  "version": "1.0.0",
+  "description": "LSP implementation for Obsidian ",
+  "author": "Ishan",
+  "dependencies": {
+    "vscode-languageserver": "^6.1.1",
+    "vscode-languageserver-textdocument": "^1.0.1"
+  }
+}
