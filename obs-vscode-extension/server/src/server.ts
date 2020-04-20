@@ -19,12 +19,6 @@ connection.onInitialize((params: InitializeParams) => {
   }
 });
 
-interface CompilerError {
-  line: number;
-  column: number;
-  message: string;
-}
-
 async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument>) {
   connection.console.log("Validating document");
 
@@ -36,7 +30,9 @@ async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument
   await tmpFile.write(change.document.getText(), 0);
   tmpFile.close();
 
-  const errorRegex = /^.*\s(\d+)\.(\d+): (.*)$/;
+  const typecheckingError = /^.*\s(?<line>\d+)\.(?<col>\d+): (?<msg>.*)$/;
+  const parsingError = /Parser failure at (?<line>\d+).(?<col>\d+): (?<msg>.*)$/;
+  const syntaxError = /(?<msg>.*) at (?<line>\d+):(?<col>\d+)/;
 
   let stdout: string = "";
 
@@ -44,6 +40,7 @@ async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument
     stdout = process.execSync(`obsidianc "${tmpName}"`, { encoding: "utf8"});
   }
   catch (e) {
+    // node throws if a child process exits with nonzero status
     stdout = e.stdout.toString();
   }
   // Harvest messages from obsidianc
@@ -52,13 +49,18 @@ async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument
   // be null 
   const diagnostics: Diagnostic[] = <Diagnostic[]>
     stdout.split("\n")
-    .map((line: string) => {
-        const parseResult = errorRegex.exec(line);
-        if (parseResult === null) return null;
+    .map(line => {
+        const parseResult: RegExpExecArray | undefined = <RegExpExecArray | undefined>
+          [typecheckingError, parsingError, syntaxError]
+          .map(regex => regex.exec(line))
+          .find(x => x !== null);
+        if (parseResult === undefined) return null;
 
-        const errorLine = Number(parseResult[1]) - 1;
-        const errorColumn = Number(parseResult[2]) - 1;
-        const errorMessage = parseResult[3];
+        // The compiler reports positions where lines/cols
+        // start as 1, but vscode needs it starting from 0
+        const errorLine = Number(parseResult.groups!.line) - 1;
+        const errorColumn = Number(parseResult.groups!.col) - 1;
+        const errorMessage = parseResult.groups!.msg;
 
         const errorPosition = Position.create(errorLine, errorColumn);
         return Diagnostic.create(
