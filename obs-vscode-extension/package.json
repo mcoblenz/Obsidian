@@ -24,6 +24,7 @@
     ],
     "scripts": {
         "watch": "tsc -b -w",
+        "postinstall": "cd server && npm install",
         "compile": "tsc && cd server && tsc"
     },
     "contributes": {
