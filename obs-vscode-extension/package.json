@@ -17,14 +17,14 @@
         "@types/mocha": "^2.2.42",
         "@types/node": "^10.14.17",
         "tslint": "^5.12.1",
-        "typescript": "^3.3.1"
+        "typescript": "^3.8.3"
     },
     "categories": [
         "Programming Languages"
     ],
     "scripts": {
         "watch": "tsc -b -w",
-        "compile": "tsc && cd server && tsc" 
+        "compile": "tsc && cd server && tsc"
     },
     "contributes": {
         "languages": [
