@@ -23,7 +23,8 @@
         "Programming Languages"
     ],
     "scripts": {
-        "watch": "tsc -b -w"
+        "watch": "tsc -b -w",
+        "compile": "tsc && cd server && tsc" 
     },
     "contributes": {
         "languages": [

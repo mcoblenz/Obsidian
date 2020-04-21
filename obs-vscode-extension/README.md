@@ -13,7 +13,8 @@
 
 ## Usage
 
-* tsc
+* npm install 
+* npm run compile 
 * vsce package
 * code --install-extension obsidian-0.0.1.vsix 
 * Restart VSCode.
