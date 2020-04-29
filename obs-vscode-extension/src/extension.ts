@@ -191,7 +191,7 @@ export function activate(context: vscode.ExtensionContext) {
       debug: {
             module: serverModule,
             transport: TransportKind.ipc,
-            options: debugOptions
+            options: debugOptions,
       }
    };
 
@@ -199,6 +199,10 @@ export function activate(context: vscode.ExtensionContext) {
       documentSelector: [{ scheme: "file", language: "obs" }],
       synchronize: {
          fileEvents: [vscode.workspace.createFileSystemWatcher("**/*.obs")]
+      },
+      uriConverters: {
+         code2Protocol: (uri: vscode.Uri) => uri.fsPath,
+         protocol2Code: vscode.Uri.parse
       }
    };
 

@@ -3,6 +3,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 import * as process from "child_process";
 import { promises as fs } from "fs";
+import * as path from "path";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -37,11 +38,13 @@ async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument
   let stdout: string = "";
 
   try {
-    stdout = process.execSync(`obsidianc "${tmpName}"`, { encoding: "utf8"});
+    stdout = process.execSync(`obsidianc "${tmpName}" -L "${path.dirname(change.document.uri)}"`, { 
+      encoding: "utf8"
+    });
   }
   catch (e) {
     // node throws if a child process exits with nonzero status
-    stdout = e.stdout.toString();
+    stdout = e.stdout?.toString() || "";
   }
   // Harvest messages from obsidianc
   // Type assertion is required since TypeScript

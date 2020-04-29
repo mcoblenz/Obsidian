@@ -24,7 +24,8 @@ case class CompilerOptions (outputPath: Option[String],
                             typeCheckerDebug: Boolean,
                             printTokens: Boolean,
                             printAST: Boolean,
-                            buildClient: Boolean)
+                            buildClient: Boolean,
+                            includePaths: List[Path])
 
 object Main {
 
@@ -38,12 +39,14 @@ object Main {
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
+          |    -L <dir>                     resolve import statements using <dir>
         """.stripMargin
 
     def parseOptions(args: List[String]): CompilerOptions = {
         var outputPath: Option[String] = None
         var debugPath: Option[String] = None
         var inputFiles: List[String] = List.empty
+        var includePaths: List[Path] = List.empty
         var verbose = false
         var checkerDebug = false
         var printTokens = false
@@ -74,6 +77,18 @@ object Main {
                 case "--build-client" :: tail =>
                     buildClient = true
                     parseOptionsRec(tail)
+
+                case "-L" :: dir :: tail =>
+                    val path = Paths.get(dir)
+                    if (Files.exists(path) && Files.isDirectory(path)) {
+                        includePaths = path :: includePaths
+                        parseOptionsRec(tail)
+                    }
+                    else {
+                        println("import path directory '" + dir + "' does not exist or is not a directory")
+                        sys.exit(2)
+                    }
+
                 case option :: tail =>
                     if (option.startsWith("--") || option.startsWith("-")) {
                         println("Unknown option " + option)
@@ -103,8 +118,10 @@ object Main {
             sys.exit(2)
         }
 
+        // We want to check include paths in the order they are specified on
+        // the command line, so we reverse them to get them in the right order
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
-                        printTokens, printAST, buildClient)
+                        printTokens, printAST, buildClient, includePaths.reverse)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -267,7 +284,7 @@ object Main {
                 println()
             }
 
-            val (importsProcessedAst, importErrors) = ImportProcessor.processImports(filename, ast)
+            val (importsProcessedAst, importErrors) = ImportProcessor.processImports(filename, options.includePaths, ast)
             val fieldsLiftedAst = StateFieldTransformer.transformProgram(importsProcessedAst)
 
             val set = new HashSet[String]
