@@ -12,10 +12,6 @@ connection.onInitialize((params: InitializeParams) => {
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Full,
-      // completionProvider: {
-      //   triggerCharacters: ["."],
-      //   resolveProvider: false
-      // }
     }
   }
 });
@@ -43,7 +39,8 @@ async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument
     });
   }
   catch (e) {
-    // node throws if a child process exits with nonzero status
+    // node throws if a child process exits with nonzero status,
+    // so we have to capture the process' stdout here 
     stdout = e.stdout?.toString() || "";
   }
   // Harvest messages from obsidianc
