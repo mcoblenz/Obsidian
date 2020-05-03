@@ -13,9 +13,21 @@
 
 ## Usage
 
-* tsc
+Compiling: 
+* npm install 
+* npm run compile
+
+To develop the extension/LSP:
+* code -n . (to open the project in vscode) 
+* Go to the "Run" menu on the left 
+* First, start "Launch client"
+* The extension will open in a new VSCode window
+* Now select "Attach to server"
+* You can now trigger breakpoints, etc. 
+
+To install:
 * vsce package
-* code --install-extension obsidian-0.0.1.vsix 
+* code --install-extension obsidian-\*.vsix 
 * Restart VSCode.
 
 ## Citations

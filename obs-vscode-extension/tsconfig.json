@@ -8,5 +8,6 @@
 		"rootDir": "src"
 	},
 	"include": ["src"],
+	"compileOnSave": true,
 	"exclude": ["node_modules", ".vscode-test"]
 }

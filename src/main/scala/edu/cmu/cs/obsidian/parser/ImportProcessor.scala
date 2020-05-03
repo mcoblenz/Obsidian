@@ -42,8 +42,12 @@ object ImportProcessor {
         }
     }
 
-    private def searchPaths(importingFile: String, fileName: String): Option[(String, InputStream)] = {
-        val searchFs = List(relativePath(importingFile, _: String), standardLibraryPath(_), compilerPath(_))
+    private def searchPaths(importingFile: String, fileName: String, includePaths: List[Path]): Option[(String, InputStream)] = {
+        val searchFs = List(
+            relativePath(importingFile, _: String),
+            standardLibraryPath(_),
+            compilerPath(_)) ++ includePaths.map(path => resolvePathAndInputStream(path, _: String))
+
         for (searchF <- searchFs) {
             searchF(fileName) match {
                 case Some(x) => return Some(x)
@@ -54,17 +58,19 @@ object ImportProcessor {
         None
     }
 
-    def processImports(inFile: String, ast: Program): (Program, Seq[ErrorRecord]) = {
+    // Requires that all paths in includePaths exist and are directories
+    def processImports(inFile: String, includePaths: List[Path], ast: Program): (Program, Seq[ErrorRecord]) = {
+        var importErrors: Seq[ErrorRecord] = Seq.empty[ErrorRecord]
+
         if (filesAlreadyProcessed.contains(inFile)) {
             (ast, Seq.empty)
         } else {
             filesAlreadyProcessed.add(inFile)
 
             var allContracts = ast.contracts
-            var importErrors: Seq[ErrorRecord] = Seq.empty[ErrorRecord]
 
             ast.imports.foreach(i => {
-                val contracts = processImport(i.name, filesAlreadyProcessed, i.loc, inFile)
+                val contracts = processImport(i.name, filesAlreadyProcessed, i.loc, inFile, includePaths)
 
                 contracts match {
                     case Left(error) =>
@@ -78,8 +84,8 @@ object ImportProcessor {
         }
     }
 
-    def processImport(importPath: String, seenFiles: mutable.HashSet[String], importPos: Position, importFilename: String) : Either[ErrorRecord, Seq[Contract]] = {
-        searchPaths(importFilename, importPath) match {
+    def processImport(importPath: String, seenFiles: mutable.HashSet[String], importPos: Position, importFilename: String, includePaths: List[Path]) : Either[ErrorRecord, Seq[Contract]] = {
+        searchPaths(importFilename, importPath, includePaths) match {
             case Some((resolvedImportPath, inputStream)) => {
                 if (!seenFiles.contains(resolvedImportPath)) {
                     val importedProgram = Parser.parseFileAtPath(resolvedImportPath, inputStream, printTokens = false)
@@ -89,7 +95,7 @@ object ImportProcessor {
                     seenFiles.add(resolvedImportPath)
 
                     importedProgram.imports.foreach(i => {
-                        processImport(i.name, seenFiles, i.loc, resolvedImportPath) match {
+                        processImport(i.name, seenFiles, i.loc, resolvedImportPath, includePaths) match {
                             case Left(err) => return Left(err)
                             case Right(c) => contracts = c ++ contracts
                         }

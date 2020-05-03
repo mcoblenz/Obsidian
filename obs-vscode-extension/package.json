@@ -4,9 +4,9 @@
     "publisher": "mcoblenz",
     "repository": "http://www.github.com/mcoblenz/Obsidian",
     "description": "support for Obsidian language.",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "engines": {
-        "vscode": "^1.35.0"
+        "vscode": "^1.43.2"
     },
     "main": "./out/extension.js",
     "activationEvents": [
@@ -17,12 +17,16 @@
         "@types/mocha": "^2.2.42",
         "@types/node": "^10.14.17",
         "tslint": "^5.12.1",
-        "typescript": "^3.3.1",
-        "vscode": "^1.1.34"
+        "typescript": "^3.8.3"
     },
     "categories": [
         "Programming Languages"
     ],
+    "scripts": {
+        "watch": "tsc -b -w",
+        "postinstall": "cd server && npm install",
+        "compile": "tsc && cd server && tsc"
+    },
     "contributes": {
         "languages": [
             {
@@ -100,13 +104,13 @@
                 "title": "Obsidian: Compile client"
             },
             {
-               "command": "extension.runObsidianClient",
-               "title": "Obsidian: Compile and run client"
-           },
+                "command": "extension.runObsidianClient",
+                "title": "Obsidian: Compile and run client"
+            },
             {
-               "command": "extension.obsidianDown",
-               "title": "Obsidian: Stop Fabric network"
-           }
+                "command": "extension.obsidianDown",
+                "title": "Obsidian: Stop Fabric network"
+            }
         ],
         "problemMatchers": [
             {
@@ -127,6 +131,7 @@
         ]
     },
     "dependencies": {
-        "child_process": "^1.0.2"
+        "@types/vscode": "^1.1.36",
+        "vscode-languageclient": "^6.1.3"
     }
 }
