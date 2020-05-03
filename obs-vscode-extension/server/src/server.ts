@@ -2,8 +2,9 @@ import { createConnection, ProposedFeatures, TextDocuments, InitializeParams, Te
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import * as process from "child_process";
-import { promises as fs } from "fs";
 import * as path from "path";
+import * as os from "os";
+import { promises as fs } from "fs";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -22,7 +23,7 @@ async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument
   // Create temporary file containing the current set of changes 
   // TODO: Modify obsidianc to accept source code via stdin instead 
   // Note: obsidianc crashes if the source file begins with a dot
-  const tmpName = __dirname + "/ObsidianLSPTmp.obs"
+  const tmpName = os.tmpdir() + "/ObsidianLSPTmp.obs"
   const tmpFile = await fs.open(tmpName, "w+");
   await tmpFile.write(change.document.getText(), 0);
   tmpFile.close();

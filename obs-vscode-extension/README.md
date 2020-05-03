@@ -27,7 +27,7 @@ To develop the extension/LSP:
 
 To install:
 * vsce package
-* code --install-extension obsidian-0.0.1.vsix 
+* code --install-extension obsidian-\*.vsix 
 * Restart VSCode.
 
 ## Citations
