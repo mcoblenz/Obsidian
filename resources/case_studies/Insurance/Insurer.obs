@@ -6,17 +6,17 @@ import "TimeService.obs"
 
 main asset contract Insurer {
     Money@Owned money;
-    Bank@Shared bank;
+    Bank@Unowned bank;
     TimeService@Shared timeService;
 
-    Insurer@Owned(TimeService@Shared ts, Bank@Shared b, Money@Owned >> Unowned m) {
+    Insurer@Owned(TimeService@Shared ts, Bank@Unowned b, Money@Owned >> Unowned m) {
         timeService = ts;
         bank = b;
         money = m;
     }
 
     // TODO : Calculate Bid using some needed information, for now just int
-    transaction requestBid(int longitude, int latitude, int radius, int moistureContent, int payout) returns InsuranceBid@Owned {
+    transaction requestBid(int longitude, int latitude, int radius, int moistureContent, int payout) returns InsuranceBid@HoldingPayout {
         // For now, assume 10% of policies will have to pay out, and we're keeping a $10 profit.
         // Obviously this is oversimplified.
         int costOfBid = payout / 10 + 10;

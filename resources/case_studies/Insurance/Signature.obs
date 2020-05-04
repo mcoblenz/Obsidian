@@ -4,7 +4,7 @@ contract Signature {
 	string signature; // If we had arrays of bytes, we'd use those, but we don't.
 
 	// Constructor makes a Signature object that corresponds to a particular object.
-	Signature (WeatherRecord c) {
+	Signature@Owned (WeatherRecord c) {
 	    signature = ""; // TODO
 	}
 

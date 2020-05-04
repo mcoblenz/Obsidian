@@ -1,29 +1,32 @@
 import "Money.obs"
 
-main asset contract InsuranceBid {
+main contract InsuranceBid {
     int cost;
     int expirationTime;
-    Money@Owned payout;
 
-    InsuranceBid@Owned(int c, int expiration, Money@Owned >> Unowned m) {
+    asset state HoldingPayout {
+        Money@Owned payout;
+    }
+    state NoPayout;
+
+    InsuranceBid@HoldingPayout(int c, int expiration, Money@Owned >> Unowned m) {
         cost = c;
         expirationTime = expiration;
-        payout = m;
+        ->HoldingPayout(payout = m);
     }
 
-    transaction getCost() returns int {
+    transaction getCost(InsuranceBid@Unowned this) returns int {
         return cost;
     }
 
-    transaction getExpirationTime() returns int {
+    transaction getExpirationTime(InsuranceBid@Unowned this) returns int {
         return expirationTime;
     }
 
-    transaction getPayout() returns Money@Owned {
-        Money zeroMoney = new Money(0);
-        Money payoutCopy = payout;
-        payout = zeroMoney;
-        return payoutCopy;
+    transaction getPayout(InsuranceBid@HoldingPayout >> NoPayout this) returns Money@Owned {
+        Money p = payout;
+        ->NoPayout;
+        return p;
     }
 
 
