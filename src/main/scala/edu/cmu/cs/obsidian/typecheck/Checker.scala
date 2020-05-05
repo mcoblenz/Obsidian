@@ -2180,13 +2180,18 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         // If a given switch case is guaranteed to return, then if it DID run, then the code BELOW this will NEVER run, so
                         // we need not merge the case's output context in.
                         val (firstCaseOutputContext, newCase) = checkSwitchCase(switchCase)
+                        val firstCaseExits = hasReturnStatementDontLog(switchCase.body) || firstCaseOutputContext.isThrown
 
-                        val initialContextToMerge = if (hasReturnStatementDontLog(switchCase.body)) contextPrime else firstCaseOutputContext
+
+                        var foundNonExitingCaseYet = !firstCaseExits
+                        val initialContextToMerge = if (firstCaseExits) contextPrime else firstCaseOutputContext
                         val restCases = cases.tail
                         restCases.foldLeft((initialContextToMerge, Seq(newCase)))((prev: (Context, Seq[SwitchCase]), sc: SwitchCase) => {
                             val (newContext, newCase) = checkSwitchCase(sc)
                             val caseExits = hasReturnStatementDontLog(sc.body) || newContext.isThrown
-                            (mergeContext(s, prev._1, newContext, false, caseExits), newCase +: prev._2)
+                            val res = (mergeContext(s, prev._1, newContext, !foundNonExitingCaseYet, caseExits), newCase +: prev._2)
+                            foundNonExitingCaseYet = foundNonExitingCaseYet || caseExits
+                            res
                         })
                 }
 
