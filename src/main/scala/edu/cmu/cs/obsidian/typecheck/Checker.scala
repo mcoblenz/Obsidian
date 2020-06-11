@@ -893,7 +893,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                     .constructors
                                     .map(constr => (constr.args, constr))
 
-                 val result = checkArgs(e, context, constrSpecs, args)
+                 val result = checkArgs(e, context, constrSpecs.to(collection.immutable.Seq), args)
 
                  val (exprList, simpleType, contextPrime) = result match {
                      // Even if the args didn't check, we can still output a type
@@ -2914,7 +2914,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                     implementOk(table, obsContract, obsContract.bound.contractName, obsContract.declarations, boundDecls)
                     newDecls = obsContract.declarations.map(checkDeclaration(table))
-                    checkConstructorDistinguishibility(table.constructors, obsContract, table)
+                    checkConstructorDistinguishibility(table.constructors.to(collection.immutable.Seq), obsContract, table)
                 }
 
                 obsContract.copy(declarations = newDecls)
@@ -2948,6 +2948,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
         val newContracts = globalTable.ast.contracts.map(checkDiffContract)
 
-        (errors, new SymbolTable(Program(globalTable.ast.imports, newContracts)))
+        (errors.toSeq, new SymbolTable(Program(globalTable.ast.imports, newContracts)))
     }
 }

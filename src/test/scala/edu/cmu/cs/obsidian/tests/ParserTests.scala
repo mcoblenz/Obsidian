@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian.tests
 
-import org.scalatest.junit.JUnitSuite
+import org.scalatestplus.junit.JUnitSuite
 import org.junit.Test
 import org.junit.Assert.assertTrue
 import edu.cmu.cs.obsidian.lexer._
@@ -35,7 +35,7 @@ class ParserTests extends JUnitSuite {
 
     private def shouldSucceed(src: String): Unit = {
         val result = parse(src)
-        val message: String = if (result.isRight) "" else result.left.get
+        val message: String = result.swap.getOrElse("")
         assertTrue(message, result.isRight)
     }
 
@@ -58,7 +58,7 @@ class ParserTests extends JUnitSuite {
 
     private def shouldEqual(src: String, ast: AST): Unit = {
         val result = parse(src)
-        assertTrue(result.isRight && result.right.get == ast)
+        assertTrue(result.isRight && result.getOrElse(null) == ast)
     }
 
     private def shouldEqual(src1: String, src2: String): Unit = {

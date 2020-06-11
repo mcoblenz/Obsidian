@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/Obsidian.iml" filepath="$PROJECT_DIR$/.idea/modules/Obsidian.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/Obsidian-build.iml" filepath="$PROJECT_DIR$/.idea/modules/Obsidian-build.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/project-Obsidian-build.iml" filepath="$PROJECT_DIR$/.idea/modules/project-Obsidian-build.iml" />
     </modules>
   </component>
 </project>

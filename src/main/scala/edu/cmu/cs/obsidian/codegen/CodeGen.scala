@@ -8,7 +8,7 @@ import com.helger.jcodemodel._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.{mutable, _}
 
 
@@ -633,13 +633,14 @@ class CodeGen (val target: Target, table: SymbolTable) {
             * the necessary information for the table */
             var fieldLookup = generalizedPartition[(State, Field), String](fields.toList, _._2.name)
                 .transform(fieldInfoFunc)
-            var txLookup = Map.empty[String, TransactionInfo]
+            var txLookup = immutable.Map.empty[String, TransactionInfo]
 
             /* add on any whole-contract declarations to the lookup table: these are fairly simple */
             for (decl <- contract.declarations) {
                 decl match {
                     case f: Field => fieldLookup = fieldLookup.updated(f.name, GlobalFieldInfo(f))
-                    case t: Transaction => txLookup = txLookup.updated(t.name, GlobalTransactionInfo(t))
+                    case t: Transaction =>
+                        txLookup = txLookup + (t.name -> GlobalTransactionInfo(t))
                     case _ => ()
                 }
             }
@@ -679,7 +680,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                         innerClassField = innerClassField
                     )
 
-                stateLookup = stateLookup.insert(s.name, context)
+                stateLookup = stateLookup.updated(s.name, context)
             }
         }
 
@@ -698,7 +699,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             stateEnumField = stateEnumField,
             txLookup = txLookup,
             fieldLookup = fieldLookup,
-            pendingFieldAssignments = Set.empty
+            pendingFieldAssignments = immutable.Set.empty
         )
 
         /* i.e. if this contract defines any type states */
@@ -1016,8 +1017,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
         def checkState(argName: String)(st: String): IJExpression =
             invokeGetState(JExpr.ref(argName), true).invoke("toString").invoke("equals").arg(JExpr.lit(st))
 
-        def anyExpr(exprs: TraversableOnce[IJExpression]): IJExpression = exprs.fold(JExpr.FALSE)(_.cor(_))
-        def allExpr(exprs: TraversableOnce[IJExpression]): IJExpression = exprs.fold(JExpr.TRUE)(_.cand(_))
+        def anyExpr(exprs: IterableOnce[IJExpression]): IJExpression = exprs.iterator.fold(JExpr.FALSE)(_.cor(_))
+        def allExpr(exprs: IterableOnce[IJExpression]): IJExpression = exprs.iterator.fold(JExpr.TRUE)(_.cand(_))
 
         // Because constructor may have different parameter names, we make copies of parameters with multiple names as appropriate
         def genArgCopy(argPair: (VariableDeclWithSpec, String)): Unit = argPair match {
@@ -1679,12 +1680,12 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
                     val newTypeArgs = resolveTypeVars(translationContext.contract, txArg.typIn.typeParams)
 
-                    val javaArgType = resolveType(txArg.typIn.withParams(newTypeArgs), table)
+                    val javaArgType = resolveType(txArg.typIn.withParams(newTypeArgs.to(collection.immutable.Seq)), table)
                     val errorBlock = new JBlock()
 
                     val transactionArgExpr =
                         unmarshallExprExpectingFullObjects(translationContext, enoughArgs, runArg,
-                            txArg.typIn.withParams(newTypeArgs),
+                            txArg.typIn.withParams(newTypeArgs.to(collection.immutable.Seq)),
                             txArg.typOut, errorBlock, runArgNumber)
 
                     val newTxArg: JVar = enoughArgs.decl(
@@ -2963,7 +2964,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
     private def generateInitializer(
                                             newClass: JDefinedClass,
                                             translationContext: TranslationContext,
-                                            aContract: Contract) {
+                                            aContract: Contract) : Unit = {
         val methodName = "new_" + newClass.name()
 
         val meth: JMethod = newClass.method(JMod.PRIVATE, model.VOID, methodName)
@@ -3158,7 +3159,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
             jTry._finally().assign(isInsideInvocationFlag(), JExpr.lit(false))
 
             // Clear any pending field assignments between transactions.
-            translationContext.pendingFieldAssignments = Set.empty
+            translationContext.pendingFieldAssignments = immutable.Set.empty
         }
 
         meth
@@ -3236,7 +3237,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     body: JBlock,
                     statement: Statement,
                     translationContext: TranslationContext,
-                    localContext: Map[String, JVar]): Map[String, JVar] = {
+                    localContext: immutable.Map[String, JVar]): immutable.Map[String, JVar] = {
         var nextContext = localContext
         statement match {
             case VariableDecl(typ, name) =>
@@ -3244,9 +3245,9 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     case BoolType() => JExpr.lit(false)
                     case _ => JExpr._null()
                 }
-                nextContext = localContext.updated(name, body.decl(resolveType(typ, table), name, initializer))
+                nextContext = localContext + (name -> body.decl(resolveType(typ, table), name, initializer))
             case VariableDeclWithInit(typ, name, e) =>
-                nextContext = localContext.updated(name, body.decl(resolveType(typ, table), name, translateExpr(e, translationContext, localContext)))
+                nextContext = localContext + (name -> body.decl(resolveType(typ, table), name, translateExpr(e, translationContext, localContext)))
             case Return() => body._return()
             case ReturnExpr(e) => body._return(translateExpr(e, translationContext, localContext))
             case Transition(newStateName, updates, permission) =>
@@ -3299,7 +3300,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     translationContext.assignVariable(fieldName, JExpr.ref(stateInitializationVariableName(newStateName, fieldName)), body, true)
                 }
 
-                translationContext.pendingFieldAssignments = Set.empty
+                translationContext.pendingFieldAssignments = immutable.Set.empty
             case Assignment(ReferenceIdentifier(x), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext, false)
@@ -3433,7 +3434,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     body: JBlock,
                     statements: Seq[Statement],
                     translationContext: TranslationContext,
-                    localContext: Map[String, JVar]): Unit = {
+                    localContext: immutable.Map[String, JVar]): Unit = {
         var nextContext = localContext
         for (st <- statements) {
             nextContext = translateStatement(body, st, translationContext, nextContext)

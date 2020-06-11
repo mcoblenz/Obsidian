@@ -3,14 +3,14 @@ package edu.cmu.cs.obsidian.util
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck._
 
-import scala.collection.Map
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable
+import scala.collection.immutable.TreeMap
 import scala.util.parsing.input.Position
 
 class IdentityAstTransformer {
 
     type FoldFunc[TFrom, TTo] = Int
-    type Context = Map[String, ObsidianType]
+    type Context = immutable.Map[String, ObsidianType]
     val emptyContext = new TreeMap[String, ObsidianType]()
 
     var currentContractSourcePath = ""
@@ -342,18 +342,18 @@ class IdentityAstTransformer {
         s match {
             case oldDecl@VariableDecl(typ, varName) =>
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
-                (oldDecl.copy(typ = newTyp).setLoc(oldDecl), context.updated(varName, newTyp), errors)
+                (oldDecl.copy(typ = newTyp).setLoc(oldDecl), context + (varName -> newTyp), errors)
             case oldDecl@VariableDeclWithSpec(typIn, typOut, varName) =>
                 val (newTypIn, errorsIn) = transformType(table, lexicallyInsideOf, context, typIn, s.loc, params)
                 val (newTypOut, errorsOut) = transformType(table, lexicallyInsideOf, context, typOut, s.loc, params)
                 val newDecl = oldDecl.copy(typIn = newTypIn, typOut = newTypOut)
                 val totalErrors = errorsIn ++ errorsOut
-                (newDecl, context.updated(varName, newTypIn), totalErrors)
+                (newDecl, context + (varName -> newTypIn), totalErrors)
             case oldDecl@VariableDeclWithInit(typ, varName, e) =>
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
                 val (newE, exprErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)
                 val newDecl = oldDecl.copy(typ = newTyp, e = newE).setLoc(oldDecl)
-                (newDecl, context.updated(varName, newTyp), errors ++ exprErrors)
+                (newDecl, context + (varName -> newTyp), errors ++ exprErrors)
             case r@Return() => (r, context, Seq())
             case r@ReturnExpr(e) =>
                 val (newE, exprErrors) = transformExpression(table, lexicallyInsideOf, context, e, params)

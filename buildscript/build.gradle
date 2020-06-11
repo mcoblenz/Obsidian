@@ -37,6 +37,7 @@ dependencies {
     compile 'org.glassfish:javax.json:1.1.0-M1'
     compile 'org.json:json:20171018'
     compile 'com.google.protobuf:protobuf-java:3.11.4'
+    compile ''
 }
 
 version = '1.0'

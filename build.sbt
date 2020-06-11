@@ -2,7 +2,7 @@ name := "Obsidian"
 
 version := "0.1"
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.13.2"
 
 organization := "edu.cmu.cs.obsidian"
 
@@ -11,7 +11,7 @@ resolvers += "Jitpack" at "https://www.jitpack.io"
 
 scalacOptions := Seq("-unchecked", "-deprecation")
 
-libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
+libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2"
 
 assemblyJarName in assembly := "obsidianc.jar"
 
@@ -24,10 +24,12 @@ includeFilter in (Compile, unmanagedResources) := "*.obs"
 trapExit := false
 
 /* testing dependencies */
-libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.1" % "test"
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
-
 libraryDependencies += "junit" % "junit" % "4.12" % "test"
+libraryDependencies += "org.scalactic" %% "scalactic" % "3.1.2" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.1.2" % "test"
+libraryDependencies += "org.scalatestplus" %% "scalatestplus-junit" % "1.0.0-M2"
+
+
 libraryDependencies += "com.google.protobuf" % "protobuf-java" % "3.11.4"
 libraryDependencies += "org.hyperledger.fabric-chaincode-java" % "fabric-chaincode-shim" % "1.4.4"
 libraryDependencies += "com.helger" % "jcodemodel" % "3.3.0"

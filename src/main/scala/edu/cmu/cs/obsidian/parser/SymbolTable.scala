@@ -98,7 +98,7 @@ class ContractTable(
       */
     def substitute(typeArgs: Seq[ObsidianType]): ContractTable = {
         val newContract = contract match {
-            case obsCon: ObsidianContractImpl => obsCon.substitute(obsCon.params, typeArgs)
+            case obsCon: ObsidianContractImpl => obsCon.substitute(obsCon.params, typeArgs.to(collection.immutable.Seq))
             case javacon : JavaFFIContractImpl => javacon
         }
 
@@ -149,15 +149,15 @@ class ContractTable(
         }
 
     val stateLookup: Map[String, StateTable] = {
-        indexDecl[State](contract.declarations, StateDeclTag).mapValues(
+        indexDecl[State](contract.declarations, StateDeclTag).view.mapValues(
             (st: State) => new StateTable(st, this)
-        )
+        ).toMap
     }
 
     val childContractLookup: Map[String, ContractTable] = {
-        indexDecl[Contract](contract.declarations, ContractDeclTag).mapValues(
+        indexDecl[Contract](contract.declarations, ContractDeclTag).view.mapValues(
             (ct: Contract) => new ContractTable(ct, symbolTable, this)
-        )
+        ).toMap
     }
 
     val contractTable: ContractTable = this

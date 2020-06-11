@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.tests
 import edu.cmu.cs.obsidian.lexer._
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.scalatest.junit.JUnitSuite
+import org.scalatestplus.junit.JUnitSuite
 
 class LexerTests extends JUnitSuite {
 
@@ -22,7 +22,7 @@ class LexerTests extends JUnitSuite {
 
     private def shouldEqual(src: String, tokens: Seq[Token]): Unit = {
         val result = Lexer.tokenize(src)
-        assertTrue(result.isRight && result.right.get == tokens)
+        assertTrue(result.isRight && result.getOrElse(null) == tokens)
     }
 
     private def shouldEqual(src1: String, src2: String): Unit = {

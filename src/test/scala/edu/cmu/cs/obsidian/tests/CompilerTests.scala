@@ -4,7 +4,7 @@ package edu.cmu.cs.obsidian.tests
 import _root_.org.junit.Test
 import edu.cmu.cs.obsidian._
 import org.junit.Assert.assertTrue
-import org.scalatest.junit.JUnitSuite
+import org.scalatestplus.junit.JUnitSuite
 
 import scala.sys.process._
 
