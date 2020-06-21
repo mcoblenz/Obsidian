@@ -58,7 +58,7 @@ case class TranslationContext(
 
     // When we encounter a state initializer, we generate an instance of the inner class and set up its fields as requested.
     // At transition time, we make sure that all the fields have been initialized.
-    var pendingFieldAssignments: Set[String]
+    var pendingFieldAssignments: immutable.Set[String]
 ) {
     val StaticMemberReference = "out"
     /* gets the enum if it exists, fails otherwise */

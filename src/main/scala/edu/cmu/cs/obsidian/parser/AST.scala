@@ -339,8 +339,8 @@ case class Transaction(name: String,
             isPrivate,
             thisType.substitute(genericParams, actualParams).asInstanceOf[NonPrimitiveType],
             thisFinalType.substitute(genericParams, actualParams).asInstanceOf[NonPrimitiveType],
-            initialFieldTypes.mapValues(_.substitute(genericParams, actualParams)),
-            finalFieldTypes.mapValues(_.substitute(genericParams, actualParams)))
+            initialFieldTypes.view.mapValues(_.substitute(genericParams, actualParams)).toMap,
+            finalFieldTypes.view.mapValues(_.substitute(genericParams, actualParams)).toMap)
             .setLoc(this)
 
     def declarationStr: String =
