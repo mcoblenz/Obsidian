@@ -13,7 +13,7 @@ import edu.cmu.cs.obsidian.util.Util
 import org.apache.commons.io.FileUtils
 import scala.sys.process._
 
-object CodeGenJava {
+object CodeGenJava extends CodeGenerator{
 
     def translateServerASTToJava(ast: Program, protobufOuterClassName: String, table: SymbolTable): Either[String, JCodeModel] = {
         // Server must have a main contract.
