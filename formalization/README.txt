@@ -1,0 +1,2 @@
+This directory contains a mechanization in Agda of a very small fragment of 
+Silica, consisting only of variables. I stopped working on this after determining that mechanizing the entire Silica language would take a prohibitive amount of time. Nonetheless, some key properties of Silica are proved here, so I am keeping this around as evidence of those properties.
