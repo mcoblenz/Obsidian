@@ -11,8 +11,9 @@ organization := "edu.cmu.cs.obsidian"
 libraryDependencies += "com.github.spullara.mustache.java" % "compiler" % "0.9.6"
 
 // For dependencies of fabric-chaincode.
-// We previously used Bintray, but it seemed unreliable; Travis builds failed occasionally.
+resolvers += "Jitpack" at "https://www.jitpack.io"
 resolvers += Resolver.jcenterRepo
+
 
 scalacOptions := Seq("-unchecked", "-deprecation")
 
