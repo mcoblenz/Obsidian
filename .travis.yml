@@ -1,7 +1,7 @@
 dist: trusty
 language: scala
 scala:
-    - 2.12.4
+    - 2.13.2
 
 # This may be necessary depending on the tests we eventually run. For example,
 # the chaincode base server uses "java.util.Base64", which is only supported
@@ -19,7 +19,7 @@ before_install:
 
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
-  - sbt ++2.12.4 test
+  - sbt ++2.13.2 test
   - bash travis_specific/tests.sh
 
 cache:
