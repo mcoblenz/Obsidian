@@ -7,7 +7,8 @@ scalaVersion := "2.13.2"
 organization := "edu.cmu.cs.obsidian"
 
 // For dependencies of fabric-chaincode.
-resolvers += "Jitpack" at "https://www.jitpack.io"
+// We previously used Bintray, but it seemed unreliable; Travis builds failed occasionally.
+resolvers += Resolver.jcenterRepo
 
 scalacOptions := Seq("-unchecked", "-deprecation")
 
