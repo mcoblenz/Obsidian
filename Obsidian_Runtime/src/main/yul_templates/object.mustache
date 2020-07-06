@@ -1,0 +1,21 @@
+object "{{creationObject}}" {
+    code {
+        {{memoryInit}}
+        {{callValueCheck}}
+        {{?notLibrary}}
+        {{?constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
+        {{implicitConstructor}}({{constructorParams}})
+        {{/notLibrary}}
+        {{deploy}}
+        {{functions}}
+    }
+    object "{{runtimeObject}}" {
+        code {
+            {{memoryInit}}
+            {{dispatch}}
+            {{runtimeFunctions}}
+        }
+        {{runtimeSubObjects}}
+    }
+    {{subObjects}}
+}
