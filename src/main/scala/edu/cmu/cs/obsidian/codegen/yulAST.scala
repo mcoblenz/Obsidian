@@ -8,7 +8,7 @@ object LiteralKind extends Enumeration {
     val number, boolean, string = Value
 }
 trait Expression extends YulAST
-trait Statement extends YulAST
+trait YulStatement extends YulAST
 
 
 // for each asm struct, create a case class
@@ -19,18 +19,18 @@ case class Literal(kind:LiteralKind.LiteralKind, value: String, vtype: String) e
 case class Identifier(name: String) extends Expression
 case class FunctionCall(functionName: Identifier, arguements: Seq[Expression]) extends Expression
 
-case class Assignment(variableNames: Seq[Identifier], value: Expression) extends Statement
-case class VariableDeclaration(variables: Seq[TypedName]) extends Statement
+case class Assignment(variableNames: Seq[Identifier], value: Expression) extends YulStatement
+case class VariableDeclaration(variables: Seq[TypedName]) extends YulStatement
 case class FunctionDefinition(name:String, parameters:Seq[TypedName],
-                              returnVariables:Seq[TypedName],body: Block) extends Statement
-case class If(condition: Expression, body: Block) extends Statement
-case class Switch(expression: Expression, cases: Seq[Case]) extends Statement
-case class ForLoop(pre: Block, condition: Expression, post: Block, body: Block) extends Statement
-case class Break() extends Statement
-case class Continue() extends Statement
-case class Leave() extends Statement
-case class ExpressionStatement(expression:Expression) extends Statement
-case class Block(statements: Seq[Statement]) extends Statement
+                              returnVariables:Seq[TypedName],body: Block) extends YulStatement
+case class If(condition: Expression, body: Block) extends YulStatement
+case class Switch(expression: Expression, cases: Seq[Case]) extends YulStatement
+case class ForLoop(pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement
+case class Break() extends YulStatement
+case class Continue() extends YulStatement
+case class Leave() extends YulStatement
+case class ExpressionStatement(expression:Expression) extends YulStatement
+case class Block(statements: Seq[YulStatement]) extends YulStatement
 
 
 /*
