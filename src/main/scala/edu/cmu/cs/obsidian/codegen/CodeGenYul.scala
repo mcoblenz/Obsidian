@@ -5,12 +5,24 @@ import java.nio.file.{Path, Paths}
 
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.parser.{JavaFFIContractImpl, ObsidianContractImpl, Program, SymbolTable}
+import edu.cmu.cs.obsidian.parser._
+import edu.cmu.cs.obsidian.codegen.YulAST
+
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import com.github.mustachejava.Mustache
 import com.github.mustachejava.MustacheFactory
 
-object CodeGenYul extends CodeGenerator{
+import scala.collection.immutable.Map
+
+
+// need some table remembering field index in storage
+object CodeGenYul extends CodeGenerator {
+
+    // TODO improve this temporary symbol table
+    var temp_symbol_table: Map[String, Int] = Map() // map from field identifiers to index in storage
+    var temp_table_idx = 0
+
+
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
 
@@ -34,7 +46,7 @@ object CodeGenYul extends CodeGenerator{
         mainContract match {
             case obsContract: ObsidianContractImpl => {
                 val translated_obj =  translateContract(obsContract)
-                genYulCode(translated_obj, finalOutputPath)
+                yulString(translated_obj, finalOutputPath)
             }
             case _ => None
         }
@@ -42,7 +54,7 @@ object CodeGenYul extends CodeGenerator{
         return true
     }
 
-    def translateProgram(program: Program): Unit ={
+    def translateProgram(program: Program): Unit = {
         // ignore imports for now
         for (c <- program.contracts) {
             c match {
@@ -52,15 +64,56 @@ object CodeGenYul extends CodeGenerator{
         }
     }
 
-    def translateContract(contract: ObsidianContractImpl): Object ={
-        // create deploy object
+    def translateContract(contract: ObsidianContractImpl): Object = {
+        // create runtime obj
+        var subobjects: Seq[Object] = Seq()
         val runtime_name = contract.name + "_deployed"
-        val runtime = Object(runtime_name, Code(Block(Seq())), Seq(), Seq())
-        val create = Object(contract.name, Code(Block(Seq())), Seq(runtime), Seq())
-        create
+        val runtime_obj = Object(runtime_name, Code(Block(Seq())), Seq(), Seq())
+        subobjects = runtime_obj +: subobjects
+
+        var statement_seq: Seq[YulStatement] = Seq()
+        // initialization
+//        statement_seq = statement_seq +: translate_mem_init() // TODO check seq append
+
+        // declaration
+        // what to do when instance of constructor
+        for (decl <- contract.declarations if !decl.isInstanceOf[Constructor]) {
+//            statement_seq = statement_seq +: translateDeclaration(decl)
+        }
+
+        val create = Object(contract.name, Code(Block(statement_seq)), subobjects, Seq())
+        return create
     }
 
-    def genYulCode(obj: Object, finalOutputPath: Path)= {
+//    def translate_mem_init(): Seq[Statement]
+
+    def translateDeclaration(declaration: Declaration): Seq[YulStatement] = {
+        declaration match {
+            case f: Field => translateField(f)
+            case t: Transaction =>Seq()
+            case s: State =>Seq()
+            case c: ObsidianContractImpl =>Seq()
+            case c: JavaFFIContractImpl => Seq()
+            case c: Constructor =>Seq()
+            case t: TypeDecl =>
+                assert(false, "TODO")
+                Seq()
+            // This should never be hit.
+            case _ =>
+                assert(false, "Translating unexpected declaration: " + declaration)
+                Seq()
+        }
+    }
+
+    def translateField(field: Field): Seq[YulStatement] = {
+        // no need to sstore
+        // TODO create symbol table
+        temp_symbol_table += field.name -> temp_table_idx
+        temp_table_idx += 1
+        Seq()
+    }
+
+    def yulString(obj: Object, finalOutputPath: Path)= {
         printf("outputpath: %s, name: %s", finalOutputPath, obj.name)
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/Object.mustache"),"example")
