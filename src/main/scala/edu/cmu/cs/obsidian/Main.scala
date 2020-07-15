@@ -25,6 +25,7 @@ case class CompilerOptions (outputPath: Option[String],
                             printTokens: Boolean,
                             printAST: Boolean,
                             buildClient: Boolean,
+                            yul: Boolean,
                             includePaths: List[Path])
 
 object Main {
@@ -39,6 +40,7 @@ object Main {
           |    --print-tokens               print output of the lexer
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
+          |    --yul                        outputs yul code
           |    -L <dir>                     resolve import statements using <dir>
         """.stripMargin
 
@@ -52,6 +54,7 @@ object Main {
         var printTokens = false
         var printAST = false
         var buildClient = false
+        var yul = false
 
         def parseOptionsRec(remainingArgs: List[String]) : Unit = {
             remainingArgs match {
@@ -76,6 +79,9 @@ object Main {
                     parseOptionsRec(tail)
                 case "--build-client" :: tail =>
                     buildClient = true
+                    parseOptionsRec(tail)
+                case "--yul" :: tail =>
+                    yul = true
                     parseOptionsRec(tail)
 
                 case "-L" :: dir :: tail =>
@@ -121,7 +127,7 @@ object Main {
         // We want to check include paths in the order they are specified on
         // the command line, so we reverse them to get them in the right order
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
-                        printTokens, printAST, buildClient, includePaths.reverse)
+                        printTokens, printAST, buildClient, yul, includePaths.reverse)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -260,6 +266,10 @@ object Main {
 
             if (!CodeGenJava.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable)){
                 return false
+            }
+
+            if (options.yul) {
+                CodeGenYul.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable)
             }
 
         } catch {
