@@ -50,4 +50,4 @@ def rip_etherscan(etherscan_address, APIkey) :
 
 if __name__ == "__main__" :
     #The first argument should be the etherscan address, the second should be the etherscan API key
-    sys.exit(rip_etherscan(sys.argv[1], sys.argv[2]))
+    rip_etherscan(sys.argv[1], sys.argv[2])

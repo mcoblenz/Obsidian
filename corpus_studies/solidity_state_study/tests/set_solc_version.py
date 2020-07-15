@@ -5,14 +5,12 @@ import sys
 import subprocess as sub
 import os
 import re
+import semver
 
-def is_compatable_version(version_needed, version) :
-    version_numbers_needed = version_needed.split(".")
-    version_numbers = version.split(".")
-    if len(version_numbers_needed) != len(version_numbers) or len(version_numbers_needed) != 3 :
-        return False
-    
-    return version_numbers_needed[1] == version_numbers[1] and int(version_numbers_needed[2]) <= int(version_numbers[2])
+
+def is_compatable_version(version_range, version) :
+    range = semver.Range(version_range, True)
+    return range.test(version)
 
 #This script relies on solc being the version from trailofbits/solc-select. If you're using a version with a different mechanism for choosing
 #the compiler version, you may need to change this function.
@@ -20,42 +18,39 @@ def get_solc_versions() :
     process = sub.run(["solc", "--versions"], stdout=sub.PIPE, encoding='ascii')
     return process.stdout.split("\n")
 
-def get_solc_version(file) :
-
+def get_solc_pragma(file) :
     while True :
         line = file.readline()
 
         if not line :
             break
-
         if "pragma" in line :
-            
-            version = line.split("^")[1].replace(";","")
-            if len(version.split(".")) != 3:
-                print("Unsupported compiler specification, aborting.", file=sys.stderr)
+            version = line.replace(";","")
             return version
 
     return ""
 
 def set_version(file_path) :
     file = open(file_path, "r")
-    version_needed = get_solc_version(file)
+    version_line = get_solc_pragma(file)
     file.close()
 
-    if not version_needed :
-        print("No version of solc specified in input file, aborting.", file=sys.stderr)
+    if not version_line :
+        #No version of solc specified in input file.
+        return False
 
+    version_groups = version_line.replace("pragma solidity ", "")
     versions_available = get_solc_versions()
 
-    compatable_versions = list(filter(lambda vers : is_compatable_version(version_needed, vers), versions_available))
+    compatable_versions = list(filter(lambda vers : vers != "nightly" and is_compatable_version(version_groups, vers), versions_available))
     if compatable_versions :
         #Set the solc version to the first available version
-        sub.run(["solc", "use", compatable_versions[0]])
+        sub.run(["solc", "use", compatable_versions[0]], stdout=sub.PIPE, encoding='ascii')
     else :
-        print("No compatable version of solc found, aborting.", file=sys.stderr)
-        return 1
+        #No compatable version of solc found
+        return False
 
-    return 0
+    return True
 
 if __name__ == "__main__" :
     set_version(sys.argv[1])
