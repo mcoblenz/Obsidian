@@ -8,6 +8,4 @@ bash TransactionInConstructorTest.sh
 
 cd ../YulTests
 
-#cd resources/tests/YulTests
-
 bash IntContainerTest.sh
