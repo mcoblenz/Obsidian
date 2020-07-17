@@ -15,7 +15,10 @@ import edu.cmu.cs.obsidian.protobuf._
 import edu.cmu.cs.obsidian.typecheck.{Checker, DuplicateContractError, ErrorRecord, InferTypes, StateNameValidator}
 import edu.cmu.cs.obsidian.util._
 
-
+object Target extends Enumeration {
+    type Target = Value
+    val fabric, yul = Value
+}
 
 case class CompilerOptions (outputPath: Option[String],
                             debugPath: Option[String],
@@ -25,7 +28,7 @@ case class CompilerOptions (outputPath: Option[String],
                             printTokens: Boolean,
                             printAST: Boolean,
                             buildClient: Boolean,
-                            yul: Boolean,
+                            target: Target.Target,
                             includePaths: List[Path])
 
 object Main {
@@ -54,7 +57,7 @@ object Main {
         var printTokens = false
         var printAST = false
         var buildClient = false
-        var yul = false
+        var target: Target.Target = Target.fabric
 
         def parseOptionsRec(remainingArgs: List[String]) : Unit = {
             remainingArgs match {
@@ -81,7 +84,7 @@ object Main {
                     buildClient = true
                     parseOptionsRec(tail)
                 case "--yul" :: tail =>
-                    yul = true
+                    target = Target.yul
                     parseOptionsRec(tail)
 
                 case "-L" :: dir :: tail =>
@@ -127,7 +130,7 @@ object Main {
         // We want to check include paths in the order they are specified on
         // the command line, so we reverse them to get them in the right order
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
-                        printTokens, printAST, buildClient, yul, includePaths.reverse)
+                        printTokens, printAST, buildClient, target, includePaths.reverse)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -264,11 +267,13 @@ object Main {
                 return false
             }
 
-            if (!CodeGenJava.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable)){
-                return false
+            if (options.target == Target.fabric) {
+                if (!CodeGenJava.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable)){
+                    return false
+                }
             }
 
-            if (options.yul) {
+            if (options.target == Target.yul) {
                 CodeGenYul.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable)
             }
 
