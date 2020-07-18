@@ -8,4 +8,4 @@ bash TransactionInConstructorTest.sh
 
 cd ../YulTests
 
-bash IntContainerTest.sh
+bash EmptyContract.sh
