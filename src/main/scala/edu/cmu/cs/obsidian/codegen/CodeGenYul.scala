@@ -1,19 +1,17 @@
 package edu.cmu.cs.obsidian.codegen
 
 import java.io.{File, FileReader, PrintWriter}
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.codegen.YulAST
-
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import com.github.mustachejava.Mustache
 import com.github.mustachejava.MustacheFactory
 
 import scala.collection.immutable.Map
-
 
 // need some table remembering field index in storage
 object CodeGenYul extends CodeGenerator {
@@ -31,7 +29,6 @@ object CodeGenYul extends CodeGenerator {
         if (mainContractOption.isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-
         val mainName = findMainContractName(ast)
 
         val finalOutputPath = options.outputPath match {
@@ -40,61 +37,78 @@ object CodeGenYul extends CodeGenerator {
             case None =>
                 Paths.get(mainName)
         }
-
-        // temporary code, not designed to be recursive
-        val mainContract = mainContractOption.get
-        mainContract match {
-            case obsContract: ObsidianContractImpl => {
-                val translated_obj =  translateContract(obsContract)
-                yulString(translated_obj, finalOutputPath)
-            }
-            case _ => None
-        }
-//        val ast_seq =  translateProgram(ast)
-        return true
+        // translate from obsidian AST to yul AST
+        val translated_obj = translateProgram(ast)
+        // generate yul string from yul AST and write to output file
+        yulString(translated_obj, finalOutputPath)
+        true
     }
 
-    def translateProgram(program: Program): Unit = {
-        // ignore imports for now
+
+    def translateProgram(program: Program): Object = {
+        // TODO temporary code to generate an empty template for main contract
+        // translate main contract
+        val mainContractOption = findMainContract(program)
+        if (mainContractOption.isEmpty) {
+            throw new RuntimeException("No main contract found")
+        }
+        val mainContract = mainContractOption.get
+
+        val main_contract_ast = mainContract match {
+            case obsContract: ObsidianContractImpl => translateContract(obsContract)
+            case _ => throw new RuntimeException("Java contract not supported in yul translation")
+        }
+
+        // TODO ignore imports, data for now
+        // translate other contracts (if any) and add them to the subObjects
+        var new_subObjects: Seq[Object] = main_contract_ast.subObjects
         for (c <- program.contracts) {
             c match {
-                case obsContract: ObsidianContractImpl => translateContract(obsContract)
-                case javaContract: JavaFFIContractImpl => None
+                case obsContract: ObsidianContractImpl =>
+                    if (!c.modifiers.contains(IsMain())) { // if not main contract
+                        new_subObjects = main_contract_ast.subObjects :+ translateContract(obsContract)
+                    }
+                case _: JavaFFIContractImpl =>
+                    throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
+        Object(main_contract_ast.name, main_contract_ast.code,
+            new_subObjects, main_contract_ast.data)
     }
 
     def translateContract(contract: ObsidianContractImpl): Object = {
         // create runtime obj
-        var subobjects: Seq[Object] = Seq()
+        var subObjects: Seq[Object] = Seq()
         val runtime_name = contract.name + "_deployed"
         val runtime_obj = Object(runtime_name, Code(Block(Seq())), Seq(), Seq())
-        subobjects = runtime_obj +: subobjects
+        subObjects = runtime_obj +: subObjects
 
         var statement_seq: Seq[YulStatement] = Seq()
-        // initialization
-//        statement_seq = statement_seq +: translate_mem_init() // TODO check seq append
+        // TODO initialization
 
-        // declaration
-        // what to do when instance of constructor
-        for (decl <- contract.declarations if !decl.isInstanceOf[Constructor]) {
-//            statement_seq = statement_seq +: translateDeclaration(decl)
-        }
-
-        val create = Object(contract.name, Code(Block(statement_seq)), subobjects, Seq())
+        val create = Object(contract.name, Code(Block(statement_seq)), subObjects, Seq())
         return create
     }
 
-//    def translate_mem_init(): Seq[Statement]
 
     def translateDeclaration(declaration: Declaration): Seq[YulStatement] = {
         declaration match {
             case f: Field => translateField(f)
-            case t: Transaction =>Seq()
-            case s: State =>Seq()
-            case c: ObsidianContractImpl =>Seq()
-            case c: JavaFFIContractImpl => Seq()
-            case c: Constructor =>Seq()
+            case t: Transaction =>
+                assert(false, "TODO")
+                Seq()
+            case s: State =>
+                assert(false, "TODO")
+                Seq()
+            case c: ObsidianContractImpl =>
+                assert(false, "TODO")
+                Seq()
+            case c: JavaFFIContractImpl =>
+                assert(false, "TODO")
+                Seq()
+            case c: Constructor =>
+                assert(false, "TODO")
+                Seq()
             case t: TypeDecl =>
                 assert(false, "TODO")
                 Seq()
@@ -106,8 +120,8 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateField(field: Field): Seq[YulStatement] = {
-        // no need to sstore
-        // TODO create symbol table
+        // Reserve a slot in the storage by assigning a index in the symbol table
+        // since field declaration has not yet be assigned, there is no need to do sstore
         temp_symbol_table += field.name -> temp_table_idx
         temp_table_idx += 1
         Seq()
@@ -115,6 +129,7 @@ object CodeGenYul extends CodeGenerator {
 
     def yulString(obj: Object, finalOutputPath: Path)= {
         printf("outputpath: %s, name: %s", finalOutputPath, obj.name)
+        Files.createDirectories(finalOutputPath)
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/Object.mustache"),"example")
         val scope = new Scope(obj.name)
