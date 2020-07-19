@@ -43,7 +43,7 @@ case class Block (statements: Seq[YulStatement]) extends YulStatement
     HexLiteral = 'hex' ('"' ([0-9a-fA-F]{2})* '"' | '\'' ([0-9a-fA-F]{2})* '\'')
     StringLiteral = '"' ([^"\r\n\\] | '\\' .)* '"'
  */
-case class Object (name: String, code: Code, subObjects: Seq[Object], data: Seq[Data]) extends YulAST
+case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data: Seq[Data]) extends YulAST
 case class Code (block:Block) extends YulAST
 case class Data (name: String, hex: Seq[HexLiteral], str: Seq[StringLiteral]) extends YulAST
 case class HexLiteral (content: String) extends YulAST

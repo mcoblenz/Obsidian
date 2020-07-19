@@ -6,10 +6,10 @@ import java.nio.file.{Files, Path, Paths}
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
-import edu.cmu.cs.obsidian.codegen.YulAST
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import com.github.mustachejava.Mustache
 import com.github.mustachejava.MustacheFactory
+import edu.cmu.cs.obsidian.codegen.Code
 
 import scala.collection.immutable.Map
 
@@ -45,7 +45,7 @@ object CodeGenYul extends CodeGenerator {
     }
 
 
-    def translateProgram(program: Program): Object = {
+    def translateProgram(program: Program): YulObject = {
         // TODO temporary code to generate an empty template for main contract
         // translate main contract
         val mainContractOption = findMainContract(program)
@@ -61,7 +61,7 @@ object CodeGenYul extends CodeGenerator {
 
         // TODO ignore imports, data for now
         // translate other contracts (if any) and add them to the subObjects
-        var new_subObjects: Seq[Object] = main_contract_ast.subObjects
+        var new_subObjects: Seq[YulObject] = main_contract_ast.subObjects
         for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
@@ -72,21 +72,21 @@ object CodeGenYul extends CodeGenerator {
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
-        Object(main_contract_ast.name, main_contract_ast.code,
+        YulObject(main_contract_ast.name, main_contract_ast.code,
             new_subObjects, main_contract_ast.data)
     }
 
-    def translateContract(contract: ObsidianContractImpl): Object = {
+    def translateContract(contract: ObsidianContractImpl): YulObject = {
         // create runtime obj
-        var subObjects: Seq[Object] = Seq()
+        var subObjects: Seq[YulObject] = Seq()
         val runtime_name = contract.name + "_deployed"
-        val runtime_obj = Object(runtime_name, Code(Block(Seq())), Seq(), Seq())
+        val runtime_obj = YulObject(runtime_name, Code(Block(Seq())), Seq(), Seq())
         subObjects = runtime_obj +: subObjects
 
         var statement_seq: Seq[YulStatement] = Seq()
         // TODO initialization
 
-        val create = Object(contract.name, Code(Block(statement_seq)), subObjects, Seq())
+        val create = YulObject(contract.name, Code(Block(statement_seq)), subObjects, Seq())
         return create
     }
 
@@ -127,7 +127,7 @@ object CodeGenYul extends CodeGenerator {
         Seq()
     }
 
-    def yulString(obj: Object, finalOutputPath: Path)= {
+    def yulString(obj: YulObject, finalOutputPath: Path)= {
         printf("outputpath: %s, name: %s", finalOutputPath, obj.name)
         Files.createDirectories(finalOutputPath)
         val mf = new DefaultMustacheFactory()
