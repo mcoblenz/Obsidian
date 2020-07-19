@@ -131,7 +131,7 @@ object CodeGenYul extends CodeGenerator {
         printf("outputpath: %s, name: %s", finalOutputPath, obj.name)
         Files.createDirectories(finalOutputPath)
         val mf = new DefaultMustacheFactory()
-        val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/Object.mustache"),"example")
+        val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
         val scope = new Scope(obj.name)
         mustache.execute(new PrintWriter(new File(finalOutputPath.toString(), obj.name + ".yul")), scope).flush
     }
