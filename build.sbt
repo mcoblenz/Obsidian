@@ -12,6 +12,8 @@ libraryDependencies += "com.github.spullara.mustache.java" % "compiler" % "0.9.6
 
 // For dependencies of fabric-chaincode.
 resolvers += "Jitpack" at "https://www.jitpack.io"
+resolvers += Resolver.jcenterRepo
+
 
 scalacOptions := Seq("-unchecked", "-deprecation")
 
