@@ -3,8 +3,8 @@ object "{{creationObject}}" {
         {{memoryInit}}
         {{callValueCheck}}
         {{#notLibrary}}
-        {{#constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
-        {{implicitConstructor}}({{constructorParams}})
+            {{#constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
+            {{implicitConstructor}}({{constructorParams}})
         {{/notLibrary}}
         {{deploy}}
         {{functions}}
