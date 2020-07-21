@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
-import java.io.{File, FileReader, PrintWriter}
+import java.io.{File, FileReader, FileWriter, StringWriter}
 import java.nio.file.{Files, Path, Paths}
 
 import com.github.mustachejava.DefaultMustacheFactory
@@ -39,8 +39,13 @@ object CodeGenYul extends CodeGenerator {
         }
         // translate from obsidian AST to yul AST
         val translated_obj = translateProgram(ast)
-        // generate yul string from yul AST and write to output file
-        yulString(translated_obj, finalOutputPath)
+        // generate yul string from yul AST
+        val s = yulString(translated_obj)
+        // write string to output file
+        Files.createDirectories(finalOutputPath)
+        val writer = new FileWriter(new File(finalOutputPath.toString(), translated_obj.name + ".yul"))
+        writer.write(s)
+        writer.flush()
         true
     }
 
@@ -127,13 +132,11 @@ object CodeGenYul extends CodeGenerator {
         Seq()
     }
 
-    def yulString(obj: YulObject, finalOutputPath: Path)= {
-        printf("outputpath: %s, name: %s", finalOutputPath, obj.name)
-        Files.createDirectories(finalOutputPath)
+    def yulString(obj: YulObject) = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
         val scope = new Scope(obj.name)
-        mustache.execute(new PrintWriter(new File(finalOutputPath.toString(), obj.name + ".yul")), scope).flush
+        mustache.execute(new StringWriter(), scope).toString()
     }
 }
 
