@@ -6,10 +6,9 @@ sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/YulTests/EmptyContra
 
 cd EmptyContract
 
-solc --strict-assembly EmptyContract.yul > /dev/null
-#docker run ethereum/solc:stable --strict-assembly EmptyContract.yul > /dev/null
+CURR_PATH="$( pwd -P )"
 
-#docker run -v /local/path:/sources ethereum/solc:stable -o /dev/null --abi --bin /sources/Contract.sol
+docker run -v "$CURR_PATH":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/EmptyContract.yul > /dev/null
 
 if [ $? -ne 0 ]; then
   echo "EmptyContract test failed: solc cannot compile yul code"

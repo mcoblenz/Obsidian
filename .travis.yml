@@ -11,9 +11,6 @@ jdk:
 
 before_install:
   - ./travis_specific/install-protobuf.sh
-  - sudo add-apt-repository ppa:ethereum/ethereum
-  - sudo apt-get update
-  - sudo apt-get install solc
   - curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s
   - mv bin $HOME
   - export PATH=${PATH}:${HOME}/protobuf/
