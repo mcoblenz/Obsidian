@@ -259,7 +259,6 @@ class StateNum(AbstractDetector):
             encoded_truth_value = reduce(lambda x,y : 2*x + y, check_assignments, 0)
 
             if not encoded_truth_value in states :
-                #print(var_vals)
                 states.append(encoded_truth_value)
 
             inc_list = self.increment_list(list(map(lambda tup : fst(tup), index_list)), length_list)
@@ -282,8 +281,6 @@ class StateNum(AbstractDetector):
                 return False
             elif var in nonconstant_vars :
                 uses_state = True
-        if uses_state :
-            print(str(check))
         return uses_state
 
     # Finds all stateful checks in a given function by searching that function
@@ -314,10 +311,10 @@ class StateNum(AbstractDetector):
     # helper functions above.
     def count_states(self, contract) :
         state_checks = {}
-        for f in contract.functions :
+        for f in [f for f in contract.functions if not f.is_constructor_variables]:
             state_checks[f.name] = self.derive_state_checks(f)
 
-        state_checks = {k:v for (k,v) in state_checks.items() if v}
+        state_checks = {k:v for k,v in state_checks.items() if v}
         return len(self.find_states(state_checks))
 
     # Implemented for use as a detector plugin in slither, this function is 

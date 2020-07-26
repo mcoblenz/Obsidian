@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 
 import sys
+import os
 import re
 import subprocess as sub
 import rip_etherscan
@@ -26,5 +27,5 @@ if __name__ == "__main__" :
             rip_etherscan.rip_etherscan(address, sys.argv[2])
             success = set_solc_version.set_version(gen_contract_address(address))
             if success :
-                sub.run(["slither", gen_contract_address(address), "--solc-disable-warnings", "--detect", "hasstate,statenum"])
+                sub.run(["slither", gen_contract_address(address), "--solc-disable-warnings", "--detect", "reentrancy-eth,reentrancy-unlimited-gas,reentrancy-no-eth"])
     addresses_file.close()

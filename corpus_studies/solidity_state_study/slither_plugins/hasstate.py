@@ -1,11 +1,12 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 from slither.core.expressions import *
+from functools import reduce
 from slither.core.declarations.solidity_variables import SOLIDITY_VARIABLES,SOLIDITY_VARIABLES_COMPOSED
 
 # Solidity variables that are used as state variables instead of 
 # local variables, and thus must be explicitly checked for when
 # checking for state usage.
-SOLIDITY_VARIABLE_WHITELIST = ["now", "this"]
+SOLIDITY_VARIABLE_WHITELIST = ["now", "this", "block.number", "block.timestamp"]
 
 # This is a function used to check for state in multiple plugins, 
 # and thus belongs on this level for easy code reuse.
@@ -17,7 +18,8 @@ def get_vars_used(exp) :
     if isinstance(exp, Identifier) :
         return {str(exp)}
     elif isinstance(exp, CallExpression) :
-        return {str(arg) for arg in exp.arguments} if exp.arguments else set()
+        vars = [get_vars_used(arg) for arg in exp.arguments]
+        return reduce(lambda s,x : s.union(x), vars, set())
     elif isinstance(exp, UnaryOperation) :
         return get_vars_used(exp.expression)
     elif isinstance(exp, BinaryOperation) :
@@ -31,7 +33,7 @@ def get_vars_used(exp) :
                     .union(get_vars_used(exp.expression_right))
                 )
     elif isinstance(exp, MemberAccess) :
-        return get_vars_used(exp.expression).union({str(exp.member_name), str(exp)})
+        return {str(exp)}
     elif isinstance(exp, TupleExpression) :
         # There should be exactly one element in the tuple 
         #     (that is, they should act as parenthesis).

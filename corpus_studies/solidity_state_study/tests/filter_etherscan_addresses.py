@@ -6,7 +6,7 @@ import re
 import subprocess as sub
 import rip_etherscan
 import set_solc_version
-
+import time
 
 def gen_contract_address(address) :
     return "etherscan_cache/" + address + ".sol"
@@ -28,11 +28,10 @@ if __name__ == "__main__" :
             rip_etherscan.rip_etherscan(address, sys.argv[2])
             success = set_solc_version.set_version(gen_contract_address(address))
             if success :
-                try :
-                    sub.run(["slither", gen_contract_address(address), "--solc-disable-warnings", "--detect", "hasstate"],stdout=sub.PIPE,encoding='ascii')
-                    filtered_file.write(address + "\n")
-                except :
-                    pass
+                filtered_file.write(address + "\n")
+            else :
+                print("No valid compiler version found")
+            time.sleep(0.5)
     addresses_file.close()
     filtered_file.close()
     os.remove(addresses_file_path)

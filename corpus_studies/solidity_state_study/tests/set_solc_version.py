@@ -24,7 +24,7 @@ def get_solc_pragma(file) :
 
         if not line :
             break
-        if "pragma" in line :
+        if "pragma" in line and "//" not in line:
             version = line.replace(";","")
             return version
 
