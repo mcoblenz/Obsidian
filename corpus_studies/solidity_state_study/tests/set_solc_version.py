@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3
 #In order to run this script you must use python 3.5 or later
 
 import sys

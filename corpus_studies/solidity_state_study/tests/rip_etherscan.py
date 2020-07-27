@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3
 
 import sys
 import os
@@ -18,7 +18,7 @@ def is_cached(address) :
 def save_file(address, source_code) :
     if not path.isdir(CACHE) :
         os.mkdir(CACHE)
-    file = open(CACHE + address + ".sol", "x")
+    file = open(CACHE + address + ".sol", "w")
     file.write(source_code)
     file.close()
     return 0
