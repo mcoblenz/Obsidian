@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 import sys
 import os
@@ -6,15 +6,18 @@ import re
 import json
 import urllib.request
 
+CACHE = "etherscan_cache/"
 
 BASEURL = "https://api.etherscan.io/api?module=contract&action=getsourcecode&address=%s&apikey=%s"
 
 
 def is_cached(address) :
-    return os.path.isfile("etherscan_cache/" + address + ".sol")
+    return os.path.isfile(CACHE + address + ".sol")
 
 def save_file(address, source_code) :
-    file = open("etherscan_cache/" + address + ".sol", "w")
+    if not os.is_dir(CACHE) :
+        os.mkdir(CACHE)
+    file = open(CACHE + address + ".sol", "x")
     file.write(source_code)
     file.close()
     return 0
