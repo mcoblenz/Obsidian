@@ -2,6 +2,7 @@
 
 import sys
 import os
+from os import path
 import re
 import json
 import urllib.request
@@ -15,7 +16,7 @@ def is_cached(address) :
     return os.path.isfile(CACHE + address + ".sol")
 
 def save_file(address, source_code) :
-    if not os.is_dir(CACHE) :
+    if not path.isdir(CACHE) :
         os.mkdir(CACHE)
     file = open(CACHE + address + ".sol", "x")
     file.write(source_code)
