@@ -10,7 +10,8 @@ import semantic_version as sv
 
 def is_compatable_version(version_range, version) :
     range = sv.NpmSpec(version_range)
-    return range.match(version)
+    version_obj = sv.Version(version)
+    return range.match(version_obj)
 
 #This script relies on solc being the version from trailofbits/solc-select. If you're using a version with a different mechanism for choosing
 #the compiler version, you may need to change this function.
