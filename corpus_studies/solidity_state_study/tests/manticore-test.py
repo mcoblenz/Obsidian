@@ -16,6 +16,8 @@ if __name__ == "__main__" :
     contract_name = "Pausable"
     account = m.solidity_create_contract(source_code, account, contract_name=contract_name)
 
+    m.run()
+
 
     print(m.count_all_states())
 
