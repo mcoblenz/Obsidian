@@ -5,11 +5,11 @@ import sys
 import subprocess as sub
 import os
 import re
-import semver
+import semantic_version as sv
 
 
 def is_compatable_version(version_range, version) :
-    range = semver.NpmSpec(version_range)
+    range = sv.NpmSpec(version_range)
     return range.match(version)
 
 #This script relies on solc being the version from trailofbits/solc-select. If you're using a version with a different mechanism for choosing
