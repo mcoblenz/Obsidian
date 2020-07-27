@@ -9,8 +9,8 @@ import semver
 
 
 def is_compatable_version(version_range, version) :
-    range = semver.Range(version_range, True)
-    return range.test(version)
+    range = semver.NpmSpec(version_range)
+    return range.match(version)
 
 #This script relies on solc being the version from trailofbits/solc-select. If you're using a version with a different mechanism for choosing
 #the compiler version, you may need to change this function.
