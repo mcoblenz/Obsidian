@@ -6,6 +6,10 @@ scalaVersion := "2.13.2"
 
 organization := "edu.cmu.cs.obsidian"
 
+// mustache java
+// https://mvnrepository.com/artifact/com.github.spullara.mustache.java/mustache.java
+libraryDependencies += "com.github.spullara.mustache.java" % "compiler" % "0.9.6"
+
 // For dependencies of fabric-chaincode.
 resolvers += "Jitpack" at "https://www.jitpack.io"
 resolvers += Resolver.jcenterRepo
