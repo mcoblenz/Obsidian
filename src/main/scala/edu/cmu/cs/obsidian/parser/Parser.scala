@@ -114,8 +114,9 @@ object Parser extends Parsers {
         val intPrim = IntT() ^^ { t => IntType().setLoc(t) }
         val boolPrim = BoolT() ^^ { t => BoolType().setLoc(t) }
         val stringPrim = StringT() ^^ { t => StringType().setLoc(t) }
+        val int256Prim = Int256T() ^^ {t => Int256Type().setLoc(t)}
 
-        parseNonPrimitive | intPrim | boolPrim | stringPrim
+        parseNonPrimitive | intPrim | boolPrim | stringPrim | int256Prim
     }
 
     private def extractTypeFromPermission(permission: Option[~[Token, Seq[Identifier]]],

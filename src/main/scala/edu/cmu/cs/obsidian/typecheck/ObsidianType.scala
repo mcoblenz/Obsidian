@@ -335,7 +335,7 @@ object ObsidianType {
     }
 }
 
-/* int, bool, or string */
+/* int, int256, unit, bool, or string */
 sealed trait PrimitiveType extends ObsidianType {
     val isBottom: Boolean = false
     override def residualType(mode: OwnershipConsumptionMode): ObsidianType = this
@@ -407,6 +407,10 @@ case class BoolType() extends PrimitiveType {
 }
 case class StringType() extends PrimitiveType {
     override def toString: String = "string"
+}
+
+case class Int256Type() extends PrimitiveType {
+    override def toString: String = "Int256"
 }
 
 case class UnitType() extends PrimitiveType {

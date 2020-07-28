@@ -40,6 +40,7 @@ object Lexer extends RegexParsers {
         case "owned" => OwnedT()
         case "main" => MainT()
         case "int" => IntT()
+        case "int256" => Int256T()
         case "bool" => BoolT()
         case "string" => StringT()
         case "true" => TrueT()

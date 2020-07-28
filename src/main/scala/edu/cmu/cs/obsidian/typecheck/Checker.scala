@@ -335,6 +335,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (IntType(), IntType()) => true
             case (BoolType(), BoolType()) => true
             case (StringType(), StringType()) => true
+            case (Int256Type(), Int256Type()) => true
+            case (Int256Type(), IntType()) => true
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 (np1, np2) match {
                     case (ContractReferenceType(c1, c1p, _), ContractReferenceType(c2, c2p, _)) =>
@@ -485,6 +487,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case (IntType(), IntType()) => Some(IntType())
             case (BoolType(), BoolType()) => Some(BoolType())
             case (StringType(), StringType()) => Some(StringType())
+            case (Int256Type(), Int256Type()) => Some(Int256Type())
             case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
                 nonPrimitiveMergeTypes(np1, np2, contractTable).flatMap(s => Some(s))
             case _ => None
@@ -590,7 +593,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             // Eliminate things we can't invoke methods on first.
             val nonPrimitiveReceiverType = receiverType match {
                 case BottomType() => return (BottomType(), contextAfterReceiver, false, receiverPrime, Nil, args)
-                case UnitType() | IntType() | BoolType() | StringType() =>
+                case UnitType() | IntType() | Int256Type() | BoolType() | StringType() =>
                     logError(e, NonInvokeableError(receiverType))
                     return (BottomType(), contextAfterReceiver, false, receiverPrime, Nil, args)
                 case np: NonPrimitiveType => np
@@ -598,7 +601,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             //Finding out if the Contract is a FFIContract
             val isFFIInvocation = receiverType match {
-                case BottomType() | UnitType() | IntType() | BoolType() | StringType() => false
+                case BottomType() | UnitType() | IntType() | Int256Type() | BoolType() | StringType() => false
                 case np : NonPrimitiveType =>
                     val contractTableOpt = context.contractTable.lookupContract(np.contractName)
                     contractTableOpt match {
@@ -708,7 +711,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                              (BottomType(), context, e)
                          }
                  }
-             case NumLiteral(_) => (IntType(), context, e)
+
+             case NumLiteral(_) => (Int256Type(), context, e)
              case StringLiteral(_) => (StringType(), context, e)
              case TrueLiteral() => (BoolType(), context, e)
              case FalseLiteral() => (BoolType(), context, e)
@@ -764,6 +768,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                      // Regular BigInt addition
                      case (_: IntType | _: BottomType, _: IntType | _: BottomType) =>
                          (IntType(), c2, Add(e1Prime, e2Prime).setLoc(e))
+                     // Int256 addition
+                     case (_: Int256Type | _: BottomType, _: Int256Type | _: BottomType) =>
+                         (Int256Type(), c2, Add(e1Prime, e2Prime).setLoc(e))
+                     // Int256 + Int
+                     case (_: Int256Type | _: BottomType, _: IntType | _: BottomType) =>
+                         (IntType(), c2, Add(e1Prime, e2Prime).setLoc(e))
+                     case (_: IntType | _: BottomType, _: Int256Type | _: BottomType) =>
+                         (IntType(), c2, Add(e1Prime, e2Prime).setLoc(e))
                      // String concatenation
                      case (_: StringType | _: BottomType, _: StringType | _: BottomType) =>
                          (StringType(), c2, StringConcat(e1Prime, e2Prime).setLoc(e))
@@ -793,7 +805,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case Equals(e1: Expression, e2: Expression) =>
                  val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
                  val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
-                 if (t1 == t2) (BoolType(), c2, Equals(e1Prime, e2Prime).setLoc(e)) else {
+                 if ((t1 == t2) || (t1 == Int256Type() && t2 == IntType()) || (t1 == IntType() && t2 == Int256Type())) {
+                     (BoolType(), c2, Equals(e1Prime, e2Prime).setLoc(e))
+                 } else {
                      if (!t1.isBottom && !t2.isBottom) {
                          logError(e, DifferentTypeError(e1, t1, e2, t2))
                      }
@@ -814,7 +828,9 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
              case NotEquals(e1: Expression, e2: Expression) =>
                  val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
                  val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
-                 if (t1 == t2) (BoolType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e)) else {
+                 if ((t1 == t2) || (t1 == Int256Type() && t2 == IntType()) || (t1 == IntType() && t2 == Int256Type())) {
+                     (BoolType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e))
+                 } else {
                      if (!t1.isBottom && !t2.isBottom) {
                          logError(e, DifferentTypeError(e1, t1, e2, t2))
                      }
