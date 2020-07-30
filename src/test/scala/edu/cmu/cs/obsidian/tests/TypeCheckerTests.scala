@@ -68,7 +68,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def operationTest(): Unit = {
         runTest("resources/tests/type_checker_tests/SimpleOperations.obs",
-            (PlusTypeError(IntType(), BoolType()), 8)
+            (PlusTypeError(Int256Type(), BoolType()), 8)
                 ::
                 (SubtypingError(
                     StringType(),
@@ -83,11 +83,11 @@ class TypeCheckerTests extends JUnitSuite {
                     BoolType(), false), 14)
                 ::
                 (SubtypingError(
-                    IntType(),
+                    Int256Type(),
                     BoolType(), false), 16)
                 ::
                 (SubtypingError(
-                    IntType(),
+                    Int256Type(),
                     BoolType(), false), 16)
                 ::
                 Nil
@@ -171,7 +171,7 @@ class TypeCheckerTests extends JUnitSuite {
                 ::
                 (MustReturnError("t_ret_nonprimitive"), 31)
                 ::
-                (SubtypingError(IntType(),
+                (SubtypingError(Int256Type(),
                     ContractReferenceType(ContractType("C_Owned", Nil), Owned(), NotRemoteReferenceType()), false), 33)
                 ::
                 (MustReturnError("no_return"), 38)
@@ -200,11 +200,11 @@ class TypeCheckerTests extends JUnitSuite {
                     TrueLiteral(),
                     BoolType(),
                     NumLiteral(5),
-                    IntType()), 14)
+                    Int256Type()), 14)
                 ::
                 (DifferentTypeError(
                     NumLiteral(1),
-                    IntType(),
+                    Int256Type(),
                     FalseLiteral(),
                     BoolType()), 16)
                 ::
@@ -226,7 +226,7 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("Invocation", Nil), Unowned(), NotRemoteReferenceType()),
                     "otherMethod"), 23)
                 ::
-                (NonInvokeableError(IntType()), 25)
+                (NonInvokeableError(Int256Type()), 25)
                 ::
                 (MethodUndefinedError(
                     ContractReferenceType(ContractType("OtherContract", Nil), Owned(), NotRemoteReferenceType()),
@@ -672,7 +672,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def revertTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Revert.obs",
-            (SubtypingError(IntType(), StringType(), false), 12) :: Nil)
+            (SubtypingError(Int256Type(), StringType(), false), 12) :: Nil)
     }
 
     @Test def inStateTest(): Unit = {

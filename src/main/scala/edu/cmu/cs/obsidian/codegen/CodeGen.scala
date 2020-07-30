@@ -243,7 +243,10 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
     private def marshallExprWithFullObjects(unmarshalledExpr: IJExpression, typ: ObsidianType): IJExpression = {
         val marshalledArg = typ match {
+
             case IntType() => unmarshalledExpr.invoke("toString");
+            case Int256Type() =>
+                throw new RuntimeException("int256 not supported in Fabric")
             case BoolType() =>
                 val encoder = model.directClass("java.util.Base64").staticInvoke("getEncoder")
                 val bytes = JExpr.cond(unmarshalledExpr, JExpr.ref("TRUE_ARRAY"), JExpr.ref("FALSE_ARRAY"))
@@ -268,6 +271,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 val newInt = JExpr._new(model.parseType("java.math.BigInteger"))
                 newInt.arg(stringRepresentation)
                 newInt
+            case Int256Type() =>
+                throw new RuntimeException("int256 not supported in Fabric")
             case BoolType() =>
                 val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
                 val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.client.ChaincodeClientTransactionFailedException"))
@@ -321,6 +326,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 exception.arg(intAsString)
                 test._then()._throw(exception)
                 decl
+            case Int256Type() =>
+                throw new RuntimeException("int256 not supported in Fabric")
             case BoolType() =>
                 val ifLengthIncorrect = errorBlock._if(marshalledExpr.ref("length").eq(JExpr.lit(1)).not())
                 val exception = JExpr._new(model.directClass("edu.cmu.cs.obsidian.chaincode.BadArgumentException"))
@@ -1741,6 +1748,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                                 val stringResult = returnObj.invoke("toString")
                                 val charset = model.ref("java.nio.charset.StandardCharsets").staticRef("UTF_8")
                                 stringResult.invoke("getBytes").arg(charset)
+                            case Int256Type() =>
+                                throw new RuntimeException("int256 not supported in Fabric")
                             case BoolType() => model.ref("edu.cmu.cs.obsidian.chaincode.ChaincodeUtils")
                               .staticInvoke("booleanToBytes").arg(returnObj)
                             case StringType() =>    val invocation = returnObj.invoke("getBytes")
@@ -2054,6 +2063,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
                 nonNullBody.add(setInvocation)
             }
+            case Int256Type() =>
+                throw new RuntimeException("int256 not supported in Fabric")
             case BoolType() => {
                 val setterName: String = setterNameForField(field.name)
                 val setInvocation = JExpr.invoke(builderVar, setterName).arg(fieldVar)
@@ -2444,6 +2455,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
                 ifNonempty._then().assign(fieldVar, newInteger)
             }
+            case Int256Type() =>
+                throw new RuntimeException("int256 not supported in Fabric")
             case BoolType() => {
                 val getterName = getterNameForField(javaFieldName)
                 // foo = archive.getFoo();
@@ -2653,6 +2666,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
     private def resolveType(typ: ObsidianType, table: SymbolTable, interfaceParam: Option[AbstractJType]): AbstractJType = {
         typ match {
             case IntType() => model.directClass("java.math.BigInteger")
+            case Int256Type() => throw new RuntimeException("int256 not supported in Fabric")
             case BoolType() => model.BOOLEAN
             case StringType() => model.ref("String")
             case n: NonPrimitiveType => {
@@ -2769,6 +2783,8 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     model.ref("java.math.BigInteger").staticInvoke("valueOf")
                 val _ = newInt.arg(0)
                 Some(newInt)
+            case Int256Type() =>
+                throw new RuntimeException("int256 not supported in Fabric")
             case BoolType() =>
                 Some(JExpr.lit(false))
             case StringType() =>
