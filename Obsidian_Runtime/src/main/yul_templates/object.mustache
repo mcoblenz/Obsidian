@@ -6,14 +6,28 @@ object "{{creationObject}}" {
             {{#constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
             {{implicitConstructor}}({{constructorParams}})
         {{/notLibrary}}
-        {{deploy}}
-        {{functions}}
+        {{#deploy}}
+            {{call}}
+        {{/deploy}}
+        {{#deployFunctions}}
+            {{code}}
+        {{/deployFunctions}}
     }
     object "{{runtimeObject}}" {
         code {
-            {{memoryInit}}
-            {{dispatch}}
-            {{runtimeFunctions}}
+            {{memoryInitRuntime}}
+            {{#dispatch}}
+                let selector := shift_right_unsigned(calldataload(0))
+                switch selector
+                {{#dispatchCase}}
+                    case {{hash}} {
+                        {{dispatchCall}}}
+                    }
+                {{/dispatchCase}}
+            {{/dispatch}}
+            {{#runtimeFunctions}}
+                {{code}}
+            {{/runtimeFunctions}}
         }
         {{runtimeSubObjects}}
     }
