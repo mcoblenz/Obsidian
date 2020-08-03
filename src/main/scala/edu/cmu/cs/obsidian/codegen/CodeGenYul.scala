@@ -3,14 +3,14 @@ package edu.cmu.cs.obsidian.codegen
 import java.io.{File, FileReader, FileWriter, StringWriter}
 import java.nio.file.{Files, Path, Paths}
 
-import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
-import com.github.mustachejava.Mustache
-import com.github.mustachejava.MustacheFactory
+
 import edu.cmu.cs.obsidian.codegen.Code
 import jdk.nashorn.internal.runtime.FunctionScope
+
+import edu.cmu.cs.obsidian.codegen.yulString
 
 import scala.collection.immutable.Map
 
@@ -43,7 +43,7 @@ object CodeGenYul extends CodeGenerator {
         // translate from obsidian AST to yul AST
         val translated_obj = translateProgram(ast)
         // generate yul string from yul AST
-        val s = yulString(translated_obj)
+        val s = yulString.yulString(translated_obj)
         // write string to output file
         // currently it's created in the Obsidian directory; this may need to be changed, based on desired destination
         Files.createDirectories(finalOutputPath)
@@ -249,15 +249,6 @@ object CodeGenYul extends CodeGenerator {
             case _ => Seq() // TODO unimplemented
         }
     }
-
-
-    def yulString(obj: YulObject): String = {
-        val mf = new DefaultMustacheFactory()
-        val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
-        val scope = new ObjScope(obj)
-        val raw: String = mustache.execute(new StringWriter(), scope).toString()
-        raw.replaceAll("&amp;","&").replaceAll("&gt;",">").replaceAll("&#10;", "\n")
-    }
 }
 
 // temporary function, not designed for a full recursive walk through of the object
@@ -265,33 +256,6 @@ class ObjScope(obj: YulObject) {
     class Func(val code: String){}
     class Case(val hash: String){}
     class Call(val call: String){}
-
-    def yulFunctionDefString(f: FunctionDefinition): String = {
-        val mf = new DefaultMustacheFactory()
-        val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"),"function")
-        val scope = new FuncScope(f)
-        mustache.execute(new StringWriter(), scope).toString()
-    }
-
-    def yulFunctionCallString(f: FunctionCall): String = {
-        var code = f.functionName.name+"("
-        var isFirst = true
-        for (arg <- f.arguments){
-            val argStr =
-                arg match {
-                    case Literal(_,value, _)=> value
-                    case _ => ""
-                }
-            if (isFirst){
-                code = code + argStr
-                isFirst = false
-            }
-            else {
-                code = code + "," + argStr
-            }
-        }
-        code + ")" + "\n"
-    }
 
     // TODO unimplemented; hardcode to uint256 for now
     def mapObsTypeToABI(ntype: String): String = {
@@ -325,10 +289,10 @@ class ObjScope(obj: YulObject) {
 
     for (s <- obj.code.block.statements) {
         s match {
-            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(yulFunctionDefString(f))
+            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(yulString.yulFunctionDefString(f))
             case e: ExpressionStatement =>
                 e.expression match {
-                    case f: FunctionCall => deployCall = deployCall :+ new Call(yulFunctionCallString(f))
+                    case f: FunctionCall => deployCall = deployCall :+ new Call(yulString.yulFunctionCallString(f))
                     case _ => () // TODO unimplemented
                 }
             case _ => () // TODO unimplemented
@@ -340,13 +304,13 @@ class ObjScope(obj: YulObject) {
             s match {
                 case f: FunctionDefinition => {
                     dispatch = true
-                    val code = yulFunctionDefString(f)
+                    val code = yulString.yulFunctionDefString(f)
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
                     dispatchArray = dispatchArray :+ new Case(hashFunction(f))
                 }
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => memoryInitRuntime = yulFunctionCallString(f)
+                        case f: FunctionCall => memoryInitRuntime = yulString.yulFunctionCallString(f)
                         case _ => () // TODO unimplemented
                     }
                 case _ => ()
@@ -364,27 +328,6 @@ class ObjScope(obj: YulObject) {
 class FuncScope(f: FunctionDefinition){
     class Param(val name: String){}
     class Body(val code: String){}
-
-    // TODO duplicated code; refactor into a separate helper module
-    def yulFunctionCallString(f: FunctionCall): String = {
-        var code = f.functionName.name+"("
-        var isFirst = true
-        for (arg <- f.arguments){
-            val argStr =
-                arg match {
-                    case Literal(_,value, _)=> value
-                    case _ => ""
-                }
-            if (isFirst){
-                code = code + argStr
-                isFirst = false
-            }
-            else {
-                code = code + "," + argStr
-            }
-        }
-        code + ")" + "\n"
-    }
 
     val functionName: String = f.name
     val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""}
@@ -407,7 +350,7 @@ class FuncScope(f: FunctionDefinition){
             case ExpressionStatement(e) =>
                 e match {
                     case func: FunctionCall =>
-                        codeBody = codeBody :+ new Body(yulFunctionCallString(func))
+                        codeBody = codeBody :+ new Body(yulString.yulFunctionCallString(func))
                 }
             case _ => ()
         }
