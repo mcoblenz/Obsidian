@@ -108,12 +108,6 @@ object CodeGenYul extends CodeGenerator {
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
 
-        // deploy
-        val deployExpr = FunctionCall(
-            Identifier("constructor_"+contract.name), // TODO change how to find constructor function name after adding randomized suffix/prefix
-            Seq()) // TODO constructor params not implemented
-        statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(deployExpr)
-
         // create runtime object
         val runtime_name = contract.name + "_deployed"
         val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq())
@@ -174,11 +168,16 @@ object CodeGenYul extends CodeGenerator {
         for (s <- constructor.body){
             body = body ++ translateStatement(s)
         }
-        Seq(FunctionDefinition(
-            "constructor_"+constructor.name, // TODO rename transaction name (by adding prefix/suffix)
-            parameters,
-            Seq(),
-            Block(body)))
+        val deployExpr = FunctionCall(
+            Identifier("constructor_"+constructor.name), // TODO change how to find constructor function name after adding randomized suffix/prefix
+            Seq()) // TODO constructor params not implemented
+
+        Seq(ExpressionStatement(deployExpr),
+            FunctionDefinition(
+                "constructor_"+constructor.name, // TODO rename transaction name (by adding prefix/suffix)
+                parameters,
+                Seq(),
+                Block(body)))
     }
 
     // TODO unimplemented; hardcode to uint256 for now
