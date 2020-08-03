@@ -17,7 +17,7 @@ case class Case (value: Literal, body: Block) extends YulAST
 
 case class Literal (kind: LiteralKind.LiteralKind, value: String, vtype: String) extends Expression
 case class Identifier (name: String) extends Expression
-case class FunctionCall (functionName: Identifier, arguements: Seq[Expression]) extends Expression
+case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) extends Expression
 
 case class Assignment (variableNames: Seq[Identifier], value: Expression) extends YulStatement
 case class VariableDeclaration (variables: Seq[TypedName]) extends YulStatement
