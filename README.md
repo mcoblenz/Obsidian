@@ -8,22 +8,18 @@ Obsidian language development
 See http://obsidian-lang.com.
 
 ###### Preliminary setup
-1. Install IntelliJ and the Scala plugin (https://www.jetbrains.com/idea/download/).
-2. Install protoc (https://github.com/protocolbuffers/protobuf). On macOS: `brew install protobuf`.
-3. Install sbt (https://www.scala-sbt.org/release/docs/Setup.html).
-4. Install gradle. On macOS: `brew install gradle`.
+1. Install Oracle Java 11.
+2. Install IntelliJ and the Scala plugin (https://www.jetbrains.com/idea/download/).
+3. Install protoc (https://github.com/protocolbuffers/protobuf). On macOS: `brew install protobuf`.
+4. Install sbt (https://www.scala-sbt.org/release/docs/Setup.html).
+5. Install gradle. On macOS: `brew install gradle`.
 
 ###### Compiler setup
 1. In a terminal, go to the root of the Obsidian project folder.
 2. Run: `make`. This will build the compiler, generating a Jar file in target/scala-2.12/.
 
 ###### Editor setup
-1. Install nodejs (https://nodejs.org/en/).
-2. Install typescript (`npm install -g typescript`).
-3. Install VSCode (https://code.visualstudio.com).
-4. Copy the obs-vscode-extension directory into ~/.vscode/extensions.
-5. `cd ~/.vscode/extensions/obs-vscode-extension` and run `tsc` to build the extension.
-6. Use VSCode to edit Obsidian files.
+See obs-vscode-extension to set up VSCode for use with Obsidian.
 
 ###### Running the compiler from VSCode
 1. Make sure the bin directory of the Obsidian codebase is in your $PATH.
