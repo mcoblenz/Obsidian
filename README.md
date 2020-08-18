@@ -73,3 +73,22 @@ Then, push the modified .jar to the Git master branch, and it will be available 
 
 - `OBSIDIAN_COMPILER_DIR`: The root directory of the compiler repository. Needed to be able to locate some compiler resources.
 
+###### Repository organization
+Makefile: for building and testing the Obsidian compiler.
+Obsidian_Runtime: provides runtime support for running Obsidian programs.
+buildscript: scripts for running Obsidian programs on Hyperledger Fabric
+docs: the Obsidian web site.
+evaluation: starter code and some data from the Obsidian vs. Solidity RCT.
+fabric: files needed by the Obsidian compiler to prepare executable Fabric packages.
+formalization: a partial formalization in Agda of the core of Obsidian.
+network-framework: data needed for running Obsidian programs on Hyperledger Fabric.
+obs-vscode-extension: An extension for Visual Studio Code for editing and running Obsidian programs.
+obstest.pl: used for testing Obsidian programs.
+papers: an archive of some Obsidian papers.
+project: this directory specifies how SBT should build the compiler.
+pygments_lexer_obsidian: a fork of the Pygments project to support the tokens needed for Obsidian programs.
+resources: Test files and case studies.
+solidity_user_guide: the user guide given to Solidity participants in the RCT.
+src: compiler source code.
+travis_specific: configuration for Travis continuous integration.
+user_guide: the Obsidian user guide (given to Obsidian participants in the RCT).
