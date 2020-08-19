@@ -1,5 +1,15 @@
 #!/usr/local/bin/python3
 
+
+# This script rips code from etherscan and saves it into a cache so that it can be read by a compiler.
+
+# It takes two arguments on the command line:
+#    1. The etherscan address to rip
+#    2. An etherscan API key
+
+# The caching directory is denoted by the variable CACHE, so if you want to change the location on your
+# own machine, change that variable. If you want to avoid caching altogether, have is_cached always return True.
+
 import sys
 import os
 from os import path
@@ -8,9 +18,10 @@ import json
 import urllib.request
 
 CACHE = "etherscan_cache/"
-
 BASEURL = "https://api.etherscan.io/api?module=contract&action=getsourcecode&address=%s&apikey=%s"
 
+def cache() :
+    return CACHE
 
 def is_cached(address) :
     return os.path.isfile(CACHE + address + ".sol")
@@ -53,5 +64,4 @@ def rip_etherscan(etherscan_address, APIkey) :
     return save_file(etherscan_address, info["result"][0]["SourceCode"])
 
 if __name__ == "__main__" :
-    #The first argument should be the etherscan address, the second should be the etherscan API key
     rip_etherscan(sys.argv[1], sys.argv[2])

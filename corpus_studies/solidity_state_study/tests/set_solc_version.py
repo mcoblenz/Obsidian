@@ -1,12 +1,17 @@
 #!/usr/local/bin/python3
-#In order to run this script you must use python 3.5 or later
+# In order to run this script you must use python 3.5 or later
+
+# This script relies on the version of solc from trailofbits/solc-select. If you're using a version with a different mechanism for choosing
+# the compiler version, you may need to change this script.
+
+# The script expects one argument on the command line:
+#    1. The file path of the solidity file to change the compiler version for
 
 import sys
 import subprocess as sub
 import os
 import re
 import semantic_version as sv
-
 
 def is_compatable_version(version_range, version) :
     range = sv.NpmSpec(version_range)
@@ -16,8 +21,6 @@ def is_compatable_version(version_range, version) :
         return False
     return range.match(version_obj)
 
-#This script relies on solc being the version from trailofbits/solc-select. If you're using a version with a different mechanism for choosing
-#the compiler version, you may need to change this function.
 def get_solc_versions() :
     process = sub.run(["solc", "--versions"], stdout=sub.PIPE, encoding='ascii')
     return process.stdout.split("\n")

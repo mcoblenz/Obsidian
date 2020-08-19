@@ -82,9 +82,6 @@ if __name__ == "__main__" :
                         contract_dict[contract] = ([] if contract_dict.get(contract) is None else contract_dict[contract]) + [function]
                         
                         reentrant_function_storage[address] = contract_dict
-
-
-
                 
     addresses_file.close()
     results_file = open("reentrancy_results.txt", "w+")
