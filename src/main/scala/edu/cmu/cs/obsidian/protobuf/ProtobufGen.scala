@@ -109,6 +109,7 @@ object ProtobufGen {
     private def translateFieldDecl(f: edu.cmu.cs.obsidian.parser.Field): ProtobufDeclaration = {
         f.typ match {
             case i@edu.cmu.cs.obsidian.typecheck.IntType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.name)
+            case i@edu.cmu.cs.obsidian.typecheck.Int256Type() => ProtobufField(edu.cmu.cs.obsidian.protobuf.IntType(), f.name)
             case b@edu.cmu.cs.obsidian.typecheck.BoolType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.BoolType(), f.name)
             case s@edu.cmu.cs.obsidian.typecheck.StringType() => ProtobufField(edu.cmu.cs.obsidian.protobuf.StringType(), f.name)
                 // TODO: get the right type for the state if this is type specifies typestate?
