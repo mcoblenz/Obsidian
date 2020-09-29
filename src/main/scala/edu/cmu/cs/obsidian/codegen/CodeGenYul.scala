@@ -6,11 +6,10 @@ import java.nio.file.{Files, Path, Paths}
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
-
 import edu.cmu.cs.obsidian.codegen.Code
 import jdk.nashorn.internal.runtime.FunctionScope
-
 import edu.cmu.cs.obsidian.codegen.yulString
+import edu.cmu.cs.obsidian.typecheck.ContractType
 
 import scala.collection.immutable.Map
 
@@ -73,7 +72,7 @@ object CodeGenYul extends CodeGenerator {
                 case obsContract: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain())) { // if not main contract
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
-                        if (c.name != "Contract") {
+                        if (c.name != ContractType.topContractName) {
                             new_subObjects = main_contract_ast.subObjects :+ translateContract(obsContract)
                         }
                     }
