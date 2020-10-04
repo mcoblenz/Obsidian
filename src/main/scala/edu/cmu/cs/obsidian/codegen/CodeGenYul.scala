@@ -8,20 +8,19 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.codegen.Code
 import jdk.nashorn.internal.runtime.FunctionScope
-import edu.cmu.cs.obsidian.codegen.yulString
+
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
 import scala.collection.immutable.Map
 
-// need some table remembering field index in storage
 object CodeGenYul extends CodeGenerator {
 
     // TODO improve this temporary symbol table
-    var temp_symbol_table: Map[String, Int] = Map() // map from field identifiers to index in storage
-    var temp_table_idx = 0
-    var state_idx = -1
-    var state_enum_mapping: Map[String, Int] = Map() // map from state name to an enum value
-    var state_enum_counter = 0
+    var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
+    var tempTableIdx = 0 // counter indicating the next available slot in the table
+    var stateIdx = -1    // whether or not there is a state
+    var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
+    var stateEnumCounter = 0  // counter indicating the next value to assign since we don't knon the total num of states
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -42,7 +41,7 @@ object CodeGenYul extends CodeGenerator {
         // translate from obsidian AST to yul AST
         val translated_obj = translateProgram(ast)
         // generate yul string from yul AST
-        val s = yulString.yulString(translated_obj)
+        val s = translated_obj.yulString()
         // write string to output file
         // currently it's created in the Obsidian directory; this may need to be changed, based on desired destination
         Files.createDirectories(finalOutputPath)
@@ -71,6 +70,8 @@ object CodeGenYul extends CodeGenerator {
             c match {
                 case obsContract: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain())) { // if not main contract
+                        // this is a top level contract object
+                        // note: interfaces are not translated;
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
                         if (c.name != ContractType.topContractName) {
                             new_subObjects = main_contract_ast.subObjects :+ translateContract(obsContract)
@@ -90,8 +91,9 @@ object CodeGenYul extends CodeGenerator {
         var statement_seq_runtime: Seq[YulStatement] = Seq()
 
         // memory init
-        val freeMemPointer = 64
-        val firstFreeMem = 128
+        val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
+        val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
+        // the free memory pointer points to 0x80 initially
         val initExpr = FunctionCall(
             Identifier("mstore"),
             Seq(Literal(LiteralKind.number, freeMemPointer.toString(), "int"),Literal(LiteralKind.number, firstFreeMem.toString(), "int")))
@@ -99,6 +101,8 @@ object CodeGenYul extends CodeGenerator {
         statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr)
 
         // callValueCheck: TODO unimplemented
+        // it checks for the wei sent together with the current call and revert if that's non zero.
+        // if callvalue() { revert(0, 0) }
 
         // translate declarations
         for (d <- contract.declarations) {
@@ -115,7 +119,7 @@ object CodeGenYul extends CodeGenerator {
         YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq())
     }
 
-
+    // return statements that go to deploy object, and statements that go to runtime object
     def translateDeclaration(declaration: Declaration): (Seq[YulStatement], Seq[YulStatement]) = {
         declaration match {
             case f: Field => (Seq(), translateField(f))
@@ -144,25 +148,26 @@ object CodeGenYul extends CodeGenerator {
     def translateField(field: Field): Seq[YulStatement] = {
         // Reserve a slot in the storage by assigning a index in the symbol table
         // since field declaration has not yet be assigned, there is no need to do sstore
-        temp_symbol_table += field.name -> temp_table_idx
-        temp_table_idx += 1
+        tempSymbolTable += field.name -> tempTableIdx
+        tempTableIdx += 1
         Seq()
     }
 
     def translateState(s: State): Seq[YulStatement] = {
-        if (state_idx == -1){
-            state_idx = temp_table_idx
-            temp_table_idx += 1
+        if (stateIdx == -1){
+            stateIdx = tempTableIdx
+            tempTableIdx += 1
         }
         // add state name to enum value mapping
-        state_enum_mapping += s.name -> state_enum_counter
-        state_enum_counter += 1
+        stateEnumMapping += s.name -> stateEnumCounter
+        stateEnumCounter += 1
+
         Seq()
     }
 
     def translateConstructor(constructor: Constructor): Seq[YulStatement] = {
-        val f: (VariableDeclWithSpec) => TypedName = (v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString())) )
-        val parameters: Seq[TypedName] = (constructor.args).map[TypedName](f)
+        val extractTypeName: (VariableDeclWithSpec) => TypedName = (v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString())) )
+        val parameters: Seq[TypedName] = (constructor.args).map[TypedName](extractTypeName)
         var body: Seq[YulStatement] =Seq()
         for (s <- constructor.body){
             body = body ++ translateStatement(s)
@@ -191,7 +196,7 @@ object CodeGenYul extends CodeGenerator {
         val ret: Seq[TypedName] =
             if (transaction.retType.isEmpty) {
                 Seq()
-            } else { // TODO hard code return variable name now
+            } else { // TODO hard code return variable name now, need a special naming convention to avoid collisions
                 Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString())) )
             }
 
@@ -217,7 +222,7 @@ object CodeGenYul extends CodeGenerator {
                 assignTo match {
                     // TODO only support int/int256 now
                     case ReferenceIdentifier(x) =>
-                        val idx = temp_symbol_table(x)
+                        val idx = tempSymbolTable(x)
                         val value = e match {
                             case NumLiteral(v) => v
                             case _ =>
@@ -241,14 +246,18 @@ object CodeGenYul extends CodeGenerator {
     def translateExpr(e: Expression): Seq[YulStatement] = {
         e match {
             case ReferenceIdentifier(x) =>
-                val idx = temp_symbol_table(x)
+                val idx = tempSymbolTable(x)
                 val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
                 Seq(ExpressionStatement(expr))
-            case _ => Seq() // TODO unimplemented
+            case _ =>
+                assert(false, "TODO")
+                Seq() // TODO unimplemented
         }
     }
 }
 
+// Yulstring
+// document scope class relation to mustache
 // temporary function, not designed for a full recursive walk through of the object
 class ObjScope(obj: YulObject) {
     class Func(val code: String){}
@@ -260,7 +269,7 @@ class ObjScope(obj: YulObject) {
         "uint256"
     }
 
-    // TODO unimplemented; hardcode for now
+    // TODO unimplemented; hardcode for now; bouncycastle library may be helpful
     def keccak256(s: String): String = {
         "0x70a08231"
     }
@@ -302,14 +311,16 @@ class ObjScope(obj: YulObject) {
             s match {
                 case f: FunctionDefinition => {
                     dispatch = true
-                    val code = yulString.yulFunctionDefString(f)
+                    val code = f.yulFunctionDefString()
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
                     dispatchArray = dispatchArray :+ new Case(hashFunction(f))
                 }
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => memoryInitRuntime = yulString.yulFunctionCallString(f)
-                        case _ => () // TODO unimplemented
+                        case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
+                        case _ =>
+                            assert(false, "TODO")
+                            () // TODO unimplemented
                     }
                 case _ => ()
             }
@@ -322,8 +333,8 @@ class ObjScope(obj: YulObject) {
 
 }
 
-// TODO need to fix indentation
-class FuncScope(f: FunctionDefinition){
+// TODO need to fix indentation of the output
+class FuncScope(f: FunctionDefinition) {
     class Param(val name: String){}
     class Body(val code: String){}
 
@@ -348,7 +359,7 @@ class FuncScope(f: FunctionDefinition){
             case ExpressionStatement(e) =>
                 e match {
                     case func: FunctionCall =>
-                        codeBody = codeBody :+ new Body(yulString.yulFunctionCallString(func))
+                        codeBody = codeBody :+ new Body(func.yulFunctionCallString())
                 }
             case _ => ()
         }

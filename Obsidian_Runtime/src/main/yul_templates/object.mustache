@@ -1,27 +1,43 @@
+{{! This is a template used by mustache to generate the final string of yul code. The
+structures of these templates are referenced from github repo
+ethereum/solidity/libsolidity/codegen/ir/IRGenerator.cpp
+(https://github.com/ethereum/solidity/blob/develop/libsolidity/codegen/ir/IRGenerator.cpp)
+Consulting example yul code is also helpful in understanding the template.
+https://solidity.readthedocs.io/en/latest/yul.html#specification-of-yul-object
+}}
 object "{{creationObject}}" {
     code {
+        {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
         {{memoryInit}}
+        {{! protection against sending Ether }}
         {{callValueCheck}}
+        {{! not impletmented by the current stage, cited from IRGenerator.cpp (link in file comment above) }}
         {{#notLibrary}}
             {{#constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
             {{implicitConstructor}}({{constructorParams}})
         {{/notLibrary}}
+        {{! call constructor }}
         {{#deploy}}
             {{call}}
         {{/deploy}}
+        {{! functions related to constructor }}
         {{#deployFunctions}}
             {{code}}
         {{/deployFunctions}}
     }
     object "{{runtimeObject}}" {
         code {
+            {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
             {{memoryInitRuntime}}
+            {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
             {{#dispatch}}
+                {{! TODO BUG: forget to add implementation of shift_right_unsigned,
+                    it simply returns shr(224, value) }}
                 let selector := shift_right_unsigned(calldataload(0))
                 switch selector
                 {{#dispatchCase}}
                     case {{hash}} {
-                        {{dispatchCall}}}
+                        {{dispatchCall}}
                     }
                 {{/dispatchCase}}
             {{/dispatch}}

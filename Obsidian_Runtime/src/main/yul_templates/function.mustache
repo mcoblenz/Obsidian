@@ -1,3 +1,8 @@
+{{! This is a template used by mustache to generate the final string of yul code. The
+structures of these templates are referenced from github repo
+ethereum/solidity/libsolidity/codegen/ir/IRGenerator.cpp
+(https://github.com/ethereum/solidity/blob/develop/libsolidity/codegen/ir/IRGenerator.cpp) }}
+
 function {{functionName}}({{arg0}}{{#params}},{{name}}{{/params}}){{#hasRetVal}}->{{retParams}}{{/hasRetVal}}{
 {{#body}}
     {{code}}
