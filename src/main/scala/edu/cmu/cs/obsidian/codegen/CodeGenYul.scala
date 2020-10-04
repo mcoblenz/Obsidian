@@ -71,9 +71,8 @@ object CodeGenYul extends CodeGenerator {
                 case obsContract: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain())) { // if not main contract
                         // this is a top level contract object
-                        // note: interface are not translated;
+                        // note: interfaces are not translated;
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
-                        // instead of comparing string, "Contracttype.topContractName" in ObsidianType.scala
                         if (c.name != ContractType.topContractName) {
                             new_subObjects = main_contract_ast.subObjects :+ translateContract(obsContract)
                         }
@@ -162,6 +161,7 @@ object CodeGenYul extends CodeGenerator {
         // add state name to enum value mapping
         stateEnumMapping += s.name -> stateEnumCounter
         stateEnumCounter += 1
+
         Seq()
     }
 
@@ -269,7 +269,7 @@ class ObjScope(obj: YulObject) {
         "uint256"
     }
 
-    // TODO unimplemented; hardcode for now; bouncycastle library maybe helpful
+    // TODO unimplemented; hardcode for now; bouncycastle library may be helpful
     def keccak256(s: String): String = {
         "0x70a08231"
     }
@@ -296,21 +296,17 @@ class ObjScope(obj: YulObject) {
 
     for (s <- obj.code.block.statements) {
         s match {
-            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.yulFunctionDefString())
+            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(yulString.yulFunctionDefString(f))
             case e: ExpressionStatement =>
                 e.expression match {
-                    case f: FunctionCall => deployCall = deployCall :+ new Call(f.yulFunctionCallString())
-                    case _ =>
-                        assert(false, "TODO")
-                        () // TODO unimplemented
+                    case f: FunctionCall => deployCall = deployCall :+ new Call(yulString.yulFunctionCallString(f))
+                    case _ => () // TODO unimplemented
                 }
-            case _ =>
-                assert(false, "TODO")
-                () // TODO unimplemented
+            case _ => () // TODO unimplemented
         }
     }
 
-    for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
+    for (sub <- obj.subObjects) { // TODO separate runtime object out as a module
         for (s <- sub.code.block.statements) { // temporary fix due to issue above
             s match {
                 case f: FunctionDefinition => {
