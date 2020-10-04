@@ -9,7 +9,6 @@ import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.codegen.Code
 import jdk.nashorn.internal.runtime.FunctionScope
 
-import edu.cmu.cs.obsidian.codegen.YulStringGenerator
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
 import scala.collection.immutable.Map
@@ -42,7 +41,7 @@ object CodeGenYul extends CodeGenerator {
         // translate from obsidian AST to yul AST
         val translated_obj = translateProgram(ast)
         // generate yul string from yul AST
-        val s = YulStringGenerator.yulString(translated_obj)
+        val s = translated_obj.yulString()
         // write string to output file
         // currently it's created in the Obsidian directory; this may need to be changed, based on desired destination
         Files.createDirectories(finalOutputPath)
@@ -297,10 +296,10 @@ class ObjScope(obj: YulObject) {
 
     for (s <- obj.code.block.statements) {
         s match {
-            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(YulStringGenerator.yulFunctionDefString(f))
+            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.yulFunctionDefString())
             case e: ExpressionStatement =>
                 e.expression match {
-                    case f: FunctionCall => deployCall = deployCall :+ new Call(YulStringGenerator.yulFunctionCallString(f))
+                    case f: FunctionCall => deployCall = deployCall :+ new Call(f.yulFunctionCallString())
                     case _ =>
                         assert(false, "TODO")
                         () // TODO unimplemented
@@ -316,13 +315,13 @@ class ObjScope(obj: YulObject) {
             s match {
                 case f: FunctionDefinition => {
                     dispatch = true
-                    val code = YulStringGenerator.yulFunctionDefString(f)
+                    val code = f.yulFunctionDefString()
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
                     dispatchArray = dispatchArray :+ new Case(hashFunction(f))
                 }
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => memoryInitRuntime = YulStringGenerator.yulFunctionCallString(f)
+                        case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
                         case _ =>
                             assert(false, "TODO")
                             () // TODO unimplemented
@@ -364,7 +363,7 @@ class FuncScope(f: FunctionDefinition) {
             case ExpressionStatement(e) =>
                 e match {
                     case func: FunctionCall =>
-                        codeBody = codeBody :+ new Body(YulStringGenerator.yulFunctionCallString(func))
+                        codeBody = codeBody :+ new Body(func.yulFunctionCallString())
                 }
             case _ => ()
         }
