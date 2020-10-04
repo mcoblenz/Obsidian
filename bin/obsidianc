@@ -4,9 +4,9 @@ bin_dir="$(cd "$(dirname $BASH_SOURCE)"; pwd)"
 root_dir="$bin_dir/.."
 export OBSIDIAN_COMPILER_DIR="$root_dir"
 
-obsidian_jar="$root_dir/target/scala-2.12/obsidianc.jar"
+obsidian_jar="$(find "$root_dir/target" -name "obsidianc.jar" | head -n1)"
 
-if [[ ! -e "$obsidian_jar" ]]; then
+if [[ -z "$obsidian_jar" ]]; then
     (
         cd "$root_dir"
         sbt assembly

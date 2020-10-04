@@ -1,0 +1,4 @@
+[submodule "resources/case_studies/Shipping"]
+	path = resources/case_studies/Shipping
+	url = https://github.com/laredo/Shipping.git
+	branch = generic-linked-list
