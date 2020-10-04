@@ -6,7 +6,7 @@ import com.github.mustachejava.MustacheFactory
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen.{FuncScope, FunctionCall, FunctionDefinition, Literal, ObjScope, YulObject}
 
-object yulString {
+object YulStringGenerator {
 
     def yulString(obj: YulObject): String = {
         val mf = new DefaultMustacheFactory()
