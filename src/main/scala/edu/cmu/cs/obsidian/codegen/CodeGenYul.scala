@@ -197,7 +197,7 @@ object CodeGenYul extends CodeGenerator {
         val ret: Seq[TypedName] =
             if (transaction.retType.isEmpty) {
                 Seq()
-            } else { // TODO hard code return variable name now
+            } else { // TODO hard code return variable name now, need a special naming convention to avoid collisions
                 Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString())) )
             }
 
@@ -299,9 +299,13 @@ class ObjScope(obj: YulObject) {
             case e: ExpressionStatement =>
                 e.expression match {
                     case f: FunctionCall => deployCall = deployCall :+ new Call(YulStringGenerator.yulFunctionCallString(f))
-                    case _ => () // TODO unimplemented
+                    case _ =>
+                        assert(false, "TODO")
+                        () // TODO unimplemented
                 }
-            case _ => () // TODO unimplemented
+            case _ =>
+                assert(false, "TODO")
+                () // TODO unimplemented
         }
     }
 
@@ -317,7 +321,9 @@ class ObjScope(obj: YulObject) {
                 case e: ExpressionStatement =>
                     e.expression match {
                         case f: FunctionCall => memoryInitRuntime = YulStringGenerator.yulFunctionCallString(f)
-                        case _ => () // TODO unimplemented
+                        case _ =>
+                            assert(false, "TODO")
+                            () // TODO unimplemented
                     }
                 case _ => ()
             }
