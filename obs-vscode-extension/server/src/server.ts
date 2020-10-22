@@ -23,7 +23,12 @@ async function validateTextDocument(change: TextDocumentChangeEvent<TextDocument
   // Create temporary file containing the current set of changes 
   // TODO: Modify obsidianc to accept source code via stdin instead 
   // Note: obsidianc crashes if the source file begins with a dot
-  const tmpName = os.tmpdir() + "/ObsidianLSPTmp.obs"
+  const osTmpDir =  os.tmpdir();
+  const { sep } = require('path');
+  const tmpDir = await fs.mkdtemp(`${osTmpDir}${sep}`);
+
+  const tmpName = `${tmpDir}${sep}ObsidianLSPTmp.obs`;
+  console.log(`tmpFile: ${tmpName}`);
   const tmpFile = await fs.open(tmpName, "w+");
   await tmpFile.write(change.document.getText(), 0);
   tmpFile.close();

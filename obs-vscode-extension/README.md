@@ -18,12 +18,14 @@ Compiling:
 * npm run compile
 
 To develop the extension/LSP:
-* code -n . (to open the project in vscode) 
+* code -n . (to open the project in vscode)
+* npm run compile to rebuild (VS Code does not automatically rebuild the extension when you run the debugger)
 * Go to the "Run" menu on the left 
-* First, start "Launch client"
+* First, start "Launch client". Or, to see server messages, instead choose "Client + Server" and skip "Attach to server" below.
 * The extension will open in a new VSCode window
 * Now select "Attach to server"
 * You can now trigger breakpoints, etc. 
+* Log to console from server with console.log. Messages appear in the "Attach to server" section of the Debug Console in the host VSCode (not the one being debugged).
 
 To install:
 * vsce package

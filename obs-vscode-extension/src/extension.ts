@@ -30,27 +30,29 @@ export function activate(context: vscode.ExtensionContext) {
    // The command has been defined in the package.json file
    // Now provide the implementation of the command with registerCommand
    // The commandId parameter must match the command field in package.json
-   let compileCommand = vscode.commands.registerCommand('extension.compileObsidian', () => {
-         // The code you place here will be executed every time your command is executed
-            let task = getCompilationTask();
-            if (task != undefined) {
-               vscode.tasks.executeTask(task as vscode.Task).then(
-                  compilationExecution => vscode.tasks.onDidEndTaskProcess(((e) => {
-                     if (e.execution.task == task) {
-                        if (e.exitCode == 0) {
-                           vscode.window.showInformationMessage('Compilation succeeded.');
-                        }
-                        else {
-                           vscode.window.showInformationMessage('Compilation failed.');
-                        }
-                     }
-                  })
-               ))
-            }
-         }       
-   );
 
-   context.subscriptions.push(compileCommand);
+   // MJC: this is commented out for now because the LSP server makes manual compilation unnecessary.
+   // let compileCommand = vscode.commands.registerCommand('extension.compileObsidian', () => {
+   //       // The code you place here will be executed every time your command is executed
+   //          let task = getCompilationTask();
+   //          if (task != undefined) {
+   //             vscode.tasks.executeTask(task as vscode.Task).then(
+   //                compilationExecution => vscode.tasks.onDidEndTaskProcess(((e) => {
+   //                   if (e.execution.task == task) {
+   //                      if (e.exitCode == 0) {
+   //                         vscode.window.showInformationMessage('Compilation succeeded.');
+   //                      }
+   //                      else {
+   //                         vscode.window.showInformationMessage('Compilation failed.');
+   //                      }
+   //                   }
+   //                })
+   //             ))
+   //          }
+   //       }       
+   // );
+
+   // context.subscriptions.push(compileCommand);
 
    let compileClientCommand = vscode.commands.registerCommand('extension.compileObsidianClient', () => {
       // The code you place here will be executed every time your command is executed
