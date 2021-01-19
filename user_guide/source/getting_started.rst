@@ -11,10 +11,14 @@ Editor setup
 ------------
 - Install nodejs (https://nodejs.org/en/).
 - Install typescript (`npm install -g typescript`).
-- Install VSCode (https://code.visualstudio.com).
-- Copy the obs-vscode-extension directory into ~/.vscode/extensions.
-- `cd ~/.vscode/extensions/obs-vscode-extension` and run `tsc` to build the extension.
-- Use VSCode to edit Obsidian files.
+- Install VSCode (https://code.visualstudio.com) and make sure that the commandline tool it provides, `code` is in your path.
+- Install vsce `npm install -g vsce`
+- Go to the extension directory `extensions/obs-vscode-extension`
+- Run `npm install`
+- Run `npm run compile`
+- Run `vsce package`
+- Run `code --install-extension obs-vscode-extension/*.vsix`
+- Use VSCode to edit Obsidian files, possibly after closing and reopening VSCode to refresh its extensions.
 
 Running the compiler from VSCode
 ---------------------------------
