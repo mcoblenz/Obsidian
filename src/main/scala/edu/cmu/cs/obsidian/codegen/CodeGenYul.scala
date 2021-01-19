@@ -7,7 +7,7 @@ import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.codegen.Code
-import jdk.nashorn.internal.runtime.FunctionScope
+// import jdk.nashorn.internal.runtime.FunctionScope // iev
 
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
