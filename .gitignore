@@ -44,6 +44,8 @@ project/plugins/project/
 *.proto
 .idea/libraries/
 
+.idea/*
+
 # Gradle build script caches and whatnot
 buildscript/.gradle
 buildscript/build
