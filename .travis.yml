@@ -15,12 +15,14 @@ before_install:
   - mv bin $HOME
   - export PATH=${PATH}:${HOME}/protobuf/
   - export PATH=${PATH}:${HOME}/bin/
-
+  # install ganache and truffle
+  - ./travis_specific/install_ganache.sh
 
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++2.13.2 test
   - bash travis_specific/tests.sh
+  - bash travis_specific/ganache_tests.sh
 
 cache:
   directories:
