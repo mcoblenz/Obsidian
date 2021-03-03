@@ -1,7 +1,7 @@
 dist: trusty
 language: scala
 scala:
-    - 2.13.2
+    - 2.13.2  ## 2.13.5
 
 # This may be necessary depending on the tests we eventually run. For example,
 # the chaincode base server uses "java.util.Base64", which is only supported
