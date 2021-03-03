@@ -1,5 +1,5 @@
 #!/bin/bash
 
-## todo/iev: no idea if npm will be installed by the time this runs. this may well break
+npm install -g npm@7.6.0 # as of 3 march 2021 this is a recent enough npm build to support ganache and truffle
 npm install
 npm install -g ganache-cli truffle
