@@ -12,9 +12,15 @@ echo "--- iev --- current working directory:"
 pwd
 
 # Yul tests -- note that these only test if the compiler runs without an error
-cd ../YulTests || exit 1 ## fixing this relative path to an absolute one
-bash EmptyContract.sh
+for test in resources/tests/YulTests/*.sh
+do
+  echo "running Yul Test $test"
+  bash "$test"
+done
 
 # Ganache Tests -- these actually build the compiled Yul via Truffle then run it via Ganache
-cd ../GanacheTests || exit 1
-bash EmptyContract.sh
+for test in resources/tests/GanacheTests/*.sh
+do
+  echo "running Ganache Test $test"
+  bash "$test"
+done
