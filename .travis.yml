@@ -23,7 +23,7 @@ before_install:
 
 script:
   # - gradle publish -b Obsidian_Runtime/build.gradle
-  - sbt ++2.13.2 test # this actually builds Obsidian
+  - sbt ++2.13.5 test # this actually builds Obsidian
   # - bash travis_specific/tests.sh
   - bash travis_specific/ganache_tests.sh
 
