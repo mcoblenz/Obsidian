@@ -4,13 +4,13 @@ scala:
     - 2.13.5  ## used to be 2.13.2
 
 node_js:
-     - 9.4.0
+     - 15.11.0
 
 # This may be necessary depending on the tests we eventually run. For example,
 # the chaincode base server uses "java.util.Base64", which is only supported
 # as of java version 8
 jdk:
-  - oraclejdk9 ## todo / iev updating this to jdk9 to see if i can get a more modern node too; deep waters
+  - oraclejdk15 ## todo / iev updating this to jdk9 to see if i can get a more modern node too; deep waters
 
 before_install:
   - ./travis_specific/install-protobuf.sh
