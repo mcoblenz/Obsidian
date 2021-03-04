@@ -4,13 +4,20 @@ scala:
     - 2.13.5  ## used to be 2.13.2
 
 node_js:
-     - 15.11.0
+     - 15.11.0 ## cirremt as of 4 march 2021
 
 # This may be necessary depending on the tests we eventually run. For example,
 # the chaincode base server uses "java.util.Base64", which is only supported
 # as of java version 8
 jdk:
-  - oraclejdk9 ## todo / iev updating this to jdk9 to see if i can get a more modern node too; deep waters
+  - oraclejdk9 ## todo / iev: jdk9 works; jdk15 doesn't. figure out how high you can go and why not.
+
+## todo / iev: gradle that was getting run on the jdk15 shot above was 5.1.1 but current version
+##  is 6.8.3. so that probably needs to get updated to work with modern java, but i'm not sure
+##  where that's happening. the errors i was seeing were of the form of not finding libraries.
+##
+## compare https://travis-ci.org/github/mcoblenz/Obsidian/builds/761498294
+## and https://travis-ci.org/github/mcoblenz/Obsidian/builds/761505439
 
 
 before_install:
