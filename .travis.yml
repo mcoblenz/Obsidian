@@ -10,7 +10,8 @@ node_js:
 # the chaincode base server uses "java.util.Base64", which is only supported
 # as of java version 8
 jdk:
-  - oraclejdk11 ## todo / iev: jdk9 works; jdk15 doesn't. figure out how high you can go and why
+  - oraclejdk12
+  ## todo / iev: jdk9 works; jdk15 doesn't. figure out how high you can go and why
   # - not.
 
 ## todo / iev: gradle that was getting run on the jdk15 shot above was 5.1.1 but current version
@@ -33,7 +34,7 @@ before_install:
 script:
   # - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++2.13.5 test # this actually builds Obsidian
-  # - bash travis_specific/tests.sh
+  - bash travis_specific/tests.sh
   - bash travis_specific/ganache_tests.sh
 
 cache:
