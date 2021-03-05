@@ -10,7 +10,8 @@ node_js:
 # the chaincode base server uses "java.util.Base64", which is only supported
 # as of java version 8
 jdk:
-  - oraclejdk9 ## todo / iev: jdk9 works; jdk15 doesn't. figure out how high you can go and why not.
+  - oraclejdk11 ## todo / iev: jdk9 works; jdk15 doesn't. figure out how high you can go and why
+  # - not.
 
 ## todo / iev: gradle that was getting run on the jdk15 shot above was 5.1.1 but current version
 ##  is 6.8.3. so that probably needs to get updated to work with modern java, but i'm not sure
