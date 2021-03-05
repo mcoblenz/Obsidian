@@ -16,4 +16,5 @@ if [ $? -ne 0 ]; then
 fi
 
 
+# this isn't getting run and ends up in the TLD
 rm -rf EmptyContract
