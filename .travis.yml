@@ -1,18 +1,14 @@
 dist: focal
 language: scala
 scala:
-    - 2.13.5  ## used to be 2.13.2
+    - 2.13.5
 
 node_js:
-     - 15.11.0 ## cirremt as of 4 march 2021
+     - 15.11.0
 
-# This may be necessary depending on the tests we eventually run. For example,
-# the chaincode base server uses "java.util.Base64", which is only supported
-# as of java version 8
 jdk:
   - oraclejdk12
-  ## todo / iev: jdk9 works; jdk15 doesn't. figure out how high you can go and why
-  # - not.
+  ## todo / iev: jdk9 works, 15 doesn't. up to 12 seems to work.
 
 ## todo / iev: gradle that was getting run on the jdk15 shot above was 5.1.1 but current version
 ##  is 6.8.3. so that probably needs to get updated to work with modern java, but i'm not sure
