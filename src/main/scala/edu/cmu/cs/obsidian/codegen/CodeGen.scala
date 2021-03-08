@@ -295,7 +295,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 // I have the JDirectClass, but I need an IJExpression.
                 val connectionManagerClassObj = connectionManagerClass.dotclass()
 
-                val constructor = targetClass.invoke("getConstructor").arg(connectionManagerClassObj).arg(javaStringType.dotclass())
+                val constructor = targetClass.invoke("getConstructor").arg(connectionManagerClassObj).arg(javaStringType().dotclass())
                 val constructorInvocation = constructor.invoke("newInstance")
                 constructorInvocation.arg(JExpr.ref("connectionManager"))
 
@@ -1110,7 +1110,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
 
         aContract.params.foreach(p => {
-            constructor.param(javaStringType, genericParamName(p))
+            constructor.param(javaStringType(), genericParamName(p))
             invocation.arg(refGenericParam(p))
 
             p.gVar.permissionVar match {
@@ -2360,7 +2360,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     if (initializeFromArchive) {
                         val classArchiveNameVar = block.decl(javaStringType(), "classArchiveName",
                             archive.invoke("getObj").invoke("getImplementingClassArchiveName"))
-                        val archiveDataVar = block.decl(javaStringType, "archiveData",
+                        val archiveDataVar = block.decl(javaStringType(), "archiveData",
                             archive.invoke("getObj").invoke("getImplementingClassData"))
 
                         val tempArchive = block.decl(model.directClass("java.lang.Object"), "tempArchive")
@@ -2991,7 +2991,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
         // Handle the generic parameters:
         aContract.params.foreach(p => {
-            val param = meth.param(javaStringType, genericParamName(p))
+            val param = meth.param(javaStringType(), genericParamName(p))
             body.assign(JExpr.refthis(genericParamName(p)), param)
             p.gVar.permissionVar match {
                 case Some(pVar) =>

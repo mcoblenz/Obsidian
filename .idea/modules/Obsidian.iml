@@ -79,8 +79,8 @@
     <orderEntry type="library" name="sbt: org.reflections:reflections:0.9.11:jar" level="project" />
     <orderEntry type="library" name="sbt: org.scala-lang.modules:scala-parser-combinators_2.13:1.1.2:jar" level="project" />
     <orderEntry type="library" name="sbt: org.scala-lang.modules:scala-xml_2.13:1.2.0:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.scala-lang:scala-library:2.13.2:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.scala-lang:scala-reflect:2.13.2:jar" level="project" />
+    <orderEntry type="library" name="sbt: org.scala-lang:scala-library:2.13.5:jar" level="project" />
+    <orderEntry type="library" name="sbt: org.scala-lang:scala-reflect:2.13.5:jar" level="project" />
     <orderEntry type="library" name="sbt: org.scalactic:scalactic_2.13:3.1.2:jar" level="project" />
     <orderEntry type="library" name="sbt: org.scalatest:scalatest_2.13:3.1.2:jar" level="project" />
     <orderEntry type="library" name="sbt: org.scalatestplus:scalatestplus-junit_2.13:1.0.0-M2:jar" level="project" />
