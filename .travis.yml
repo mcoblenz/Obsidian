@@ -7,8 +7,7 @@ node_js:
      - 15.11.0
 
 jdk:
-  - oraclejdk13
-  ## todo / iev: jdk9 works, 15 doesn't. up to 12 seems to work.
+  - oraclejdk12 ## as of 9 march 2021, up to jdk12 seems to work but 13/14/15 fail
 
 ## todo / iev: gradle that was getting run on the jdk15 shot above was 5.1.1 but current version
 ##  is 6.8.3. so that probably needs to get updated to work with modern java, but i'm not sure
