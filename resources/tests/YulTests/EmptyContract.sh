@@ -15,6 +15,4 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-
-# this isn't getting run and ends up in the TLD
 rm -rf EmptyContract

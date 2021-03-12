@@ -463,7 +463,7 @@ object Parser extends Parsers {
                     case None =>
                         Field(isConst = false, typ, name._1, availableInSet).setLoc(typ)
             }
-            // case _ => failure("available in fields only permitted at the top level of contracts")
+            case _ ~ _ ~ _ ~ _ ~ Some(x) ~ _ => throw new RuntimeException("TODO") //failure("available in fields only permitted at the top level of contracts")
         }
     }
 

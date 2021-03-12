@@ -620,7 +620,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
         def generalizedPartition[T, S](ts: List[T], f: Function[T, S]): immutable.HashMap[S, Seq[T]] = {
             ts match {
                 case h :: rest =>
-                    val (equiv, nonEquiv) = rest.partition(f(_) == (f(h)))
+                    val (equiv, nonEquiv) = rest.partition(f(_) == f(h))
                     generalizedPartition(nonEquiv, f).updated(f(h), h +: equiv)
                 case _ => new immutable.HashMap[S, Seq[T]]()
             }
