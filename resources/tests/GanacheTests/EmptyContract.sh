@@ -21,9 +21,10 @@ set -e
 # todo: if this is in the test script for each thing, it'll spin up a new ganache-cli instance every
 #  time, which is wasteful but also means that each test is insulated from each other. which do we want?
 
-## todo: what's the right gas limit?
+## todo: what's the right gas limit? MC: "use all the gas"
 ganache-cli --gasLimit 3000 2> /dev/null 1> /dev/null &
-sleep 5 # to make sure ganache-cli is up and running before compiling ## todo: this is from the doc i scraped but dear god is it a hack and i hate it
+## todo: this is a total hack 
+sleep 5 # to make sure ganache-cli is up and running before compiling
 rm -rf build
 truffle compile
 truffle migrate --reset --network development
