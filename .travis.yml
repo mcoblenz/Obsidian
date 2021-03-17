@@ -15,7 +15,6 @@ before_install:
   # - mv bin $HOME
   - export PATH=${PATH}:${HOME}/protobuf/
   - export PATH=${PATH}:${HOME}/bin/
-  - export OBS=${HOME}/Obsidian
   # install ganache and truffle
   - ./travis_specific/install_ganache.sh
 
