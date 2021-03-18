@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
+# note: this won't be set locally so either set it on your machine to make
+# sense or run this only via travis.
 cd "$TRAVIS_BUILD_DIR" || exit 1
 
-# Ganache Tests -- these actually build the compiled Yul via Truffle then run it via Ganache
+# Ganache Tests -- these actually build the compiled Yul via Truffle then
+# run it via Ganache
 
 ANY_FAILURES=0
 
@@ -16,4 +19,3 @@ do
 done
 
 exit $ANY_FAILURES
-
