@@ -19,7 +19,7 @@ sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/EmptyCo
 # copy
 cp resources/tests/GanacheTests/truffle-config.js EmptyContract/
 cd EmptyContract
-yes "N" | truffle init
+truffle init --force
 
 CURR_PATH="$( pwd -P )"
 
