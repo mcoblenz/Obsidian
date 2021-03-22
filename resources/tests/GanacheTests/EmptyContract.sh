@@ -46,8 +46,8 @@ fi
 # maybe it can be deleted.
 set -e
 
-# start up ganache; todo: 3000 is a magic number, it may be wrong
-ganache-cli --gasLimit 3000 &> /dev/null &
+# start up ganache; todo: gas is a magic number, it may be wrong
+ganache-cli --gasLimit 2000 &> /dev/null &
 
 ## todo: this is a total hack
 sleep 5 # to make sure ganache-cli is up and running before compiling
