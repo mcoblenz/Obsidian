@@ -16,24 +16,37 @@ fi
 # compile the contract to yul, also creating the directory to work in
 sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/EmptyContract.obs"
 
-# copy
-cp resources/tests/GanacheTests/truffle-config.js EmptyContract/
+# check to make sure that solc succeeded, failing otherwise
+if [ $? -ne 0 ]; then
+  echo "EmptyContract test failed: sbt exited cannot compile obs to yul"
+  exit 1
+fi
+
+# copy in the cached output of truffle init
+cp -r resources/tests/GanacheTests/truffle-env/* EmptyContract/
+
+# copy in the js describing the tests; todo: does this have to be named test.js?
+cp resources/tests/GanacheTests/EmptyContract.test.js EmptyContract/test/test.js
+
 cd EmptyContract
-truffle init --force
 
 CURR_PATH="$( pwd -P )"
 
-## todo: this is redundant work (and redundant code) if the other tests
-## have run; how to use that?
-docker run -v "$CURR_PATH":/sources ethereum/solc:stable --abi --bin --strict-assembly EmptyContract.yul > contracts/EmptyContract.evm
+# generate the evm from yul
+docker run -v "$CURR_PATH":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/EmptyContract.yul > contracts/EmptyContract.evm
 
+# check to make sure that solc succeeded, failing otherwise
 if [ $? -ne 0 ]; then
   echo "EmptyContract test failed: solc cannot compile yul code"
   exit 1
 fi
 
+# todo: this exits if there was a non-zero exit status but the above if
+# statement should have the same semantics? i don't know why this is here,
+# maybe it can be deleted.
 set -e
 
+# start up ganache; todo: 3000 is a magic number, it may be wrong
 ganache-cli --gasLimit 3000 &> /dev/null &
 
 ## todo: this is a total hack
@@ -44,8 +57,9 @@ rm -rf build
 truffle compile
 truffle migrate --reset --network development
 truffle test
-kill -9 $(lsof -t -i:8545)
 
-## todo: this will run things to here, but not check the output. figure out where that ends up.
+#todo check the result of truffle test somehow to indicate failure or not
+
+kill -9 $(lsof -t -i:8545)
 
 rm -rf EmptyContract

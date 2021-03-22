@@ -248,7 +248,7 @@ object CodeGenYul extends CodeGenerator {
                 val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
                 Seq(ExpressionStatement(expr))
             case _ =>
-                assert(false, "TODO")
+                assert(false, "TODO: " + e.toString())
                 Seq() // TODO unimplemented
         }
     }

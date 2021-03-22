@@ -9,7 +9,7 @@ module.exports = {
       network_id: "*",
       type: "fabric-evm"
     }
-  }
+  },
 
   // i believe these are the defaults but they may need to change to work for us. specifically the docker setting.
   compilers: {
