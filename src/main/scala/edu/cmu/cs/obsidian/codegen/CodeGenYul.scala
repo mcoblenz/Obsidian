@@ -1,12 +1,11 @@
 package edu.cmu.cs.obsidian.codegen
 
-import java.io.{File, FileReader, FileWriter, StringWriter}
+import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
 
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
-import edu.cmu.cs.obsidian.codegen.Code
 
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
