@@ -53,7 +53,7 @@ echo "binary representation is: $DATA"
 echo "starting ganache-cli"
 # start up ganache; todo: gas is a magic number, it may be wrong. it needs
 # to match what's in params below, i think. 0xbb8 is 3000.
-ganache-cli --gasLimit 3000 &> /dev/null &
+ganache-cli --gasLimit 3000 --accounts=1 & #> /dev/null &
 
 # todo: ping on that port or something instead of sleeping
 sleep 10
@@ -62,7 +62,9 @@ echo "waking up after ganache-cli should have started, at $(pwd -P)"
 echo "data is:: $DATA"
 
 # todo there MUST be a better way to form json objects.
-PARAMS='{"from":"0xDEADBEEF", "gas":"0xbb8", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
+ACCT=`curl -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' 'http://localhost:8545' | jq '.result[0]'`
+echo "using account $ACCT"
+PARAMS='{"from":'$ACCT', "gas":"0xbb8", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
 
 echo "PARAMS is:: $PARAMS"
 
@@ -70,6 +72,8 @@ echo "PARAMS is:: $PARAMS"
 ## optional so i'm ignoring it. also i have no idea what the from address
 ## should be. i suspect it can maybe be arbitrary? the to address might be
 ## how i check the output.
+
+
 
 curl -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'
 
