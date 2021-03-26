@@ -4,10 +4,11 @@
 module.exports = {
   networks: {
     development: {
-      host: "127.0.0.1",
-      port: "8545", // standard ethereum port, i think
-      network_id: "*",
-      type: "fabric-evm"
+	host: "127.0.0.1",
+	port: "8545", // standard ethereum port, i think
+	network_id: "*",
+	type: "fabric-evm",
+	gas: "3000"
     }
   },
 

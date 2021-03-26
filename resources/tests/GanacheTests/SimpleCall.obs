@@ -1,6 +1,6 @@
 main contract SimpleCall{
         transaction incr(int x) returns int {
-            return x+1;
+            return 4;
         }
 
         transaction main(int x) returns int {
