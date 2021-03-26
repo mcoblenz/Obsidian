@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+#todo there's more technical debt here than just this. but. use this
+#instead of the name of the file below; this will make it easier to make
+#this happen in a loop real soon.
 NAME=EmptyContract
 
 # check to make sure that both tools are installed, fail otherwise.
@@ -14,9 +17,11 @@ sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.o
 
 # check to make sure that solc succeeded, failing otherwise
 if [ $? -ne 0 ]; then
-  echo "EmptyContract test failed: sbt exited cannot compile obs to yul"
+  echo "$NAME test failed: sbt exited cannot compile obs to yul"
   exit 1
 fi
+
+#todo: check that it exists, fail otherwise.
 
 cd $NAME
 
@@ -35,26 +40,19 @@ fi
 # this is a bit of a hack. solc is supposed to output a json object and it
 # just isn't. so this is grepping through to grab the right lines with the
 # hex that represents the output.
+#
+# todo: this probably fails if the binary is more than one line long.
 TOP=`grep -n "Binary representation" $NAME.evm | cut -f1 -d:`
 BOT=`grep -n "Text representation" $NAME.evm | cut -f1 -d:`
-
-TOP=$((TOP+1))
-BOT=$((BOT-1))
-
-echo "top line for binary output $TOP"
-echo "bot line for binary output $BOT"
-
+TOP=$((TOP+1)) #drop the line with the name
+BOT=$((BOT-1)) #drop the empty line after the binary
 DATA=`sed -n $TOP','$BOT'p' $NAME.evm`
 
 echo "binary representation is: $DATA"
 
-# todo: this exits if there was a non-zero exit status but the above if
-# statement should have the same semantics? i don't know why this is here,
-# maybe it can be deleted.
-set -e
-
 echo "starting ganache-cli"
-# start up ganache; todo: gas is a magic number, it may be wrong
+# start up ganache; todo: gas is a magic number, it may be wrong. it needs
+# to match what's in params below, i think. 0xbb8 is 3000.
 ganache-cli --gasLimit 3000 &> /dev/null &
 
 # todo: ping on that port or something instead of sleeping
@@ -62,7 +60,6 @@ sleep 10
 echo "waking up after ganache-cli should have started, at $(pwd -P)"
 
 # todo curl command here
-DATA="0x0"
 PARAMS='{"from":"0xDEADBEEF", \
 	 "gas":"0xbb8", \
 	 "gasPrice":"0x9184e72a000", \
