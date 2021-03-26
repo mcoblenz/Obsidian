@@ -59,12 +59,12 @@ ganache-cli --gasLimit 3000 &> /dev/null &
 sleep 10
 echo "waking up after ganache-cli should have started, at $(pwd -P)"
 
-# todo curl command here
-PARAMS='{"from":"0xDEADBEEF", \
-	 "gas":"0xbb8", \
-	 "gasPrice":"0x9184e72a000", \
-	 "value":"0x0", \
-	 "data":0x"'$DATA'"\}'
+echo "data is:: $DATA"
+
+# todo there MUST be a better way to form json objects.
+PARAMS='{"from":"0xDEADBEEF", "gas":"0xbb8", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
+
+echo "PARAMS is:: $PARAMS"
 
 ## nb there's a "to" field here that i'm not sure what it does but it's
 ## optional so i'm ignoring it. also i have no idea what the from address
