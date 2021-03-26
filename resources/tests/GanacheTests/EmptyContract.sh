@@ -4,6 +4,8 @@
 #instead of the name of the file below; this will make it easier to make
 #this happen in a loop real soon.
 NAME=EmptyContract
+GAS=30000000
+GAS_HEX=0x1C9C380
 
 # check to make sure that both tools are installed, fail otherwise.
 if ! hash ganache-cli
@@ -53,7 +55,7 @@ echo "binary representation is: $DATA"
 echo "starting ganache-cli"
 # start up ganache; todo: gas is a magic number, it may be wrong. it needs
 # to match what's in params below, i think. 0xbb8 is 3000.
-ganache-cli --gasLimit 3000 --accounts=1 & #> /dev/null &
+ganache-cli --gasLimit $GAS --accounts=1 --defaultBalanceEther=5000000 & #> /dev/null &
 
 # todo: ping on that port or something instead of sleeping
 sleep 10
@@ -62,17 +64,18 @@ echo "waking up after ganache-cli should have started, at $(pwd -P)"
 echo "data is:: $DATA"
 
 # todo there MUST be a better way to form json objects.
-ACCT=`curl -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' 'http://localhost:8545' | jq '.result[0]'`
-echo "using account $ACCT"
-PARAMS='{"from":'$ACCT', "gas":"0xbb8", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
-
-echo "PARAMS is:: $PARAMS"
 
 ## nb there's a "to" field here that i'm not sure what it does but it's
 ## optional so i'm ignoring it. also i have no idea what the from address
 ## should be. i suspect it can maybe be arbitrary? the to address might be
 ## how i check the output.
 
+# query ganache-cli for the list of accounts, grab the first one, use that to run it.
+ACCT=`curl -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' 'http://localhost:8545' | jq '.result[0]'`
+echo "using account $ACCT"
+PARAMS='{"from":'$ACCT', "gas":"'$GAS_HEX'", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
+
+echo "PARAMS is:: $PARAMS"
 
 
 curl -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'
