@@ -27,3 +27,7 @@ script:
 cache:
   directories:
   - $HOME/.m2
+
+addons:
+  hosts:
+    - localhost
