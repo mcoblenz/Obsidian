@@ -5,4 +5,4 @@ npm install
 npm install -g ganache-cli
 npm audit fix
 
-sudo apt-get install jq # a commandline JSON tool
+sudo snap install jq # a commandline JSON tool
