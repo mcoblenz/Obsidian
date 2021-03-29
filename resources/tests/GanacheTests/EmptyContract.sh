@@ -80,6 +80,8 @@ echo "PARAMS is $PARAMS"
 RESP=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'`
 ERROR=$($RESP | tr -d '\n' | jq '.error.message')
 
+echo "response from ganache is: $RESP"
+
 RET=0
 
 if [[ $ERROR -ne "null" ]]
