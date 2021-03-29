@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash -x
 
 #todo there's more technical debt here than just this. but. use this
 #instead of the name of the file below; this will make it easier to make
@@ -23,15 +23,16 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-#todo: check that it exists, fail otherwise.
+if [ ! -d "$NAME" ]; then
+    echo "$NAME directory failed to get created"
+    exit 1
+fi
 
-cd $NAME
-
-CURR_PATH="$( pwd -P )"
+cd "$NAME"
 
 # generate the evm from yul
 echo "running solc to produce evm bytecode"
-docker run -v "$CURR_PATH":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/$NAME.yul > $NAME.evm
+docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/$NAME.yul > $NAME.evm
 
 # check to make sure that solc succeeded, failing otherwise
 if [ $? -ne 0 ]; then
@@ -57,11 +58,36 @@ echo "starting ganache-cli"
 # to match what's in params below, i think. 0xbb8 is 3000.
 ganache-cli --gasLimit $GAS --accounts=1 --defaultBalanceEther=5000000 & #> /dev/null &
 
-# todo: ping on that port or something instead of sleeping
-sleep 10
-echo "waking up after ganache-cli should have started, at $(pwd -P)"
+#form the JSON object to ask for the list of accounts
+ACCT_DATA=$( jq -ncM \
+                --arg "jn" "2.0" \
+                --arg "mn" "eth_accounts" \
+                --argjson "pn" "[]" \
+                --arg "idn" "1" \
+                '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
+         )
 
-echo "data is:: $DATA"
+#we'll keep querying for the accounts until we get a good result, this will
+#also block until ganache-cli comes up.
+echo "querying ganache-cli until accounts are available"
+KEEPGOING=1
+ACCTS=""
+until [ "$KEEPGOING" -eq 0 ] ;
+do
+    ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545)
+    KEEPGOING=$?
+    printf '.'
+    sleep 1
+done
+echo
+
+
+echo "waking up after ganache-cli should have started, at $(pwd -P)"
+echo "data is: $DATA"
+
+# we'll return this at the exit at the bottom of the file; TravisCI says a
+# job passes or fails based on the last command run
+RET=0
 
 # todo there MUST be a better way to form json objects.
 
@@ -70,20 +96,25 @@ echo "data is:: $DATA"
 ## should be. i suspect it can maybe be arbitrary? the to address might be
 ## how i check the output.
 
-# query ganache-cli for the list of accounts, grab the first one, use that to run it.
-ACCT=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' 'http://localhost:8545' | jq '.result[0]'`
-echo "using account $ACCT"
+ACCT=`echo $ACCTS | jq '.result[0]'`
+echo "ACCT is $ACCT"
+
+
+ ######## START HERE
 PARAMS='{"from":'$ACCT', "gas":"'$GAS_HEX'", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
 
 echo "PARAMS is $PARAMS"
 
 RESP=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'`
-ERROR=$($RESP | tr -d '\n' | jq '.error.message')
-
 echo "response from ganache is: $RESP"
 
-RET=0
+if [ "$RESP" == "400 Bad Request" ]
+then
+    echo "got a 400 bad response from ganache-cli"
+    exit 1
+fi
 
+ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
 if [[ $ERROR -ne "null" ]]
 then
     RET=1
@@ -91,13 +122,14 @@ then
 fi
 
 #todo check the result of test somehow to indicate failure or not
+
+# clean up; todo: make this a subroutine that can get called at any of the exits
 echo "killing ganache-cli"
 kill -9 $(lsof -t -i:8545)
 
+rm "$NAME/$NAME.yul"
+rm "$NAME/$NAME.evm"
+cd "../"
+rmdir "$NAME"
+
 exit $RET
-
-# cd up one directory first? this will not actually do any clean up. also
-# in travis, why would we care to run the scary command and remove the
-# directory anyway?
-
-# rm -rf $NAME #yikes

@@ -11,7 +11,9 @@ ANY_FAILURES=0
 
 for test in resources/tests/GanacheTests/*.sh
 do
+  echo "------------------------------------------------------------"
   echo "running Ganache Test $test"
+  echo "------------------------------------------------------------"
   TEST_RESULT=$($test)
   echo "$TEST_RESULT"
 
