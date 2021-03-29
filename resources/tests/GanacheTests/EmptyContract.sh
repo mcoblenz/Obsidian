@@ -71,17 +71,31 @@ echo "data is:: $DATA"
 ## how i check the output.
 
 # query ganache-cli for the list of accounts, grab the first one, use that to run it.
-ACCT=`curl -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' 'http://localhost:8545' | jq '.result[0]'`
+ACCT=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' 'http://localhost:8545' | jq '.result[0]'`
 echo "using account $ACCT"
 PARAMS='{"from":'$ACCT', "gas":"'$GAS_HEX'", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
 
-echo "PARAMS is:: $PARAMS"
+echo "PARAMS is $PARAMS"
 
+RESP=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'`
+ERROR=$($RESP | tr -d '\n' | jq '.error.message')
 
-curl -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'
+RET=0
+
+if [[ $ERROR -ne "null" ]]
+then
+    RET=1
+    echo "transaction produced an error: $ERROR"
+fi
 
 #todo check the result of test somehow to indicate failure or not
 echo "killing ganache-cli"
 kill -9 $(lsof -t -i:8545)
+
+exit $RET
+
+# cd up one directory first? this will not actually do any clean up. also
+# in travis, why would we care to run the scary command and remove the
+# directory anyway?
 
 # rm -rf $NAME #yikes
