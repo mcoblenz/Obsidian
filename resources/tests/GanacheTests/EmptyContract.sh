@@ -5,7 +5,7 @@
 #this happen in a loop real soon.
 NAME=EmptyContract
 GAS=30000000
-GAS_HEX=0x1C9C380
+GAS_HEX=$(printf '%x' $GAS) # 0x1C9C380
 
 # check to make sure that both tools are installed, fail otherwise.
 if ! hash ganache-cli
@@ -49,9 +49,9 @@ TOP=`grep -n "Binary representation" $NAME.evm | cut -f1 -d:`
 BOT=`grep -n "Text representation" $NAME.evm | cut -f1 -d:`
 TOP=$((TOP+1)) #drop the line with the name
 BOT=$((BOT-1)) #drop the empty line after the binary
-DATA=`sed -n $TOP','$BOT'p' $NAME.evm`
+EVM_BIN=`sed -n $TOP','$BOT'p' $NAME.evm`
 
-echo "binary representation is: $DATA"
+echo "binary representation is: $EVM_BIN"
 
 echo "starting ganache-cli"
 # start up ganache; todo: gas is a magic number, it may be wrong. it needs
@@ -83,7 +83,6 @@ echo
 
 
 echo "waking up after ganache-cli should have started, at $(pwd -P)"
-echo "data is: $DATA"
 
 # we'll return this at the exit at the bottom of the file; TravisCI says a
 # job passes or fails based on the last command run
@@ -96,16 +95,32 @@ RET=0
 ## should be. i suspect it can maybe be arbitrary? the to address might be
 ## how i check the output.
 
-ACCT=`echo $ACCTS | jq '.result[0]'`
+ACCT=`echo $ACCTS | jq '.result[0]' | tr -d '"'`
 echo "ACCT is $ACCT"
 
 
- ######## START HERE
-PARAMS='{"from":'$ACCT', "gas":"'$GAS_HEX'", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
+######## START HERE
+PARAMS=$( jq -ncM \
+             --arg "fn" "$ACCT" \
+             --arg "gn" "0x$GAS_HEX" \
+	     --arg "gpn" "0x9184e72a000" \
+	     --arg "vn" "0x0" \
+	     --arg "dn" "0x$EVM_BIN" \
+             '{"from":$fn,"gas":$gn,"gasPrice":$gpn,"value":$vn,"data":$dn}'
+      )
 
+SEND_DATA=$( jq -ncM \
+                --arg "jn" "2.0" \
+                --arg "mn" "eth_sendTransaction" \
+                --argjson "pn" "$PARAMS" \
+                --arg "idn" "1" \
+                '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
+      )
+
+#PARAMS='{"from":'$ACCT', "gas":"'$GAS_HEX'", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
 echo "PARAMS is $PARAMS"
-
-RESP=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'`
+#RESP=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'`
+RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
 echo "response from ganache is: $RESP"
 
 if [ "$RESP" == "400 Bad Request" ]
@@ -123,12 +138,13 @@ fi
 
 #todo check the result of test somehow to indicate failure or not
 
+
 # clean up; todo: make this a subroutine that can get called at any of the exits
 echo "killing ganache-cli"
 kill -9 $(lsof -t -i:8545)
 
-rm "$NAME/$NAME.yul"
-rm "$NAME/$NAME.evm"
+rm "$NAME.yul"
+rm "$NAME.evm"
 cd "../"
 rmdir "$NAME"
 
