@@ -248,8 +248,12 @@ object CodeGenYul extends CodeGenerator {
                 val idx = tempSymbolTable(x)
                 val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
                 Seq(ExpressionStatement(expr))
+            case NumLiteral(n) =>
+                // we compile to int256 in yul, first asserting to make sure that the literal in the obsidian source is within range
+                assert(false, "iev")
+                Seq()
             case _ =>
-                assert(false, "TODO")
+                assert(false, "TODO" + e.toString())
                 Seq() // TODO unimplemented
         }
     }
