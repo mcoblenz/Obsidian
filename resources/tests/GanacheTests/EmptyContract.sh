@@ -110,13 +110,13 @@ SEND_DATA=$( jq -ncM \
                 '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
       )
 echo "transaction being sent is given by"
-echo "$SEND_DATA" | jq
+echo "$SEND_DATA" | jq -M
 
 echo
 
 RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
 echo "response from ganache is:"
-((echo "$RESP" | tr -d '\n') ; echo) | jq
+((echo "$RESP" | tr -d '\n') ; echo) | jq -M
 
 if [ "$RESP" == "400 Bad Request" ]
 then

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash -x
 
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
@@ -14,10 +14,13 @@ do
   echo "------------------------------------------------------------"
   echo "running Ganache Test $test"
   echo "------------------------------------------------------------"
-  TEST_RESULT=$($test)
+  TEST_RESULT=$("$test")
   echo "$TEST_RESULT"
 
-  if [ $? -ne 0 ] ; then ANY_FAILURES=1 ; fi
+  if [ "$?" -ne 0 ]
+  then
+      ANY_FAILURES=1
+  fi
 done
 
-exit $ANY_FAILURES
+exit "$ANY_FAILURES"
