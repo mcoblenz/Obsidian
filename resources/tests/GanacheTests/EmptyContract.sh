@@ -1,13 +1,14 @@
 #!/bin/bash
 
-#todo there's more technical debt here than just this. but. use this
-#instead of the name of the file below; this will make it easier to make
-#this happen in a loop real soon.
+# todo these are constants that i think are likely to change per-test in
+# the future; i've hoisted them up here so that they can get read in from a
+# config file per test later. (issue #302)
 NAME=EmptyContract
-GAS=30000000
+GAS=30000000                  # this is a magic number (issue #302)
 GAS_HEX=$(printf '%x' $GAS)
-GAS_PRICE='0x9184e72a000'
-START_ETH=5000000
+GAS_PRICE='0x9184e72a000'     # this is a magic number from the YUL docs (issue #302)
+START_ETH=5000000             # this is a magic number (issue #302)
+NUM_ACCT=1
 
 # check to make sure that both tools are installed, fail otherwise.
 if ! hash ganache-cli
@@ -34,7 +35,7 @@ cd "$NAME"
 
 # generate the evm from yul
 echo "running solc to produce evm bytecode"
-docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/$NAME.yul > $NAME.evm
+docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/"$NAME".yul > "$NAME".evm
 
 # check to make sure that solc succeeded, failing otherwise
 if [ $? -ne 0 ]; then
@@ -42,25 +43,22 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# this is a bit of a hack. solc is supposed to output a json object and it
-# just isn't. so this is grepping through to grab the right lines with the
-# hex that represents the output.
-#
-# todo: this probably fails if the binary is more than one line long.
+# todo this is a bit of a hack. solc is supposed to output a json object
+# and it just isn't. so this is grepping through to grab the right lines
+# with the hex that represents the output. this likely fails if the binary
+# is more than one line long. (issue #302)
 TOP=`grep -n "Binary representation" $NAME.evm | cut -f1 -d:`
 BOT=`grep -n "Text representation" $NAME.evm | cut -f1 -d:`
-TOP=$((TOP+1)) #drop the line with the name
-BOT=$((BOT-1)) #drop the empty line after the binary
+TOP=$((TOP+1)) # drop the line with the name
+BOT=$((BOT-1)) # drop the empty line after the binary
 EVM_BIN=`sed -n $TOP','$BOT'p' $NAME.evm`
-
-
 echo "binary representation is: $EVM_BIN"
 
+# start up ganache
 echo "starting ganache-cli"
-# start up ganache; todo: gas is a magic number, it may be wrong.
-ganache-cli --gasLimit "$GAS" --accounts=1 --defaultBalanceEther="$START_ETH" &> /dev/null &
+ganache-cli --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
 
-#form the JSON object to ask for the list of accounts
+# form the JSON object to ask for the list of accounts
 ACCT_DATA=$( jq -ncM \
                 --arg "jn" "2.0" \
                 --arg "mn" "eth_accounts" \
@@ -69,8 +67,8 @@ ACCT_DATA=$( jq -ncM \
                 '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
          )
 
-#we'll keep querying for the accounts until we get a good result, this will
-#also block until ganache-cli comes up.
+# we'll keep querying for the accounts until we get a good result, this
+# will also block until ganache-cli comes up.
 echo "querying ganache-cli until accounts are available"
 KEEPGOING=1
 ACCTS=""
@@ -87,12 +85,13 @@ echo
 RET=0
 
 # todo: i'm not sure what account to mark as the "to" account. i think i
-# can use that later to test the ouptu of things. i'll just need to make
-# more than one account when i start up ganache
+# can use that later to test the output of running more complicated
+# contracts. i'll need to make more than one account when i start up
+# ganache. (issue #302)
 ACCT=`echo $ACCTS | jq '.result[0]' | tr -d '"'`
 echo "ACCT is $ACCT"
 
-#todo what's that 0x0 mean?
+# todo what's that 0x0 mean?
 PARAMS=$( jq -ncM \
              --arg "fn" "$ACCT" \
              --arg "gn" "0x$GAS_HEX" \
@@ -111,14 +110,15 @@ SEND_DATA=$( jq -ncM \
       )
 
 echo "transaction being sent is given by"
-echo "$SEND_DATA" # | jq -M #todo why doesn't this work on travis? it's great locally. also below.
-
+echo "$SEND_DATA" # | jq -M #todo why doesn't this work on travis? also below. (issue #302)
 echo
 
 RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
 echo "response from ganache is: $RESP"
-# ((echo "$RESP" | tr -d '\n') ; echo) # | jq -M
+# ((echo "$RESP" | tr -d '\n') ; echo) # | jq -M # (issue #302)
 
+# todo: this is not an exhaustive or principled way to check the output of
+# curling a post. (issue #302)
 if [ "$RESP" == "400 Bad Request" ]
 then
     echo "got a 400 bad response from ganache-cli"
@@ -132,17 +132,18 @@ then
     echo "transaction produced an error: $ERROR"
 fi
 
-# todo check the result of test somehow to indicate failure or not
+# todo check the result of test somehow to indicate failure or not (issue #302)
 
-# clean up; todo: make this a subroutine that can get called at any of the exits
+# clean up by killing ganache and the local files
+# todo: make this a subroutine that can get called at any of the exits (issue #302)
 echo "killing ganache-cli"
 kill -9 $(lsof -t -i:8545)
 
+# todo: for debugging it's nice to be able to look at these. maybe delete
+# them by default but take a flag to keep them around. (issue #302)
 rm "$NAME.yul"
 rm "$NAME.evm"
 cd "../"
 rmdir "$NAME"
 
-# TODO this exits with 1 when there's an error but travis still says the
-# whole thing passes, possibly because Simple passes?
 exit "$RET"
