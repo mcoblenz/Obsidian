@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#cd ../../../
+cd ../../../
 
 sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/YulTests/EmptyContract.obs"
 
