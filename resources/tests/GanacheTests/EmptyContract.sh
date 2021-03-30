@@ -1,11 +1,13 @@
-#!/bin/bash -x
+#!/bin/bash
 
 #todo there's more technical debt here than just this. but. use this
 #instead of the name of the file below; this will make it easier to make
 #this happen in a loop real soon.
 NAME=EmptyContract
 GAS=30000000
-GAS_HEX=$(printf '%x' $GAS) # 0x1C9C380
+GAS_HEX=$(printf '%x' $GAS)
+GAS_PRICE='0x9184e72a000'
+START_ETH=5000000
 
 # check to make sure that both tools are installed, fail otherwise.
 if ! hash ganache-cli
@@ -51,12 +53,12 @@ TOP=$((TOP+1)) #drop the line with the name
 BOT=$((BOT-1)) #drop the empty line after the binary
 EVM_BIN=`sed -n $TOP','$BOT'p' $NAME.evm`
 
+
 echo "binary representation is: $EVM_BIN"
 
 echo "starting ganache-cli"
-# start up ganache; todo: gas is a magic number, it may be wrong. it needs
-# to match what's in params below, i think. 0xbb8 is 3000.
-ganache-cli --gasLimit $GAS --accounts=1 --defaultBalanceEther=5000000 & #> /dev/null &
+# start up ganache; todo: gas is a magic number, it may be wrong.
+ganache-cli --gasLimit "$GAS" --accounts=1 --defaultBalanceEther="$START_ETH" &> /dev/null &
 
 #form the JSON object to ask for the list of accounts
 ACCT_DATA=$( jq -ncM \
@@ -76,34 +78,25 @@ until [ "$KEEPGOING" -eq 0 ] ;
 do
     ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545)
     KEEPGOING=$?
-    printf '.'
     sleep 1
 done
 echo
-
-
-echo "waking up after ganache-cli should have started, at $(pwd -P)"
 
 # we'll return this at the exit at the bottom of the file; TravisCI says a
 # job passes or fails based on the last command run
 RET=0
 
-# todo there MUST be a better way to form json objects.
-
-## nb there's a "to" field here that i'm not sure what it does but it's
-## optional so i'm ignoring it. also i have no idea what the from address
-## should be. i suspect it can maybe be arbitrary? the to address might be
-## how i check the output.
-
+# todo: i'm not sure what account to mark as the "to" account. i think i
+# can use that later to test the ouptu of things. i'll just need to make
+# more than one account when i start up ganache
 ACCT=`echo $ACCTS | jq '.result[0]' | tr -d '"'`
 echo "ACCT is $ACCT"
 
-
-######## START HERE
+#todo what's that 0x0 mean?
 PARAMS=$( jq -ncM \
              --arg "fn" "$ACCT" \
              --arg "gn" "0x$GAS_HEX" \
-	     --arg "gpn" "0x9184e72a000" \
+	     --arg "gpn" "$GAS_PRICE" \
 	     --arg "vn" "0x0" \
 	     --arg "dn" "0x$EVM_BIN" \
              '{"from":$fn,"gas":$gn,"gasPrice":$gpn,"value":$vn,"data":$dn}'
@@ -116,10 +109,11 @@ SEND_DATA=$( jq -ncM \
                 --arg "idn" "1" \
                 '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
       )
+echo "transaction being sent is given by"
+echo "$SEND_DATA" | jq
 
-#PARAMS='{"from":'$ACCT', "gas":"'$GAS_HEX'", "gasPrice":"0x9184e72a000", "value":"0x0", "data":"0x'$DATA'"}'
-echo "PARAMS is $PARAMS"
-#RESP=`curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":'$PARAMS',"id":1}' 'http://localhost:8545'`
+echo
+
 RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
 echo "response from ganache is: $RESP"
 
@@ -130,7 +124,7 @@ then
 fi
 
 ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
-if [[ $ERROR -ne "null" ]]
+if [ "$ERROR" != "null" ]
 then
     RET=1
     echo "transaction produced an error: $ERROR"
@@ -148,4 +142,4 @@ rm "$NAME.evm"
 cd "../"
 rmdir "$NAME"
 
-exit $RET
+exit "$RET"
