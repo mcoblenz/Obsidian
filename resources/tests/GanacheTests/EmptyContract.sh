@@ -109,14 +109,15 @@ SEND_DATA=$( jq -ncM \
                 --arg "idn" "1" \
                 '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
       )
+
 echo "transaction being sent is given by"
-echo "$SEND_DATA" | jq -M
+echo "$SEND_DATA" # | jq -M #todo why doesn't this work on travis? it's great locally. also below.
 
 echo
 
 RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
-echo "response from ganache is:"
-((echo "$RESP" | tr -d '\n') ; echo) | jq -M
+echo "response from ganache is: $RESP"
+# ((echo "$RESP" | tr -d '\n') ; echo) # | jq -M
 
 if [ "$RESP" == "400 Bad Request" ]
 then
@@ -131,8 +132,7 @@ then
     echo "transaction produced an error: $ERROR"
 fi
 
-#todo check the result of test somehow to indicate failure or not
-
+# todo check the result of test somehow to indicate failure or not
 
 # clean up; todo: make this a subroutine that can get called at any of the exits
 echo "killing ganache-cli"
@@ -143,4 +143,6 @@ rm "$NAME.evm"
 cd "../"
 rmdir "$NAME"
 
+# TODO this exits with 1 when there's an error but travis still says the
+# whole thing passes, possibly because Simple passes?
 exit "$RET"
