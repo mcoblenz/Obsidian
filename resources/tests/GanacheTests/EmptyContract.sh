@@ -115,7 +115,8 @@ echo "$SEND_DATA" | jq
 echo
 
 RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
-echo "response from ganache is: $RESP"
+echo "response from ganache is:"
+((echo "$RESP" | tr -d '\n') ; echo) | jq
 
 if [ "$RESP" == "400 Bad Request" ]
 then
