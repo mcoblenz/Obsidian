@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
@@ -11,12 +11,11 @@ ANY_FAILURES=0
 
 for test in resources/tests/GanacheTests/*.sh
 do
-  echo "------------------------------------------------------------"
+  echo "---------------------------------------------------------------"
   echo "running Ganache Test $test"
-  echo "------------------------------------------------------------"
-  TEST_RESULT=$("$test")
-  echo "$TEST_RESULT"
+  echo "---------------------------------------------------------------"
 
+  "$test"
   if [ "$?" -ne 0 ]
   then
       ANY_FAILURES=1
