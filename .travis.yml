@@ -11,15 +11,14 @@ jdk:
 
 before_install:
   - ./travis_specific/install-protobuf.sh
-  # - curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s # installs hyperledger
-  # - mv bin $HOME
+  - curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s # installs hyperledger
+  - mv bin $HOME
   - export PATH=${PATH}:${HOME}/protobuf/
   - export PATH=${PATH}:${HOME}/bin/
-  # install ganache and truffle
   - ./travis_specific/install_ganache.sh
 
 script:
-  # - gradle publish -b Obsidian_Runtime/build.gradle
+  - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++2.13.5 test # this actually builds Obsidian
   - bash travis_specific/tests.sh
   - bash travis_specific/ganache_tests.sh
