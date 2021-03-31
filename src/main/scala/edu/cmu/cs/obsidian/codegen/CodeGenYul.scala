@@ -109,12 +109,23 @@ object CodeGenYul extends CodeGenerator {
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
 
+        // this creates valid output for the empty obsidian contract and ends up being dead code if
+        // there's anything else that returns ever.
+        val retExpr = FunctionCall(
+            Identifier("return"),
+            Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))
+        )
+        statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(retExpr)
+        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(retExpr)
+
         // create runtime object
         val runtime_name = contract.name + "_deployed"
         val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq())
         subObjects = runtime_obj +: subObjects
 
-        YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq())
+        val x = YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq())
+        print (x.toString() + "\n")
+        x
     }
 
     // return statements that go to deploy object, and statements that go to runtime object
