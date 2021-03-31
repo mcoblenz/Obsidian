@@ -2,12 +2,11 @@ package edu.cmu.cs.obsidian.codegen
 
 import java.io.{File, FileReader, FileWriter, StringWriter}
 import java.nio.file.{Files, Path, Paths}
-
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.codegen.Code
-
+import edu.cmu.cs.obsidian.codegen.LiteralKind.number
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
 import scala.collection.immutable.Map
@@ -252,6 +251,7 @@ object CodeGenYul extends CodeGenerator {
                 // we compile to int256 in yul, first asserting to make sure that the literal in the obsidian source is within range
                 assert(false, "iev")
                 Seq()
+                //Seq(Literal(number,n.toString(),"s256"))
             case _ =>
                 assert(false, "TODO" + e.toString())
                 Seq() // TODO unimplemented
