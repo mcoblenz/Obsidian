@@ -248,12 +248,13 @@ object CodeGenYul extends CodeGenerator {
                 val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
                 Seq(ExpressionStatement(expr))
             case NumLiteral(n) =>
-                // we compile to int256 in yul, first asserting to make sure that the literal in the obsidian source is within range
-                assert(false, "iev")
-                Seq()
-                //Seq(Literal(number,n.toString(),"s256"))
+                // we compile to int, which is s256 in yul, first asserting to make sure that the
+                // literal in the obsidian source is small enough.
+                val top = 0x7FFFFFFF
+                assert(n < top, "numeric literals larger than " + top + "are not supported")
+                Seq(ExpressionStatement(Literal(LiteralKind.number,n.toString(),"int")))
             case _ =>
-                assert(false, "TODO" + e.toString())
+                assert(false, "TODO: translation of " + e.toString() + " is not implemented")
                 Seq() // TODO unimplemented
         }
     }
@@ -363,6 +364,8 @@ class FuncScope(f: FunctionDefinition) {
                 e match {
                     case func: FunctionCall =>
                         codeBody = codeBody :+ new Body(func.yulFunctionCallString())
+                    case litn : Literal =>
+                        codeBody = codeBody :+ new Body(litn.value.toString())
                 }
             case _ => ()
         }
