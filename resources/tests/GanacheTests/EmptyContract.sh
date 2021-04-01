@@ -67,8 +67,9 @@ ACCT_DATA=$( jq -ncM \
                 '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
          )
 
-# we'll keep querying for the accounts until we get a good result, this
-# will also block until ganache-cli comes up.
+# ganache-cli takes a little while to start up, and the first thing that we
+# need from it is the list of accounts. so we poll on the account endpoint
+# until we get a good result to avoid using sleep or something less precise.
 echo "querying ganache-cli until accounts are available"
 KEEPGOING=1
 ACCTS=""
