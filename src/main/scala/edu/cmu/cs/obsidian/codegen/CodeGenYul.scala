@@ -220,9 +220,17 @@ object CodeGenYul extends CodeGenerator {
     def translateStatement(s: Statement): Seq[YulStatement] = {
         s match {
             case Return() =>
-                Seq()
+                Seq(Leave())
             case ReturnExpr(e) =>
-                translateExpr(e)
+                assert(false, "TODO: returning a value not implemented")
+                Seq()
+                // former implementation is this:
+                //
+                // translateExpr(e)
+                //
+                // removing this may cause some tests to fail; i'm not sure. to implement this the
+                // right way, we need to allocate some space in some form of memory and put e there
+                // to follow the semantics for return in Yul.
             case Assignment(assignTo, e) =>
                 assignTo match {
                     // TODO only support int/int256 now
