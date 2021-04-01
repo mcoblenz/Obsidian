@@ -1,27 +1,32 @@
-dist: trusty
+dist: focal
 language: scala
 scala:
-    - 2.13.2
+    - 2.13.5
 
-# This may be necessary depending on the tests we eventually run. For example,
-# the chaincode base server uses "java.util.Base64", which is only supported
-# as of java version 8
+node_js:
+     - 15.11.0
+
 jdk:
-  - oraclejdk8
+  - oraclejdk12 ## as of 9 march 2021, up to jdk12 seems to work but 13/14/15 fail
 
 before_install:
   - ./travis_specific/install-protobuf.sh
   - curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s
-  - mv bin $HOME
+  - mv bin/* $HOME/bin/
   - export PATH=${PATH}:${HOME}/protobuf/
   - export PATH=${PATH}:${HOME}/bin/
-
+  - ./travis_specific/install_ganache.sh
 
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
-  - sbt ++2.13.2 test
+  - sbt ++2.13.5 test # this actually builds Obsidian
   - bash travis_specific/tests.sh
+  - bash travis_specific/ganache_tests.sh
 
 cache:
   directories:
   - $HOME/.m2
+
+addons:
+  hosts:
+    - localhost

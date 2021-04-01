@@ -44,8 +44,13 @@ project/plugins/project/
 *.proto
 .idea/libraries/
 
+.idea/modules/*.iml
+.idea/modules.xml
+
 # Gradle build script caches and whatnot
 buildscript/.gradle
 buildscript/build
 # Vim
 *.swp
+
+.bsp
