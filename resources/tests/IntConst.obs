@@ -1,6 +1,7 @@
 main contract IntCons{
-        transaction intconst() returns int {
-            4;
+        int x;
+        transaction intconst() {
+            x = 4;
             return;
         }
 }
