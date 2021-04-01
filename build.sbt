@@ -2,7 +2,7 @@ name := "Obsidian"
 
 version := "0.1"
 
-scalaVersion := "2.13.2"
+scalaVersion := "2.13.5"
 
 organization := "edu.cmu.cs.obsidian"
 

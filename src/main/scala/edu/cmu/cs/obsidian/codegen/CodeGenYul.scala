@@ -1,12 +1,11 @@
 package edu.cmu.cs.obsidian.codegen
 
-import java.io.{File, FileReader, FileWriter, StringWriter}
+import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
 
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
-import edu.cmu.cs.obsidian.codegen.Code
 
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
@@ -109,6 +108,15 @@ object CodeGenYul extends CodeGenerator {
             statement_seq_deploy = statement_seq_deploy ++ deploy_seq
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
+
+        // this creates valid output for the empty obsidian contract and ends up being dead code if
+        // there's anything else that returns ever.
+        val retExpr = FunctionCall(
+            Identifier("return"),
+            Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))
+        )
+        statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(retExpr)
+        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(retExpr)
 
         // create runtime object
         val runtime_name = contract.name + "_deployed"
@@ -249,7 +257,7 @@ object CodeGenYul extends CodeGenerator {
                 val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
                 Seq(ExpressionStatement(expr))
             case _ =>
-                assert(false, "TODO")
+                assert(false, "TODO: " + e.toString())
                 Seq() // TODO unimplemented
         }
     }

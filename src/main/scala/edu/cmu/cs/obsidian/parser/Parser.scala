@@ -463,8 +463,11 @@ object Parser extends Parsers {
                     case None =>
                         Field(isConst = false, typ, name._1, availableInSet).setLoc(typ)
             }
+            //TODO: replace this RuntimeException with a more appropriate error, maybe a call to failure()
+            case _ ~ _ ~ _ ~ _ ~ Some(x) ~ _ => throw new RuntimeException("available in fields only permitted at the top level of contracts")
         }
     }
+
     private def parseReturns = ReturnsT() ~! parseType ^^ {
         case _ ~ typ => typ
     }
