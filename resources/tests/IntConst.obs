@@ -1,4 +1,4 @@
-main contract IntCons{
+main contract IntConst{
         int x;
         transaction intconst() {
             x = 4;
