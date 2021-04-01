@@ -248,10 +248,7 @@ object CodeGenYul extends CodeGenerator {
                 val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
                 Seq(ExpressionStatement(expr))
             case NumLiteral(n) =>
-                // we compile to int, which is s256 in yul, first asserting to make sure that the
-                // literal in the obsidian source is small enough.
-                val top = 0x7FFFFFFF
-                assert(n < top, "numeric literals larger than " + top + "are not supported")
+                // we compile to int, which is s256 in yul
                 Seq(ExpressionStatement(Literal(LiteralKind.number,n.toString(),"int")))
             case _ =>
                 assert(false, "TODO: translation of " + e.toString() + " is not implemented")
