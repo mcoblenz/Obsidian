@@ -1,0 +1,7 @@
+main contract IntConst{
+        int x;
+        transaction intconst() {
+            x = 4;
+            return;
+        }
+}

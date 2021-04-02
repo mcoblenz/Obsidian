@@ -2,11 +2,9 @@ package edu.cmu.cs.obsidian.codegen
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
-
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
-
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
 import scala.collection.immutable.Map
@@ -222,9 +220,17 @@ object CodeGenYul extends CodeGenerator {
     def translateStatement(s: Statement): Seq[YulStatement] = {
         s match {
             case Return() =>
-                Seq()
+                Seq(Leave())
             case ReturnExpr(e) =>
-                translateExpr(e)
+                assert(false, "TODO: returning a value not implemented")
+                Seq()
+                // former implementation is this:
+                //
+                // translateExpr(e)
+                //
+                // removing this may cause some tests to fail; i'm not sure. to implement this the
+                // right way, we need to allocate some space in some form of memory and put e there
+                // to follow the semantics for return in Yul.
             case Assignment(assignTo, e) =>
                 assignTo match {
                     // TODO only support int/int256 now
@@ -258,12 +264,15 @@ object CodeGenYul extends CodeGenerator {
                 val idx = tempSymbolTable(x)
                 val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
                 Seq(ExpressionStatement(expr))
+            case NumLiteral(n) =>
+                // we compile to int, which is s256 in yul
+                Seq(ExpressionStatement(Literal(LiteralKind.number,n.toString(),"int")))
             case TrueLiteral() =>
                 Seq(ExpressionStatement(Literal(LiteralKind.boolean, "true", "bool")))
             case FalseLiteral() =>
                 Seq(ExpressionStatement(Literal(LiteralKind.boolean, "false", "bool")))
             case _ =>
-                assert(false, "TODO: " + e.toString())
+                assert(false, "TODO: translation of " + e.toString() + " is not implemented")
                 Seq() // TODO unimplemented
         }
     }
@@ -373,6 +382,8 @@ class FuncScope(f: FunctionDefinition) {
                 e match {
                     case func: FunctionCall =>
                         codeBody = codeBody :+ new Body(func.yulFunctionCallString())
+                    case litn : Literal =>
+                        codeBody = codeBody :+ new Body(litn.value.toString())
                 }
             case _ => ()
         }
