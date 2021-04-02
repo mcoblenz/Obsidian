@@ -28,7 +28,9 @@ object "{{creationObject}}" {
     object "{{runtimeObject}}" {
         code {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
-            {{memoryInitRuntime}}
+            {{#memoryInitsRuntime}}
+                {{code}}
+            {{/memoryInitsRuntime}}
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
             {{#dispatch}}
                 {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}

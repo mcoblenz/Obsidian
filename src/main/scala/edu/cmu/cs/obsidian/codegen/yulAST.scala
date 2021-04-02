@@ -126,13 +126,15 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         var dispatch = false
         var dispatchArray: Array[Case] = Array[Case]()
         var deployCall: Array[Call] = Array[Call]()
-        var memoryInitRuntime: String = ""
+        var memoryInitRuntime: Array[Call] = Array[Call]()
 
         print("obj.code.block.statements:" + obj.code.block.statements.toString() + "\n")
 
         for (s <- obj.code.block.statements) {
             s match {
-                case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.yulFunctionDefString())
+                case f: FunctionDefinition =>
+                    print("f is: " + f.toString() + "\n")
+                    deployFunctionArray = deployFunctionArray :+ new Func(f.yulFunctionDefString())
                 case e: ExpressionStatement =>
                     e.expression match {
                         case f: FunctionCall => deployCall = deployCall :+ new Call(f.yulFunctionCallString())
@@ -159,19 +161,21 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     }
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
+                            case f: FunctionCall => memoryInitRuntime = memoryInitRuntime :+ new Call(f.yulFunctionCallString()) /// iev
                             case _ =>
-                                assert(false, "TODO")
+                                assert(false, "TODO: " + e.toString())
                                 () // TODO unimplemented
                         }
                     case _ => ()
                 }
             }
+            println("memoryInitRuntime: " + memoryInitRuntime.mkString(";"))
         }
         def deploy(): Array[Call] = deployCall
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
+        def memoryInitRuntimes(): Array[Call] = memoryInitRuntime
 
     }
 
