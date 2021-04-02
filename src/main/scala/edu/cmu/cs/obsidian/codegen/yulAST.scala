@@ -1,8 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
 import java.io.{FileReader, StringWriter}
-import com.github.mustachejava.Mustache
-import com.github.mustachejava.MustacheFactory
 import com.github.mustachejava.DefaultMustacheFactory
 
 // reminder: use abstract class if want to create a base class that requires constructor arguments
@@ -130,6 +128,8 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         var deployCall: Array[Call] = Array[Call]()
         var memoryInitRuntime: String = ""
 
+        print("obj.code.block.statements:" + obj.code.block.statements.toString() + "\n")
+
         for (s <- obj.code.block.statements) {
             s match {
                 case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.yulFunctionDefString())
@@ -137,14 +137,16 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     e.expression match {
                         case f: FunctionCall => deployCall = deployCall :+ new Call(f.yulFunctionCallString())
                         case _ =>
-                            assert(false, "TODO")
+                            assert(false, "TODO: objscope not implemented for expression statement " + e.toString())
                             () // TODO unimplemented
                     }
                 case _ =>
-                    assert(false, "TODO")
+                    assert(false, "TODO: objscope not implemented for block statement " + s.toString())
                     () // TODO unimplemented
             }
         }
+
+        print("after loop, deployCall is " + deployCall.length.toString() + "\n")
 
         for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
