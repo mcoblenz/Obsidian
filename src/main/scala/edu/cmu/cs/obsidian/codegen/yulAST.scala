@@ -148,7 +148,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
             }
         }
 
-        print("after loop, deployCall is " + deployCall.length.toString() + "\n")
+        print("after loop, deployCall is " + deployCall.length.toString() + "\n") // iev: i think this is not the culprit, i think it's below in memoryInitRuntime. i may also be putting that return(0,0) in a whacky place, who konws?
 
         for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
