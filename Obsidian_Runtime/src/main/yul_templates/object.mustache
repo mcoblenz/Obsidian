@@ -31,9 +31,8 @@ object "{{creationObject}}" {
             {{memoryInitRuntime}}
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
             {{#dispatch}}
-                {{! TODO BUG: forget to add implementation of shift_right_unsigned,
-                    it simply returns shr(224, value) }}
-                let selector := shift_right_unsigned(calldataload(0))
+                {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
+                let selector := shr(224, calldataload(0))
                 switch selector
                 {{#dispatchCase}}
                     case {{hash}} {
