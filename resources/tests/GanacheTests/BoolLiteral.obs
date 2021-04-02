@@ -1,0 +1,8 @@
+main contract BoolLiteral{
+	 bool x;
+
+	 transaction BoolLiteral () {
+	     x = true;
+	     x = false;
+	 }
+}

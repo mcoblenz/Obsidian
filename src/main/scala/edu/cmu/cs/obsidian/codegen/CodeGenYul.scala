@@ -238,6 +238,8 @@ object CodeGenYul extends CodeGenerator {
                         val idx = tempSymbolTable(x)
                         val value = e match {
                             case NumLiteral(v) => v
+                            case TrueLiteral() => "true"
+                            case FalseLiteral() => "false"
                             case _ =>
                                 assert(false, "TODO")
                                 0
@@ -265,6 +267,10 @@ object CodeGenYul extends CodeGenerator {
             case NumLiteral(n) =>
                 // we compile to int, which is s256 in yul
                 Seq(ExpressionStatement(Literal(LiteralKind.number,n.toString(),"int")))
+            case TrueLiteral() =>
+                Seq(ExpressionStatement(Literal(LiteralKind.boolean, "true", "bool")))
+            case FalseLiteral() =>
+                Seq(ExpressionStatement(Literal(LiteralKind.boolean, "false", "bool")))
             case _ =>
                 assert(false, "TODO: translation of " + e.toString() + " is not implemented")
                 Seq() // TODO unimplemented
