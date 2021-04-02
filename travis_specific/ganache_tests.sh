@@ -21,8 +21,11 @@ do
 
   NAME=$(basename -s '.json' $test)
   GAS=$(cat "$test" | jq '.gas')
-  GAS_HEX=$(printf '%x' $GAS)
-  GAS_PRICE=$(cat "$test" | jq '.gasprice')
+  GAS_HEX=$(printf '%x' "$GAS")
+  # nb: we store gas price as a string because it's usually quite large so
+  # it's good to have it in hex notation, but that means we need to crop
+  # off the quotations.
+  GAS_PRICE=$(cat "$test" | jq '.gasprice' | tr -d '"')
   START_ETH=$(cat "$test" | jq '.startingeth')
   NUM_ACCT=$(cat "$test" | jq '.numaccts')
 
