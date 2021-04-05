@@ -126,9 +126,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         var dispatch = false
         var dispatchArray: Array[Case] = Array[Case]()
         var deployCall: Array[Call] = Array[Call]()
-        var memoryInitRuntime: Array[Call] = Array[Call]()
-
-        print("obj.code.block.statements:" + obj.code.block.statements.toString() + "\n")
+        var memoryInitRuntime : String = ""
 
         for (s <- obj.code.block.statements) {
             s match {
@@ -148,8 +146,6 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
             }
         }
 
-        print("after loop, deployCall is " + deployCall.length.toString() + "\n") // iev: i think this is not the culprit, i think it's below in memoryInitRuntime. i may also be putting that return(0,0) in a whacky place, who konws?
-
         for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
                 s match {
@@ -161,7 +157,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     }
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall => memoryInitRuntime = memoryInitRuntime :+ new Call(f.yulFunctionCallString()) /// iev
+                            case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString() /// iev
                             case _ =>
                                 assert(false, "TODO: " + e.toString())
                                 () // TODO unimplemented
@@ -169,14 +165,12 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     case _ => ()
                 }
             }
-            println("memoryInitRuntime: " + memoryInitRuntime.mkString(";"))
         }
         def deploy(): Array[Call] = deployCall
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def memoryInitRuntimes(): Array[Call] = memoryInitRuntime
-
+        def defaultReturn() : Call = Call(FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))))
     }
 
     // TODO need to fix indentation of the output
