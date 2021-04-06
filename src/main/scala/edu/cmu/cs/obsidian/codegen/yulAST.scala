@@ -162,7 +162,9 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                                 assert(false, "TODO: " + e.toString())
                                 () // TODO unimplemented
                         }
-                    case _ => assert(false); ()
+                    case _ =>
+                        assert(false)
+                        ()
                 }
             }
         }
@@ -201,7 +203,10 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                         case func: FunctionCall =>
                             codeBody = codeBody :+ new Body(func.yulFunctionCallString())
                     }
-                case _ => assert(false); ()
+                case _ =>
+                    println("this is the bug")
+                    assert(false)
+                    ()
             }
         }
         // TODO assume only one return variable for now

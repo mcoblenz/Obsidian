@@ -338,9 +338,13 @@ class ObjScope(obj: YulObject) {
             case e: ExpressionStatement =>
                 e.expression match {
                     case f: FunctionCall => deployCall = deployCall :+ new Call(yulString.yulFunctionCallString(f))
-                    case _ => () // TODO unimplemented
+                    case _ =>
+                        assert(false, "unimplemented")
+                        () // TODO unimplemented
                 }
-            case _ => () // TODO unimplemented
+            case _ =>
+                assert(false, "unimplemented")
+                () // TODO unimplemented
         }
     }
 
@@ -360,14 +364,16 @@ class ObjScope(obj: YulObject) {
                             assert(false, "TODO")
                             () // TODO unimplemented
                     }
-                case _ => ()
+                case _ =>
+                    assert(false, "unimplemented")
+                    ()
             }
         }
     }
 
     def deploy(): Array[Call] = deployCall
     def deployFunctions(): Array[Func] = deployFunctionArray
-    def runtimeFunctions(): Array[Func] = runtimeFunctionArray //iev: i want to be able to add something after the runtime functions, i think
+    def runtimeFunctions(): Array[Func] = runtimeFunctionArray
     def dispatchCase(): Array[Case] = dispatchArray
 
 }
@@ -402,7 +408,9 @@ class FuncScope(f: FunctionDefinition) {
                     case litn : Literal =>
                         codeBody = codeBody :+ new Body(litn.value.toString())
                 }
-            case _ => ()
+            case _ =>
+                assert(false) // xxx
+                ()
         }
     }
     // TODO assume only one return variable for now
