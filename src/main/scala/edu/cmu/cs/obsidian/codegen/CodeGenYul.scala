@@ -257,18 +257,15 @@ object CodeGenYul extends CodeGenerator {
                 }
             case IfThenElse(scrutinee,pos,neg) =>
                 val scrutinee_yul : Seq[YulStatement] = translateExpr(scrutinee)
-                if(scrutinee_yul.length > 1){
+                if (scrutinee_yul.length > 1){
                     assert(false,"boolean expression in conditional translates to a sequence of expressons")
                     Seq()
                 }
                 scrutinee_yul.apply(0) match {
                     case ExpressionStatement(sye) =>
-                        //print("scrutinee explanded to: " + sye.toString())
                         val pos_yul = pos.flatMap(translateStatement)
                         val neg_yul = neg.flatMap(translateStatement)
-                        val ret = Seq(Switch(sye,Seq(Case(true_lit , Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
-                        print ("expanded to: " + ret.toString())
-                        ret
+                        Seq(Switch(sye,Seq(Case(true_lit , Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
                         assert(false, "if statement built on non-expression: " + e.toString())
                         Seq()

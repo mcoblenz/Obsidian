@@ -1,4 +1,4 @@
-main contract IfThenElse{
+main contract IfThenElse {
         int x;
         transaction ifthenelse() {
             if (true) {
