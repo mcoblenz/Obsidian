@@ -263,7 +263,7 @@ object CodeGenYul extends CodeGenerator {
                     case ExpressionStatement(sye) =>
                         val pos_yul = pos.flatMap(translateStatement)
                         val neg_yul = neg.flatMap(translateStatement)
-                        Seq(Switch(sye,Seq(Case(true_lit , Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
+                        Seq(edu.cmu.cs.obsidian.codegen.Switch(sye,Seq(Case(true_lit , Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
                         assert(false, "if statement built on non-expression: " + e.toString())
                         Seq()
@@ -398,16 +398,17 @@ class FuncScope(f: FunctionDefinition) {
         }
     }
 
+    // travese a sequence of yul statements, recurring into each, and produce the corresponding Body objects
     def statementsToBody(statements: Seq[YulStatement]): Array[Body] = {
         var body: Array[Body] = Array[Body]()
         for (s <- statements){
-            s match {]
+            s match {
                 case ExpressionStatement(e) =>
                     e match {
                         case func: FunctionCall =>
-                            codeBody = codeBody :+ new Body(func.yulFunctionCallString())
+                            body = body :+ new Body(func.yulFunctionCallString())
                         case litn : Literal =>
-                            codeBody = codeBody :+ new Body(litn.value.toString())
+                            body = body :+ new Body(litn.value.toString())
                         case _ =>
                             assert(false, "while traversing body, found expression statement " + e.toString() + ", currently unimplemented")
                     }
