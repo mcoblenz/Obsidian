@@ -6,6 +6,7 @@ import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.typecheck.ContractType
+import edu.cmu.cs.obsidian.codegen.Switch
 
 import scala.collection.immutable.Map
 
@@ -17,6 +18,10 @@ object CodeGenYul extends CodeGenerator {
     var stateIdx = -1    // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
     var stateEnumCounter = 0  // counter indicating the next value to assign since we don't knon the total num of states
+
+    // some constants hoisted from below to avoid repeated code
+    val true_lit : Literal = Literal(LiteralKind.boolean, "true", "bool")
+    val false_lit : Literal = Literal(LiteralKind.boolean, "false", "bool")
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -248,11 +253,24 @@ object CodeGenYul extends CodeGenerator {
                         assert(false, "TODO")
                         Seq()
                 }
-
-            case _ =>
-                assert(false, "TODO")
+            case IfThenElse(scrutinee,pos,neg) =>
+                val scrutinee_yul : Seq[YulStatement] = translateExpr(scrutinee)
+                if (scrutinee_yul.length > 1){
+                    assert(false,"boolean expression in conditional translates to a sequence of expressons")
+                    Seq()
+                }
+                scrutinee_yul.apply(0) match {
+                    case ExpressionStatement(sye) =>
+                        val pos_yul = pos.flatMap(translateStatement)
+                        val neg_yul = neg.flatMap(translateStatement)
+                        Seq(Switch(sye,Seq(Case(true_lit , Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
+                    case e =>
+                        assert(false, "if statement built on non-expression: " + e.toString())
+                        Seq()
+                }
+            case x =>
+                assert(false, "TODO: translateStatement for " + x.toString() + " is unimplemented")
                 Seq()
-
         }
     }
 
@@ -266,9 +284,9 @@ object CodeGenYul extends CodeGenerator {
                 // we compile to int, which is s256 in yul
                 Seq(ExpressionStatement(Literal(LiteralKind.number,n.toString(),"int")))
             case TrueLiteral() =>
-                Seq(ExpressionStatement(Literal(LiteralKind.boolean, "true", "bool")))
+                Seq(ExpressionStatement(true_lit))
             case FalseLiteral() =>
-                Seq(ExpressionStatement(Literal(LiteralKind.boolean, "false", "bool")))
+                Seq(ExpressionStatement(false_lit))
             case _ =>
                 assert(false, "TODO: translation of " + e.toString() + " is not implemented")
                 Seq() // TODO unimplemented
