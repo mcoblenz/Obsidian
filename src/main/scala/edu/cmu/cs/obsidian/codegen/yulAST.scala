@@ -157,12 +157,12 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     }
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString() /// iev
+                            case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
                             case _ =>
                                 assert(false, "TODO: " + e.toString())
                                 () // TODO unimplemented
                         }
-                    case _ => ()
+                    case _ => assert(false); ()
                 }
             }
         }
@@ -170,7 +170,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def defaultReturn() : Call = Call(FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))))
+        def defaultReturn() = FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int")))
     }
 
     // TODO need to fix indentation of the output
@@ -201,7 +201,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                         case func: FunctionCall =>
                             codeBody = codeBody :+ new Body(func.yulFunctionCallString())
                     }
-                case _ => ()
+                case _ => assert(false); ()
             }
         }
         // TODO assume only one return variable for now
