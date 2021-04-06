@@ -3,21 +3,22 @@ package edu.cmu.cs.obsidian.codegen
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
 import edu.cmu.cs.obsidian.CompilerOptions
+// note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
+// in those places we use the fully qualified name
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.typecheck.ContractType
-import edu.cmu.cs.obsidian.codegen.Switch
 
 import scala.collection.immutable.Map
 
 object CodeGenYul extends CodeGenerator {
 
     // TODO improve this temporary symbol table
-    var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
-    var tempTableIdx = 0 // counter indicating the next available slot in the table
-    var stateIdx = -1    // whether or not there is a state
-    var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
-    var stateEnumCounter = 0  // counter indicating the next value to assign since we don't knon the total num of states
+    var tempSymbolTable : Map[String, Int] = Map() // map from field identifiers to index in storage
+    var tempTableIdx : Int = 0 // counter indicating the next available slot in the table
+    var stateIdx : Int = -1    // whether or not there is a state
+    var stateEnumMapping : Map[String, Int] = Map() // map from state name to an enum value
+    var stateEnumCounter : Int = 0  // counter indicating the next value to assign since we don't know the total num of states
 
     // some constants hoisted from below to avoid repeated code
     val true_lit : Literal = Literal(LiteralKind.boolean, "true", "bool")
@@ -116,8 +117,7 @@ object CodeGenYul extends CodeGenerator {
         // there's anything else that returns ever.
         val retExpr = FunctionCall(
             Identifier("return"),
-            Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))
-        )
+            Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int")))
 
         // create runtime object
         val runtime_name = contract.name + "_deployed"
@@ -158,7 +158,7 @@ object CodeGenYul extends CodeGenerator {
         // since field declaration has not yet be assigned, there is no need to do sstore
         tempSymbolTable += field.name -> tempTableIdx
         tempTableIdx += 1
-        Seq()
+        Seq() // TODO: do we really mean to always return the empty sequence?
     }
 
     def translateState(s: State): Seq[YulStatement] = {
@@ -170,7 +170,7 @@ object CodeGenYul extends CodeGenerator {
         stateEnumMapping += s.name -> stateEnumCounter
         stateEnumCounter += 1
 
-        Seq()
+        Seq() // TODO: do we really mean to always return the empty sequence?
     }
 
     def translateConstructor(constructor: Constructor): Seq[YulStatement] = {
@@ -186,7 +186,7 @@ object CodeGenYul extends CodeGenerator {
 
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
-                "constructor_"+constructor.name, // TODO rename transaction name (by adding prefix/suffix)
+                "constructor_"+constructor.name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
                 parameters,
                 Seq(),
                 Block(body)))
@@ -243,14 +243,14 @@ object CodeGenYul extends CodeGenerator {
                             case NumLiteral(v) => v
                             case TrueLiteral() => "true"
                             case FalseLiteral() => "false"
-                            case _ =>
-                                assert(false, "TODO")
+                            case l =>
+                                assert(false, "TODO: translate assignment case" + l.toString())
                                 0
                         }
                         val expr = FunctionCall(Identifier("sstore"), Seq(Literal(LiteralKind.number, idx.toString(), "int"),Literal(LiteralKind.number, value.toString(), "int")))
                         Seq(ExpressionStatement(expr))
-                    case _ =>
-                        assert(false, "TODO")
+                    case e =>
+                        assert(false, "TODO: translate assignment case" +  e.toString())
                         Seq()
                 }
             case IfThenElse(scrutinee,pos,neg) =>
@@ -398,7 +398,7 @@ class FuncScope(f: FunctionDefinition) {
         }
     }
 
-    // travese a sequence of yul statements, recurring into each, and produce the corresponding Body objects
+    // traverse a sequence of yul statements, recurring into each, and produce the corresponding Body objects
     def statementsToBody(statements: Seq[YulStatement]): Array[Body] = {
         var body: Array[Body] = Array[Body]()
         for (s <- statements){
@@ -424,20 +424,20 @@ class FuncScope(f: FunctionDefinition) {
                 case edu.cmu.cs.obsidian.codegen.If(condition, body) =>
                     assert(false,"if")
                     ()
-                case Switch(expression, cases) =>
+                case edu.cmu.cs.obsidian.codegen.Switch(expression, cases) =>
                     assert(false,"switch")
                     ()
                 case ForLoop(pre,condition,post,body) =>
                     assert(false,"forloop")
                     ()
                 case Break() =>
-                    assert(false,"break")
+                    body = body :+ new Body(s.toString())
                     ()
                 case Continue() =>
-                    assert(false,"continue")
+                    body = body :+ new Body(s.toString())
                     ()
                 case Leave() =>
-                    assert(false,"leave")
+                    body = body :+ new Body(s.toString())
                     ()
                 case Block(statements) =>
                     assert(false,"block")

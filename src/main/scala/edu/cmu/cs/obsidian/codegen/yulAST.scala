@@ -59,9 +59,15 @@ case class FunctionDefinition (
 case class If (condition: Expression, body: Block) extends YulStatement
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement
 case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement
-case class Break () extends YulStatement
-case class Continue () extends YulStatement
-case class Leave () extends YulStatement
+case class Break () extends YulStatement {
+    override def toString() : String = "break"
+}
+case class Continue () extends YulStatement {
+    override def toString() : String = "continue"
+}
+case class Leave () extends YulStatement {
+    override def toString() : String = "leave"
+}
 case class ExpressionStatement (expression: Expression) extends YulStatement
 case class Block (statements: Seq[YulStatement]) extends YulStatement
 
