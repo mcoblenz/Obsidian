@@ -367,7 +367,6 @@ class ObjScope(obj: YulObject) {
     def deployFunctions(): Array[Func] = deployFunctionArray
     def runtimeFunctions(): Array[Func] = runtimeFunctionArray
     def dispatchCase(): Array[Case] = dispatchArray
-
 }
 
 // TODO need to fix indentation of the output
@@ -417,6 +416,8 @@ class FuncScope(f: FunctionDefinition) {
                     assert(false,"if")
                     ()
                 case edu.cmu.cs.obsidian.codegen.Switch(expression, cases) =>
+                    val expBlock = assert(false)
+                    val caseBlocks = cases.map(c => assert(false))
                     assert(false,"switch")
                     ()
                 case ForLoop(pre,condition,post,body) =>
