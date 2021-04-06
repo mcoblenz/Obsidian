@@ -225,30 +225,22 @@ object CodeGenYul extends CodeGenerator {
             case Return() =>
                 Seq(Leave())
             case ReturnExpr(e) =>
+                // we need to allocate some space in some form of memory and put e there
                 assert(false, "TODO: returning a value not implemented")
                 Seq()
-                // former implementation is this:
-                //
-                // translateExpr(e)
-                //
-                // removing this may cause some tests to fail; i'm not sure. to implement this the
-                // right way, we need to allocate some space in some form of memory and put e there
-                // to follow the semantics for return in Yul.
             case Assignment(assignTo, e) =>
                 assignTo match {
-                    // TODO only support int/int256 now
                     case ReferenceIdentifier(x) =>
                         val idx = tempSymbolTable(x)
-                        val value = e match {
+                        val value = e match { // todo/iev: why can't you just do e.toString() below?
                             case NumLiteral(v) => v
                             case TrueLiteral() => "true"
                             case FalseLiteral() => "false"
                             case l =>
-                                assert(false, "TODO: translate assignment case" + l.toString())
+                                assert(false, "TODO: unimplemented translate assignment case" + l.toString())
                                 0
                         }
-                        val expr = FunctionCall(Identifier("sstore"), Seq(Literal(LiteralKind.number, idx.toString(), "int"),Literal(LiteralKind.number, value.toString(), "int")))
-                        Seq(ExpressionStatement(expr))
+                        Seq(ExpressionStatement(FunctionCall(Identifier("sstore"), Seq(Literal(LiteralKind.number, idx.toString(), "int"),Literal(LiteralKind.number, value.toString(), "int")))))
                     case e =>
                         assert(false, "TODO: translate assignment case" +  e.toString())
                         Seq()
@@ -256,10 +248,10 @@ object CodeGenYul extends CodeGenerator {
             case IfThenElse(scrutinee,pos,neg) =>
                 val scrutinee_yul : Seq[YulStatement] = translateExpr(scrutinee)
                 if (scrutinee_yul.length > 1){
-                    assert(false,"boolean expression in conditional translates to a sequence of expressons")
+                    assert(false,"boolean expression in conditional translates to a sequence of expressions")
                     Seq()
                 }
-                scrutinee_yul.apply(0) match {
+                scrutinee_yul.head match {
                     case ExpressionStatement(sye) =>
                         val pos_yul = pos.flatMap(translateStatement)
                         val neg_yul = neg.flatMap(translateStatement)
@@ -458,7 +450,7 @@ class FuncScope(f: FunctionDefinition) {
     var retParams = ""
     if (f.returnVariables.nonEmpty){
         hasRetVal = true
-        retParams = f.returnVariables.apply(0).name
+        retParams = f.returnVariables.head.name
     }
     def params(): Array[Param] = argRest
     def body(): Array[Body] = codeBody
