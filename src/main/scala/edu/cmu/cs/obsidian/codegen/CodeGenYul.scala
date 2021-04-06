@@ -361,11 +361,11 @@ class ObjScope(obj: YulObject) {
                     e.expression match {
                         case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
                         case _ =>
-                            assert(false, "TODO")
+                            assert(false, "iterating subobjects, case for " + e.toString() + " unimplemented")
                             () // TODO unimplemented
                     }
-                case _ =>
-                    assert(false, "unimplemented")
+                case x =>
+                    assert(false, "iterating subobjects, case for " + x.toString() + "unimplemented")
                     ()
             }
         }
@@ -397,54 +397,61 @@ class FuncScope(f: FunctionDefinition) {
             }
         }
     }
-    // construct body
-    var codeBody: Array[Body] = Array[Body]()
-    for (s <- f.body.statements){
-        s match {
-            case ExpressionStatement(e) =>
-                e match {
-                    case func: FunctionCall =>
-                        codeBody = codeBody :+ new Body(func.yulFunctionCallString())
-                    case litn : Literal =>
-                        codeBody = codeBody :+ new Body(litn.value.toString())
-                    case _ =>
-                        assert(false, "while traversing body, found expression statement " + e.toString() + ", currently unimplemented")
-                }
-            case edu.cmu.cs.obsidian.codegen.Assignment(varnames,value) =>
-                assert(false,"assignment")
-                ()
-            case VariableDeclaration(vars) =>
-                assert(false,"variable decl")
-                ()
-            case FunctionDefinition(name, params, returnvars, body) =>
-                assert(false,"function def")
-                ()
-            case edu.cmu.cs.obsidian.codegen.If(condition, body) =>
-                assert(false,"if")
-                ()
-            case Switch(expression, cases) =>
-                assert(false,"switch")
-                ()
-            case ForLoop(pre,condition,post,body) =>
-                assert(false,"forloop")
-                ()
-            case Break() =>
-                assert(false,"break")
-                ()
-            case Continue() =>
-                assert(false,"continue")
-                ()
-            case Leave() =>
-                assert(false,"leave")
-                ()
-            case Block(statements) =>
-                assert(false,"block")
-                ()
-            case x =>
-                assert(false, "missing codegen case for: " + x.toString() + "(this should not happen)")
-                ()
+
+    def statementsToBody(statements: Seq[YulStatement]): Array[Body] = {
+        var body: Array[Body] = Array[Body]()
+        for (s <- statements){
+            s match {]
+                case ExpressionStatement(e) =>
+                    e match {
+                        case func: FunctionCall =>
+                            codeBody = codeBody :+ new Body(func.yulFunctionCallString())
+                        case litn : Literal =>
+                            codeBody = codeBody :+ new Body(litn.value.toString())
+                        case _ =>
+                            assert(false, "while traversing body, found expression statement " + e.toString() + ", currently unimplemented")
+                    }
+                case edu.cmu.cs.obsidian.codegen.Assignment(varnames,value) =>
+                    assert(false,"assignment")
+                    ()
+                case VariableDeclaration(vars) =>
+                    assert(false,"variable decl")
+                    ()
+                case FunctionDefinition(name, params, returnvars, body) =>
+                    assert(false,"function def")
+                    ()
+                case edu.cmu.cs.obsidian.codegen.If(condition, body) =>
+                    assert(false,"if")
+                    ()
+                case Switch(expression, cases) =>
+                    assert(false,"switch")
+                    ()
+                case ForLoop(pre,condition,post,body) =>
+                    assert(false,"forloop")
+                    ()
+                case Break() =>
+                    assert(false,"break")
+                    ()
+                case Continue() =>
+                    assert(false,"continue")
+                    ()
+                case Leave() =>
+                    assert(false,"leave")
+                    ()
+                case Block(statements) =>
+                    assert(false,"block")
+                    ()
+                case x =>
+                    assert(false, "missing codegen case for: " + x.toString() + "(this should not happen)")
+                    ()
+            }
         }
+        return body
     }
+
+    // construct body
+    var codeBody: Array[Body] = statementsToBody(f.body.statements)
+
     // TODO assume only one return variable for now
     var hasRetVal = false
     var retParams = ""
