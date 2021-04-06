@@ -407,9 +407,41 @@ class FuncScope(f: FunctionDefinition) {
                         codeBody = codeBody :+ new Body(func.yulFunctionCallString())
                     case litn : Literal =>
                         codeBody = codeBody :+ new Body(litn.value.toString())
+                    case _ =>
+                        assert(false, "while traversing body, found expression statement " + e.toString() + ", currently unimplemented")
                 }
-            case _ =>
-                assert(false) // xxx
+            case edu.cmu.cs.obsidian.codegen.Assignment(varnames,value) =>
+                assert(false,"assignment")
+                ()
+            case VariableDeclaration(vars) =>
+                assert(false,"variable decl")
+                ()
+            case FunctionDefinition(name, params, returnvars, body) =>
+                assert(false,"function def")
+                ()
+            case edu.cmu.cs.obsidian.codegen.If(condition, body) =>
+                assert(false,"if")
+                ()
+            case Switch(expression, cases) =>
+                assert(false,"switch")
+                ()
+            case ForLoop(pre,condition,post,body) =>
+                assert(false,"forloop")
+                ()
+            case Break() =>
+                assert(false,"break")
+                ()
+            case Continue() =>
+                assert(false,"continue")
+                ()
+            case Leave() =>
+                assert(false,"leave")
+                ()
+            case Block(statements) =>
+                assert(false,"block")
+                ()
+            case x =>
+                assert(false, "missing codegen case for: " + x.toString() + "(this should not happen)")
                 ()
         }
     }
