@@ -16,23 +16,43 @@ trait YulStatement extends YulAST
 // combinators to create strings, used below
 object U {
     def brace(s: String): String = "{" + s + "}"
+    def paren(s: String): String = "(" + s + ")"
 }
 
 // for each asm struct, create a case class
 case class TypedName (name: String, ntype: String) extends YulAST
 case class Case (value: Literal, body: Block) extends YulAST
 
-case class Literal (kind: LiteralKind.LiteralKind, value: String, vtype: String) extends Expression
-case class Identifier (name: String) extends Expression
+case class Literal (kind: LiteralKind.LiteralKind, value: String, vtype: String) extends Expression {
+    override def toString: String = {
+        /* todo/iev: i'm not positive if these assertions are the best idea, but they might be
+           a nice seatbelt. the constants i'm checking against may be wrong or incomplete right now,
+           this needs to be tested
+        */
+        val msg: String = "internal error: literal with inconsistent type string"
+        kind match {
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.number => assert(vtype=="int",msg)
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.boolean => assert(vtype=="bool",msg)
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.string => assert(vtype=="string",msg)
+        }
+        value + ":" + vtype //todo/iev: just the value?
+    }
+}
+case class Identifier (name: String) extends Expression {
+    override def toString: String = {
+        name
+    }
+}
+
 case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) extends Expression {
-    override def toString(): String = {
+    override def toString: String = {
         var code = this.functionName.name+"("
         var isFirst = true
-        for (arg <- this.arguments){
+        for (arg <- this.arguments){ // todo/iev: replace this with something simpler
             val argStr =
                 arg match {
                     case Literal(_,value, _) => value
-                    case _ => "" // todo/iev: is this right?
+                    case _ => assert(false); "" // todo/iev: is this right? why do we ignore non-literals?
                 }
             if (isFirst){
                 code = code + argStr
@@ -48,12 +68,12 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
 
 case class Assignment (variableNames: Seq[Identifier], value: Expression) extends YulStatement {
     override def toString: String = {
-        "let " + (variableNames.map(id => id.name)).mkString(", ") + " := " + value.toString
+        "let " + variableNames.map(id => id.name).mkString(", ") + " := " + value.toString
     }
 }
 case class VariableDeclaration (variables: Seq[TypedName]) extends YulStatement {
     override def toString: String = {
-        "let " +  (variables.map(id => id.name+":"+id.ntype)).mkString(", ")
+        "let " +  variables.map(id => id.name+":"+id.ntype).mkString(", ")
     }
 }
 case class FunctionDefinition (
@@ -76,8 +96,8 @@ case class If (condition: Expression, body: Block) extends YulStatement{
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement
 case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
     override def toString: String = {
-        "for " + (U.brace(pre.toString)) + condition.toString + (U.brace(post.toString)) +
-          (U.brace(body.toString)) // iev: this last one could be nicer, depending on if we pipe into a PP or not
+        "for " + U.brace(pre.toString) + condition.toString + U.brace(post.toString) +
+          U.brace(body.toString) // iev: this last one could be nicer, depending on if we pipe into a PP or not
     }
 }
 case class Break () extends YulStatement {
