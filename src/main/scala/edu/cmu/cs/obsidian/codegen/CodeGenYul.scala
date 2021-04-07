@@ -345,13 +345,13 @@ class ObjScope(obj: YulObject) {
             s match {
                 case f: FunctionDefinition => {
                     dispatch = true
-                    val code = f.yulFunctionDefString()
+                    val code = f.toString()
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
                     dispatchArray = dispatchArray :+ new Case(hashFunction(f))
                 }
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
+                        case f: FunctionCall => memoryInitRuntime = f.toString()
                         case _ =>
                             assert(false, "iterating subobjects, case for " + e.toString() + " unimplemented")
                             () // TODO unimplemented
@@ -397,7 +397,7 @@ class FuncScope(f: FunctionDefinition) {
                 case ExpressionStatement(e) =>
                     e match {
                         case func: FunctionCall =>
-                            body = body :+ new Body(func.yulFunctionCallString())
+                            body = body :+ new Body(func.toString())
                         case litn : Literal =>
                             body = body :+ new Body(litn.value)
                         case _ =>

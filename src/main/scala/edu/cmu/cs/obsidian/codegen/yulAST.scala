@@ -21,7 +21,7 @@ case class Case (value: Literal, body: Block) extends YulAST
 case class Literal (kind: LiteralKind.LiteralKind, value: String, vtype: String) extends Expression
 case class Identifier (name: String) extends Expression
 case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) extends Expression {
-    def yulFunctionCallString(): String = {
+    override def toString(): String = {
         var code = this.functionName.name+"("
         var isFirst = true
         for (arg <- this.arguments){
@@ -42,14 +42,18 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
     }
 }
 
-case class Assignment (variableNames: Seq[Identifier], value: Expression) extends YulStatement
+case class Assignment (variableNames: Seq[Identifier], value: Expression) extends YulStatement {
+    override def toString(): String = {
+        "let " + (variableNames.map(id => id.name)).mkString(", ") + " := " + value.toString
+    }
+}
 case class VariableDeclaration (variables: Seq[TypedName]) extends YulStatement
 case class FunctionDefinition (
                                   name: String,
                                   parameters: Seq[TypedName],
                                   returnVariables: Seq[TypedName],
                                   body: Block) extends YulStatement {
-    def yulFunctionDefString(): String = {
+    override def toString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"),"function")
         val scope = new FuncScope(this)
@@ -138,10 +142,10 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
             s match {
                 case f: FunctionDefinition =>
                     print("f is: " + f.toString() + "\n")
-                    deployFunctionArray = deployFunctionArray :+ new Func(f.yulFunctionDefString())
+                    deployFunctionArray = deployFunctionArray :+ new Func(f.toString())
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => deployCall = deployCall :+ new Call(f.yulFunctionCallString())
+                        case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString())
                         case _ =>
                             assert(false, "TODO: objscope not implemented for expression statement " + e.toString())
                             () // TODO unimplemented
@@ -157,12 +161,12 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                 s match {
                     case f: FunctionDefinition =>
                         dispatch = true
-                        val code = f.yulFunctionDefString()
+                        val code = f.toString()
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
                         dispatchArray = dispatchArray :+ new Case(hashFunction(f))
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
+                            case f: FunctionCall => memoryInitRuntime = f.toString()
                             case _ =>
                                 assert(false, "TODO: " + e.toString())
                                 () // TODO unimplemented
@@ -177,7 +181,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def defaultReturn() = FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))).yulFunctionCallString()
+        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))).toString()
     }
 
     // TODO need to fix indentation of the output
@@ -206,7 +210,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                 case ExpressionStatement(e) =>
                     e match {
                         case func: FunctionCall =>
-                            codeBody = codeBody :+ new Body(func.yulFunctionCallString())
+                            codeBody = codeBody :+ new Body(func.toString())
                     }
                 case _ =>
                     println("this is the bug")
