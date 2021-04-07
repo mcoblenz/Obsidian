@@ -240,6 +240,8 @@ object CodeGenYul extends CodeGenerator {
                                 assert(false, "TODO: unimplemented translate assignment case" + l.toString())
                                 0
                         }
+                        // todo/iev this is a bug: the thing in the second argument to sstore may be `true` or `false` which are not int literals.
+                        // to see it manifest, run BoolLiteral when the toString for Literal in yulAST includes a type annotation (which may not be valid Yul)
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"), Seq(Literal(LiteralKind.number, idx.toString(), "int"),Literal(LiteralKind.number, value.toString(), "int")))))
                     case e =>
                         assert(false, "TODO: translate assignment case" +  e.toString())
