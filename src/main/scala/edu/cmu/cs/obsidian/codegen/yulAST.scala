@@ -46,7 +46,12 @@ case class Identifier (name: String) extends Expression {
 
 case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) extends Expression {
     override def toString: String = {
-        var code = this.functionName.name+"("
+        //iev: this assert replicates previous behaviour, but i'm not sure if that was right
+        assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
+                "internal error: function call with non-literal argument")
+        functionName + U.paren(arguments.map(id=>id.toString).mkString(", ")) + "\n"
+
+        /* var code = this.functionName.name+"("
         var isFirst = true
         for (arg <- this.arguments){ // todo/iev: replace this with something simpler
             val argStr =
@@ -62,7 +67,7 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
                 code = code + "," + argStr
             }
         }
-        code + ")" + "\n"
+        code + ")" + "\n" */
     }
 }
 
