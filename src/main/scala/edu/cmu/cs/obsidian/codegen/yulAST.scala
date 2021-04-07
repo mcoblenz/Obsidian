@@ -81,7 +81,12 @@ case class If (condition: Expression, body: Block) extends YulStatement{
         "if " + condition.toString + U.brace(body.toString) // iev: no idea if this will work, but it might!
     }
 }
-case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement
+case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement{
+    override def toString: String = {
+        "switch" + expression.toString + "\n" +
+          cases.map(c => "case" + c.value.toString + U.brace(c.body.toString) + "\n") + "\n"
+    }
+}
 case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
     override def toString: String = {
         "for " + U.brace(pre.toString) + condition.toString + U.brace(post.toString) +

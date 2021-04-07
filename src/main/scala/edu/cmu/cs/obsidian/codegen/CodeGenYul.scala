@@ -389,62 +389,10 @@ class FuncScope(f: FunctionDefinition) {
         }
     }
 
-    // traverse a sequence of yul statements, recurring into each, and produce the corresponding Body objects
-    def statementsToBody(statements: Seq[YulStatement]): Array[Body] = {
-        var body: Array[Body] = Array[Body]()
-        for (s <- statements){
-            s match {
-                case ExpressionStatement(e) =>
-                    e match {
-                        case func: FunctionCall =>
-                            body = body :+ new Body(func.toString())
-                        case litn : Literal =>
-                            body = body :+ new Body(litn.value)
-                        case _ =>
-                            assert(false, "while traversing body, found expression statement " + e.toString + ", currently unimplemented")
-                    }
-                case edu.cmu.cs.obsidian.codegen.Assignment(varnames,value) =>
-                    assert(false,"assignment")
-                    ()
-                case VariableDeclaration(vars) =>
-                    assert(false,"variable decl")
-                    ()
-                case FunctionDefinition(name, params, returnvars, body) =>
-                    assert(false,"function def")
-                    ()
-                case edu.cmu.cs.obsidian.codegen.If(condition, body) =>
-                    assert(false,"if")
-                    ()
-                case edu.cmu.cs.obsidian.codegen.Switch(expression, cases) =>
-                    val expBlock = assert(false)
-                    val caseBlocks = cases.map(c => assert(false))
-                    assert(false,"switch")
-                    ()
-                case ForLoop(pre,condition,post,body) =>
-                    assert(false,"forloop")
-                    ()
-                case Break() =>
-                    body = body :+ new Body(s.toString)
-                    ()
-                case Continue() =>
-                    body = body :+ new Body(s.toString)
-                    ()
-                case Leave() =>
-                    body = body :+ new Body(s.toString)
-                    ()
-                case Block(statements) =>
-                    assert(false,"block")
-                    ()
-                case x =>
-                    assert(false, "missing codegen case for: " + x.toString + "(this should not happen)")
-                    ()
-            }
-        }
-        return body
-    }
-
     // construct body
-    var codeBody: Array[Body] = statementsToBody(f.body.statements)
+    var bods: Seq[Body] = f.body.statements.map(s => new Body(s.toString))
+    var codeBody: Array[Body] = new Array[Body](bods.length)
+    bods.copyToArray(codeBody)
 
     // TODO assume only one return variable for now
     var hasRetVal = false
