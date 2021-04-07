@@ -13,10 +13,11 @@ object LiteralKind extends Enumeration {
 trait Expression extends YulAST
 trait YulStatement extends YulAST
 
-// combinators to create strings, used below
+// combinators to reduce repeated code, used below
 object U {
     def brace(s: String): String = "{" + s + "}"
     def paren(s: String): String = "(" + s + ")"
+    def ilit(i: Int): Literal = Literal(LiteralKind.number,i.toString,"int")
 }
 
 // for each asm struct, create a case class
@@ -213,7 +214,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))).toString()
+        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(U.ilit(0),U.ilit(0))).toString
     }
 
     // TODO need to fix indentation of the output
