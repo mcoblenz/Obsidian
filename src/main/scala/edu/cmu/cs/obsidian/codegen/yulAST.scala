@@ -13,6 +13,10 @@ object LiteralKind extends Enumeration {
 trait Expression extends YulAST
 trait YulStatement extends YulAST
 
+// combinators to create strings, used below
+object U {
+    def brace(s: String): String = "{" + s + "}"
+}
 
 // for each asm struct, create a case class
 case class TypedName (name: String, ntype: String) extends YulAST
@@ -27,8 +31,8 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
         for (arg <- this.arguments){
             val argStr =
                 arg match {
-                    case Literal(_,value, _)=> value
-                    case _ => ""
+                    case Literal(_,value, _) => value
+                    case _ => "" // todo/iev: is this right?
                 }
             if (isFirst){
                 code = code + argStr
@@ -43,37 +47,58 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
 }
 
 case class Assignment (variableNames: Seq[Identifier], value: Expression) extends YulStatement {
-    override def toString(): String = {
+    override def toString: String = {
         "let " + (variableNames.map(id => id.name)).mkString(", ") + " := " + value.toString
     }
 }
-case class VariableDeclaration (variables: Seq[TypedName]) extends YulStatement
+case class VariableDeclaration (variables: Seq[TypedName]) extends YulStatement {
+    override def toString: String = {
+        "let " +  (variables.map(id => id.name+":"+id.ntype)).mkString(", ")
+    }
+}
 case class FunctionDefinition (
                                   name: String,
                                   parameters: Seq[TypedName],
                                   returnVariables: Seq[TypedName],
                                   body: Block) extends YulStatement {
-    override def toString(): String = {
+    override def toString: String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"),"function")
         val scope = new FuncScope(this)
-        mustache.execute(new StringWriter(), scope).toString()
+        mustache.execute(new StringWriter(), scope).toString
     }
 }
-case class If (condition: Expression, body: Block) extends YulStatement
+case class If (condition: Expression, body: Block) extends YulStatement{
+    override def toString: String = {
+        "if " + condition.toString + U.brace(body.toString) // iev: no idea if this will work, but it might!
+    }
+}
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement
-case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement
+case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
+    override def toString: String = {
+        "for " + (U.brace(pre.toString)) + condition.toString + (U.brace(post.toString)) +
+          (U.brace(body.toString)) // iev: this last one could be nicer, depending on if we pipe into a PP or not
+    }
+}
 case class Break () extends YulStatement {
-    override def toString(): String = "break"
+    override def toString: String = "break"
 }
 case class Continue () extends YulStatement {
-    override def toString(): String = "continue"
+    override def toString: String = "continue"
 }
 case class Leave () extends YulStatement {
-    override def toString(): String = "leave"
+    override def toString: String = "leave"
 }
-case class ExpressionStatement (expression: Expression) extends YulStatement
-case class Block (statements: Seq[YulStatement]) extends YulStatement
+case class ExpressionStatement (expression: Expression) extends YulStatement{
+    override def toString: String = {
+        expression.toString //iev: this is very likely not good enough
+    }
+}
+case class Block (statements: Seq[YulStatement]) extends YulStatement {
+    override def toString: String = {
+        statements.map(s => s.toString).mkString(" ")
+    }
+}
 
 
 /*
