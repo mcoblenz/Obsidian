@@ -92,7 +92,7 @@ case class If (condition: Expression, body: Block) extends YulStatement{
 //todo/iev: mustache file for this?
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement{
     override def toString: String = {
-        "switch " + expression.toString + "\n" + cases.map(c => c.toString) + "\n"
+        "switch " + expression.toString + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
     }
 }
 
