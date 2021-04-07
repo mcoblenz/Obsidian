@@ -49,25 +49,7 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
         //iev: this assert replicates previous behaviour, but i'm not sure if that was right
         assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
                 "internal error: function call with non-literal argument")
-        functionName + U.paren(arguments.map(id=>id.toString).mkString(", ")) + "\n"
-
-        /* var code = this.functionName.name+"("
-        var isFirst = true
-        for (arg <- this.arguments){ // todo/iev: replace this with something simpler
-            val argStr =
-                arg match {
-                    case Literal(_,value, _) => value
-                    case _ => assert(false); "" // todo/iev: is this right? why do we ignore non-literals?
-                }
-            if (isFirst){
-                code = code + argStr
-                isFirst = false
-            }
-            else {
-                code = code + "," + argStr
-            }
-        }
-        code + ")" + "\n" */
+        functionName.toString + U.paren(arguments.map(id=>id.toString).mkString(", ")) + "\n"
     }
 }
 
@@ -191,7 +173,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         for (s <- obj.code.block.statements) {
             s match {
                 case f: FunctionDefinition =>
-                    print("f is: " + f.toString() + "\n")
+                    print("f is: " + f.toString() + "\n") // todo remember to delete this
                     deployFunctionArray = deployFunctionArray :+ new Func(f.toString())
                 case e: ExpressionStatement =>
                     e.expression match {
