@@ -60,13 +60,13 @@ case class If (condition: Expression, body: Block) extends YulStatement
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement
 case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement
 case class Break () extends YulStatement {
-    override def toString() : String = "break"
+    override def toString(): String = "break"
 }
 case class Continue () extends YulStatement {
-    override def toString() : String = "continue"
+    override def toString(): String = "continue"
 }
 case class Leave () extends YulStatement {
-    override def toString() : String = "leave"
+    override def toString(): String = "leave"
 }
 case class ExpressionStatement (expression: Expression) extends YulStatement
 case class Block (statements: Seq[YulStatement]) extends YulStatement
@@ -132,7 +132,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         var dispatch = false
         var dispatchArray: Array[Case] = Array[Case]()
         var deployCall: Array[Call] = Array[Call]()
-        var memoryInitRuntime : String = ""
+        var memoryInitRuntime: String = ""
 
         for (s <- obj.code.block.statements) {
             s match {
@@ -220,7 +220,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         var retParams = ""
         if (f.returnVariables.nonEmpty){
             hasRetVal = true
-            retParams = f.returnVariables.apply(0).name
+            retParams = f.returnVariables.head.name
         }
         def params(): Array[Param] = argRest
         def body(): Array[Body] = codeBody

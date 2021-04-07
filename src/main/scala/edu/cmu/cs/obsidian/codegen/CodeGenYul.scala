@@ -14,15 +14,15 @@ import scala.collection.immutable.Map
 object CodeGenYul extends CodeGenerator {
 
     // TODO improve this temporary symbol table
-    var tempSymbolTable : Map[String, Int] = Map() // map from field identifiers to index in storage
-    var tempTableIdx : Int = 0 // counter indicating the next available slot in the table
-    var stateIdx : Int = -1    // whether or not there is a state
-    var stateEnumMapping : Map[String, Int] = Map() // map from state name to an enum value
-    var stateEnumCounter : Int = 0  // counter indicating the next value to assign since we don't know the total num of states
+    var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
+    var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
+    var stateIdx: Int = -1    // whether or not there is a state
+    var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
+    var stateEnumCounter: Int = 0  // counter indicating the next value to assign since we don't know the total num of states
 
     // some constants hoisted from below to avoid repeated code
-    val true_lit : Literal = Literal(LiteralKind.boolean, "true", "bool")
-    val false_lit : Literal = Literal(LiteralKind.boolean, "false", "bool")
+    val true_lit: Literal = Literal(LiteralKind.boolean, "true", "bool")
+    val false_lit: Literal = Literal(LiteralKind.boolean, "false", "bool")
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -246,7 +246,7 @@ object CodeGenYul extends CodeGenerator {
                         Seq()
                 }
             case IfThenElse(scrutinee,pos,neg) =>
-                val scrutinee_yul : Seq[YulStatement] = translateExpr(scrutinee)
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
                 if (scrutinee_yul.length > 1){
                     assert(false,"boolean expression in conditional translates to a sequence of expressions")
                     Seq()
@@ -255,7 +255,7 @@ object CodeGenYul extends CodeGenerator {
                     case ExpressionStatement(sye) =>
                         val pos_yul = pos.flatMap(translateStatement)
                         val neg_yul = neg.flatMap(translateStatement)
-                        Seq(edu.cmu.cs.obsidian.codegen.Switch(sye,Seq(Case(true_lit , Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
+                        Seq(edu.cmu.cs.obsidian.codegen.Switch(sye,Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
                         assert(false, "if statement built on non-expression: " + e.toString())
                         Seq()
