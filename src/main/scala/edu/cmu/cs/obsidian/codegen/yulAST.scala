@@ -155,12 +155,11 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
                 s match {
-                    case f: FunctionDefinition => {
+                    case f: FunctionDefinition =>
                         dispatch = true
                         val code = f.yulFunctionDefString()
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
                         dispatchArray = dispatchArray :+ new Case(hashFunction(f))
-                    }
                     case e: ExpressionStatement =>
                         e.expression match {
                             case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
@@ -178,7 +177,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def defaultReturn() = (FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int")))).yulFunctionCallString()
+        def defaultReturn() = FunctionCall(Identifier("return"),Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))).yulFunctionCallString()
     }
 
     // TODO need to fix indentation of the output

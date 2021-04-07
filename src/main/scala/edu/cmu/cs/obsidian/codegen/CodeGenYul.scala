@@ -193,7 +193,7 @@ object CodeGenYul extends CodeGenerator {
     }
 
     // TODO unimplemented; hardcode to uint256 for now
-    def mapObsTypeToABI(ntype: String) = {
+    def mapObsTypeToABI(ntype: String): String= {
         "uint256"
     }
 
@@ -399,9 +399,9 @@ class FuncScope(f: FunctionDefinition) {
                         case func: FunctionCall =>
                             body = body :+ new Body(func.yulFunctionCallString())
                         case litn : Literal =>
-                            body = body :+ new Body(litn.value.toString())
+                            body = body :+ new Body(litn.value)
                         case _ =>
-                            assert(false, "while traversing body, found expression statement " + e.toString() + ", currently unimplemented")
+                            assert(false, "while traversing body, found expression statement " + e.toString + ", currently unimplemented")
                     }
                 case edu.cmu.cs.obsidian.codegen.Assignment(varnames,value) =>
                     assert(false,"assignment")
@@ -424,19 +424,19 @@ class FuncScope(f: FunctionDefinition) {
                     assert(false,"forloop")
                     ()
                 case Break() =>
-                    body = body :+ new Body(s.toString())
+                    body = body :+ new Body(s.toString)
                     ()
                 case Continue() =>
-                    body = body :+ new Body(s.toString())
+                    body = body :+ new Body(s.toString)
                     ()
                 case Leave() =>
-                    body = body :+ new Body(s.toString())
+                    body = body :+ new Body(s.toString)
                     ()
                 case Block(statements) =>
                     assert(false,"block")
                     ()
                 case x =>
-                    assert(false, "missing codegen case for: " + x.toString() + "(this should not happen)")
+                    assert(false, "missing codegen case for: " + x.toString + "(this should not happen)")
                     ()
             }
         }
