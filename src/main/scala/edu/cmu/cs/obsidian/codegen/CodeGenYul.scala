@@ -121,7 +121,7 @@ object CodeGenYul extends CodeGenerator {
 
         // create runtime object
         val runtime_name = contract.name + "_deployed"
-        val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)),Seq(),Seq())
+        val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq())
         subObjects = runtime_obj +: subObjects
 
         YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq())
@@ -257,7 +257,7 @@ object CodeGenYul extends CodeGenerator {
                     case ExpressionStatement(sye) =>
                         val pos_yul = pos.flatMap(translateStatement)
                         val neg_yul = neg.flatMap(translateStatement)
-                        Seq(edu.cmu.cs.obsidian.codegen.Switch(sye,Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
+                        Seq(edu.cmu.cs.obsidian.codegen.Switch(sye, Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
                         assert(false, "if statement built on non-expression: " + e.toString())
                         Seq()
