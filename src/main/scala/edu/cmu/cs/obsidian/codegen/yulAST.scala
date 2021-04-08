@@ -172,7 +172,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                 strRep = strRep + mapObsTypeToABI(p.ntype)
             }
             strRep = strRep + ")"
-            keccak256(strRep)
+            keccak256(strRep) //todo/iev: this is a call to the constant function, so we compute a big thing and then drop it on the floor
             // TODO truncate and keep the first 4 bytes
         }
 
@@ -189,7 +189,6 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         for (s <- obj.code.block.statements) {
             s match {
                 case f: FunctionDefinition =>
-                    print("f is: " + f.toString() + "\n") // todo remember to delete this
                     deployFunctionArray = deployFunctionArray :+ new Func(f.toString())
                 case e: ExpressionStatement =>
                     e.expression match {
@@ -229,7 +228,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(U.ilit(0),U.ilit(0))).toString
+        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(U.ilit(0),U.ilit(0))).toString //todo/iev
     }
 
     // TODO need to fix indentation of the output
@@ -258,14 +257,14 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                 case ExpressionStatement(e) =>
                     e match {
                         case func: FunctionCall =>
-                            codeBody = codeBody :+ new Body(func.toString())
+                            codeBody = codeBody :+ new Body(func.toString)
                     }
                 case _ =>
-                    println("this is the bug")
-                    assert(false)
+                    assert(false, "constructing body unimplemented for " + s.toString)
                     ()
             }
         }
+
         // TODO assume only one return variable for now
         var hasRetVal = false
         var retParams = ""
