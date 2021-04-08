@@ -75,21 +75,18 @@ case class FunctionDefinition (
     }
 }
 
-//todo/iev: mustache file for this?
 case class If (condition: Expression, body: Block) extends YulStatement{
     override def toString: String = {
         "if " + condition.toString + brace(body.toString)
     }
 }
 
-//todo/iev: mustache file for this?
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement{
     override def toString: String = {
         "switch " + expression.toString + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
     }
 }
 
-//todo/iev: mustache file for this?
 case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
     override def toString: String = {
         "for " + brace(pre.toString) + condition.toString + brace(post.toString) +
@@ -148,26 +145,6 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         class Func(val code: String){}
         class Case(val hash: String){}
         class Call(val call: String){}
-
-        // TODO unimplemented; hardcode to uint256 for now
-        def mapObsTypeToABI(ntype: String): String = {
-            "uint256"
-        }
-
-        // TODO unimplemented; hardcode for now; bouncycastle library maybe helpful
-        def keccak256(s: String): String = {
-            "0x70a08231"
-        }
-
-        def hashFunction(f: FunctionDefinition): String = {
-            var strRep: String = f.name + "("
-            for (p <- f.parameters){
-                strRep = strRep + mapObsTypeToABI(p.ntype)
-            }
-            strRep = strRep + ")"
-            keccak256(strRep) //todo/iev: this is a call to the constant function, so we compute a big thing and then drop it on the floor
-            // TODO truncate and keep the first 4 bytes
-        }
 
         val mainContractName: String = obj.name
         val creationObject: String = mainContractName

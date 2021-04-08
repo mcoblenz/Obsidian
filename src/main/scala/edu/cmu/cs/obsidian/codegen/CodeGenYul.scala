@@ -289,26 +289,6 @@ class ObjScope(obj: YulObject) {
     class Case(val hash: String){}
     class Call(val call: String){}
 
-    // TODO unimplemented; hardcode to uint256 for now
-    def mapObsTypeToABI(ntype: String): String = {
-        "uint256"
-    }
-
-    // TODO unimplemented; hardcode for now; bouncycastle library may be helpful
-    def keccak256(s: String): String = {
-        "0x70a08231"
-    }
-
-    def hashFunction(f: FunctionDefinition): String = {
-        var strRep: String = f.name + "("
-        for (p <- f.parameters){
-            strRep = strRep + mapObsTypeToABI(p.ntype)
-        }
-        strRep = strRep + ")"
-        keccak256(strRep)
-        // TODO truncate and keep the first 4 bytes
-    }
-
     val mainContractName: String = obj.name
     val creationObject: String = mainContractName
     val runtimeObject: String = mainContractName + "_deployed"
@@ -321,10 +301,10 @@ class ObjScope(obj: YulObject) {
 
     for (s <- obj.code.block.statements) {
         s match {
-            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(yulString.yulFunctionDefString(f))
+            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
             case e: ExpressionStatement =>
                 e.expression match {
-                    case f: FunctionCall => deployCall = deployCall :+ new Call(yulString.yulFunctionCallString(f))
+                    case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
                     case _ =>
                         assert(false, "unimplemented")
                         () // TODO unimplemented
@@ -340,19 +320,18 @@ class ObjScope(obj: YulObject) {
             s match {
                 case f: FunctionDefinition => {
                     dispatch = true
-                    val code = f.toString()
-                    runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
+                    runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
                     dispatchArray = dispatchArray :+ new Case(hashFunction(f))
                 }
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => memoryInitRuntime = f.toString()
+                        case f: FunctionCall => memoryInitRuntime = f.toString
                         case _ =>
-                            assert(false, "iterating subobjects, case for " + e.toString() + " unimplemented")
+                            assert(false, "iterating subobjects, case for " + e.toString + " unimplemented")
                             () // TODO unimplemented
                     }
                 case x =>
-                    assert(false, "iterating subobjects, case for " + x.toString() + "unimplemented")
+                    assert(false, "iterating subobjects, case for " + x.toString + "unimplemented")
                     ()
             }
         }
