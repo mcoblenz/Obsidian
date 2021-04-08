@@ -180,12 +180,11 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                 s match {
                     case f: FunctionDefinition =>
                         dispatch = true
-                        val code = f.toString()
-                        runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
+                        runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
                         dispatchArray = dispatchArray :+ new Case(hashFunction(f))
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall => memoryInitRuntime = f.toString()
+                            case f: FunctionCall => memoryInitRuntime = f.toString
                             case _ =>
                                 assert(false, "TODO: " + e.toString())
                                 () // TODO unimplemented

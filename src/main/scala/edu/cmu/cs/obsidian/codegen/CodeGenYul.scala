@@ -185,7 +185,7 @@ object CodeGenYul extends CodeGenerator {
                 Seq(),
                 Block(body)))
     }
-    
+
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
         val f: (VariableDeclWithSpec) => TypedName = v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString()))
         val parameters: Seq[TypedName] = transaction.args.map[TypedName](f)
