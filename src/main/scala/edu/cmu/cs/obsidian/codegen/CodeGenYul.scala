@@ -168,8 +168,8 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateConstructor(constructor: Constructor): Seq[YulStatement] = {
-        val extractTypeName: (VariableDeclWithSpec) => TypedName = (v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString())) )
-        val parameters: Seq[TypedName] = (constructor.args).map[TypedName](extractTypeName)
+        val extractTypeName: VariableDeclWithSpec => TypedName = v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))
+        val parameters: Seq[TypedName] = constructor.args.map[TypedName](extractTypeName)
         var body: Seq[YulStatement] =Seq()
         for (s <- constructor.body){
             body = body ++ translateStatement(s)
@@ -187,14 +187,14 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
-        val f: (VariableDeclWithSpec) => TypedName = v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString()))
+        val f: VariableDeclWithSpec => TypedName = v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))
         val parameters: Seq[TypedName] = transaction.args.map[TypedName](f)
 
         val ret: Seq[TypedName] =
             if (transaction.retType.isEmpty) {
                 Seq()
             } else { // TODO hard code return variable name now, need a special naming convention to avoid collisions
-                Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString())) )
+                Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString)))
             }
 
         var body: Seq[YulStatement] = Seq()
@@ -269,7 +269,7 @@ object CodeGenYul extends CodeGenerator {
             case FalseLiteral() =>
                 Seq(ExpressionStatement(false_lit))
             case _ =>
-                assert(false, "TODO: translation of " + e.toString() + " is not implemented")
+                assert(false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq() // TODO unimplemented
         }
     }
@@ -312,11 +312,10 @@ class ObjScope(obj: YulObject) {
     for (sub <- obj.subObjects) { // TODO separate runtime object out as a module
         for (s <- sub.code.block.statements) { // temporary fix due to issue above
             s match {
-                case f: FunctionDefinition => {
+                case f: FunctionDefinition =>
                     dispatch = true
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
                     dispatchArray = dispatchArray :+ new Case(hashFunction(f))
-                }
                 case e: ExpressionStatement =>
                     e.expression match {
                         case f: FunctionCall => memoryInitRuntime = f.toString
