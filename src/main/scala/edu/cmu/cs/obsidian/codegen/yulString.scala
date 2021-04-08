@@ -8,6 +8,7 @@ import edu.cmu.cs.obsidian.codegen.{FuncScope, FunctionCall, FunctionDefinition,
 
 object yulString {
 
+    // todo: does this code get called?
     def yulString(obj: YulObject): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
@@ -16,6 +17,7 @@ object yulString {
         raw.replaceAll("&amp;","&").replaceAll("&gt;",">").replaceAll("&#10;", "\n")
     }
 
+    // todo: does this code get called?
     def yulFunctionDefString(f: FunctionDefinition): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"),"function")
@@ -23,6 +25,7 @@ object yulString {
         mustache.execute(new StringWriter(), scope).toString()
     }
 
+    // todo: does this code get called?
     def yulFunctionCallString(f: FunctionCall): String = {
         var code = f.functionName.name+"("
         var isFirst = true
