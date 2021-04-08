@@ -2,6 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 import java.io.{FileReader, StringWriter}
 import com.github.mustachejava.DefaultMustacheFactory
+import edu.cmu.cs.obsidian.codegen.Util._
 
 // reminder: use abstract class if want to create a base class that requires constructor arguments
 sealed trait YulAST
@@ -13,19 +14,11 @@ object LiteralKind extends Enumeration {
 trait Expression extends YulAST
 trait YulStatement extends YulAST
 
-// combinators to reduce repeated code, used below
-// todo/iev: make this its own file so I can use it in CodeGenYul, too
-object U {
-    def brace(s: String): String = "{" + s + "}"
-    def paren(s: String): String = "(" + s + ")"
-    def ilit(i: Int): Literal = Literal(LiteralKind.number,i.toString,"int")
-}
-
 // for each asm struct, create a case class
 case class TypedName (name: String, ntype: String) extends YulAST
 case class Case (value: Literal, body: Block) extends YulAST {
     override def toString: String = {
-        "case " + value.toString + " " + U.brace(body.toString)
+        "case " + value.toString + " " + brace(body.toString)
     }
 }
 
@@ -55,7 +48,7 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
         //iev: this assert replicates previous behaviour, but i'm not sure if that was right
         assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
                 "internal error: function call with non-literal argument")
-        functionName.toString + U.paren(arguments.map(id=>id.toString).mkString(", "))
+        functionName.toString + paren(arguments.map(id=>id.toString).mkString(", "))
     }
 }
 
@@ -85,7 +78,7 @@ case class FunctionDefinition (
 //todo/iev: mustache file for this?
 case class If (condition: Expression, body: Block) extends YulStatement{
     override def toString: String = {
-        "if " + condition.toString + U.brace(body.toString)
+        "if " + condition.toString + brace(body.toString)
     }
 }
 
@@ -99,8 +92,8 @@ case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatemen
 //todo/iev: mustache file for this?
 case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
     override def toString: String = {
-        "for " + U.brace(pre.toString) + condition.toString + U.brace(post.toString) +
-          U.brace(body.toString) // iev: this last one could be nicer, depending on if we pipe into a PP or not
+        "for " + brace(pre.toString) + condition.toString + brace(post.toString) +
+          brace(body.toString) // iev: this last one could be nicer, depending on if we pipe into a PP or not
     }
 }
 case class Break () extends YulStatement {
@@ -228,7 +221,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(U.ilit(0),U.ilit(0))).toString //todo/iev
+        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(ilit(0),ilit(0))).toString //todo/iev
     }
 
     // TODO need to fix indentation of the output

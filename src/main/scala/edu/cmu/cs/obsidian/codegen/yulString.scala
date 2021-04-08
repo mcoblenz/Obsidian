@@ -10,6 +10,7 @@ object yulString {
 
     // todo: does this code get called?
     def yulString(obj: YulObject): String = {
+        assert(false)
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
         val scope = new ObjScope(obj)
@@ -19,6 +20,7 @@ object yulString {
 
     // todo: does this code get called?
     def yulFunctionDefString(f: FunctionDefinition): String = {
+        assert(false)
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"),"function")
         val scope = new FuncScope(f)
@@ -27,6 +29,7 @@ object yulString {
 
     // todo: does this code get called?
     def yulFunctionCallString(f: FunctionCall): String = {
+        assert(false)
         var code = f.functionName.name+"("
         var isFirst = true
         for (arg <- f.arguments){

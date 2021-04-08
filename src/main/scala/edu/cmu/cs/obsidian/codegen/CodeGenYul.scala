@@ -8,6 +8,7 @@ import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.typecheck.ContractType
+import edu.cmu.cs.obsidian.codegen.Util._
 
 import scala.collection.immutable.Map
 
@@ -19,10 +20,6 @@ object CodeGenYul extends CodeGenerator {
     var stateIdx: Int = -1    // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
     var stateEnumCounter: Int = 0  // counter indicating the next value to assign since we don't know the total num of states
-
-    // some constants hoisted from below to avoid repeated code
-    val true_lit: Literal = Literal(LiteralKind.boolean, "true", "bool")
-    val false_lit: Literal = Literal(LiteralKind.boolean, "false", "bool")
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -47,7 +44,7 @@ object CodeGenYul extends CodeGenerator {
         // write string to output file
         // currently it's created in the Obsidian directory; this may need to be changed, based on desired destination
         Files.createDirectories(finalOutputPath)
-        val writer = new FileWriter(new File(finalOutputPath.toString(), translated_obj.name + ".yul"))
+        val writer = new FileWriter(new File(finalOutputPath.toString, translated_obj.name + ".yul"))
         writer.write(s)
         writer.flush()
         true
@@ -96,9 +93,7 @@ object CodeGenYul extends CodeGenerator {
         val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
         val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
         // the free memory pointer points to 0x80 initially
-        val initExpr = FunctionCall(
-            Identifier("mstore"),
-            Seq(Literal(LiteralKind.number, freeMemPointer.toString(), "int"),Literal(LiteralKind.number, firstFreeMem.toString(), "int")))
+        val initExpr = FunctionCall(Identifier("mstore"), Seq(ilit(freeMemPointer), ilit(firstFreeMem)))
         statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
         statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr)
 
@@ -115,9 +110,7 @@ object CodeGenYul extends CodeGenerator {
 
         // this creates valid output for the empty obsidian contract and ends up being dead code if
         // there's anything else that returns ever.
-        val retExpr = FunctionCall(
-            Identifier("return"),
-            Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int")))
+        val retExpr = FunctionCall(Identifier("return"), Seq(ilit(0), ilit(0)))
 
         // create runtime object
         val runtime_name = contract.name + "_deployed"
@@ -272,11 +265,11 @@ object CodeGenYul extends CodeGenerator {
         e match {
             case ReferenceIdentifier(x) =>
                 val idx = tempSymbolTable(x)
-                val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
+                val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
                 Seq(ExpressionStatement(expr))
             case NumLiteral(n) =>
                 // we compile to int, which is s256 in yul
-                Seq(ExpressionStatement(Literal(LiteralKind.number,n.toString(),"int")))
+                Seq(ExpressionStatement(ilit(n)))
             case TrueLiteral() =>
                 Seq(ExpressionStatement(true_lit))
             case FalseLiteral() =>
