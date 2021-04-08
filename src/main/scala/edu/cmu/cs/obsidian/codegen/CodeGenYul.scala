@@ -3,6 +3,7 @@ package edu.cmu.cs.obsidian.codegen
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
 import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
 import edu.cmu.cs.obsidian.parser._
@@ -224,20 +225,18 @@ object CodeGenYul extends CodeGenerator {
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
-                        val idx = tempSymbolTable(x)
-                        val value = e match { // todo/iev: why can't you just do e.toString() below?
-                            case NumLiteral(v) => v
-                            case TrueLiteral() => "true"
-                            case FalseLiteral() => "false"
+                        val kind : LiteralKind = e match {
+                            case NumLiteral(_) => LiteralKind.number
+                            case TrueLiteral() => LiteralKind.boolean
+                            case FalseLiteral() => LiteralKind.boolean
                             case l =>
-                                assert(false, "TODO: unimplemented translate assignment case" + l.toString())
-                                0
+                                assert(false, "TODO: unimplemented translate assignment case: " + l.toString)
+                                LiteralKind.number
                         }
-                        // todo/iev this is a bug: the thing in the second argument to sstore may be `true` or `false` which are not int literals.
-                        // to see it manifest, run BoolLiteral when the toString for Literal in yulAST includes a type annotation (which may not be valid Yul)
-                        Seq(ExpressionStatement(FunctionCall(Identifier("sstore"), Seq(Literal(LiteralKind.number, idx.toString(), "int"),Literal(LiteralKind.number, value.toString(), "int")))))
+                        Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
+                            Seq(ilit(tempSymbolTable(x)),Literal(kind, e.toString, kind.toString)))))
                     case e =>
-                        assert(false, "TODO: translate assignment case" +  e.toString())
+                        assert(false, "TODO: translate assignment case" +  e.toString)
                         Seq()
                 }
             case IfThenElse(scrutinee,pos,neg) =>
@@ -252,11 +251,11 @@ object CodeGenYul extends CodeGenerator {
                         val neg_yul = neg.flatMap(translateStatement)
                         Seq(edu.cmu.cs.obsidian.codegen.Switch(sye, Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
-                        assert(false, "if statement built on non-expression: " + e.toString())
+                        assert(false, "if statement built on non-expression: " + e.toString)
                         Seq()
                 }
             case x =>
-                assert(false, "TODO: translateStatement for " + x.toString() + " is unimplemented")
+                assert(false, "TODO: translateStatement for " + x.toString + " is unimplemented")
                 Seq()
         }
     }
@@ -343,13 +342,12 @@ class ObjScope(obj: YulObject) {
     def dispatchCase(): Array[Case] = dispatchArray
 }
 
-// TODO need to fix indentation of the output
 class FuncScope(f: FunctionDefinition) {
     class Param(val name: String){}
     class Body(val code: String){}
 
     val functionName: String = f.name
-    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""}
+    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""} //todo/iev: is this a bug?
     var argRest: Array[Param] = Array[Param]()
     if (f.parameters.length > 1){
         var first  = true

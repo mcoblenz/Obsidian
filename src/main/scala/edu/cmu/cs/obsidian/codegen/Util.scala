@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
-/* combinators to for producing strings to reduce repeated code, used in yulAST and CodeGenYul */
+/* utility functions shared between yulAST and CodeGenYul */
 object Util {
   def brace(s: String): String = "{" + s + "}"
   def paren(s: String): String = "(" + s + ")"

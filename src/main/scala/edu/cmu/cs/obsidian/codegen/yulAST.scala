@@ -9,7 +9,9 @@ sealed trait YulAST
 
 object LiteralKind extends Enumeration {
     type LiteralKind = Value
-    val number, boolean, string = Value
+    val number = Value("int")
+    val boolean = Value("bool")
+    val string = Value("string")
 }
 trait Expression extends YulAST
 trait YulStatement extends YulAST
