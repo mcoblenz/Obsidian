@@ -2,6 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 import java.io.{FileReader, StringWriter}
 import com.github.mustachejava.DefaultMustacheFactory
+import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
 
 // reminder: use abstract class if want to create a base class that requires constructor arguments
@@ -9,9 +10,9 @@ sealed trait YulAST
 
 object LiteralKind extends Enumeration {
     type LiteralKind = Value
-    val number = Value("int")
-    val boolean = Value("bool")
-    val string = Value("string")
+    val number: codegen.LiteralKind.Value = Value("int")
+    val boolean: codegen.LiteralKind.Value = Value("bool")
+    val string: codegen.LiteralKind.Value = Value("string")
 }
 trait Expression extends YulAST
 trait YulStatement extends YulAST
@@ -132,7 +133,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
         val scope = new ObjScope(this)
-        val raw: String = mustache.execute(new StringWriter(), scope).toString()
+        val raw: String = mustache.execute(new StringWriter(), scope).toString
         raw.replaceAll("&amp;","&").replaceAll("&gt;",">").replaceAll("&#10;", "\n")
     }
 
@@ -161,16 +162,16 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         for (s <- obj.code.block.statements) {
             s match {
                 case f: FunctionDefinition =>
-                    deployFunctionArray = deployFunctionArray :+ new Func(f.toString())
+                    deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString())
+                        case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
                         case _ =>
-                            assert(false, "TODO: objscope not implemented for expression statement " + e.toString())
+                            assert(false, "TODO: objscope not implemented for expression statement " + e.toString)
                             () // TODO unimplemented
                     }
                 case _ =>
-                    assert(false, "TODO: objscope not implemented for block statement " + s.toString())
+                    assert(false, "TODO: objscope not implemented for block statement " + s.toString)
                     () // TODO unimplemented
             }
         }
@@ -222,19 +223,10 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
             }
         }
         // construct body
-        var codeBody: Array[Body] = Array[Body]()
-        for (s <- f.body.statements){
-            s match {
-                case ExpressionStatement(e) =>
-                    e match {
-                        case func: FunctionCall =>
-                            codeBody = codeBody :+ new Body(func.toString)
-                    }
-                case _ =>
-                    assert(false, "constructing body unimplemented for " + s.toString)
-                    ()
-            }
-        }
+        // todo/iev: this is copied code from CodeGenYul
+        var bods: Seq[Body] = f.body.statements.map(s => new Body(s.toString))
+        var codeBody: Array[Body] = new Array[Body](bods.length)
+        bods.copyToArray(codeBody)
 
         // TODO assume only one return variable for now
         var hasRetVal = false
