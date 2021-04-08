@@ -199,7 +199,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
         def dispatchCase(): Array[Case] = dispatchArray
-        def defaultReturn(): String = FunctionCall(Identifier("return"),Seq(ilit(0),ilit(0))).toString //todo/iev
+        def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"),Seq(ilit(0),ilit(0)))
     }
 
     // TODO need to fix indentation of the output
