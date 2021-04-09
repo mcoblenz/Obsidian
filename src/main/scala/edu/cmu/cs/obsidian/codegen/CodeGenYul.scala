@@ -125,7 +125,7 @@ object CodeGenYul extends CodeGenerator {
             case s: State =>
                 (Seq(), translateState(s))
             case c: ObsidianContractImpl =>
-                assert(false, "TODO")
+                assert(assertion = false, "TODO")
                 (Seq(), Seq())
             case c: JavaFFIContractImpl =>
                 assert(assertion = false, "Java contracts not supported in Yul translation")
@@ -133,7 +133,7 @@ object CodeGenYul extends CodeGenerator {
             case c: Constructor =>
                 (translateConstructor(c), Seq())
             case t: TypeDecl =>
-                assert(false, "TODO")
+                assert(assertion = false, "TODO")
                 (Seq(), Seq())
             // This should never be hit.
             case _ =>
@@ -197,7 +197,7 @@ object CodeGenYul extends CodeGenerator {
                 Seq(Leave())
             case ReturnExpr(e) =>
                 // we need to allocate some space in some form of memory and put e there
-                assert(false, "TODO: returning a value not implemented")
+                assert(assertion = false, "TODO: returning a value not implemented")
                 Seq()
             case Assignment(assignTo, e) =>
                 assignTo match {
@@ -207,13 +207,13 @@ object CodeGenYul extends CodeGenerator {
                             case TrueLiteral() => LiteralKind.boolean
                             case FalseLiteral() => LiteralKind.boolean
                             case l =>
-                                assert(false, "TODO: unimplemented translate assignment case: " + l.toString)
+                                assert(assertion = false, "TODO: unimplemented translate assignment case: " + l.toString)
                                 LiteralKind.number
                         }
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
                             Seq(ilit(tempSymbolTable(x)),Literal(kind, e.toString, kind.toString)))))
                     case e =>
-                        assert(false, "TODO: translate assignment case" +  e.toString)
+                        assert(assertion = false, "TODO: translate assignment case" +  e.toString)
                         Seq()
                 }
             case IfThenElse(scrutinee,pos,neg) =>
@@ -233,53 +233,134 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: Expression => translateExpr(e)
             case VariableDecl(typ, varName) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case VariableDeclWithInit(typ, varName, e) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case VariableDeclWithSpec(typIn, typOut, varName) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case Transition(newStateName, updates, thisPermission) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case Revert(maybeExpr) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case If(eCond, s) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case IfInState(e, ePerm, typeState, s1, s2) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case TryCatch(s1, s2) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case Switch(e, cases) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
             case StaticAssert(expr, typeState) =>
-                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
         }
     }
 
     def translateExpr(e: Expression): Seq[YulStatement] = {
         e match {
-            case ReferenceIdentifier(x) =>
-                val idx = tempSymbolTable(x)
-                val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
-                Seq(ExpressionStatement(expr))
-            case NumLiteral(n) =>
-                Seq(ExpressionStatement(ilit(n)))
-            case TrueLiteral() =>
-                Seq(ExpressionStatement(true_lit))
-            case FalseLiteral() =>
-                Seq(ExpressionStatement(false_lit))
-            case _ =>
-                assert(false, "TODO: translation of " + e.toString + " is not implemented")
-                Seq() // TODO unimplemented
+            case e: AtomicExpression =>
+                e match {
+                    case ReferenceIdentifier(x) =>
+                        val idx = tempSymbolTable(x)
+                        val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
+                        Seq(ExpressionStatement(expr))
+                    case NumLiteral(n) =>
+                        Seq(ExpressionStatement(ilit(n)))
+                    case StringLiteral(value) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case TrueLiteral() =>
+                        Seq(ExpressionStatement(true_lit))
+                    case FalseLiteral() =>
+                        Seq(ExpressionStatement(false_lit))
+                    case This() =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Parent() =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                }
+            case e: UnaryExpression =>
+                e match {
+                    case LogicalNegation(e) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Negate(e) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Dereference(e, f) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Disown(e) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                }
+            case e: BinaryExpression =>
+                e match {
+                    case Conjunction(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Disjunction(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Add(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case StringConcat(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Subtract(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Divide(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Multiply(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Mod(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Equals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case GreaterThan(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case GreaterThanOrEquals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case LessThan(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case LessThanOrEquals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case NotEquals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                }
+            case LocalInvocation(name, genericParams, params, args) =>
+                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq()
+            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
+                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq()
+            case Construction(contractType, args, isFFIInvocation) =>
+                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq()
+            case StateInitializer(stateName, fieldName) =>
+                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq()
         }
     }
 }
@@ -309,11 +390,11 @@ class ObjScope(obj: YulObject) {
                 e.expression match {
                     case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
                     case _ =>
-                        assert(false, "unimplemented")
+                        assert(assertion = false, "unimplemented")
                         () // TODO unimplemented
                 }
             case _ =>
-                assert(false, "unimplemented")
+                assert(assertion = false, "unimplemented")
                 () // TODO unimplemented
         }
     }
@@ -329,11 +410,11 @@ class ObjScope(obj: YulObject) {
                     e.expression match {
                         case f: FunctionCall => memoryInitRuntime = f.toString
                         case _ =>
-                            assert(false, "iterating subobjects, case for " + e.toString + " unimplemented")
+                            assert(assertion = false, "iterating subobjects, case for " + e.toString + " unimplemented")
                             () // TODO unimplemented
                     }
                 case x =>
-                    assert(false, "iterating subobjects, case for " + x.toString + "unimplemented")
+                    assert(assertion = false, "iterating subobjects, case for " + x.toString + "unimplemented")
                     ()
             }
         }
