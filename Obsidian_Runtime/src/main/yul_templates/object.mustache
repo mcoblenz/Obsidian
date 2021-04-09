@@ -24,6 +24,7 @@ object "{{creationObject}}" {
         {{#deployFunctions}}
             {{code}}
         {{/deployFunctions}}
+        {{defaultReturn}}
     }
     object "{{runtimeObject}}" {
         code {
@@ -43,6 +44,7 @@ object "{{creationObject}}" {
             {{#runtimeFunctions}}
                 {{code}}
             {{/runtimeFunctions}}
+            {{defaultReturn}}
         }
         {{runtimeSubObjects}}
     }

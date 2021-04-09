@@ -3,10 +3,13 @@ package edu.cmu.cs.obsidian.codegen
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
 import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
+// note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
+// in those places we use the fully qualified name
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.typecheck.ContractType
-import edu.cmu.cs.obsidian.codegen.Switch
+import edu.cmu.cs.obsidian.codegen.Util._
 
 import scala.collection.immutable.Map
 
@@ -14,14 +17,10 @@ object CodeGenYul extends CodeGenerator {
 
     // TODO improve this temporary symbol table
     var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
-    var tempTableIdx = 0 // counter indicating the next available slot in the table
-    var stateIdx = -1    // whether or not there is a state
+    var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
+    var stateIdx: Int = -1    // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
-    var stateEnumCounter = 0  // counter indicating the next value to assign since we don't knon the total num of states
-
-    // some constants hoisted from below to avoid repeated code
-    val true_lit : Literal = Literal(LiteralKind.boolean, "true", "bool")
-    val false_lit : Literal = Literal(LiteralKind.boolean, "false", "bool")
+    var stateEnumCounter: Int = 0  // counter indicating the next value to assign since we don't know the total num of states
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -46,22 +45,21 @@ object CodeGenYul extends CodeGenerator {
         // write string to output file
         // currently it's created in the Obsidian directory; this may need to be changed, based on desired destination
         Files.createDirectories(finalOutputPath)
-        val writer = new FileWriter(new File(finalOutputPath.toString(), translated_obj.name + ".yul"))
+        val writer = new FileWriter(new File(finalOutputPath.toString, translated_obj.name + ".yul"))
         writer.write(s)
         writer.flush()
         true
     }
 
     def translateProgram(program: Program): YulObject = {
-        // translate main contract
-        val mainContractOption = findMainContract(program)
-        if (mainContractOption.isEmpty) {
-            throw new RuntimeException("No main contract found")
-        }
-        val mainContract = mainContractOption.get
-        val main_contract_ast = mainContract match {
-            case obsContract: ObsidianContractImpl => translateContract(obsContract)
-            case _ => throw new RuntimeException("Java contract not supported in yul translation")
+        // translate main contract, or fail if none is found or only a java contract is present
+        val main_contract_ast: YulObject =
+            findMainContract(program) match {
+            case Some(p) => p match {
+                case c @ ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
+                case JavaFFIContractImpl(_, _, _, _, _) => throw new RuntimeException("Java contract not supported in yul translation")
+            }
+            case None => throw new RuntimeException("No main contract found")
         }
 
         // TODO ignore imports, data for now
@@ -95,9 +93,7 @@ object CodeGenYul extends CodeGenerator {
         val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
         val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
         // the free memory pointer points to 0x80 initially
-        val initExpr = FunctionCall(
-            Identifier("mstore"),
-            Seq(Literal(LiteralKind.number, freeMemPointer.toString(), "int"),Literal(LiteralKind.number, firstFreeMem.toString(), "int")))
+        val initExpr = FunctionCall(Identifier("mstore"), Seq(ilit(freeMemPointer), ilit(firstFreeMem)))
         statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
         statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr)
 
@@ -111,15 +107,6 @@ object CodeGenYul extends CodeGenerator {
             statement_seq_deploy = statement_seq_deploy ++ deploy_seq
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
-
-        // this creates valid output for the empty obsidian contract and ends up being dead code if
-        // there's anything else that returns ever.
-        val retExpr = FunctionCall(
-            Identifier("return"),
-            Seq(Literal(LiteralKind.number,"0","int"),Literal(LiteralKind.number,"0","int"))
-        )
-        statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(retExpr)
-        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(retExpr)
 
         // create runtime object
         val runtime_name = contract.name + "_deployed"
@@ -150,7 +137,7 @@ object CodeGenYul extends CodeGenerator {
                 (Seq(), Seq())
             // This should never be hit.
             case _ =>
-                assert(false, "Translating unexpected declaration: " + declaration)
+                assert(assertion = false, "Translating unexpected declaration: " + declaration)
                 (Seq(), Seq())
         }
     }
@@ -160,7 +147,7 @@ object CodeGenYul extends CodeGenerator {
         // since field declaration has not yet be assigned, there is no need to do sstore
         tempSymbolTable += field.name -> tempTableIdx
         tempTableIdx += 1
-        Seq()
+        Seq() // TODO: do we really mean to always return the empty sequence?
     }
 
     def translateState(s: State): Seq[YulStatement] = {
@@ -172,54 +159,36 @@ object CodeGenYul extends CodeGenerator {
         stateEnumMapping += s.name -> stateEnumCounter
         stateEnumCounter += 1
 
-        Seq()
+        Seq() // TODO: do we really mean to always return the empty sequence?
     }
 
     def translateConstructor(constructor: Constructor): Seq[YulStatement] = {
-        val extractTypeName: (VariableDeclWithSpec) => TypedName = (v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString())) )
-        val parameters: Seq[TypedName] = (constructor.args).map[TypedName](extractTypeName)
-        var body: Seq[YulStatement] =Seq()
-        for (s <- constructor.body){
-            body = body ++ translateStatement(s)
-        }
+        val new_name: String = "constructor_" + constructor.name
         val deployExpr = FunctionCall(
-            Identifier("constructor_"+constructor.name), // TODO change how to find constructor function name after adding randomized suffix/prefix
+            Identifier(new_name), // TODO change how to find constructor function name after adding randomized suffix/prefix
             Seq()) // TODO constructor params not implemented
 
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
-                "constructor_"+constructor.name, // TODO rename transaction name (by adding prefix/suffix)
-                parameters,
-                Seq(),
-                Block(body)))
-    }
-
-    // TODO unimplemented; hardcode to uint256 for now
-    def mapObsTypeToABI(ntype: String) = {
-        "uint256"
+                new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
+                constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
+                Seq(), //todo/iev: why is this always empty?
+                Block(constructor.body.flatMap(translateStatement))))
     }
 
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
-        val f: (VariableDeclWithSpec) => TypedName = v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString()))
-        val parameters: Seq[TypedName] = transaction.args.map[TypedName](f)
-
         val ret: Seq[TypedName] =
             if (transaction.retType.isEmpty) {
                 Seq()
             } else { // TODO hard code return variable name now, need a special naming convention to avoid collisions
-                Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString())) )
+                Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString)))
             }
-
-        var body: Seq[YulStatement] = Seq()
-        for (s <- transaction.body){
-            body = body ++ translateStatement(s)
-        }
 
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
-            parameters,
+            transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
             ret,
-            Block(body)))
+            Block(transaction.body.flatMap(translateStatement))))
     }
 
     def translateStatement(s: Statement): Seq[YulStatement] = {
@@ -227,51 +196,43 @@ object CodeGenYul extends CodeGenerator {
             case Return() =>
                 Seq(Leave())
             case ReturnExpr(e) =>
+                // we need to allocate some space in some form of memory and put e there
                 assert(false, "TODO: returning a value not implemented")
                 Seq()
-                // former implementation is this:
-                //
-                // translateExpr(e)
-                //
-                // removing this may cause some tests to fail; i'm not sure. to implement this the
-                // right way, we need to allocate some space in some form of memory and put e there
-                // to follow the semantics for return in Yul.
             case Assignment(assignTo, e) =>
                 assignTo match {
-                    // TODO only support int/int256 now
                     case ReferenceIdentifier(x) =>
-                        val idx = tempSymbolTable(x)
-                        val value = e match {
-                            case NumLiteral(v) => v
-                            case TrueLiteral() => "true"
-                            case FalseLiteral() => "false"
-                            case _ =>
-                                assert(false, "TODO")
-                                0
+                        val kind : LiteralKind = e match {
+                            case NumLiteral(_) => LiteralKind.number
+                            case TrueLiteral() => LiteralKind.boolean
+                            case FalseLiteral() => LiteralKind.boolean
+                            case l =>
+                                assert(false, "TODO: unimplemented translate assignment case: " + l.toString)
+                                LiteralKind.number
                         }
-                        val expr = FunctionCall(Identifier("sstore"), Seq(Literal(LiteralKind.number, idx.toString(), "int"),Literal(LiteralKind.number, value.toString(), "int")))
-                        Seq(ExpressionStatement(expr))
-                    case _ =>
-                        assert(false, "TODO")
+                        Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
+                            Seq(ilit(tempSymbolTable(x)),Literal(kind, e.toString, kind.toString)))))
+                    case e =>
+                        assert(false, "TODO: translate assignment case" +  e.toString)
                         Seq()
                 }
             case IfThenElse(scrutinee,pos,neg) =>
-                val scrutinee_yul : Seq[YulStatement] = translateExpr(scrutinee)
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
                 if (scrutinee_yul.length > 1){
-                    assert(false,"boolean expression in conditional translates to a sequence of expressons")
+                    assert(assertion = false,"boolean expression in conditional translates to a sequence of expressions")
                     Seq()
                 }
-                scrutinee_yul.apply(0) match {
+                scrutinee_yul.head match {
                     case ExpressionStatement(sye) =>
                         val pos_yul = pos.flatMap(translateStatement)
                         val neg_yul = neg.flatMap(translateStatement)
-                        Seq(Switch(sye,Seq(Case(true_lit , Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
+                        Seq(edu.cmu.cs.obsidian.codegen.Switch(sye, Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
-                        assert(false, "if statement built on non-expression: " + e.toString())
+                        assert(assertion = false, "if statement built on non-expression: " + e.toString)
                         Seq()
                 }
             case x =>
-                assert(false, "TODO: translateStatement for " + x.toString() + " is unimplemented")
+                assert(false, "TODO: translateStatement for " + x.toString + " is unimplemented")
                 Seq()
         }
     }
@@ -280,17 +241,16 @@ object CodeGenYul extends CodeGenerator {
         e match {
             case ReferenceIdentifier(x) =>
                 val idx = tempSymbolTable(x)
-                val expr = FunctionCall(Identifier("sload"), Seq(Literal(LiteralKind.number, idx.toString(), "int")))
+                val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
                 Seq(ExpressionStatement(expr))
             case NumLiteral(n) =>
-                // we compile to int, which is s256 in yul
-                Seq(ExpressionStatement(Literal(LiteralKind.number,n.toString(),"int")))
+                Seq(ExpressionStatement(ilit(n)))
             case TrueLiteral() =>
                 Seq(ExpressionStatement(true_lit))
             case FalseLiteral() =>
                 Seq(ExpressionStatement(false_lit))
             case _ =>
-                assert(false, "TODO: translation of " + e.toString() + " is not implemented")
+                assert(false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq() // TODO unimplemented
         }
     }
@@ -304,26 +264,6 @@ class ObjScope(obj: YulObject) {
     class Case(val hash: String){}
     class Call(val call: String){}
 
-    // TODO unimplemented; hardcode to uint256 for now
-    def mapObsTypeToABI(ntype: String): String = {
-        "uint256"
-    }
-
-    // TODO unimplemented; hardcode for now; bouncycastle library may be helpful
-    def keccak256(s: String): String = {
-        "0x70a08231"
-    }
-
-    def hashFunction(f: FunctionDefinition): String = {
-        var strRep: String = f.name + "("
-        for (p <- f.parameters){
-            strRep = strRep + mapObsTypeToABI(p.ntype)
-        }
-        strRep = strRep + ")"
-        keccak256(strRep)
-        // TODO truncate and keep the first 4 bytes
-    }
-
     val mainContractName: String = obj.name
     val creationObject: String = mainContractName
     val runtimeObject: String = mainContractName + "_deployed"
@@ -336,50 +276,53 @@ class ObjScope(obj: YulObject) {
 
     for (s <- obj.code.block.statements) {
         s match {
-            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(yulString.yulFunctionDefString(f))
+            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
             case e: ExpressionStatement =>
                 e.expression match {
-                    case f: FunctionCall => deployCall = deployCall :+ new Call(yulString.yulFunctionCallString(f))
-                    case _ => () // TODO unimplemented
+                    case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
+                    case _ =>
+                        assert(false, "unimplemented")
+                        () // TODO unimplemented
                 }
-            case _ => () // TODO unimplemented
+            case _ =>
+                assert(false, "unimplemented")
+                () // TODO unimplemented
         }
     }
 
     for (sub <- obj.subObjects) { // TODO separate runtime object out as a module
         for (s <- sub.code.block.statements) { // temporary fix due to issue above
             s match {
-                case f: FunctionDefinition => {
+                case f: FunctionDefinition =>
                     dispatch = true
-                    val code = f.yulFunctionDefString()
-                    runtimeFunctionArray = runtimeFunctionArray :+ new Func(code)
+                    runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
                     dispatchArray = dispatchArray :+ new Case(hashFunction(f))
-                }
                 case e: ExpressionStatement =>
                     e.expression match {
-                        case f: FunctionCall => memoryInitRuntime = f.yulFunctionCallString()
+                        case f: FunctionCall => memoryInitRuntime = f.toString
                         case _ =>
-                            assert(false, "TODO")
+                            assert(false, "iterating subobjects, case for " + e.toString + " unimplemented")
                             () // TODO unimplemented
                     }
-                case _ => ()
+                case x =>
+                    assert(false, "iterating subobjects, case for " + x.toString + "unimplemented")
+                    ()
             }
         }
     }
+
     def deploy(): Array[Call] = deployCall
     def deployFunctions(): Array[Func] = deployFunctionArray
     def runtimeFunctions(): Array[Func] = runtimeFunctionArray
     def dispatchCase(): Array[Case] = dispatchArray
-
 }
 
-// TODO need to fix indentation of the output
 class FuncScope(f: FunctionDefinition) {
     class Param(val name: String){}
     class Body(val code: String){}
 
     val functionName: String = f.name
-    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""}
+    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""} //todo/iev: is this a bug?
     var argRest: Array[Param] = Array[Param]()
     if (f.parameters.length > 1){
         var first  = true
@@ -392,26 +335,16 @@ class FuncScope(f: FunctionDefinition) {
             }
         }
     }
+
     // construct body
-    var codeBody: Array[Body] = Array[Body]()
-    for (s <- f.body.statements){
-        s match {
-            case ExpressionStatement(e) =>
-                e match {
-                    case func: FunctionCall =>
-                        codeBody = codeBody :+ new Body(func.yulFunctionCallString())
-                    case litn : Literal =>
-                        codeBody = codeBody :+ new Body(litn.value.toString())
-                }
-            case _ => ()
-        }
-    }
+   var codeBody : Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
+
     // TODO assume only one return variable for now
     var hasRetVal = false
     var retParams = ""
     if (f.returnVariables.nonEmpty){
         hasRetVal = true
-        retParams = f.returnVariables.apply(0).name
+        retParams = f.returnVariables.head.name
     }
     def params(): Array[Param] = argRest
     def body(): Array[Body] = codeBody

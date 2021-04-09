@@ -83,13 +83,19 @@ sealed abstract class BinaryExpression(make: (Expression, Expression) => BinaryE
 
 /* Expressions */
 case class ReferenceIdentifier(name: String) extends AtomicExpression {
-    override val toString = name
+    override val toString: String = name
 }
 
-case class NumLiteral(value: Int) extends AtomicExpression
+case class NumLiteral(value: Int) extends AtomicExpression {
+    override def toString: String = value.toString
+}
 case class StringLiteral(value: String) extends AtomicExpression
-case class TrueLiteral() extends AtomicExpression
-case class FalseLiteral() extends AtomicExpression
+case class TrueLiteral() extends AtomicExpression{
+    override def toString: String = "true"
+}
+case class FalseLiteral() extends AtomicExpression{
+    override def toString: String = "false"
+}
 case class This() extends AtomicExpression {
     override def toString: String = "this"
 }
