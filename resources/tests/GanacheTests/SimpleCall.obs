@@ -1,12 +1,12 @@
 main contract SimpleCall{
         int x;
-        transaction mod() {
+        transaction updatex() {
             x = 4;
             return;
         }
         transaction main(){
             x = 9;
-            mod();
+            updatex();
             return;
         }
 }

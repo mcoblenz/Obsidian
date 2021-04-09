@@ -349,8 +349,10 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                 }
-            case LocalInvocation(name, genericParams, params, args) =>
-                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+            case e @ LocalInvocation(name, genericParams, params, args) =>
+                println (e.toString)
+                //val expr = FunctionCall(Identifier("delegatecall"), Seq(ilit(5),ilit(5),ilit(5),ilit(5),ilit(5),ilit(5)))
+                //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match))
                 Seq()
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")

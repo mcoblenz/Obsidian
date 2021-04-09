@@ -1,4 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
+import org.bouncycastle.jcajce.provider.digest.Keccak
+import org.bouncycastle.jcajce.provider.digest.Keccak.Digest256
 
 /* utility functions shared between yulAST and CodeGenYul */
 object Util {
@@ -16,6 +18,8 @@ object Util {
 
   // TODO unimplemented; hardcode for now; bouncycastle library may be helpful
   def keccak256(s: String): String = {
+    // TODO check out https://www.codota.com/code/java/classes/org.bouncycastle.crypto.examples.DESExample
+    // val d : Digest256 = Keccak.Digest256
     "0x70a08231"
   }
 
