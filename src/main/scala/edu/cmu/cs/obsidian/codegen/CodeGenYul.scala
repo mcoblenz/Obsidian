@@ -231,8 +231,36 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "if statement built on non-expression: " + e.toString)
                         Seq()
                 }
-            case x =>
-                assert(false, "TODO: translateStatement for " + x.toString + " is unimplemented")
+            case e: Expression => translateExpr(e)
+            case VariableDecl(typ, varName) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case VariableDeclWithInit(typ, varName, e) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case VariableDeclWithSpec(typIn, typOut, varName) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case Transition(newStateName, updates, thisPermission) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case Revert(maybeExpr) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case If(eCond, s) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case IfInState(e, ePerm, typeState, s1, s2) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case TryCatch(s1, s2) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case Switch(e, cases) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case StaticAssert(expr, typeState) =>
+                assert(false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
         }
     }

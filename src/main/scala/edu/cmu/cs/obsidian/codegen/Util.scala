@@ -22,7 +22,7 @@ object Util {
   def hashFunction(f: FunctionDefinition): String = {
     // TODO/iev until the above todo gets resolved, the outer call makes this function
     // basically \_ => "0x70a08231". the original implementation didn't have a
-    // seperator so i don't know what it should be but probably not " "
+    // separator so i don't know what it should be but probably not " "
     keccak256(f.name + paren(f.parameters.map(p=>mapObsTypeToABI(p.ntype)).mkString(" ")))
     // TODO truncate and keep the first 4 bytes
   }
