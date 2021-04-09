@@ -21,7 +21,7 @@ trait YulStatement extends YulAST
 case class TypedName (name: String, ntype: String) extends YulAST
 case class Case (value: Literal, body: Block) extends YulAST {
     override def toString: String = {
-        "case " + value.toString + " " + brace(body.toString)
+        s"case ${value.toString} ${brace(body.toString)}"
     }
 }
 
@@ -51,18 +51,18 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
         //iev: this assert replicates previous behaviour, but i'm not sure if that was right
         assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
                 "internal error: function call with non-literal argument")
-        functionName.toString + paren(arguments.map(id=>id.toString).mkString(", "))
+        s"${functionName.toString} ${paren(arguments.map(id=>id.toString).mkString(", "))}"
     }
 }
 
 case class Assignment (variableNames: Seq[Identifier], value: Expression) extends YulStatement {
     override def toString: String = {
-        "let " + variableNames.map(id => id.name).mkString(", ") + " := " + value.toString
+        s"let ${variableNames.map(id => id.name).mkString(", ")} := ${value.toString}"
     }
 }
 case class VariableDeclaration (variables: Seq[TypedName]) extends YulStatement {
     override def toString: String = {
-        "let " +  variables.map(id => id.name+":"+id.ntype).mkString(", ")
+        s"let ${variables.map(id => id.name+":"+id.ntype).mkString(", ")}"
     }
 }
 case class FunctionDefinition (
@@ -80,20 +80,20 @@ case class FunctionDefinition (
 
 case class If (condition: Expression, body: Block) extends YulStatement{
     override def toString: String = {
-        "if " + condition.toString + brace(body.toString)
+        s"if ${condition.toString} ${brace(body.toString)}"
     }
 }
 
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement{
     override def toString: String = {
-        "switch " + expression.toString + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
+        s"switch ${expression.toString}" + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
     }
 }
 
 case class ForLoop (pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
     override def toString: String = {
-        "for " + brace(pre.toString) + condition.toString + brace(post.toString) +
-          brace(body.toString) // iev: this last one could be nicer, depending on if we pipe into a PP or not
+        s"for ${brace(pre.toString)} ${condition.toString} ${brace(post.toString)}" + "\n" +
+          brace(body.toString)
     }
 }
 case class Break () extends YulStatement {

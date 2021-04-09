@@ -2,8 +2,8 @@ package edu.cmu.cs.obsidian.codegen
 
 /* utility functions shared between yulAST and CodeGenYul */
 object Util {
-  def brace(s: String): String = "{" + s + "}"
-  def paren(s: String): String = "(" + s + ")"
+  def brace(str: String): String = s"{$str}"
+  def paren(str: String): String = s"($str)"
   def ilit(i: Int): Literal = Literal(LiteralKind.number,i.toString,"int")
   def blit(b : Boolean): Literal = Literal(LiteralKind.boolean,b.toString,"bool")
   val true_lit: Literal = blit(true)
