@@ -203,7 +203,6 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"),Seq(ilit(0),ilit(0)))
     }
 
-    // TODO need to fix indentation of the output
     class FuncScope(f: FunctionDefinition) {
         class Param(val name: String){}
         class Body(val code: String){}
@@ -223,10 +222,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
             }
         }
         // construct body
-        // todo/iev: this is copied code from CodeGenYul
-        var bods: Seq[Body] = f.body.statements.map(s => new Body(s.toString))
-        var codeBody: Array[Body] = new Array[Body](bods.length)
-        bods.copyToArray(codeBody)
+        var codeBody: Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
 
         // TODO assume only one return variable for now
         var hasRetVal = false
@@ -239,7 +235,3 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def body(): Array[Body] = codeBody
     }
 }
-
-
-
-

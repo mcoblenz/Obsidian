@@ -52,15 +52,14 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateProgram(program: Program): YulObject = {
-        // translate main contract
-        val mainContractOption = findMainContract(program)
-        if (mainContractOption.isEmpty) {
-            throw new RuntimeException("No main contract found")
-        }
-        val mainContract = mainContractOption.get
-        val main_contract_ast = mainContract match {
-            case obsContract: ObsidianContractImpl => translateContract(obsContract)
-            case _ => throw new RuntimeException("Java contract not supported in yul translation")
+        // translate main contract, or fail if none is found or only a java contract is present
+        val main_contract_ast: YulObject =
+            findMainContract(program) match {
+            case Some(p) => p match {
+                case c @ ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
+                case JavaFFIContractImpl(_, _, _, _, _) => throw new RuntimeException("Java contract not supported in yul translation")
+            }
+            case None => throw new RuntimeException("No main contract found")
         }
 
         // TODO ignore imports, data for now
@@ -109,10 +108,6 @@ object CodeGenYul extends CodeGenerator {
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
 
-        // this creates valid output for the empty obsidian contract and ends up being dead code if
-        // there's anything else that returns ever.
-        val retExpr = FunctionCall(Identifier("return"), Seq(ilit(0), ilit(0)))
-
         // create runtime object
         val runtime_name = contract.name + "_deployed"
         val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq())
@@ -142,7 +137,7 @@ object CodeGenYul extends CodeGenerator {
                 (Seq(), Seq())
             // This should never be hit.
             case _ =>
-                assert(false, "Translating unexpected declaration: " + declaration)
+                assert(assertion = false, "Translating unexpected declaration: " + declaration)
                 (Seq(), Seq())
         }
     }
@@ -168,28 +163,20 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateConstructor(constructor: Constructor): Seq[YulStatement] = {
-        val extractTypeName: VariableDeclWithSpec => TypedName = v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))
-        val parameters: Seq[TypedName] = constructor.args.map[TypedName](extractTypeName)
-        var body: Seq[YulStatement] =Seq()
-        for (s <- constructor.body){
-            body = body ++ translateStatement(s)
-        }
+        val new_name: String = "constructor_" + constructor.name
         val deployExpr = FunctionCall(
-            Identifier("constructor_"+constructor.name), // TODO change how to find constructor function name after adding randomized suffix/prefix
+            Identifier(new_name), // TODO change how to find constructor function name after adding randomized suffix/prefix
             Seq()) // TODO constructor params not implemented
 
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
-                "constructor_"+constructor.name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                parameters,
-                Seq(),
-                Block(body)))
+                new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
+                constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
+                Seq(), //todo/iev: why is this always empty?
+                Block(constructor.body.flatMap(translateStatement))))
     }
 
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
-        val f: VariableDeclWithSpec => TypedName = v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))
-        val parameters: Seq[TypedName] = transaction.args.map[TypedName](f)
-
         val ret: Seq[TypedName] =
             if (transaction.retType.isEmpty) {
                 Seq()
@@ -197,16 +184,11 @@ object CodeGenYul extends CodeGenerator {
                 Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString)))
             }
 
-        var body: Seq[YulStatement] = Seq()
-        for (s <- transaction.body){
-            body = body ++ translateStatement(s)
-        }
-
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
-            parameters,
+            transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
             ret,
-            Block(body)))
+            Block(transaction.body.flatMap(translateStatement))))
     }
 
     def translateStatement(s: Statement): Seq[YulStatement] = {
@@ -237,7 +219,7 @@ object CodeGenYul extends CodeGenerator {
             case IfThenElse(scrutinee,pos,neg) =>
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
                 if (scrutinee_yul.length > 1){
-                    assert(false,"boolean expression in conditional translates to a sequence of expressions")
+                    assert(assertion = false,"boolean expression in conditional translates to a sequence of expressions")
                     Seq()
                 }
                 scrutinee_yul.head match {
@@ -246,7 +228,7 @@ object CodeGenYul extends CodeGenerator {
                         val neg_yul = neg.flatMap(translateStatement)
                         Seq(edu.cmu.cs.obsidian.codegen.Switch(sye, Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
-                        assert(false, "if statement built on non-expression: " + e.toString)
+                        assert(assertion = false, "if statement built on non-expression: " + e.toString)
                         Seq()
                 }
             case x =>
@@ -262,7 +244,6 @@ object CodeGenYul extends CodeGenerator {
                 val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
                 Seq(ExpressionStatement(expr))
             case NumLiteral(n) =>
-                // we compile to int, which is s256 in yul
                 Seq(ExpressionStatement(ilit(n)))
             case TrueLiteral() =>
                 Seq(ExpressionStatement(true_lit))
@@ -356,9 +337,7 @@ class FuncScope(f: FunctionDefinition) {
     }
 
     // construct body
-    var bods: Seq[Body] = f.body.statements.map(s => new Body(s.toString))
-    var codeBody: Array[Body] = new Array[Body](bods.length)
-    bods.copyToArray(codeBody)
+   var codeBody : Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
 
     // TODO assume only one return variable for now
     var hasRetVal = false
