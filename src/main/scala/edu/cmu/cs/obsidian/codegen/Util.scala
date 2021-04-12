@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 import org.bouncycastle.jcajce.provider.digest.Keccak
-import org.bouncycastle.jcajce.provider.digest.Keccak.Digest256
+import org.bouncycastle.util.encoders.Hex
 
 /* utility functions shared between yulAST and CodeGenYul */
 object Util {
@@ -16,18 +16,13 @@ object Util {
     "uint256"
   }
 
-  // TODO unimplemented; hardcode for now; bouncycastle library may be helpful
   def keccak256(s: String): String = {
-    // TODO check out https://www.codota.com/code/java/classes/org.bouncycastle.crypto.examples.DESExample
-    // val d : Digest256 = Keccak.Digest256
-    "0x70a08231"
+    val digestK: Keccak.Digest256 = new Keccak.Digest256()
+    val digest: Array[Byte] = digestK.digest(s.getBytes)
+    Hex.toHexString(digest.slice(0,4)) //todo: i'm not sure if it should be the first or last 4.
   }
 
   def hashFunction(f: FunctionDefinition): String = {
-    // TODO/iev until the above todo gets resolved, the outer call makes this function
-    // basically \_ => "0x70a08231". the original implementation didn't have a
-    // separator so i don't know what it should be but probably not " "
     keccak256(f.name + paren(f.parameters.map(p=>mapObsTypeToABI(p.ntype)).mkString(" ")))
-    // TODO truncate and keep the first 4 bytes
   }
 }
