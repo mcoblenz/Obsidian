@@ -8,6 +8,8 @@ object Util {
   def paren(str: String): String = s"($str)"
   def ilit(i: Int): Literal = Literal(LiteralKind.number,i.toString,"int")
   def blit(b : Boolean): Literal = Literal(LiteralKind.boolean,b.toString,"bool")
+  def hexlit(s: String): Literal = Literal(LiteralKind.number,s,"int")
+
   val true_lit: Literal = blit(true)
   val false_lit: Literal = blit(false)
 
@@ -22,6 +24,10 @@ object Util {
       case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul");""
       case _ => assert(assertion = false, "yul codegen encountered an obsidian type without a mapping to the ABI"); ""
     }
+  }
+
+  def functionRename(name: String): String = {
+    name //todo some sort of alpha variation here combined with consulting a mapping
   }
 
   def keccak256(s: String): String = {

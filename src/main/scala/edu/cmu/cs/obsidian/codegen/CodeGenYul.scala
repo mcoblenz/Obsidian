@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
-import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.{CompilerOptions, codegen}
 import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
@@ -97,7 +97,7 @@ object CodeGenYul extends CodeGenerator {
         statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
         statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr)
 
-        // callValueCheck: TODO unimplemented
+        // callValueCheck: TODO unimplemented // iev working here
         // it checks for the wei sent together with the current call and revert if that's non zero.
         // if callvalue() { revert(0, 0) }
 
@@ -350,8 +350,7 @@ object CodeGenYul extends CodeGenerator {
                         Seq()
                 }
             case e @ LocalInvocation(name, genericParams, params, args) =>
-                println (e.toString)
-                //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match))
+                //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match)) // todo iev working here
                 Seq()
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
@@ -379,11 +378,30 @@ class ObjScope(obj: YulObject) {
     var runtimeFunctionArray: Array[Func] = Array[Func]()
     var deployFunctionArray: Array[Func] = Array[Func]()
     var dispatch = false
-    var dispatchArray: Array[Case] = Array[Case]()
+    var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
     var deployCall: Array[Call] = Array[Call]()
     var memoryInitRuntime: String = ""
 
+    def dispatchEntry(f : FunctionDefinition) : Seq[YulStatement] =
+    {
+        //    if callvalue() { revert(0, 0) }
+        //    abi_decode_tuple_(4, calldatasize())
+        //    fun_retrieve_24()
+        //    let memPos := allocate_memory(0)
+        //    let memEnd := abi_encode_tuple__to__fromStack(memPos  )
+        //    return(memPos, sub(memEnd, memPos))
+        val x = Seq(
+            codegen.If(FunctionCall(Identifier("callvalue"),Seq()),
+                Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"),Seq(ilit(0),ilit(0))))))),
+            codegen.ExpressionStatement(FunctionCall(Identifier(functionRename(f.name)),Seq()))
+            //codegen.Assignment(Seq(Indentifier("memPos")),)
+        )
+        println(x.toString)
+        x
+    }
+
     for (s <- obj.code.block.statements) {
+        println("here!")
         s match {
             case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
             case e: ExpressionStatement =>
@@ -402,10 +420,11 @@ class ObjScope(obj: YulObject) {
     for (sub <- obj.subObjects) { // TODO separate runtime object out as a module
         for (s <- sub.code.block.statements) { // temporary fix due to issue above
             s match {
-                case f: FunctionDefinition =>
+                case f: FunctionDefinition => // todo iev working here
                     dispatch = true
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                    dispatchArray = dispatchArray :+ new Case(hashOfFunctionDef(f)) // todo iev: this isn't the Case that takes two args, weirdly START HERE
+                    dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
+
                 case e: ExpressionStatement =>
                     e.expression match {
                         case f: FunctionCall => memoryInitRuntime = f.toString
@@ -423,7 +442,7 @@ class ObjScope(obj: YulObject) {
     def deploy(): Array[Call] = deployCall
     def deployFunctions(): Array[Func] = deployFunctionArray
     def runtimeFunctions(): Array[Func] = runtimeFunctionArray
-    def dispatchCase(): Array[Case] = dispatchArray
+    def dispatchCase(): Array[codegen.Case] = dispatchArray
 }
 
 class FuncScope(f: FunctionDefinition) {
@@ -431,8 +450,9 @@ class FuncScope(f: FunctionDefinition) {
     class Body(val code: String){}
 
     val functionName: String = f.name
-    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""} //todo/iev: is this a bug?
+    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""}
     var argRest: Array[Param] = Array[Param]()
+
     if (f.parameters.length > 1){
         var first  = true
         for (p <- f.parameters){
