@@ -18,11 +18,10 @@ object Util {
 
   def keccak256(s: String): String = {
     val digestK: Keccak.Digest256 = new Keccak.Digest256()
-    val digest: Array[Byte] = digestK.digest(s.getBytes)
-    Hex.toHexString(digest.slice(0,4)) //todo: i'm not sure if it should be the first or last 4.
+    Hex.toHexString(digestK.digest(s.getBytes).slice(0,4)) //todo: i'm not sure if it should be the first or last 4.
   }
 
-  def hashFunction(f: FunctionDefinition): String = {
+  def hashOfFunctionDef(f: FunctionDefinition): String = {
     keccak256(f.name + paren(f.parameters.map(p=>mapObsTypeToABI(p.ntype)).mkString(" ")))
   }
 }

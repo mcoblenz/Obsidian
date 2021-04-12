@@ -405,7 +405,7 @@ class ObjScope(obj: YulObject) {
                 case f: FunctionDefinition =>
                     dispatch = true
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                    dispatchArray = dispatchArray :+ new Case(hashFunction(f)) // todo iev: this isn't the Case that takes two args, weirdly START HERE
+                    dispatchArray = dispatchArray :+ new Case(hashOfFunctionDef(f)) // todo iev: this isn't the Case that takes two args, weirdly START HERE
                 case e: ExpressionStatement =>
                     e.expression match {
                         case f: FunctionCall => memoryInitRuntime = f.toString

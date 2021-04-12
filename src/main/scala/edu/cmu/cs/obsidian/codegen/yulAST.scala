@@ -182,7 +182,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     case f: FunctionDefinition =>
                         dispatch = true
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                        dispatchArray = dispatchArray :+ new Case(hashFunction(f))
+                        dispatchArray = dispatchArray :+ new Case(hashOfFunctionDef(f))
                     case e: ExpressionStatement =>
                         e.expression match {
                             case f: FunctionCall => memoryInitRuntime = f.toString
