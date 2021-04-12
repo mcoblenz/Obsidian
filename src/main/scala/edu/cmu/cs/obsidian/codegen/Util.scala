@@ -16,7 +16,7 @@ object Util {
     // it's basically hard coded, and doesn't traverse the structure of more complicated types.
     ntype match {
       case "bool" => "boolean"
-      case "int" => "int256"
+      case "int" => "u256"
       case "string" => "string"
       case "Int256" => "int256"
       case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul");""
@@ -26,7 +26,7 @@ object Util {
 
   def keccak256(s: String): String = {
     val digestK: Keccak.Digest256 = new Keccak.Digest256()
-    Hex.toHexString(digestK.digest(s.getBytes).slice(0,4)) //todo: i'm not sure if it should be the first or last 4.
+    s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0,4))}" //todo: i'm not sure if it should be the first or last 4.
   }
 
   def hashOfFunctionDef(f: FunctionDefinition): String = {

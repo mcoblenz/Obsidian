@@ -37,8 +37,14 @@ case class Literal (kind: LiteralKind.LiteralKind, value: String, vtype: String)
             case edu.cmu.cs.obsidian.codegen.LiteralKind.boolean => assert(vtype=="bool",msg)
             case edu.cmu.cs.obsidian.codegen.LiteralKind.string => assert(vtype=="string",msg)
         }
-        // from the spec, "Unless it is the default type, the type of a literal has to be specified after a colon"
-        s"${value}:${vtype}"
+        // from the spec, "Unless it is the default type, the type of a literal has to be specified
+        // after a colon", which seems like this should be what we want to do:
+        //
+        // s"${value}:${mapObsTypeToABI(vtype)}"
+        //
+        // however, as of 12 April 2021, this produces a ton of warnings from solc about "user
+        // defined types are not yet supported"
+        value
     }
 }
 case class Identifier (name: String) extends Expression {
