@@ -167,11 +167,11 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     e.expression match {
                         case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
                         case _ =>
-                            assert(false, "TODO: objscope not implemented for expression statement " + e.toString)
+                            assert(assertion = false, "TODO: objscope not implemented for expression statement " + e.toString)
                             () // TODO unimplemented
                     }
                 case _ =>
-                    assert(false, "TODO: objscope not implemented for block statement " + s.toString)
+                    assert(assertion = false, "TODO: objscope not implemented for block statement " + s.toString)
                     () // TODO unimplemented
             }
         }
@@ -187,7 +187,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                         e.expression match {
                             case f: FunctionCall => memoryInitRuntime = f.toString
                             case _ =>
-                                assert(false, "TODO: " + e.toString())
+                                assert(assertion = false, "TODO: " + e.toString())
                                 () // TODO unimplemented
                         }
                     case _ =>

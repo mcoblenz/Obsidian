@@ -351,7 +351,6 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e @ LocalInvocation(name, genericParams, params, args) =>
                 println (e.toString)
-                //val expr = FunctionCall(Identifier("delegatecall"), Seq(ilit(5),ilit(5),ilit(5),ilit(5),ilit(5),ilit(5)))
                 //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match))
                 Seq()
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
@@ -367,7 +366,6 @@ object CodeGenYul extends CodeGenerator {
     }
 }
 
-// Yulstring
 // document scope class relation to mustache
 // temporary function, not designed for a full recursive walk through of the object
 class ObjScope(obj: YulObject) {
@@ -407,7 +405,7 @@ class ObjScope(obj: YulObject) {
                 case f: FunctionDefinition =>
                     dispatch = true
                     runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                    dispatchArray = dispatchArray :+ new Case(hashFunction(f))
+                    dispatchArray = dispatchArray :+ new Case(hashFunction(f)) // todo iev: this isn't the Case that takes two args, weirdly START HERE
                 case e: ExpressionStatement =>
                     e.expression match {
                         case f: FunctionCall => memoryInitRuntime = f.toString
