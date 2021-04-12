@@ -37,7 +37,8 @@ case class Literal (kind: LiteralKind.LiteralKind, value: String, vtype: String)
             case edu.cmu.cs.obsidian.codegen.LiteralKind.boolean => assert(vtype=="bool",msg)
             case edu.cmu.cs.obsidian.codegen.LiteralKind.string => assert(vtype=="string",msg)
         }
-        value
+        // from the spec, "Unless it is the default type, the type of a literal has to be specified after a colon"
+        s"${value}:${vtype}"
     }
 }
 case class Identifier (name: String) extends Expression {

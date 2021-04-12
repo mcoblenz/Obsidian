@@ -11,9 +11,17 @@ object Util {
   val true_lit: Literal = blit(true)
   val false_lit: Literal = blit(false)
 
-  // TODO unimplemented; hardcode to uint256 for now
   def mapObsTypeToABI(ntype: String): String = {
-    "uint256"
+    // todo: this covers the primitive types from ObsidianType.scala but is hard to maintain because
+    // it's basically hard coded, and doesn't traverse the structure of more complicated types.
+    ntype match {
+      case "bool" => "boolean"
+      case "int" => "int256"
+      case "string" => "string"
+      case "Int256" => "int256"
+      case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul");""
+      case _ => assert(assertion = false, "yul codegen encountered an obsidian type without a mapping to the ABI"); ""
+    }
   }
 
   def keccak256(s: String): String = {
