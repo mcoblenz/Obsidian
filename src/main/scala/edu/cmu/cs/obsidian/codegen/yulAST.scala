@@ -56,9 +56,6 @@ case class Identifier (name: String) extends Expression {
 
 case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) extends Expression {
     override def toString: String = {
-        //iev: this assert replicates previous behaviour, but i'm not sure if that was right
-//        assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
-//                s"internal error: function call with non-literal argument ${arguments.toString}")
         s"${functionName.toString}${paren(arguments.map(id=>id.toString).mkString(", "))}"
     }
 }
