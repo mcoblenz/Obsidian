@@ -139,7 +139,12 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
         val scope = new ObjScope(this)
         val raw: String = mustache.execute(new StringWriter(), scope).toString
-        raw.replaceAll("&amp;","&").replaceAll("&gt;",">").replaceAll("&#10;", "\n")
+        // mustache butchers certain characters; this fixes that. there may be other characters that
+        // need to be added here
+        raw.replaceAll("&amp;","&").
+            replaceAll("&gt;",">").
+            replaceAll("&#10;", "\n").
+            replaceAll("&#61;", "=")
     }
 
     // ObjScope and FuncScope are designed to facilitate mustache templates, with the following rules
@@ -183,17 +188,20 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
 
         def dispatchEntry(f : FunctionDefinition) : Seq[YulStatement] =
         {
-            //    if callvalue() { revert(0, 0) }
-            //    abi_decode_tuple_(4, calldatasize())
-            //    fun_retrieve_24()
-            //    let memPos := allocate_memory(0)
-            //    let memEnd := abi_encode_tuple__to__fromStack(memPos  )
-            //    return(memPos, sub(memEnd, memPos))
             Seq(
+                //    if callvalue() { revert(0, 0) }
                 codegen.If(FunctionCall(Identifier("callvalue"),Seq()),
                     Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"),Seq(ilit(0),ilit(0))))))),
-                codegen.ExpressionStatement(FunctionCall(Identifier(functionRename(f.name)),Seq()))
-                //codegen.Assignment(Seq(Indentifier("memPos")),)
+                // abi_decode_tuple_(4, calldatasize())
+                codegen.ExpressionStatement(FunctionCall(Identifier("abi_decode_tuple"),Seq(ilit(4),FunctionCall(Identifier("calldatasize"),Seq())))),
+                //    fun_retrieve_24()
+                codegen.ExpressionStatement(FunctionCall(Identifier(functionRename(f.name)),f.parameters.map(p => Identifier(p.name)))), //todo: second argument is highly speculative
+                //    let memPos := allocate_memory(0)
+                codegen.Assignment(Seq(Identifier("memPos")),FunctionCall(Identifier("allocate_memory"),Seq(ilit(0)))),
+                //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
+                codegen.Assignment(Seq(Identifier("memEnd")),FunctionCall(Identifier("abi_encode_tuple_to_fromStack"),Seq(Identifier("memPos")))),
+                //    return(memPos, sub(memEnd, memPos))
+                codegen.ExpressionStatement(FunctionCall(Identifier("return"),Seq(Identifier("memPos"),FunctionCall(Identifier("sub"),Seq(Identifier("memEnd"),Identifier("memPos"))))))
             )
         }
 
