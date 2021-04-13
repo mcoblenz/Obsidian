@@ -36,6 +36,7 @@ object "{{creationObject}}" {
                 let selector := shr(224, calldataload(0))
                 {{dispatchCase}}
             {{/dispatch}}
+            {{! todo: this is deadcode for at least the empty contract but gets emitted anyway; trim it down somehow? }}
             function abi_decode_tuple(headStart, dataEnd)   {
                 if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
             }
