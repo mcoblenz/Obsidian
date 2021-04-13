@@ -4,6 +4,8 @@ import java.io.{FileReader, StringWriter}
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
+import edu.cmu.cs.obsidian.codegen.FuncScope
+
 
 // reminder: use abstract class if want to create a base class that requires constructor arguments
 sealed trait YulAST
