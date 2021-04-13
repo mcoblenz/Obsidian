@@ -34,12 +34,7 @@ object "{{creationObject}}" {
             {{#dispatch}}
                 {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
                 let selector := shr(224, calldataload(0))
-                switch selector
-                {{#dispatchCase}}
-                    case {{hash}} {
-                        {{dispatchCall}}
-                    }
-                {{/dispatchCase}}
+                {{dispatchCase}}
             {{/dispatch}}
             {{#runtimeFunctions}}
                 {{code}}

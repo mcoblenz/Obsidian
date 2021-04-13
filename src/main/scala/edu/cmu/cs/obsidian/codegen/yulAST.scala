@@ -4,7 +4,6 @@ import java.io.{FileReader, StringWriter}
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
-import edu.cmu.cs.obsidian.codegen.FuncScope
 
 
 // reminder: use abstract class if want to create a base class that requires constructor arguments
@@ -60,7 +59,7 @@ case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) e
         //iev: this assert replicates previous behaviour, but i'm not sure if that was right
 //        assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
 //                s"internal error: function call with non-literal argument ${arguments.toString}")
-        s"${functionName.toString} ${paren(arguments.map(id=>id.toString).mkString(", "))}"
+        s"${functionName.toString}${paren(arguments.map(id=>id.toString).mkString(", "))}"
     }
 }
 
@@ -95,7 +94,7 @@ case class If (condition: Expression, body: Block) extends YulStatement{
 
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement{
     override def toString: String = {
-        s"switch ${expression.toString} ${if(cases.isEmpty){"{ }"}}" + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
+        s"switch ${expression.toString}" + "\n" + (if(cases.isEmpty) brace("") else cases.map(c => c.toString).mkString("\n")) + "\n"
     }
 }
 
@@ -193,14 +192,12 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
             //    let memPos := allocate_memory(0)
             //    let memEnd := abi_encode_tuple__to__fromStack(memPos  )
             //    return(memPos, sub(memEnd, memPos))
-            val x = Seq(
+            Seq(
                 codegen.If(FunctionCall(Identifier("callvalue"),Seq()),
                     Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"),Seq(ilit(0),ilit(0))))))),
                 codegen.ExpressionStatement(FunctionCall(Identifier(functionRename(f.name)),Seq()))
                 //codegen.Assignment(Seq(Indentifier("memPos")),)
             )
-            println(x.toString)
-            x
         }
 
         for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
@@ -209,7 +206,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     case f: FunctionDefinition =>
                         dispatch = true
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                        dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
+                        dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                     case e: ExpressionStatement =>
                         e.expression match {
                             case f: FunctionCall => memoryInitRuntime = f.toString
@@ -223,10 +220,11 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                 }
             }
         }
+
         def deploy(): Array[Call] = deployCall
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
-        def dispatchCase(): Array[codegen.Case] = dispatchArray
+        def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
         def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"),Seq(ilit(0),ilit(0)))
     }
 }
