@@ -56,8 +56,8 @@ case class Identifier (name: String) extends Expression {
 case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) extends Expression {
     override def toString: String = {
         //iev: this assert replicates previous behaviour, but i'm not sure if that was right
-        assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
-                "internal error: function call with non-literal argument")
+//        assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
+//                s"internal error: function call with non-literal argument ${arguments.toString}")
         s"${functionName.toString} ${paren(arguments.map(id=>id.toString).mkString(", "))}"
     }
 }
@@ -93,7 +93,7 @@ case class If (condition: Expression, body: Block) extends YulStatement{
 
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement{
     override def toString: String = {
-        s"switch ${expression.toString}" + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
+        s"switch ${expression.toString} ${if(cases.isEmpty){"{ }"}}" + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
     }
 }
 
