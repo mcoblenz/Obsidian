@@ -1,15 +1,16 @@
 package edu.cmu.cs.obsidian.codegen
 
+import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
+
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
-import edu.cmu.cs.obsidian.{CompilerOptions, codegen}
-import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
-import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
-import edu.cmu.cs.obsidian.typecheck.ContractType
 import edu.cmu.cs.obsidian.codegen.Util._
+import edu.cmu.cs.obsidian.parser._
+import edu.cmu.cs.obsidian.typecheck.ContractType
 
 import scala.collection.immutable.Map
 
@@ -57,7 +58,8 @@ object CodeGenYul extends CodeGenerator {
             findMainContract(program) match {
             case Some(p) => p match {
                 case c @ ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
-                case JavaFFIContractImpl(_, _, _, _, _) => throw new RuntimeException("Java contract not supported in yul translation")
+                case JavaFFIContractImpl(_, _, _, _, _) =>
+                    throw new RuntimeException("Java contract not supported in yul translation")
             }
             case None => throw new RuntimeException("No main contract found")
         }
@@ -96,10 +98,6 @@ object CodeGenYul extends CodeGenerator {
         val initExpr = FunctionCall(Identifier("mstore"), Seq(ilit(freeMemPointer), ilit(firstFreeMem)))
         statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
         statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr)
-
-        // callValueCheck: TODO unimplemented // iev working here
-        // it checks for the wei sent together with the current call and revert if that's non zero.
-        // if callvalue() { revert(0, 0) }
 
         // translate declarations
         for (d <- contract.declarations) {
@@ -219,6 +217,7 @@ object CodeGenYul extends CodeGenerator {
             case IfThenElse(scrutinee,pos,neg) =>
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
                 if (scrutinee_yul.length > 1){
+                    // todo: i could hoist the expression and bind the result somehow, then branch on that.
                     assert(assertion = false,"boolean expression in conditional translates to a sequence of expressions")
                     Seq()
                 }
