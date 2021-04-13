@@ -162,7 +162,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         var runtimeFunctionArray: Array[Func] = Array[Func]()
         var deployFunctionArray: Array[Func] = Array[Func]()
         var dispatch = false
-        var dispatchArray: Array[Case] = Array[Case]()
+        var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
         var deployCall: Array[Call] = Array[Call]()
         var memoryInitRuntime: String = ""
 
@@ -183,13 +183,31 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
             }
         }
 
+        def dispatchEntry(f : FunctionDefinition) : Seq[YulStatement] =
+        {
+            //    if callvalue() { revert(0, 0) }
+            //    abi_decode_tuple_(4, calldatasize())
+            //    fun_retrieve_24()
+            //    let memPos := allocate_memory(0)
+            //    let memEnd := abi_encode_tuple__to__fromStack(memPos  )
+            //    return(memPos, sub(memEnd, memPos))
+            val x = Seq(
+                codegen.If(FunctionCall(Identifier("callvalue"),Seq()),
+                    Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"),Seq(ilit(0),ilit(0))))))),
+                codegen.ExpressionStatement(FunctionCall(Identifier(functionRename(f.name)),Seq()))
+                //codegen.Assignment(Seq(Indentifier("memPos")),)
+            )
+            println(x.toString)
+            x
+        }
+
         for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
                 s match {
                     case f: FunctionDefinition =>
                         dispatch = true
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                        dispatchArray = dispatchArray :+ new Case(hashOfFunctionDef(f))
+                        dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                     case e: ExpressionStatement =>
                         e.expression match {
                             case f: FunctionCall => memoryInitRuntime = f.toString
@@ -206,39 +224,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         def deploy(): Array[Call] = deployCall
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
-        def dispatchCase(): Array[Case] = dispatchArray
+        def dispatchCase(): Array[codegen.Case] = dispatchArray
         def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"),Seq(ilit(0),ilit(0)))
-    }
-
-    class FuncScope(f: FunctionDefinition) {
-        class Param(val name: String){}
-        class Body(val code: String){}
-
-        val functionName: String = f.name
-        val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""}
-        var argRest: Array[Param] = Array[Param]()
-        if (f.parameters.length > 1){
-            var first  = true
-            for (p <- f.parameters){
-                if (first) {
-                    first = false
-                }
-                else {
-                    argRest = argRest :+ new Param(p.name)
-                }
-            }
-        }
-        // construct body
-        var codeBody: Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
-
-        // TODO assume only one return variable for now
-        var hasRetVal = false
-        var retParams = ""
-        if (f.returnVariables.nonEmpty){
-            hasRetVal = true
-            retParams = f.returnVariables.head.name
-        }
-        def params(): Array[Param] = argRest
-        def body(): Array[Body] = codeBody
     }
 }
