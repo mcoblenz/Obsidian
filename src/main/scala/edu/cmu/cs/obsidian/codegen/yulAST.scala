@@ -218,8 +218,8 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                                 assert(assertion = false, "TODO: " + e.toString())
                                 () // TODO unimplemented
                         }
-                    case _ =>
-                        assert(false)
+                    case x =>
+                        assert(assertion = false, s"subobject case for ${x.toString} unimplemented")
                         ()
                 }
             }

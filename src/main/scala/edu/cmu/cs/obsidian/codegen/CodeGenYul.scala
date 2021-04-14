@@ -97,7 +97,7 @@ object CodeGenYul extends CodeGenerator {
         // the free memory pointer points to 0x80 initially
         val initExpr = FunctionCall(Identifier("mstore"), Seq(ilit(freeMemPointer), ilit(firstFreeMem)))
         statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
-        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr) :+ callvaluecheck
+        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr) //todo add `:+ ExpressionStatement(callvaluecheck)` here, fix what breaks
 
         // translate declarations
         for (d <- contract.declarations) {
