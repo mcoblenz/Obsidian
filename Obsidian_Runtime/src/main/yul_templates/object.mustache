@@ -37,6 +37,9 @@ object "{{creationObject}}" {
                 {{dispatchCase}}
             {{/dispatch}}
             {{! todo: this is deadcode for at least the empty contract but gets emitted anyway; trim it down somehow? }}
+            {{! these functions for memory management are produced by the solc IR backend for
+                Solidity programs analagous to our test Obsidian programs.
+             }}
             function abi_decode_tuple(headStart, dataEnd)   {
                 if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
             }
