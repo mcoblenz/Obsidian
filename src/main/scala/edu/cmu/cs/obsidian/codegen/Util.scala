@@ -1,4 +1,5 @@
 package edu.cmu.cs.obsidian.codegen
+import edu.cmu.cs.obsidian.codegen
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
 
@@ -9,6 +10,7 @@ object Util {
   def ilit(i: Int): Literal = Literal(LiteralKind.number,i.toString,"int")
   def blit(b : Boolean): Literal = Literal(LiteralKind.boolean,b.toString,"bool")
   def hexlit(s: String): Literal = Literal(LiteralKind.number,s,"int")
+  def callvaluecheck = codegen.If(FunctionCall(Identifier("callvalue"),Seq()),Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"),Seq(ilit(0),ilit(0)))))))
 
   val true_lit: Literal = blit(true)
   val false_lit: Literal = blit(false)

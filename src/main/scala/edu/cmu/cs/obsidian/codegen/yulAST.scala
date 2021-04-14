@@ -190,8 +190,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         {
             Seq(
                 //    if callvalue() { revert(0, 0) }
-                codegen.If(FunctionCall(Identifier("callvalue"),Seq()),
-                    Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"),Seq(ilit(0),ilit(0))))))),
+                callvaluecheck,
                 // abi_decode_tuple_(4, calldatasize())
                 codegen.ExpressionStatement(FunctionCall(Identifier("abi_decode_tuple"),Seq(ilit(4),FunctionCall(Identifier("calldatasize"),Seq())))),
                 //    fun_retrieve_24()
