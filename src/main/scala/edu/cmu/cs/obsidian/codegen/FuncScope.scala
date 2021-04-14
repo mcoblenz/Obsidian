@@ -5,32 +5,17 @@ class FuncScope(f: FunctionDefinition) {
     class Body(val code: String){}
 
     val functionName: String = f.name
-    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""}
-    var argRest: Array[Param] = Array[Param]()
-
-    if (f.parameters.length > 1){
-        var first  = true
-        for (p <- f.parameters){
-            if (first) {
-                first = false
-            }
-            else {
-                argRest = argRest :+ new Param(p.name)
-            }
+    val arg0: String = if (f.parameters.nonEmpty) { f.parameters.head.name } else { "" }
+    var argRest: Array[Param] =
+        if (f.parameters.nonEmpty) {
+            f.parameters.drop(1).map(p => new Param(p.name)).toArray
+        } else {
+            Array[Param]()
         }
-    }
-
-    // construct body
-    var codeBody : Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
 
     // TODO assume only one return variable for now
-    var hasRetVal = false
-    var retParams = ""
-    if (f.returnVariables.nonEmpty){
-        hasRetVal = true
-        retParams = f.returnVariables.head.name
-    }
+    var hasRetVal: Boolean = f.returnVariables.nonEmpty
+    var retParams: String = if (hasRetVal) { f.returnVariables.head.name } else { "" }
     def params(): Array[Param] = argRest
-    def body(): Array[Body] = codeBody
+    def body(): Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
 }
-
