@@ -171,7 +171,7 @@ object CodeGenYul extends CodeGenerator {
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
                 constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
                 Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap(translateStatement))))
+                Block(constructor.body.flatMap(translateStatement)))) //todo iev tempvars: likely a hack to work around something wrong
     }
 
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
@@ -186,7 +186,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
             transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
             ret,
-            Block(transaction.body.flatMap(translateStatement))))
+            Block(transaction.body.flatMap(translateStatement)))) //todo iev tempvars: likely a hack to work around something wrong
     }
 
     def translateStatement(s: Statement): Seq[YulStatement] = {
@@ -218,13 +218,14 @@ object CodeGenYul extends CodeGenerator {
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
                 if (scrutinee_yul.length > 1){
                     // todo: i could hoist the expression and bind the result somehow, then branch on that.
+                    //todo iev tempvars: see above; that's exactly what we need to do
                     assert(assertion = false,"boolean expression in conditional translates to a sequence of expressions")
                     Seq()
                 }
                 scrutinee_yul.head match {
                     case ExpressionStatement(sye) =>
-                        val pos_yul = pos.flatMap(translateStatement)
-                        val neg_yul = neg.flatMap(translateStatement)
+                        val pos_yul = pos.flatMap(translateStatement) //todo iev tempvars: this is likely a hack to fix something wrong
+                        val neg_yul = neg.flatMap(translateStatement) //todo iev tempvars: same here
                         Seq(edu.cmu.cs.obsidian.codegen.Switch(sye, Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
                     case e =>
                         assert(assertion = false, "if statement built on non-expression: " + e.toString)
@@ -312,6 +313,7 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case Add(e1, e2) =>
+                        //todo iev tempvars: this is a broken implementation that will get fixed by lifting to temp vars
                         (translateExpr(e1), translateExpr(e2)) match {
                             case (ExpressionStatement(e1_y), ExpressionStatement(e2_y)) =>
                                 Seq(ExpressionStatement(binary("add", e1_y, e2_y)))
