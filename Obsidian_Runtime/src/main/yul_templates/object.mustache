@@ -34,13 +34,46 @@ object "{{creationObject}}" {
             {{#dispatch}}
                 {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
                 let selector := shr(224, calldataload(0))
-                switch selector
-                {{#dispatchCase}}
-                    case {{hash}} {
-                        {{dispatchCall}}
-                    }
-                {{/dispatchCase}}
+                {{dispatchCase}}
             {{/dispatch}}
+            {{! todo: this is deadcode for at least the empty contract but gets emitted anyway; trim it down somehow? }}
+            {{! these functions for memory management are produced by the solc IR backend for
+                Solidity programs analagous to our test Obsidian programs.
+             }}
+            function abi_decode_tuple(headStart, dataEnd)   {
+                if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
+            }
+
+            function abi_encode_tuple_to_fromStack(headStart ) -> tail {
+                tail := add(headStart, 0)
+            }
+
+            function allocate_memory(size) -> memPtr {
+                memPtr := allocate_unbounded()
+                finalize_allocation(memPtr, size)
+            }
+
+            function allocate_unbounded() -> memPtr {
+                memPtr := mload(64)
+            }
+
+            function finalize_allocation(memPtr, size) {
+                let newFreePtr := add(memPtr, round_up_to_mul_of_32(size))
+                // protect against overflow
+                if or(gt(newFreePtr, 0xffffffffffffffff), lt(newFreePtr, memPtr)) {  panic_error_0x41() }
+                mstore(64, newFreePtr)
+            }
+
+            function panic_error_0x41() {
+                mstore(0, 35408467139433450592217433187231851964531694900788300625387963629091585785856)
+                mstore(4, 0x41)
+                revert(0, 0x24)
+            }
+
+            function round_up_to_mul_of_32(value) -> result {
+                result := and(add(value, 31), not(31))
+            }
+
             {{#runtimeFunctions}}
                 {{code}}
             {{/runtimeFunctions}}

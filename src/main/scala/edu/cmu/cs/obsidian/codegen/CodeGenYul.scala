@@ -1,15 +1,16 @@
 package edu.cmu.cs.obsidian.codegen
 
-import java.io.{File, FileWriter}
-import java.nio.file.{Files, Path, Paths}
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
+
+import java.io.{File, FileWriter}
+import java.nio.file.{Files, Path, Paths}
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
-import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
-import edu.cmu.cs.obsidian.typecheck.ContractType
 import edu.cmu.cs.obsidian.codegen.Util._
+import edu.cmu.cs.obsidian.parser._
+import edu.cmu.cs.obsidian.typecheck.ContractType
 
 import scala.collection.immutable.Map
 
@@ -57,7 +58,8 @@ object CodeGenYul extends CodeGenerator {
             findMainContract(program) match {
             case Some(p) => p match {
                 case c @ ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
-                case JavaFFIContractImpl(_, _, _, _, _) => throw new RuntimeException("Java contract not supported in yul translation")
+                case JavaFFIContractImpl(_, _, _, _, _) =>
+                    throw new RuntimeException("Java contract not supported in yul translation")
             }
             case None => throw new RuntimeException("No main contract found")
         }
@@ -95,11 +97,7 @@ object CodeGenYul extends CodeGenerator {
         // the free memory pointer points to 0x80 initially
         val initExpr = FunctionCall(Identifier("mstore"), Seq(ilit(freeMemPointer), ilit(firstFreeMem)))
         statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
-        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr)
-
-        // callValueCheck: TODO unimplemented
-        // it checks for the wei sent together with the current call and revert if that's non zero.
-        // if callvalue() { revert(0, 0) }
+        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr) //todo add `:+ ExpressionStatement(callvaluecheck)` here, fix what breaks
 
         // translate declarations
         for (d <- contract.declarations) {
@@ -125,7 +123,7 @@ object CodeGenYul extends CodeGenerator {
             case s: State =>
                 (Seq(), translateState(s))
             case c: ObsidianContractImpl =>
-                assert(false, "TODO")
+                assert(assertion = false, "TODO")
                 (Seq(), Seq())
             case c: JavaFFIContractImpl =>
                 assert(assertion = false, "Java contracts not supported in Yul translation")
@@ -133,7 +131,7 @@ object CodeGenYul extends CodeGenerator {
             case c: Constructor =>
                 (translateConstructor(c), Seq())
             case t: TypeDecl =>
-                assert(false, "TODO")
+                assert(assertion = false, "TODO")
                 (Seq(), Seq())
             // This should never be hit.
             case _ =>
@@ -197,7 +195,7 @@ object CodeGenYul extends CodeGenerator {
                 Seq(Leave())
             case ReturnExpr(e) =>
                 // we need to allocate some space in some form of memory and put e there
-                assert(false, "TODO: returning a value not implemented")
+                assert(assertion = false, "TODO: returning a value not implemented")
                 Seq()
             case Assignment(assignTo, e) =>
                 assignTo match {
@@ -207,18 +205,19 @@ object CodeGenYul extends CodeGenerator {
                             case TrueLiteral() => LiteralKind.boolean
                             case FalseLiteral() => LiteralKind.boolean
                             case l =>
-                                assert(false, "TODO: unimplemented translate assignment case: " + l.toString)
+                                assert(assertion = false, "TODO: unimplemented translate assignment case: " + l.toString)
                                 LiteralKind.number
                         }
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
                             Seq(ilit(tempSymbolTable(x)),Literal(kind, e.toString, kind.toString)))))
                     case e =>
-                        assert(false, "TODO: translate assignment case" +  e.toString)
+                        assert(assertion = false, "TODO: translate assignment case" +  e.toString)
                         Seq()
                 }
             case IfThenElse(scrutinee,pos,neg) =>
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
                 if (scrutinee_yul.length > 1){
+                    // todo: i could hoist the expression and bind the result somehow, then branch on that.
                     assert(assertion = false,"boolean expression in conditional translates to a sequence of expressions")
                     Seq()
                 }
@@ -231,121 +230,136 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "if statement built on non-expression: " + e.toString)
                         Seq()
                 }
-            case x =>
-                assert(false, "TODO: translateStatement for " + x.toString + " is unimplemented")
+            case e: Expression => translateExpr(e)
+            case VariableDecl(typ, varName) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case VariableDeclWithInit(typ, varName, e) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case VariableDeclWithSpec(typIn, typOut, varName) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case Transition(newStateName, updates, thisPermission) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case Revert(maybeExpr) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case If(eCond, s) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case IfInState(e, ePerm, typeState, s1, s2) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case TryCatch(s1, s2) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case Switch(e, cases) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
+                Seq()
+            case StaticAssert(expr, typeState) =>
+                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
         }
     }
 
     def translateExpr(e: Expression): Seq[YulStatement] = {
         e match {
-            case ReferenceIdentifier(x) =>
-                val idx = tempSymbolTable(x)
-                val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
-                Seq(ExpressionStatement(expr))
-            case NumLiteral(n) =>
-                Seq(ExpressionStatement(ilit(n)))
-            case TrueLiteral() =>
-                Seq(ExpressionStatement(true_lit))
-            case FalseLiteral() =>
-                Seq(ExpressionStatement(false_lit))
-            case _ =>
-                assert(false, "TODO: translation of " + e.toString + " is not implemented")
-                Seq() // TODO unimplemented
-        }
-    }
-}
-
-// Yulstring
-// document scope class relation to mustache
-// temporary function, not designed for a full recursive walk through of the object
-class ObjScope(obj: YulObject) {
-    class Func(val code: String){}
-    class Case(val hash: String){}
-    class Call(val call: String){}
-
-    val mainContractName: String = obj.name
-    val creationObject: String = mainContractName
-    val runtimeObject: String = mainContractName + "_deployed"
-    var runtimeFunctionArray: Array[Func] = Array[Func]()
-    var deployFunctionArray: Array[Func] = Array[Func]()
-    var dispatch = false
-    var dispatchArray: Array[Case] = Array[Case]()
-    var deployCall: Array[Call] = Array[Call]()
-    var memoryInitRuntime: String = ""
-
-    for (s <- obj.code.block.statements) {
-        s match {
-            case f: FunctionDefinition => deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
-            case e: ExpressionStatement =>
-                e.expression match {
-                    case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
-                    case _ =>
-                        assert(false, "unimplemented")
-                        () // TODO unimplemented
+            case e: AtomicExpression =>
+                e match {
+                    case ReferenceIdentifier(x) =>
+                        val idx = tempSymbolTable(x)
+                        val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
+                        Seq(ExpressionStatement(expr))
+                    case NumLiteral(n) =>
+                        Seq(ExpressionStatement(ilit(n)))
+                    case StringLiteral(value) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case TrueLiteral() =>
+                        Seq(ExpressionStatement(true_lit))
+                    case FalseLiteral() =>
+                        Seq(ExpressionStatement(false_lit))
+                    case This() =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Parent() =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
                 }
-            case _ =>
-                assert(false, "unimplemented")
-                () // TODO unimplemented
+            case e: UnaryExpression =>
+                e match {
+                    case LogicalNegation(e) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Negate(e) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Dereference(e, f) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Disown(e) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                }
+            case e: BinaryExpression =>
+                e match {
+                    case Conjunction(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Disjunction(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Add(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case StringConcat(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Subtract(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Divide(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Multiply(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Mod(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case Equals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case GreaterThan(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case GreaterThanOrEquals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case LessThan(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case LessThanOrEquals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                    case NotEquals(e1, e2) =>
+                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                        Seq()
+                }
+            case e @ LocalInvocation(name, genericParams, params, args) =>
+                //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match)) // todo iev working here
+                Seq()
+            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
+                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq()
+            case Construction(contractType, args, isFFIInvocation) =>
+                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq()
+            case StateInitializer(stateName, fieldName) =>
+                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq()
         }
     }
-
-    for (sub <- obj.subObjects) { // TODO separate runtime object out as a module
-        for (s <- sub.code.block.statements) { // temporary fix due to issue above
-            s match {
-                case f: FunctionDefinition =>
-                    dispatch = true
-                    runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                    dispatchArray = dispatchArray :+ new Case(hashFunction(f))
-                case e: ExpressionStatement =>
-                    e.expression match {
-                        case f: FunctionCall => memoryInitRuntime = f.toString
-                        case _ =>
-                            assert(false, "iterating subobjects, case for " + e.toString + " unimplemented")
-                            () // TODO unimplemented
-                    }
-                case x =>
-                    assert(false, "iterating subobjects, case for " + x.toString + "unimplemented")
-                    ()
-            }
-        }
-    }
-
-    def deploy(): Array[Call] = deployCall
-    def deployFunctions(): Array[Func] = deployFunctionArray
-    def runtimeFunctions(): Array[Func] = runtimeFunctionArray
-    def dispatchCase(): Array[Case] = dispatchArray
-}
-
-class FuncScope(f: FunctionDefinition) {
-    class Param(val name: String){}
-    class Body(val code: String){}
-
-    val functionName: String = f.name
-    val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""} //todo/iev: is this a bug?
-    var argRest: Array[Param] = Array[Param]()
-    if (f.parameters.length > 1){
-        var first  = true
-        for (p <- f.parameters){
-            if (first) {
-                first = false
-            }
-            else {
-                argRest = argRest :+ new Param(p.name)
-            }
-        }
-    }
-
-    // construct body
-   var codeBody : Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
-
-    // TODO assume only one return variable for now
-    var hasRetVal = false
-    var retParams = ""
-    if (f.returnVariables.nonEmpty){
-        hasRetVal = true
-        retParams = f.returnVariables.head.name
-    }
-    def params(): Array[Param] = argRest
-    def body(): Array[Body] = codeBody
 }

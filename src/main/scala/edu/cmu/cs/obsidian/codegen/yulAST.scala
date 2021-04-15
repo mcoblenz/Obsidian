@@ -5,6 +5,7 @@ import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
 
+
 // reminder: use abstract class if want to create a base class that requires constructor arguments
 sealed trait YulAST
 
@@ -37,6 +38,13 @@ case class Literal (kind: LiteralKind.LiteralKind, value: String, vtype: String)
             case edu.cmu.cs.obsidian.codegen.LiteralKind.boolean => assert(vtype=="bool",msg)
             case edu.cmu.cs.obsidian.codegen.LiteralKind.string => assert(vtype=="string",msg)
         }
+        // from the spec, "Unless it is the default type, the type of a literal has to be specified
+        // after a colon", which seems like this should be what we want to do:
+        //
+        // s"${value}:${mapObsTypeToABI(vtype)}"
+        //
+        // however, as of 12 April 2021, this produces a ton of warnings from solc about "user
+        // defined types are not yet supported"
         value
     }
 }
@@ -48,10 +56,7 @@ case class Identifier (name: String) extends Expression {
 
 case class FunctionCall (functionName: Identifier, arguments: Seq[Expression]) extends Expression {
     override def toString: String = {
-        //iev: this assert replicates previous behaviour, but i'm not sure if that was right
-        assert(arguments.exists(arg => arg match { case Literal(_,_,_) => true case _ => false }),
-                "internal error: function call with non-literal argument")
-        s"${functionName.toString} ${paren(arguments.map(id=>id.toString).mkString(", "))}"
+        s"${functionName.toString}${paren(arguments.map(id=>id.toString).mkString(", "))}"
     }
 }
 
@@ -86,7 +91,7 @@ case class If (condition: Expression, body: Block) extends YulStatement{
 
 case class Switch (expression: Expression, cases: Seq[Case]) extends YulStatement{
     override def toString: String = {
-        s"switch ${expression.toString}" + "\n" + cases.map(c => c.toString).mkString("\n") + "\n"
+        s"switch ${expression.toString}" + "\n" + (if(cases.isEmpty) brace("") else cases.map(c => c.toString).mkString("\n")) + "\n"
     }
 }
 
@@ -134,7 +139,12 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"),"example")
         val scope = new ObjScope(this)
         val raw: String = mustache.execute(new StringWriter(), scope).toString
-        raw.replaceAll("&amp;","&").replaceAll("&gt;",">").replaceAll("&#10;", "\n")
+        // mustache butchers certain characters; this fixes that. there may be other characters that
+        // need to be added here
+        raw.replaceAll("&amp;","&").
+            replaceAll("&gt;",">").
+            replaceAll("&#10;", "\n").
+            replaceAll("&#61;", "=")
     }
 
     // ObjScope and FuncScope are designed to facilitate mustache templates, with the following rules
@@ -155,7 +165,7 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
         var runtimeFunctionArray: Array[Func] = Array[Func]()
         var deployFunctionArray: Array[Func] = Array[Func]()
         var dispatch = false
-        var dispatchArray: Array[Case] = Array[Case]()
+        var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
         var deployCall: Array[Call] = Array[Call]()
         var memoryInitRuntime: String = ""
 
@@ -167,13 +177,31 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     e.expression match {
                         case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
                         case _ =>
-                            assert(false, "TODO: objscope not implemented for expression statement " + e.toString)
+                            assert(assertion = false, "TODO: objscope not implemented for expression statement " + e.toString)
                             () // TODO unimplemented
                     }
                 case _ =>
-                    assert(false, "TODO: objscope not implemented for block statement " + s.toString)
+                    assert(assertion = false, "TODO: objscope not implemented for block statement " + s.toString)
                     () // TODO unimplemented
             }
+        }
+
+        def dispatchEntry(f : FunctionDefinition) : Seq[YulStatement] =
+        {
+            Seq(
+                //    if callvalue() { revert(0, 0) }
+                callvaluecheck,
+                // abi_decode_tuple_(4, calldatasize())
+                codegen.ExpressionStatement(FunctionCall(Identifier("abi_decode_tuple"),Seq(ilit(4),FunctionCall(Identifier("calldatasize"),Seq())))),
+                //    fun_retrieve_24()
+                codegen.ExpressionStatement(FunctionCall(Identifier(functionRename(f.name)),f.parameters.map(p => Identifier(p.name)))), //todo: second argument is highly speculative
+                //    let memPos := allocate_memory(0)
+                codegen.Assignment(Seq(Identifier("memPos")),FunctionCall(Identifier("allocate_memory"),Seq(ilit(0)))),
+                //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
+                codegen.Assignment(Seq(Identifier("memEnd")),FunctionCall(Identifier("abi_encode_tuple_to_fromStack"),Seq(Identifier("memPos")))),
+                //    return(memPos, sub(memEnd, memPos))
+                codegen.ExpressionStatement(FunctionCall(Identifier("return"),Seq(Identifier("memPos"),FunctionCall(Identifier("sub"),Seq(Identifier("memEnd"),Identifier("memPos"))))))
+            )
         }
 
         for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
@@ -182,56 +210,25 @@ case class YulObject (name: String, code: Code, subObjects: Seq[YulObject], data
                     case f: FunctionDefinition =>
                         dispatch = true
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                        dispatchArray = dispatchArray :+ new Case(hashFunction(f))
+                        dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                     case e: ExpressionStatement =>
                         e.expression match {
                             case f: FunctionCall => memoryInitRuntime = f.toString
                             case _ =>
-                                assert(false, "TODO: " + e.toString())
+                                assert(assertion = false, "TODO: " + e.toString())
                                 () // TODO unimplemented
                         }
-                    case _ =>
-                        assert(false)
+                    case x =>
+                        assert(assertion = false, s"subobject case for ${x.toString} unimplemented")
                         ()
                 }
             }
         }
+
         def deploy(): Array[Call] = deployCall
         def deployFunctions(): Array[Func] = deployFunctionArray
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
-        def dispatchCase(): Array[Case] = dispatchArray
+        def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
         def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"),Seq(ilit(0),ilit(0)))
-    }
-
-    class FuncScope(f: FunctionDefinition) {
-        class Param(val name: String){}
-        class Body(val code: String){}
-
-        val functionName: String = f.name
-        val arg0: String = if (f.parameters.nonEmpty) {f.parameters.head.name} else {""}
-        var argRest: Array[Param] = Array[Param]()
-        if (f.parameters.length > 1){
-            var first  = true
-            for (p <- f.parameters){
-                if (first) {
-                    first = false
-                }
-                else {
-                    argRest = argRest :+ new Param(p.name)
-                }
-            }
-        }
-        // construct body
-        var codeBody: Array[Body] = f.body.statements.map(s => new Body(s.toString)).toArray
-
-        // TODO assume only one return variable for now
-        var hasRetVal = false
-        var retParams = ""
-        if (f.returnVariables.nonEmpty){
-            hasRetVal = true
-            retParams = f.returnVariables.head.name
-        }
-        def params(): Array[Param] = argRest
-        def body(): Array[Body] = codeBody
     }
 }

@@ -1,10 +1,12 @@
 main contract SimpleCall{
-        transaction incr(int x) returns int {
-            return 4;
+        int x;
+        transaction updatex() {
+            x = 4;
+            return;
         }
-
-        transaction main(int x) returns int {
-            int y = incr (x);
-            return y;
+        transaction main(){
+            x = 9;
+            updatex();
+            return;
         }
 }
