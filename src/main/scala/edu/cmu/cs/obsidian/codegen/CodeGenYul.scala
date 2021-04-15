@@ -125,7 +125,7 @@ object CodeGenYul extends CodeGenerator {
             case c: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
                 (Seq(), Seq())
-            case c: JavaFFIContractImpl =>
+            case _: JavaFFIContractImpl =>
                 assert(assertion = false, "Java contracts not supported in Yul translation")
                 (Seq(), Seq())
             case c: Constructor =>
@@ -312,8 +312,13 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case Add(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
+                        (translateExpr(e1), translateExpr(e2)) match {
+                            case (ExpressionStatement(e1_y), ExpressionStatement(e2_y)) =>
+                                Seq(ExpressionStatement(binary("add", e1_y, e2_y)))
+                            case _ =>
+                                assert(assertion = false, s"addition of expressions that expand to anything other than expressions is not supported: ${e.toString}")
+                                Seq()
+                        }
                     case StringConcat(e1, e2) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
