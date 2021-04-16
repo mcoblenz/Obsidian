@@ -19,9 +19,9 @@ object CodeGenYul extends CodeGenerator {
     // TODO improve this temporary symbol table
     var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
     var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
-    var stateIdx: Int = -1    // whether or not there is a state
+    var stateIdx: Int = -1 // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
-    var stateEnumCounter: Int = 0  // counter indicating the next value to assign since we don't know the total num of states
+    var stateEnumCounter: Int = 0 // counter indicating the next value to assign since we don't know the total num of states
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -56,13 +56,13 @@ object CodeGenYul extends CodeGenerator {
         // translate main contract, or fail if none is found or only a java contract is present
         val main_contract_ast: YulObject =
             findMainContract(program) match {
-            case Some(p) => p match {
-                case c @ ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
-                case JavaFFIContractImpl(_, _, _, _, _) =>
-                    throw new RuntimeException("Java contract not supported in yul translation")
+                case Some(p) => p match {
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
+                    case JavaFFIContractImpl(_, _, _, _, _) =>
+                        throw new RuntimeException("Java contract not supported in yul translation")
+                }
+                case None => throw new RuntimeException("No main contract found")
             }
-            case None => throw new RuntimeException("No main contract found")
-        }
 
         // TODO ignore imports, data for now
         // translate other contracts (if any) and add them to the subObjects
@@ -149,7 +149,7 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateState(s: State): Seq[YulStatement] = {
-        if (stateIdx == -1){
+        if (stateIdx == -1) {
             stateIdx = tempTableIdx
             tempTableIdx += 1
         }
@@ -200,7 +200,7 @@ object CodeGenYul extends CodeGenerator {
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
-                        val kind : LiteralKind = e match {
+                        val kind: LiteralKind = e match {
                             case NumLiteral(_) => LiteralKind.number
                             case TrueLiteral() => LiteralKind.boolean
                             case FalseLiteral() => LiteralKind.boolean
@@ -209,17 +209,17 @@ object CodeGenYul extends CodeGenerator {
                                 LiteralKind.number
                         }
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
-                            Seq(ilit(tempSymbolTable(x)),Literal(kind, e.toString, kind.toString)))))
+                            Seq(ilit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString)))))
                     case e =>
-                        assert(assertion = false, "TODO: translate assignment case" +  e.toString)
+                        assert(assertion = false, "TODO: translate assignment case" + e.toString)
                         Seq()
                 }
-            case IfThenElse(scrutinee,pos,neg) =>
+            case IfThenElse(scrutinee, pos, neg) =>
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
-                if (scrutinee_yul.length > 1){
+                if (scrutinee_yul.length > 1) {
                     // todo: i could hoist the expression and bind the result somehow, then branch on that.
                     //todo iev tempvars: see above; that's exactly what we need to do
-                    assert(assertion = false,"boolean expression in conditional translates to a sequence of expressions")
+                    assert(assertion = false, "boolean expression in conditional translates to a sequence of expressions")
                     Seq()
                 }
                 scrutinee_yul.head match {
@@ -355,7 +355,7 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                 }
-            case e @ LocalInvocation(name, genericParams, params, args) =>
+            case e@LocalInvocation(name, genericParams, params, args) =>
                 //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match)) // todo iev working here
                 Seq()
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
