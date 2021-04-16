@@ -23,6 +23,15 @@ object CodeGenYul extends CodeGenerator {
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
     var stateEnumCounter: Int = 0 // counter indicating the next value to assign since we don't know the total num of states
 
+    // we generate new temporary variables with a little bit of global state; i am making the
+    // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
+    // though that is not enforced statically.
+    var tempCnt: Int = 0
+    def nextTemp(): Identifier = {
+        tempCnt = tempCnt + 1
+        Identifier(name = s"_tmp_${tempCnt.toString}") //todo: better naming convention?
+    }
+
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
         // extract ast and find main contract
@@ -40,7 +49,7 @@ object CodeGenYul extends CodeGenerator {
                 Paths.get(mainName)
         }
         // translate from obsidian AST to yul AST
-        val translated_obj = translateProgram(ast)
+        val translated_obj = translateProgram(nextTemp(), ast)
         // generate yul string from yul AST
         val s = translated_obj.yulString()
         // write string to output file
@@ -52,12 +61,12 @@ object CodeGenYul extends CodeGenerator {
         true
     }
 
-    def translateProgram(program: Program): YulObject = {
+    def translateProgram(retvar: Identifier, program: Program): YulObject = {
         // translate main contract, or fail if none is found or only a java contract is present
         val main_contract_ast: YulObject =
             findMainContract(program) match {
                 case Some(p) => p match {
-                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(nextTemp(), c)
                     case JavaFFIContractImpl(_, _, _, _, _) =>
                         throw new RuntimeException("Java contract not supported in yul translation")
                 }
@@ -75,7 +84,7 @@ object CodeGenYul extends CodeGenerator {
                         // note: interfaces are not translated;
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
                         if (c.name != ContractType.topContractName) {
-                            new_subObjects = main_contract_ast.subObjects :+ translateContract(obsContract)
+                            new_subObjects = main_contract_ast.subObjects :+ translateContract(nextTemp(), obsContract)
                         }
                     }
                 case _: JavaFFIContractImpl =>
@@ -86,12 +95,10 @@ object CodeGenYul extends CodeGenerator {
         YulObject(main_contract_ast.name, main_contract_ast.code, new_subObjects, main_contract_ast.data)
     }
 
-    def translateContract(contract: ObsidianContractImpl): YulObject = {
+    def translateContract(retvar: Identifier, contract: ObsidianContractImpl): YulObject = {
         var subObjects: Seq[YulObject] = Seq()
         var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
-
-        var tempcnt: Int = 0
 
         // memory init
         val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
