@@ -49,7 +49,7 @@ object CodeGenYul extends CodeGenerator {
                 Paths.get(mainName)
         }
         // translate from obsidian AST to yul AST
-        val translated_obj = translateProgram(nextTemp(), ast)
+        val translated_obj = translateProgram(ast)
         // generate yul string from yul AST
         val s = translated_obj.yulString()
         // write string to output file
@@ -61,12 +61,12 @@ object CodeGenYul extends CodeGenerator {
         true
     }
 
-    def translateProgram(retvar: Identifier, program: Program): YulObject = {
+    def translateProgram(program: Program): YulObject = {
         // translate main contract, or fail if none is found or only a java contract is present
         val main_contract_ast: YulObject =
             findMainContract(program) match {
                 case Some(p) => p match {
-                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(nextTemp(), c)
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
                     case JavaFFIContractImpl(_, _, _, _, _) =>
                         throw new RuntimeException("Java contract not supported in yul translation")
                 }
@@ -84,7 +84,7 @@ object CodeGenYul extends CodeGenerator {
                         // note: interfaces are not translated;
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
                         if (c.name != ContractType.topContractName) {
-                            new_subObjects = main_contract_ast.subs :+ translateContract(nextTemp(), obsContract)
+                            new_subObjects = main_contract_ast.subs :+ translateContract(obsContract)
                         }
                     }
                 case _: JavaFFIContractImpl =>
@@ -95,7 +95,7 @@ object CodeGenYul extends CodeGenerator {
         YulObject(main_contract_ast.name, main_contract_ast.code, new_subObjects, main_contract_ast.data)
     }
 
-    def translateContract(retvar: Identifier, contract: ObsidianContractImpl): YulObject = {
+    def translateContract(contract: ObsidianContractImpl): YulObject = {
         var subObjects: Seq[YulObject] = Seq()
         var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
@@ -124,8 +124,8 @@ object CodeGenYul extends CodeGenerator {
     }
 
     // return statements that go to deploy object, and statements that go to runtime object
-    def translateDeclaration(retvar: Identifier, declaration: Declaration): (Seq[YulStatement], Seq[YulStatement]) = {
-        declaration match {
+    def translateDeclaration(d: Declaration): (Seq[YulStatement], Seq[YulStatement]) = {
+        d match {
             case f: Field => (Seq(), translateField(f))
             case t: Transaction =>
                 (Seq(), translateTransaction(, t))
@@ -144,20 +144,20 @@ object CodeGenYul extends CodeGenerator {
                 (Seq(), Seq())
             // This should never be hit.
             case _ =>
-                assert(assertion = false, "Translating unexpected declaration: " + declaration)
+                assert(assertion = false, "Translating unexpected declaration: " + d)
                 (Seq(), Seq())
         }
     }
 
-    def translateField(retvar: Identifier, field: Field): Seq[YulStatement] = {
+    def translateField(f: Field): Seq[YulStatement] = {
         // Reserve a slot in the storage by assigning a index in the symbol table
         // since field declaration has not yet be assigned, there is no need to do sstore
-        tempSymbolTable += field.name -> tempTableIdx
+        tempSymbolTable += f.name -> tempTableIdx
         tempTableIdx += 1
         Seq() // TODO: do we really mean to always return the empty sequence?
     }
 
-    def translateState(retvar: Identifier, s: State): Seq[YulStatement] = {
+    def translateState(s: State): Seq[YulStatement] = {
         if (stateIdx == -1) {
             stateIdx = tempTableIdx
             tempTableIdx += 1
@@ -169,7 +169,7 @@ object CodeGenYul extends CodeGenerator {
         Seq() // TODO: do we really mean to always return the empty sequence?
     }
 
-    def translateConstructor(retvar: Identifier, constructor: Constructor): Seq[YulStatement] = {
+    def translateConstructor(constructor: Constructor): Seq[YulStatement] = {
         val new_name: String = "constructor_" + constructor.name
         val deployExpr = FunctionCall(
             Identifier(new_name), // TODO change how to find constructor function name after adding randomized suffix/prefix
@@ -180,10 +180,10 @@ object CodeGenYul extends CodeGenerator {
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
                 constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
                 Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap((s: Statement) => translateStatement(, s))))) //todo iev tempvars: likely a hack to work around something wrong
+                Block(constructor.body.flatMap((s: Statement) => translateStatement(nextTemp(), s))))) //todo iev tempvars: likely a hack to work around something wrong
     }
 
-    def translateTransaction(retvar: Identifier, transaction: Transaction): Seq[YulStatement] = {
+    def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
         val ret: Seq[TypedName] =
             if (transaction.retType.isEmpty) {
                 Seq()
@@ -195,7 +195,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
             transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
             ret,
-            Block(transaction.body.flatMap((s: Statement) => translateStatement(, s))))) //todo iev tempvars: likely a hack to work around something wrong
+            Block(transaction.body.flatMap((s: Statement) => translateStatement(nextTemp(), s))))) //todo iev tempvars: likely a hack to work around something wrong
     }
 
     def translateStatement(retvar: Identifier, s: Statement): Seq[YulStatement] = {
