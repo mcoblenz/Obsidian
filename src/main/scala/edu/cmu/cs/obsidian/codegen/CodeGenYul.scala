@@ -76,7 +76,7 @@ object CodeGenYul extends CodeGenerator {
 
         // TODO ignore imports, data for now
         // translate other contracts (if any) and add them to the subObjects
-        var new_subObjects: Seq[YulObject] = main_contract_ast.subs
+        var new_subObjects: Seq[YulObject] = main_contract_ast.subobjects
         for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
@@ -85,7 +85,7 @@ object CodeGenYul extends CodeGenerator {
                         // note: interfaces are not translated;
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
                         if (c.name != ContractType.topContractName) {
-                            new_subObjects = main_contract_ast.subs :+ translateContract(obsContract)
+                            new_subObjects = main_contract_ast.subobjects :+ translateContract(obsContract)
                         }
                     }
                 case _: JavaFFIContractImpl =>
@@ -125,8 +125,8 @@ object CodeGenYul extends CodeGenerator {
     }
 
     // return statements that go to deploy object, and statements that go to runtime object
-    def translateDeclaration(d: Declaration): (Seq[YulStatement], Seq[YulStatement]) = {
-        d match {
+    def translateDeclaration(declaration: Declaration): (Seq[YulStatement], Seq[YulStatement]) = {
+        declaration match {
             case f: Field => (Seq(), translateField(f))
             case t: Transaction =>
                 (Seq(), translateTransaction(t))
@@ -145,7 +145,7 @@ object CodeGenYul extends CodeGenerator {
                 (Seq(), Seq())
             // This should never be hit.
             case _ =>
-                assert(assertion = false, "Translating unexpected declaration: " + d)
+                assert(assertion = false, "Translating unexpected declaration: " + declaration)
                 (Seq(), Seq())
         }
     }

@@ -103,9 +103,9 @@ case class Switch(expression: Expression, cases: Seq[Case]) extends YulStatement
     }
 }
 
-case class ForLoop(pre: Block, cond: Expression, post: Block, body: Block) extends YulStatement {
+case class ForLoop(pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
     override def toString: String = {
-        s"for ${brace(pre.toString)} ${cond.toString} ${brace(post.toString)}" + "\n" +
+        s"for ${brace(pre.toString)} ${condition.toString} ${brace(post.toString)}" + "\n" +
             brace(body.toString)
     }
 }
@@ -150,7 +150,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, subs: Seq[YulObject], data: Seq[Data]) extends YulAST {
+case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data: Seq[Data]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -223,7 +223,7 @@ case class YulObject(name: String, code: Code, subs: Seq[YulObject], data: Seq[D
 
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
 
-        for (sub <- obj.subs) { // TODO separate runtime object out as a module (make it verbose)
+        for (sub <- obj.subobjects) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
                 s match {
                     case f: FunctionDefinition =>
