@@ -27,6 +27,7 @@ object CodeGenYul extends CodeGenerator {
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
     // though that is not enforced statically.
     var tempCnt: Int = 0
+
     def nextTemp(): Identifier = {
         tempCnt = tempCnt + 1
         Identifier(name = s"_tmp_${tempCnt.toString}") //todo: better naming convention?
@@ -229,7 +230,7 @@ object CodeGenYul extends CodeGenerator {
                 val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s))
                 val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s))
                 scrutinee_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
-                                                                                Case(false_lit, Block(neg_yul)))))
+                    Case(false_lit, Block(neg_yul)))))
             case e: Expression => translateExpr(nextTemp(), e)
             case VariableDecl(typ, varName) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
@@ -276,9 +277,9 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case TrueLiteral() =>
-                        store_then_ret(retvar,true_lit)
+                        store_then_ret(retvar, true_lit)
                     case FalseLiteral() =>
-                        store_then_ret(retvar,false_lit)
+                        store_then_ret(retvar, false_lit)
                     case This() =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
