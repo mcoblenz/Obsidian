@@ -19,9 +19,19 @@ object CodeGenYul extends CodeGenerator {
     // TODO improve this temporary symbol table
     var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
     var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
-    var stateIdx: Int = -1    // whether or not there is a state
+    var stateIdx: Int = -1 // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
-    var stateEnumCounter: Int = 0  // counter indicating the next value to assign since we don't know the total num of states
+    var stateEnumCounter: Int = 0 // counter indicating the next value to assign since we don't know the total num of states
+
+    // we generate new temporary variables with a little bit of global state; i am making the
+    // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
+    // though that is not enforced statically.
+    var tempCnt: Int = 0
+
+    def nextTemp(): Identifier = {
+        tempCnt = tempCnt + 1
+        Identifier(name = s"_tmp_${tempCnt.toString}") //todo: better naming convention?
+    }
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -56,17 +66,17 @@ object CodeGenYul extends CodeGenerator {
         // translate main contract, or fail if none is found or only a java contract is present
         val main_contract_ast: YulObject =
             findMainContract(program) match {
-            case Some(p) => p match {
-                case c @ ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
-                case JavaFFIContractImpl(_, _, _, _, _) =>
-                    throw new RuntimeException("Java contract not supported in yul translation")
+                case Some(p) => p match {
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c)
+                    case JavaFFIContractImpl(_, _, _, _, _) =>
+                        throw new RuntimeException("Java contract not supported in yul translation")
+                }
+                case None => throw new RuntimeException("No main contract found")
             }
-            case None => throw new RuntimeException("No main contract found")
-        }
 
         // TODO ignore imports, data for now
         // translate other contracts (if any) and add them to the subObjects
-        var new_subObjects: Seq[YulObject] = main_contract_ast.subObjects
+        var new_subObjects: Seq[YulObject] = main_contract_ast.subobjects
         for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
@@ -75,7 +85,7 @@ object CodeGenYul extends CodeGenerator {
                         // note: interfaces are not translated;
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
                         if (c.name != ContractType.topContractName) {
-                            new_subObjects = main_contract_ast.subObjects :+ translateContract(obsContract)
+                            new_subObjects = main_contract_ast.subobjects :+ translateContract(obsContract)
                         }
                     }
                 case _: JavaFFIContractImpl =>
@@ -125,7 +135,7 @@ object CodeGenYul extends CodeGenerator {
             case c: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
                 (Seq(), Seq())
-            case c: JavaFFIContractImpl =>
+            case _: JavaFFIContractImpl =>
                 assert(assertion = false, "Java contracts not supported in Yul translation")
                 (Seq(), Seq())
             case c: Constructor =>
@@ -140,16 +150,16 @@ object CodeGenYul extends CodeGenerator {
         }
     }
 
-    def translateField(field: Field): Seq[YulStatement] = {
+    def translateField(f: Field): Seq[YulStatement] = {
         // Reserve a slot in the storage by assigning a index in the symbol table
         // since field declaration has not yet be assigned, there is no need to do sstore
-        tempSymbolTable += field.name -> tempTableIdx
+        tempSymbolTable += f.name -> tempTableIdx
         tempTableIdx += 1
         Seq() // TODO: do we really mean to always return the empty sequence?
     }
 
     def translateState(s: State): Seq[YulStatement] = {
-        if (stateIdx == -1){
+        if (stateIdx == -1) {
             stateIdx = tempTableIdx
             tempTableIdx += 1
         }
@@ -171,7 +181,7 @@ object CodeGenYul extends CodeGenerator {
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
                 constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
                 Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap(translateStatement))))
+                Block(constructor.body.flatMap((s: Statement) => translateStatement(s))))) //todo iev temp vars: likely a hack to work around something wrong
     }
 
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
@@ -186,7 +196,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
             transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
             ret,
-            Block(transaction.body.flatMap(translateStatement))))
+            Block(transaction.body.flatMap((s: Statement) => translateStatement(s))))) //todo iev temp vars: likely a hack to work around something wrong
     }
 
     def translateStatement(s: Statement): Seq[YulStatement] = {
@@ -200,7 +210,7 @@ object CodeGenYul extends CodeGenerator {
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
-                        val kind : LiteralKind = e match {
+                        val kind: LiteralKind = e match {
                             case NumLiteral(_) => LiteralKind.number
                             case TrueLiteral() => LiteralKind.boolean
                             case FalseLiteral() => LiteralKind.boolean
@@ -209,28 +219,19 @@ object CodeGenYul extends CodeGenerator {
                                 LiteralKind.number
                         }
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
-                            Seq(ilit(tempSymbolTable(x)),Literal(kind, e.toString, kind.toString)))))
+                            Seq(ilit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString)))))
                     case e =>
-                        assert(assertion = false, "TODO: translate assignment case" +  e.toString)
+                        assert(assertion = false, "TODO: translate assignment case" + e.toString)
                         Seq()
                 }
-            case IfThenElse(scrutinee,pos,neg) =>
-                val scrutinee_yul: Seq[YulStatement] = translateExpr(scrutinee)
-                if (scrutinee_yul.length > 1){
-                    // todo: i could hoist the expression and bind the result somehow, then branch on that.
-                    assert(assertion = false,"boolean expression in conditional translates to a sequence of expressions")
-                    Seq()
-                }
-                scrutinee_yul.head match {
-                    case ExpressionStatement(sye) =>
-                        val pos_yul = pos.flatMap(translateStatement)
-                        val neg_yul = neg.flatMap(translateStatement)
-                        Seq(edu.cmu.cs.obsidian.codegen.Switch(sye, Seq(Case(true_lit, Block(pos_yul)), Case(false_lit, Block(neg_yul)))))
-                    case e =>
-                        assert(assertion = false, "if statement built on non-expression: " + e.toString)
-                        Seq()
-                }
-            case e: Expression => translateExpr(e)
+            case IfThenElse(scrutinee, pos, neg) =>
+                val id = nextTemp()
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee)
+                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s)) // todo iev be careful here this might be wrong
+                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s))
+                scrutinee_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
+                    Case(false_lit, Block(neg_yul)))))
+            case e: Expression => translateExpr(nextTemp(), e)
             case VariableDecl(typ, varName) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
@@ -264,23 +265,21 @@ object CodeGenYul extends CodeGenerator {
         }
     }
 
-    def translateExpr(e: Expression): Seq[YulStatement] = {
+    def translateExpr(retvar: Identifier, e: Expression): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        val idx = tempSymbolTable(x)
-                        val expr = FunctionCall(Identifier("sload"), Seq(ilit(idx)))
-                        Seq(ExpressionStatement(expr))
+                        store_then_ret(retvar, FunctionCall(Identifier("sload"), Seq(ilit(tempSymbolTable(x)))))
                     case NumLiteral(n) =>
-                        Seq(ExpressionStatement(ilit(n)))
+                        store_then_ret(retvar, ilit(n))
                     case StringLiteral(value) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case TrueLiteral() =>
-                        Seq(ExpressionStatement(true_lit))
+                        store_then_ret(retvar, true_lit)
                     case FalseLiteral() =>
-                        Seq(ExpressionStatement(false_lit))
+                        store_then_ret(retvar, false_lit)
                     case This() =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -312,8 +311,9 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case Add(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
+                        val e1_id = nextTemp()
+                        val e2_id = nextTemp()
+                        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, binary("add", e1_id, e2_id))
                     case StringConcat(e1, e2) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -348,7 +348,7 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                 }
-            case e @ LocalInvocation(name, genericParams, params, args) =>
+            case e@LocalInvocation(name, genericParams, params, args) =>
                 //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match)) // todo iev working here
                 Seq()
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
