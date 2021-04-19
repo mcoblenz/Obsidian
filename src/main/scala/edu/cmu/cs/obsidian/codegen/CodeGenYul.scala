@@ -75,7 +75,7 @@ object CodeGenYul extends CodeGenerator {
 
         // TODO ignore imports, data for now
         // translate other contracts (if any) and add them to the subObjects
-        var new_subObjects: Seq[YulObject] = main_contract_ast.subObjects
+        var new_subObjects: Seq[YulObject] = main_contract_ast.subs
         for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
@@ -84,7 +84,7 @@ object CodeGenYul extends CodeGenerator {
                         // note: interfaces are not translated;
                         // TODO detect an extra contract named "Contract", skip that as a temporary fix
                         if (c.name != ContractType.topContractName) {
-                            new_subObjects = main_contract_ast.subObjects :+ translateContract(nextTemp(), obsContract)
+                            new_subObjects = main_contract_ast.subs :+ translateContract(nextTemp(), obsContract)
                         }
                     }
                 case _: JavaFFIContractImpl =>

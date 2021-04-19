@@ -38,9 +38,9 @@ case class Literal(kind: LiteralKind.LiteralKind, value: String, vtype: String) 
         */
         val msg: String = "internal error: literal with inconsistent type string"
         kind match {
-            case edu.cmu.cs.obsidian.codegen.LiteralKind.number => assert(vtype == "int", msg)
-            case edu.cmu.cs.obsidian.codegen.LiteralKind.boolean => assert(vtype == "bool", msg)
-            case edu.cmu.cs.obsidian.codegen.LiteralKind.string => assert(vtype == "string", msg)
+            case LiteralKind.number => assert(vtype == "int", msg)
+            case LiteralKind.boolean => assert(vtype == "bool", msg)
+            case LiteralKind.string => assert(vtype == "string", msg)
         }
         // from the spec, "Unless it is the default type, the type of a literal has to be specified
         // after a colon", which seems like this should be what we want to do:
@@ -77,11 +77,10 @@ case class VariableDeclaration(variables: Seq[TypedName]) extends YulStatement {
     }
 }
 
-case class FunctionDefinition(
-                                 name: String,
-                                 parameters: Seq[TypedName],
-                                 returnVariables: Seq[TypedName],
-                                 body: Block) extends YulStatement {
+case class FunctionDefinition(name: String,
+                              parameters: Seq[TypedName],
+                              returnVariables: Seq[TypedName],
+                              body: Block) extends YulStatement {
     override def toString: String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"), "function")
@@ -98,13 +97,15 @@ case class If(condition: Expression, body: Block) extends YulStatement {
 
 case class Switch(expression: Expression, cases: Seq[Case]) extends YulStatement {
     override def toString: String = {
-        s"switch ${expression.toString}" + "\n" + (if (cases.isEmpty) brace("") else cases.map(c => c.toString).mkString("\n")) + "\n"
+        s"switch ${expression.toString}" + "\n" +
+            (if (cases.isEmpty) brace("") else cases.map(c => c.toString).mkString("\n")) +
+            "\n"
     }
 }
 
-case class ForLoop(pre: Block, condition: Expression, post: Block, body: Block) extends YulStatement {
+case class ForLoop(pre: Block, cond: Expression, post: Block, body: Block) extends YulStatement {
     override def toString: String = {
-        s"for ${brace(pre.toString)} ${condition.toString} ${brace(post.toString)}" + "\n" +
+        s"for ${brace(pre.toString)} ${cond.toString} ${brace(post.toString)}" + "\n" +
             brace(body.toString)
     }
 }
@@ -149,7 +150,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, subObjects: Seq[YulObject], data: Seq[Data]) extends YulAST {
+case class YulObject(name: String, code: Code, subs: Seq[YulObject], data: Seq[Data]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -222,7 +223,7 @@ case class YulObject(name: String, code: Code, subObjects: Seq[YulObject], data:
 
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
 
-        for (sub <- obj.subObjects) { // TODO separate runtime object out as a module (make it verbose)
+        for (sub <- obj.subs) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
                 s match {
                     case f: FunctionDefinition =>
