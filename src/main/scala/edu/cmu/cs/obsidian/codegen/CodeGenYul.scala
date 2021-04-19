@@ -227,7 +227,7 @@ object CodeGenYul extends CodeGenerator {
             case IfThenElse(scrutinee, pos, neg) =>
                 val id = nextTemp()
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee)
-                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s))
+                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s)) // todo iev be careful here this might be wrong
                 val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s))
                 scrutinee_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
                     Case(false_lit, Block(neg_yul)))))
