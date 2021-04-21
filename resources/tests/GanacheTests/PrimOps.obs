@@ -2,9 +2,26 @@ main contract PrimOps{
         int x;
         bool y;
         transaction primops() {
+            y = true and false;
+            y = true or false;
+
             x = 4 + 4;
             x = 4 - 4;
             x = 4 / 4;
+            x = 4 * 4;
+            x = 4 % 4;
+
+            y = 1 == 2;
+            y = 1 != 2;
+            y = 3 > 4;
+            y = 3 >= 4;
+            y = 3 < 3;
+            y = 3 <= 3;
+            y = 3 != 3;
+
+            y = not y;
+            x = - x;
+
             return;
         }
 }
