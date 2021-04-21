@@ -349,11 +349,11 @@ object CodeGenYul extends CodeGenerator {
                         Seq()
                 }
             case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
-                val (seqs: Seq[Seq[YulStatement]], ids:Seq[edu.cmu.cs.obsidian.codegen.Expression]) =
+                val (seqs: Seq[Seq[YulStatement]], ids: Seq[edu.cmu.cs.obsidian.codegen.Expression]) =
                     args.map(p => {
-                    val id = nextTemp()
-                    (translateExpr(id, p), ExpressionStatement(id))
-                }).unzip
+                        val id = nextTemp()
+                        (translateExpr(id, p), ExpressionStatement(id))
+                    }).unzip
                 seqs.flatten :+ ExpressionStatement(FunctionCall(Identifier(name), ids))
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
