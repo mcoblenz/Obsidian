@@ -1,9 +1,10 @@
 main contract PrimOps{
         int x;
         bool y;
+
         transaction primops() {
-            y = true and false;
-            y = true or false;
+            //y = true and false; //these don't parse, or i have the syntax wrong
+            //y = true or false;
 
             x = 4 + 4;
             x = 4 - 4;
@@ -19,7 +20,7 @@ main contract PrimOps{
             y = 3 <= 3;
             y = 3 != 3;
 
-            y = not y;
+            //y = not y; // as above
             x = - x;
 
             return;
