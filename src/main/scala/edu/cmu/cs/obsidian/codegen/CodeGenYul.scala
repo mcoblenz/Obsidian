@@ -5,6 +5,7 @@ import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
+import scala.annotation.tailrec
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
@@ -279,6 +280,7 @@ object CodeGenYul extends CodeGenerator {
         translateExpr(e_id, e) ++ store_then_ret(retvar, unary_ap(s, e_id))
     }
 
+    @tailrec
     def translateExpr(retvar: Identifier, e: Expression): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -303,8 +305,8 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    case LogicalNegation(e) => unary_call("not",retvar,e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
-                    case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0) ,e))
+                    case LogicalNegation(e) => unary_call("not", retvar, e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
+                    case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0), e))
                     case Dereference(e, f) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -326,10 +328,10 @@ object CodeGenYul extends CodeGenerator {
                     case Mod(e1, e2) => binary_call("smod", retvar, e1, e2) // todo as with div
                     case Equals(e1, e2) => binary_call("eq", retvar, e1, e2)
                     case GreaterThan(e1, e2) => binary_call("sgt", retvar, e1, e2) // todo as with div
-                    case GreaterThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(GreaterThan(e1,e2),Equals(e1,e2)))
+                    case GreaterThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(GreaterThan(e1, e2), Equals(e1, e2)))
                     case LessThan(e1, e2) => binary_call("slt", retvar, e1, e2) //todo as with div
-                    case LessThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(LessThan(e1,e2),Equals(e1,e2)))
-                    case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1,e2)))
+                    case LessThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(LessThan(e1, e2), Equals(e1, e2)))
+                    case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
             case e@LocalInvocation(name, genericParams, params, args) =>
                 //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match)) // todo iev working here
