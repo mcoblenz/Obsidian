@@ -215,12 +215,10 @@ object CodeGenYul extends CodeGenerator {
                             case NumLiteral(_) => LiteralKind.number
                             case TrueLiteral() => LiteralKind.boolean
                             case FalseLiteral() => LiteralKind.boolean
-                            case l =>
-                                assert(assertion = false, "TODO: unimplemented translate assignment case: " + l.toString)
-                                LiteralKind.number
+                            case StringLiteral(_) => LiteralKind.string //todo missing cases?
                         }
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
-                            Seq(ilit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString)))))
+                            Seq(ilit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString))))) //todo: this is likely wrong for strings
                     case e =>
                         assert(assertion = false, "TODO: translate assignment case" + e.toString)
                         Seq()

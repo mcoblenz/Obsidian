@@ -1,7 +1,10 @@
 main contract PrimOps{
         int x;
+        bool y;
         transaction primops() {
-            x = 4;
+            x = 4 + 4;
+            x = 4 - 4;
+            x = 4 / 4;
             return;
         }
 }
