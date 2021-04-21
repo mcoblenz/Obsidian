@@ -1,0 +1,7 @@
+main contract PrimOps{
+        int x;
+        transaction primops() {
+            x = 4;
+            return;
+        }
+}
