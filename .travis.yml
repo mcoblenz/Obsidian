@@ -17,6 +17,17 @@ before_install:
   - export PATH=${PATH}:${HOME}/bin/
   - ./travis_specific/install_ganache.sh
 
+install:
+  - |
+    # from https://github.com/sbt/sbt/releases:
+    # update this only when sbt-the-bash-script needs to be updated
+    export SBT_LAUNCHER=1.5.0
+    export SBT_OPTS="-Dfile.encoding=UTF-8"
+    curl -L --silent "https://github.com/sbt/sbt/releases/download/v$SBT_LAUNCHER/sbt-$SBT_LAUNCHER.tgz" > $HOME/sbt.tgz
+    tar zxf $HOME/sbt.tgz -C $HOME
+    sudo rm /usr/local/bin/sbt
+    sudo ln -s $HOME/sbt/bin/sbt /usr/local/bin/sbt
+
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
   - sbt ++$TRAVIS_SCALA_VERSION test # this actually builds Obsidian
