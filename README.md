@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/mcoblenz/Obsidian.svg?branch=master)](https://travis-ci.org/mcoblenz/Obsidian)
+[![Build Status](https://travis-ci.com/mcoblenz/Obsidian.svg?branch=master)](https://travis-ci.com/mcoblenz/Obsidian)
 [![Documentation Status](https://readthedocs.org/projects/obsidian/badge/?version=latest)](https://obsidian.readthedocs.io/en/latest/?badge=latest)
       
 
@@ -74,21 +74,53 @@ Then, push the modified .jar to the Git master branch, and it will be available 
 - `OBSIDIAN_COMPILER_DIR`: The root directory of the compiler repository. Needed to be able to locate some compiler resources.
 
 ###### Repository organization
-Makefile: for building and testing the Obsidian compiler.
-Obsidian_Runtime: provides runtime support for running Obsidian programs.
-buildscript: scripts for running Obsidian programs on Hyperledger Fabric
-docs: the Obsidian web site.
-evaluation: starter code and some data from the Obsidian vs. Solidity RCT.
-fabric: files needed by the Obsidian compiler to prepare executable Fabric packages.
-formalization: a partial formalization in Agda of the core of Obsidian.
-network-framework: data needed for running Obsidian programs on Hyperledger Fabric.
-obs-vscode-extension: An extension for Visual Studio Code for editing and running Obsidian programs.
-obstest.pl: used for testing Obsidian programs.
-papers: an archive of some Obsidian papers.
-project: this directory specifies how SBT should build the compiler.
-pygments_lexer_obsidian: a fork of the Pygments project to support the tokens needed for Obsidian programs.
-resources: Test files and case studies.
-solidity_user_guide: the user guide given to Solidity participants in the RCT.
-src: compiler source code.
-travis_specific: configuration for Travis continuous integration.
-user_guide: the Obsidian user guide (given to Obsidian participants in the RCT).
+
+  * [Makefile](Makefile): for building and testing the Obsidian
+    compiler.
+
+  * [Obsidian_Runtime](Obsidian_Runtime): provides runtime support for
+    running Obsidian programs.
+
+  * [buildscript](buildscript): scripts for running Obsidian programs
+    on Hyperledger Fabric
+
+  * [docs](docs): the Obsidian web site.
+
+  * [evaluation](evaluation): starter code and some data from the
+    Obsidian vs. Solidity RCT.
+
+  * [fabric](fabric): files needed by the Obsidian compiler to prepare
+    executable Fabric packages.
+
+  * [formalization](formalization): a partial formalization in Agda of
+    the core of Obsidian.
+
+  * [network-framework](network-framework): data needed for running
+    Obsidian programs on Hyperledger Fabric.
+
+  * [obs-vscode-extension](obs-vscode-extension): An extension for
+    Visual Studio Code for editing and running Obsidian programs.
+
+  * [obstest.pl](obstest.pl): used for testing Obsidian programs.
+
+  * [papers](papers): an archive of some Obsidian papers.
+
+  * [project](project): this directory specifies how SBT should build
+    the compiler.
+
+  * [pygments_lexer_obsidian](pygments_lexer_obsidian): a fork of the
+    Pygments project to support the tokens needed for Obsidian
+    programs.
+
+  * [resources](resources): Test files and case studies.
+
+  * [solidity_user_guide](solidity_user_guide): the user guide given
+    to Solidity participants in the RCT.
+
+  * [src](src): compiler source code.
+
+  * [travis_specific](travis_specific): configuration for Travis
+    continuous integration.
+
+  * [user_guide](user_guide): the Obsidian user guide (given to
+    Obsidian participants in the RCT).
