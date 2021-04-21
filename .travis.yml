@@ -19,13 +19,20 @@ before_install:
 
 script:
   - gradle publish -b Obsidian_Runtime/build.gradle
-  - sbt ++2.13.5 test # this actually builds Obsidian
+  - sbt ++$TRAVIS_SCALA_VERSION test # this actually builds Obsidian
   - bash travis_specific/tests.sh
   - bash travis_specific/ganache_tests.sh
 
 cache:
   directories:
-  - $HOME/.m2
+    - $HOME/.cache/coursier
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt
+
+before_cache:
+  - rm -fv $HOME/.ivy2/.sbt.ivy.lock
+  - find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
+  - find $HOME/.sbt        -name "*.lock"               -print -delete
 
 addons:
   hosts:
