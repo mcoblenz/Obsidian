@@ -19,10 +19,10 @@ scalacOptions := Seq("-unchecked", "-deprecation")
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2"
 
-assemblyJarName in assembly := "obsidianc.jar"
+assembly / assemblyJarName := "obsidianc.jar"
 
-unmanagedResourceDirectories in Compile += baseDirectory.value / "Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian"
-includeFilter in (Compile, unmanagedResources) := "*.obs"
+Compile / unmanagedResourceDirectories += baseDirectory.value / "Obsidian_Runtime/src/main/java/Runtime/edu/cmu/cs/obsidian"
+Compile /  unmanagedResources / includeFilter := "*.obs"
 
 /* Don't throw TrapExitSecurityException.
  * Also, allow passing return code through SBT without
@@ -44,12 +44,12 @@ libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2"
 /* settings for assembly */
 
 // don't get confused about multiple META-INF/MANIFEST.MF
-assemblyMergeStrategy in assembly := {
+assembly / assemblyMergeStrategy := {
     case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
     case x if x.contains("module-info.class") => MergeStrategy.discard // https://stackoverflow.com/questions/54834125/sbt-assembly-deduplicate-module-info-class
     case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard
     case x =>
-        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        val oldStrategy = ( assembly / assemblyMergeStrategy).value
     	oldStrategy(x)
 }
 
