@@ -16,7 +16,7 @@ object "{{creationObject}}" {
             {{#constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
             {{implicitConstructor}}({{constructorParams}})
         {{/notLibrary}}
-        {{! call constructor }}
+        {{! todo: write and call constructor }}
         {{#deploy}}
             {{call}}
         {{/deploy}}
