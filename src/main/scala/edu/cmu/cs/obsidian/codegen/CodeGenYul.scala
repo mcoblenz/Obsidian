@@ -270,15 +270,33 @@ object CodeGenYul extends CodeGenerator {
     // helper function for a common calling pattern below. todo: there may be a slicker way to do
     //  this with https://docs.scala-lang.org/tour/mixin-class-composition.html in the future
     //  once all the cases are written and work
-    def binary_call(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
+    def binary_call_gen(retvar: Identifier, e1: Expression, e2: Expression, f: (Identifier, Identifier) => edu.cmu.cs.obsidian.codegen.Expression): Seq[YulStatement] = {
         val e1_id = nextTemp()
         val e2_id = nextTemp()
-        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, binary_ap(s, e1_id, e2_id))
+        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, f(e1_id, e2_id))
+    }
+
+    def binary_call(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
+        binary_call_gen(retvar, e1, e2, (e1_id, e2_id) => binary_ap(s, e1_id, e2_id))
     }
 
     def unary_call(s: String, retvar: Identifier, e: Expression): Seq[YulStatement] = {
         val e_id = nextTemp()
         translateExpr(e_id, e) ++ store_then_ret(retvar, unary_ap(s, e_id))
+    }
+
+    def geq_leq(s: String, retvar: Identifier, e1 : Expression, e2 : Expression) : Seq[YulStatement] = {
+        // this doesn't fit the pattern of binary_call or a more general version that
+        // takes  (Identifier, Identifier) => Expression, because what you want to do
+        // is build another Obsidian Expression but with the Yul Identifiers for the
+        // temp vars in it, which is incoherent.
+        //
+        // todo: maybe there's a more elegant way to do this with less repeated code
+        val e1id = nextTemp()
+        val e2id = nextTemp()
+        translateExpr(e1id,e1) ++
+            translateExpr(e2id,e2) ++
+            Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar),binary_ap("or",binary_ap(s,e1id,e2id),binary_ap("eq",e1id,e2id))))
     }
 
     @tailrec
@@ -308,10 +326,10 @@ object CodeGenYul extends CodeGenerator {
                 e match {
                     case LogicalNegation(e) => unary_call("not", retvar, e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
                     case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0), e))
-                    case Dereference(e, f) =>
+                    case Dereference(_, _) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
-                    case Disown(e) =>
+                    case Disown(_) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                 }
@@ -329,11 +347,9 @@ object CodeGenYul extends CodeGenerator {
                     case Mod(e1, e2) => binary_call("smod", retvar, e1, e2) // todo as with div
                     case Equals(e1, e2) => binary_call("eq", retvar, e1, e2)
                     case GreaterThan(e1, e2) => binary_call("sgt", retvar, e1, e2) // todo as with div
-                    // todo: this may actually be a bug; is the fragment from which e1 and e2 are drawn pure?
-                    // todo this is a cute move but also will cause the work of e1 and e2 to get duplicated; a more general binary_call helper might take a continuation.
-                    case GreaterThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(GreaterThan(e1, e2), Equals(e1, e2)))
+                    case GreaterThanOrEquals(e1, e2) => geq_leq("sgt", retvar, e1, e2)
                     case LessThan(e1, e2) => binary_call("slt", retvar, e1, e2) //todo as with div
-                    case LessThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(LessThan(e1, e2), Equals(e1, e2)))
+                    case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
             case e@LocalInvocation(name, genericParams, params, args) =>
