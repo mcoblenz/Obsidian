@@ -7,9 +7,11 @@ import org.bouncycastle.util.encoders.Hex
 object Util {
   def brace(str: String): String = s"{$str}"
   def paren(str: String): String = s"($str)"
+  def quote(str: String): String = "\"" + str + "\"" // escape characters are known to not work with string interpolation
   def ilit(i: Int): Literal = Literal(LiteralKind.number, i.toString, "int")
   def blit(b : Boolean): Literal = Literal(LiteralKind.boolean, b.toString, "bool")
   def hexlit(s: String): Literal = Literal(LiteralKind.number, s, "int")
+  def stringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
   def callvaluecheck: YulStatement = codegen.If(FunctionCall(Identifier("callvalue"), Seq()), Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"), Seq(ilit(0), ilit(0)))))))
   def unary(n: String, e: Expression): Expression = FunctionCall(Identifier(n),Seq(e))
   def binary(n : String, e1: Expression, e2: Expression): Expression = FunctionCall(Identifier(n), Seq(e1, e2))

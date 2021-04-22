@@ -31,11 +31,18 @@ object "{{creationObject}}" {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
             {{memoryInitRuntime}}
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
-            {{#dispatch}}
-                {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
-                let selector := shr(224, calldataload(0))
-                {{dispatchCase}}
-            {{/dispatch}}
+
+            {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
+            if iszero(lt(calldatasize(), 4)) {
+            {
+                {{#dispatch}}
+                    {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
+                    let selector := shr(224, calldataload(0))
+                    {{dispatchCase}}
+                {{/dispatch}}
+            }
+            if iszero(calldatasize()) {  }
+            revert(0, 0)
             {{! todo: this is deadcode for at least the empty contract but gets emitted anyway; trim it down somehow? }}
             {{! these functions for memory management are produced by the solc IR backend for
                 Solidity programs analagous to our test Obsidian programs.
@@ -77,9 +84,9 @@ object "{{creationObject}}" {
             {{#runtimeFunctions}}
                 {{code}}
             {{/runtimeFunctions}}
-            {{defaultReturn}}
         }
         {{runtimeSubObjects}}
     }
     {{subObjects}}
+}
 }

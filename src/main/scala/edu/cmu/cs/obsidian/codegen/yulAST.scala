@@ -48,7 +48,11 @@ case class Literal(kind: LiteralKind.LiteralKind, value: String, vtype: String) 
         //
         // however, as of 12 April 2021, this produces a ton of warnings from solc about "user
         // defined types are not yet supported"
-        value
+        kind match {
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.number => value
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.boolean => value
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.string => quote(value)
+        }
     }
 }
 
@@ -160,7 +164,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
         raw.replaceAll("&amp;", "&").
             replaceAll("&gt;", ">").
             replaceAll("&#10;", "\n").
-            replaceAll("&#61;", "=")
+            replaceAll("&#61;", "=").
+            replaceAll("&quot;", "\"")
     }
 
     // ObjScope and FuncScope are designed to facilitate mustache templates, with the following rules
@@ -181,6 +186,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
         var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
         var deployCall: Array[Call] = Array[Call]()
         var memoryInitRuntime: String = ""
+
+        def callValueCheck(): YulStatement = callvaluecheck
 
         def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
             Seq(
@@ -245,7 +252,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"), Seq(ilit(0), ilit(0)))
+        def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"), Seq(ilit(0), unary("datasize",stringlit(runtimeObject))))
 
         class Func(val code: String) {}
 
