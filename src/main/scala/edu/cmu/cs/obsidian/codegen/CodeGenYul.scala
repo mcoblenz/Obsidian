@@ -100,15 +100,7 @@ object CodeGenYul extends CodeGenerator {
         var subObjects: Seq[YulObject] = Seq()
         var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
-
-        // memory init
-        val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
-        val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
-        // the free memory pointer points to 0x80 initially
-        val initExpr = FunctionCall(Identifier("mstore"), Seq(ilit(freeMemPointer), ilit(firstFreeMem)))
-        statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
-        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr)
-
+        
         // translate declarations
         for (d <- contract.declarations) {
             val (deploy_seq, runtime_seq) = translateDeclaration(d)

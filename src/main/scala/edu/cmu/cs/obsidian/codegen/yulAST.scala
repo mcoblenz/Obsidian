@@ -185,7 +185,12 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
         var dispatch = false
         var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
         var deployCall: Array[Call] = Array[Call]()
-        var memoryInitRuntime: String = ""
+
+        val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
+        val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
+        // the free memory pointer points to 0x80 initially
+        var memoryInitRuntime: YulStatement = ExpressionStatement(binary("mstore",ilit(freeMemPointer), ilit(firstFreeMem)))
+        var memoryInit: YulStatement = memoryInitRuntime
 
         def callValueCheck(): YulStatement = callvaluecheck
 
@@ -238,7 +243,10 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                         dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall => memoryInitRuntime = f.toString
+                            case f: FunctionCall =>
+                                //TODO what was this line doing?
+                                //memoryInitRuntime = f.toString
+                                ()
                             case _ =>
                                 assert(assertion = false, "TODO: " + e.toString())
                                 () // TODO unimplemented
