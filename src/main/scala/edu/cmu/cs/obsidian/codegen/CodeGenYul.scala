@@ -270,14 +270,10 @@ object CodeGenYul extends CodeGenerator {
     // helper function for a common calling pattern below. todo: there may be a slicker way to do
     //  this with https://docs.scala-lang.org/tour/mixin-class-composition.html in the future
     //  once all the cases are written and work
-    def binary_call_gen(retvar: Identifier, e1: Expression, e2: Expression, f: (Identifier, Identifier) => edu.cmu.cs.obsidian.codegen.Expression): Seq[YulStatement] = {
+    def binary_call(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
         val e1_id = nextTemp()
         val e2_id = nextTemp()
-        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, f(e1_id, e2_id))
-    }
-
-    def binary_call(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
-        binary_call_gen(retvar, e1, e2, (e1_id, e2_id) => binary_ap(s, e1_id, e2_id))
+        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, binary_ap(s, e1_id, e2_id))
     }
 
     def unary_call(s: String, retvar: Identifier, e: Expression): Seq[YulStatement] = {
