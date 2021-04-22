@@ -100,7 +100,7 @@ object CodeGenYul extends CodeGenerator {
         var subObjects: Seq[YulObject] = Seq()
         var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
-        
+
         // translate declarations
         for (d <- contract.declarations) {
             val (deploy_seq, runtime_seq) = translateDeclaration(d)
