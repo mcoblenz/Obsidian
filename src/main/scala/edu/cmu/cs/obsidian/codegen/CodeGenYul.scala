@@ -281,7 +281,7 @@ object CodeGenYul extends CodeGenerator {
         translateExpr(e_id, e) ++ store_then_ret(retvar, unary_ap(s, e_id))
     }
 
-    def geq_leq(s: String, retvar: Identifier, e1 : Expression, e2 : Expression) : Seq[YulStatement] = {
+    def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
         // this doesn't fit the pattern of binary_call or a more general version that
         // takes  (Identifier, Identifier) => Expression, because what you want to do
         // is build another Obsidian Expression but with the Yul Identifiers for the
@@ -290,9 +290,9 @@ object CodeGenYul extends CodeGenerator {
         // todo: maybe there's a more elegant way to do this with less repeated code
         val e1id = nextTemp()
         val e2id = nextTemp()
-        translateExpr(e1id,e1) ++
-            translateExpr(e2id,e2) ++
-            Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar),binary_ap("or",binary_ap(s,e1id,e2id),binary_ap("eq",e1id,e2id))))
+        translateExpr(e1id, e1) ++
+            translateExpr(e2id, e2) ++
+            Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), binary_ap("or", binary_ap(s, e1id, e2id), binary_ap("eq", e1id, e2id))))
     }
 
     @tailrec
