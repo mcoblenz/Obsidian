@@ -329,7 +329,9 @@ object CodeGenYul extends CodeGenerator {
                     case Mod(e1, e2) => binary_call("smod", retvar, e1, e2) // todo as with div
                     case Equals(e1, e2) => binary_call("eq", retvar, e1, e2)
                     case GreaterThan(e1, e2) => binary_call("sgt", retvar, e1, e2) // todo as with div
-                    case GreaterThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(GreaterThan(e1, e2), Equals(e1, e2))) // todo this is a cute move but also will cause the work of e1 and e2 to get duplicated; a more general binary_call helper might take a continuation.
+                    // todo: this may actually be a bug; is the fragment from which e1 and e2 are drawn pure?
+                    // todo this is a cute move but also will cause the work of e1 and e2 to get duplicated; a more general binary_call helper might take a continuation.
+                    case GreaterThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(GreaterThan(e1, e2), Equals(e1, e2)))
                     case LessThan(e1, e2) => binary_call("slt", retvar, e1, e2) //todo as with div
                     case LessThanOrEquals(e1, e2) => translateExpr(retvar, Disjunction(LessThan(e1, e2), Equals(e1, e2)))
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
