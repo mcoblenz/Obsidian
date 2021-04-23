@@ -261,15 +261,15 @@ object CodeGenYul extends CodeGenerator {
     // helper function for a common calling pattern below. todo: there may be a slicker way to do
     //  this with https://docs.scala-lang.org/tour/mixin-class-composition.html in the future
     //  once all the cases are written and work
-    def binary_call(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
-        val e1_id = nextTemp()
-        val e2_id = nextTemp()
-        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, ap(s, e1_id, e2_id))
-    }
+    def call(s: String, retvar: Identifier, es: Expression*): Seq[YulStatement] = {
+        // for each expression, make a new temporary variable and translate the expression
+        val es_trans: Seq[(Seq[YulStatement], Identifier)] = es.map(e => {
+            val id = nextTemp()
+            (translateExpr(id,e), id)
+        })
 
-    def unary_call(s: String, retvar: Identifier, e: Expression): Seq[YulStatement] = {
-        val e_id = nextTemp()
-        translateExpr(e_id, e) ++ store_then_ret(retvar, ap(s, e_id))
+        // flatten the resultant sequences and do them first, then make the call to the function using the Ids
+        (es_trans.map(x => x._1).flatten) ++ store_then_ret(retvar, ap(s,es_trans.map(x => x._2) : _*))
     }
 
     def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
@@ -310,7 +310,7 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    case LogicalNegation(e) => unary_call("not", retvar, e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
+                    case LogicalNegation(e) => call("not", retvar, e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
                     case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0), e))
                     case Dereference(_, _) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
@@ -321,20 +321,20 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: BinaryExpression =>
                 e match {
-                    case Conjunction(e1, e2) => binary_call("and", retvar, e1, e2)
-                    case Disjunction(e1, e2) => binary_call("or", retvar, e1, e2)
-                    case Add(e1, e2) => binary_call("add", retvar, e1, e2)
+                    case Conjunction(e1, e2) => call("and", retvar, e1, e2)
+                    case Disjunction(e1, e2) => call("or", retvar, e1, e2)
+                    case Add(e1, e2) => call("add", retvar, e1, e2)
                     case StringConcat(e1, e2) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
-                    case Subtract(e1, e2) => binary_call("sub", retvar, e1, e2)
-                    case Divide(e1, e2) => binary_call("sdiv", retvar, e1, e2) // todo div is for unsigneds; i believe we have signed ints?
-                    case Multiply(e1, e2) => binary_call("mul", retvar, e1, e2)
-                    case Mod(e1, e2) => binary_call("smod", retvar, e1, e2) // todo as with div
-                    case Equals(e1, e2) => binary_call("eq", retvar, e1, e2)
-                    case GreaterThan(e1, e2) => binary_call("sgt", retvar, e1, e2) // todo as with div
+                    case Subtract(e1, e2) => call("sub", retvar, e1, e2)
+                    case Divide(e1, e2) => call("sdiv", retvar, e1, e2) // todo div is for unsigneds; i believe we have signed ints?
+                    case Multiply(e1, e2) => call("mul", retvar, e1, e2)
+                    case Mod(e1, e2) => call("smod", retvar, e1, e2) // todo as with div
+                    case Equals(e1, e2) => call("eq", retvar, e1, e2)
+                    case GreaterThan(e1, e2) => call("sgt", retvar, e1, e2) // todo as with div
                     case GreaterThanOrEquals(e1, e2) => geq_leq("sgt", retvar, e1, e2)
-                    case LessThan(e1, e2) => binary_call("slt", retvar, e1, e2) //todo as with div
+                    case LessThan(e1, e2) => call("slt", retvar, e1, e2) //todo as with div
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }

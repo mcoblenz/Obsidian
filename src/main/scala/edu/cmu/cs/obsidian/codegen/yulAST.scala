@@ -243,7 +243,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                         dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall =>
+                            case _: FunctionCall =>
                                 //TODO what was this line doing?
                                 //memoryInitRuntime = f.toString
                                 ()
