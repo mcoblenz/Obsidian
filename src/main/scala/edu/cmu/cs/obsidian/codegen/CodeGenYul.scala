@@ -265,11 +265,11 @@ object CodeGenYul extends CodeGenerator {
         // for each expression, make a new temporary variable and translate the expression
         val es_trans: Seq[(Seq[YulStatement], Identifier)] = es.map(e => {
             val id = nextTemp()
-            (translateExpr(id,e), id)
+            (translateExpr(id, e), id)
         })
 
         // flatten the resultant sequences and do them first, then make the call to the function using the Ids
-        (es_trans.map(x => x._1).flatten) ++ store_then_ret(retvar, ap(s,es_trans.map(x => x._2) : _*))
+        es_trans.flatMap(x => x._1) ++ store_then_ret(retvar, ap(s, es_trans.map(x => x._2): _*))
     }
 
     def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
