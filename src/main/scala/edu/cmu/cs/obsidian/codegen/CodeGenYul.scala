@@ -264,12 +264,12 @@ object CodeGenYul extends CodeGenerator {
     def binary_call(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
         val e1_id = nextTemp()
         val e2_id = nextTemp()
-        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, double_ap(s, e1_id, e2_id))
+        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, ap(s, e1_id, e2_id))
     }
 
     def unary_call(s: String, retvar: Identifier, e: Expression): Seq[YulStatement] = {
         val e_id = nextTemp()
-        translateExpr(e_id, e) ++ store_then_ret(retvar, single_ap(s, e_id))
+        translateExpr(e_id, e) ++ store_then_ret(retvar, ap(s, e_id))
     }
 
     def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
@@ -283,7 +283,7 @@ object CodeGenYul extends CodeGenerator {
         val e2id = nextTemp()
         translateExpr(e1id, e1) ++
             translateExpr(e2id, e2) ++
-            Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), double_ap("or", double_ap(s, e1id, e2id), double_ap("eq", e1id, e2id))))
+            Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), ap("or", ap(s, e1id, e2id), ap("eq", e1id, e2id))))
     }
 
     def translateExpr(retvar: Identifier, e: Expression): Seq[YulStatement] = {
