@@ -189,7 +189,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
         val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
         val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
         // the free memory pointer points to 0x80 initially
-        var memoryInitRuntime: Expression = binary("mstore", ilit(freeMemPointer), ilit(firstFreeMem))
+        var memoryInitRuntime: Expression = binary_ap("mstore", ilit(freeMemPointer), ilit(firstFreeMem))
         var memoryInit: Expression = memoryInitRuntime
 
         def callValueCheck(): YulStatement = callvaluecheck
@@ -262,11 +262,11 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        val datasize: Expression = unary("datasize", stringlit(runtimeObject))
+        val datasize: Expression = unary_ap("datasize", stringlit(runtimeObject))
 
-        def codeCopy() : Expression = triple("codecopy",ilit(0), unary("dataoffset",stringlit(runtimeObject)), datasize)
+        def codeCopy() : Expression = triple("codecopy",ilit(0), unary_ap("dataoffset",stringlit(runtimeObject)), datasize)
 
-        def defaultReturn(): Expression = binary("return", ilit(0), datasize)
+        def defaultReturn(): Expression = binary_ap("return", ilit(0), datasize)
 
         class Func(val code: String) {}
 
