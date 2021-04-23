@@ -5,6 +5,7 @@ import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
+import scala.annotation.tailrec
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
@@ -214,12 +215,13 @@ object CodeGenYul extends CodeGenerator {
                             case NumLiteral(_) => LiteralKind.number
                             case TrueLiteral() => LiteralKind.boolean
                             case FalseLiteral() => LiteralKind.boolean
-                            case l =>
-                                assert(assertion = false, "TODO: unimplemented translate assignment case: " + l.toString)
+                            case StringLiteral(_) => LiteralKind.string
+                            case _ =>
+                                assert(assertion = false, s"unimplemented assignment case ${assignTo.toString}")
                                 LiteralKind.number
                         }
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
-                            Seq(ilit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString)))))
+                            Seq(ilit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString))))) //todo: this is likely wrong for strings
                     case e =>
                         assert(assertion = false, "TODO: translate assignment case" + e.toString)
                         Seq()
@@ -265,6 +267,35 @@ object CodeGenYul extends CodeGenerator {
         }
     }
 
+    // helper function for a common calling pattern below. todo: there may be a slicker way to do
+    //  this with https://docs.scala-lang.org/tour/mixin-class-composition.html in the future
+    //  once all the cases are written and work
+    def binary_call(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
+        val e1_id = nextTemp()
+        val e2_id = nextTemp()
+        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, binary_ap(s, e1_id, e2_id))
+    }
+
+    def unary_call(s: String, retvar: Identifier, e: Expression): Seq[YulStatement] = {
+        val e_id = nextTemp()
+        translateExpr(e_id, e) ++ store_then_ret(retvar, unary_ap(s, e_id))
+    }
+
+    def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
+        // this doesn't fit the pattern of binary_call or a more general version that
+        // takes  (Identifier, Identifier) => Expression, because what you want to do
+        // is build another Obsidian Expression but with the Yul Identifiers for the
+        // temp vars in it, which is incoherent.
+        //
+        // todo: maybe there's a more elegant way to do this with less repeated code
+        val e1id = nextTemp()
+        val e2id = nextTemp()
+        translateExpr(e1id, e1) ++
+            translateExpr(e2id, e2) ++
+            Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), binary_ap("or", binary_ap(s, e1id, e2id), binary_ap("eq", e1id, e2id))))
+    }
+
+    @tailrec
     def translateExpr(retvar: Identifier, e: Expression): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -289,64 +320,33 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    case LogicalNegation(e) =>
+                    case LogicalNegation(e) => unary_call("not", retvar, e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
+                    case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0), e))
+                    case Dereference(_, _) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
-                    case Negate(e) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Dereference(e, f) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Disown(e) =>
+                    case Disown(_) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                 }
             case e: BinaryExpression =>
                 e match {
-                    case Conjunction(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Disjunction(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Add(e1, e2) =>
-                        val e1_id = nextTemp()
-                        val e2_id = nextTemp()
-                        translateExpr(e1_id, e1) ++ translateExpr(e2_id, e2) ++ store_then_ret(retvar, binary("add", e1_id, e2_id))
+                    case Conjunction(e1, e2) => binary_call("and", retvar, e1, e2)
+                    case Disjunction(e1, e2) => binary_call("or", retvar, e1, e2)
+                    case Add(e1, e2) => binary_call("add", retvar, e1, e2)
                     case StringConcat(e1, e2) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
-                    case Subtract(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Divide(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Multiply(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Mod(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case Equals(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case GreaterThan(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case GreaterThanOrEquals(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case LessThan(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case LessThanOrEquals(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
-                    case NotEquals(e1, e2) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
+                    case Subtract(e1, e2) => binary_call("sub", retvar, e1, e2)
+                    case Divide(e1, e2) => binary_call("sdiv", retvar, e1, e2) // todo div is for unsigneds; i believe we have signed ints?
+                    case Multiply(e1, e2) => binary_call("mul", retvar, e1, e2)
+                    case Mod(e1, e2) => binary_call("smod", retvar, e1, e2) // todo as with div
+                    case Equals(e1, e2) => binary_call("eq", retvar, e1, e2)
+                    case GreaterThan(e1, e2) => binary_call("sgt", retvar, e1, e2) // todo as with div
+                    case GreaterThanOrEquals(e1, e2) => geq_leq("sgt", retvar, e1, e2)
+                    case LessThan(e1, e2) => binary_call("slt", retvar, e1, e2) //todo as with div
+                    case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2)
+                    case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
             case e@LocalInvocation(name, genericParams, params, args) =>
                 //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match)) // todo iev working here
