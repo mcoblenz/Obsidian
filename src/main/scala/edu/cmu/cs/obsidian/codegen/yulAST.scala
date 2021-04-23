@@ -6,7 +6,6 @@ import edu.cmu.cs.obsidian.codegen.Util._
 
 import java.io.{FileReader, StringWriter}
 
-
 // reminder: use abstract class if want to create a base class that requires constructor arguments
 sealed trait YulAST
 
@@ -49,7 +48,11 @@ case class Literal(kind: LiteralKind.LiteralKind, value: String, vtype: String) 
         //
         // however, as of 12 April 2021, this produces a ton of warnings from solc about "user
         // defined types are not yet supported"
-        value
+        kind match {
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.number => value
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.boolean => value
+            case edu.cmu.cs.obsidian.codegen.LiteralKind.string => quote(value)
+        }
     }
 }
 
@@ -161,7 +164,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
         raw.replaceAll("&amp;", "&").
             replaceAll("&gt;", ">").
             replaceAll("&#10;", "\n").
-            replaceAll("&#61;", "=")
+            replaceAll("&#61;", "=").
+            replaceAll("&quot;", "\"")
     }
 
     // ObjScope and FuncScope are designed to facilitate mustache templates, with the following rules
@@ -181,7 +185,14 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
         var dispatch = false
         var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
         var deployCall: Array[Call] = Array[Call]()
-        var memoryInitRuntime: String = ""
+
+        val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
+        val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
+        // the free memory pointer points to 0x80 initially
+        var memoryInitRuntime: Expression = binary_ap("mstore", ilit(freeMemPointer), ilit(firstFreeMem))
+        var memoryInit: Expression = memoryInitRuntime
+
+        def callValueCheck(): YulStatement = callvaluecheck
 
         def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
             Seq(
@@ -232,7 +243,10 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                         dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                     case e: ExpressionStatement =>
                         e.expression match {
-                            case f: FunctionCall => memoryInitRuntime = f.toString
+                            case f: FunctionCall =>
+                                //TODO what was this line doing?
+                                //memoryInitRuntime = f.toString
+                                ()
                             case _ =>
                                 assert(assertion = false, "TODO: " + e.toString())
                                 () // TODO unimplemented
@@ -244,9 +258,15 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             }
         }
 
+
+
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"), Seq(ilit(0), ilit(0)))
+        val datasize: Expression = unary_ap("datasize", stringlit(runtimeObject))
+
+        def codeCopy() : Expression = triple("codecopy",ilit(0), unary_ap("dataoffset",stringlit(runtimeObject)), datasize)
+
+        def defaultReturn(): Expression = binary_ap("return", ilit(0), datasize)
 
         class Func(val code: String) {}
 

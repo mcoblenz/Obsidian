@@ -7,12 +7,15 @@ import org.bouncycastle.util.encoders.Hex
 object Util {
   def brace(str: String): String = s"{$str}"
   def paren(str: String): String = s"($str)"
+  def quote(str: String): String = "\"" + str + "\"" // escape characters are known to not work with string interpolation
   def ilit(i: Int): Literal = Literal(LiteralKind.number, i.toString, "int")
   def blit(b : Boolean): Literal = Literal(LiteralKind.boolean, b.toString, "bool")
   def hexlit(s: String): Literal = Literal(LiteralKind.number, s, "int")
+  def stringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
   def callvaluecheck: YulStatement = codegen.If(FunctionCall(Identifier("callvalue"), Seq()), Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"), Seq(ilit(0), ilit(0)))))))
   def unary_ap(n: String, e: Expression): Expression = FunctionCall(Identifier(n),Seq(e))
   def binary_ap(n : String, e1: Expression, e2: Expression): Expression = FunctionCall(Identifier(n), Seq(e1, e2))
+  def triple(n : String, e1: Expression, e2: Expression, e3: Expression): Expression = FunctionCall(Identifier(n), Seq(e1, e2, e3))
   def store_then_ret(retvar:Identifier, e:Expression) = Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar),e)) //todo this may not be needed once i work out more cases
 
   val true_lit: Literal = blit(true)
