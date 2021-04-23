@@ -5,7 +5,6 @@ import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
-import scala.annotation.tailrec
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
@@ -101,14 +100,6 @@ object CodeGenYul extends CodeGenerator {
         var subObjects: Seq[YulObject] = Seq()
         var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
-
-        // memory init
-        val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
-        val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
-        // the free memory pointer points to 0x80 initially
-        val initExpr = FunctionCall(Identifier("mstore"), Seq(ilit(freeMemPointer), ilit(firstFreeMem)))
-        statement_seq_deploy = statement_seq_deploy :+ ExpressionStatement(initExpr)
-        statement_seq_runtime = statement_seq_runtime :+ ExpressionStatement(initExpr) //todo add `:+ ExpressionStatement(callvaluecheck)` here, fix what breaks
 
         // translate declarations
         for (d <- contract.declarations) {
@@ -295,7 +286,6 @@ object CodeGenYul extends CodeGenerator {
             Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), binary_ap("or", binary_ap(s, e1id, e2id), binary_ap("eq", e1id, e2id))))
     }
 
-    @tailrec
     def translateExpr(retvar: Identifier, e: Expression): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -348,9 +338,13 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
-            case e@LocalInvocation(name, genericParams, params, args) =>
-                //val expr = FunctionCall(Identifier(name),args.map(x => translateExpr(e) match)) // todo iev working here
-                Seq()
+            case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
+                val (seqs: Seq[Seq[YulStatement]], ids: Seq[edu.cmu.cs.obsidian.codegen.Expression]) =
+                    args.map(p => {
+                        val id = nextTemp()
+                        (translateExpr(id, p), ExpressionStatement(id))
+                    }).unzip
+                seqs.flatten :+ ExpressionStatement(FunctionCall(Identifier(name), ids))
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()
