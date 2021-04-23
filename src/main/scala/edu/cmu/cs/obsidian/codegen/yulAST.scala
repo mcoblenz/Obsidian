@@ -258,9 +258,15 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             }
         }
 
+
+
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        def defaultReturn(): FunctionCall = FunctionCall(Identifier("return"), Seq(ilit(0), unary("datasize", stringlit(runtimeObject))))
+        val datasize: Expression = unary("datasize", stringlit(runtimeObject))
+
+        def codeCopy() : Expression = triple("codecopy",ilit(0), unary("dataoffset",stringlit(runtimeObject)), datasize)
+
+        def defaultReturn(): Expression = binary("return", ilit(0), datasize)
 
         class Func(val code: String) {}
 
