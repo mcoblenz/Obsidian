@@ -43,15 +43,16 @@ object Util {
     }
 
     def functionRename(name: String): String = {
-        name //todo some sort of alpha variation here combined with consulting a mapping
+        name //todo some sort of alpha variation here combined with consulting a mapping; consult the ABI
     }
 
     def keccak256(s: String): String = {
         val digestK: Keccak.Digest256 = new Keccak.Digest256()
-        s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0, 4))}" //todo: i'm not sure if it should be the first or last 4.
+        s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0, 4))}"
     }
 
     def hashOfFunctionDef(f: FunctionDefinition): String = {
+        // todo: the keccak256 implementation seems to agree with solc, but it's never been run on functions with arguments.
         keccak256(f.name + paren(f.parameters.map(p => mapObsTypeToABI(p.ntype)).mkString(" ")))
     }
 }

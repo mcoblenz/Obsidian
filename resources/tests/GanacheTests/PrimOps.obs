@@ -3,8 +3,8 @@ main contract PrimOps{
         bool y;
 
         transaction primops() {
-            //y = true and false; //these don't parse, or i have the syntax wrong
-            //y = true or false;
+            y = true && false;
+            y = true || false;
 
             x = 4 + 4;
             x = 4 - 4;
@@ -20,7 +20,7 @@ main contract PrimOps{
             y = 3 <= 3;
             y = 3 != 3;
 
-            //y = not y; // as above
+            y = !y;
             x = - x;
 
             return;
