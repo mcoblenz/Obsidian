@@ -22,11 +22,11 @@ object Util {
 
     def callvaluecheck: YulStatement = codegen.If(FunctionCall(Identifier("callvalue"), Seq()), Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"), Seq(ilit(0), ilit(0)))))))
 
-    def unary_ap(n: String, e: Expression): Expression = FunctionCall(Identifier(n), Seq(e))
+    def single_ap(n: String, e: Expression): Expression = FunctionCall(Identifier(n), Seq(e))
 
-    def binary_ap(n: String, e1: Expression, e2: Expression): Expression = FunctionCall(Identifier(n), Seq(e1, e2))
+    def double_ap(n: String, e1: Expression, e2: Expression): Expression = FunctionCall(Identifier(n), Seq(e1, e2))
 
-    def triple(n: String, e1: Expression, e2: Expression, e3: Expression): Expression = FunctionCall(Identifier(n), Seq(e1, e2, e3))
+    def triple_ap(n: String, e1: Expression, e2: Expression, e3: Expression): Expression = FunctionCall(Identifier(n), Seq(e1, e2, e3))
 
     def store_then_ret(retvar: Identifier, e: Expression) = Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), e)) //todo this may not be needed once i work out more cases
 
