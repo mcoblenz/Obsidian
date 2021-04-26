@@ -2,6 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
+import edu.cmu.cs.obsidian.typecheck.{BoolType, BottomType, ContractReferenceType, GenericType, Int256Type, IntType, InterfaceContractType, NonPrimitiveType, PrimitiveType, StateType, StringType, UnitType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -27,11 +28,19 @@ object CodeGenYul extends CodeGenerator {
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
     // though that is not enforced statically.
     var tempCnt: Int = 0
+    var retCnt: Int = 0
 
     def nextTemp(): Identifier = {
         tempCnt = tempCnt + 1
         Identifier(name = s"_tmp_${tempCnt.toString}") //todo: better naming convention?
     }
+
+    // todo this is getting redundant, find a better way
+    def nextRet(): String = {
+        tempCnt = tempCnt + 1
+        s"_ret_${tempCnt.toString}" //todo: better naming convention?
+    }
+
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
@@ -173,32 +182,47 @@ object CodeGenYul extends CodeGenerator {
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
                 constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
                 Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap((s: Statement) => translateStatement(s))))) //todo iev temp vars: likely a hack to work around something wrong
+                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
 
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
+        var id: Option[String] = None
         val ret: Seq[TypedName] =
-            if (transaction.retType.isEmpty) {
-                Seq()
-            } else { // TODO hard code return variable name now, need a special naming convention to avoid collisions
-                Seq(TypedName("retValTempName", mapObsTypeToABI(transaction.retType.get.toString)))
+            transaction.retType match {
+                case Some(t) => {
+                    id = Some(nextRet())
+                    Seq(TypedName(id.get, mapObsTypeToABI(t.toString)))
+                }
+                case None => Seq()
             }
 
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
             transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
             ret,
-            Block(transaction.body.flatMap((s: Statement) => translateStatement(s))))) //todo iev temp vars: likely a hack to work around something wrong
+            Block(transaction.body.flatMap((s: Statement) => translateStatement(s, id))))) //todo iev temp vars: likely a hack to work around something wrong
     }
 
-    def translateStatement(s: Statement): Seq[YulStatement] = {
+    /**
+      * translate an obsidian statement into the corresponding sequence of yul statements
+      *
+      * @param s the statement to be translated
+      * @param retVar the name of the variable to use for returning for the current scope, if there is one
+      * @return
+      */
+    def translateStatement(s: Statement, retVar: Option[String]): Seq[YulStatement] = {
         s match {
             case Return() =>
                 Seq(Leave())
             case ReturnExpr(e) =>
-                // we need to allocate some space in some form of memory and put e there
-                assert(assertion = false, "TODO: returning a value not implemented")
-                Seq()
+                retVar match {
+                    case Some(retVarName) =>
+                        val temp_id = nextTemp()
+                        val e_yul = translateExpr(temp_id,e)
+                        e_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(Identifier(retVarName)),temp_id), Leave())
+                    case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
+                        Seq()
+                }
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
@@ -220,8 +244,8 @@ object CodeGenYul extends CodeGenerator {
             case IfThenElse(scrutinee, pos, neg) =>
                 val id = nextTemp()
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee)
-                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s)) // todo iev be careful here this might be wrong
-                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s))
+                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar)) // todo iev be careful here this might be wrong
+                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar))
                 scrutinee_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
                     Case(false_lit, Block(neg_yul)))))
             case e: Expression => translateExpr(nextTemp(), e)
