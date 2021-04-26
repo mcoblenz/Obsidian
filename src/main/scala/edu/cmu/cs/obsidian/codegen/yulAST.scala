@@ -70,13 +70,14 @@ case class FunctionCall(functionName: Identifier, arguments: Seq[Expression]) ex
 
 case class Assignment(variableNames: Seq[Identifier], value: Expression) extends YulStatement {
     override def toString: String = {
-        s"let ${variableNames.map(id => id.name).mkString(", ")} := ${value.toString}"
+        s"${variableNames.map(id => id.name).mkString(", ")} := ${value.toString}"
     }
 }
 
-case class VariableDeclaration(variables: Seq[TypedName]) extends YulStatement {
+// todo: can you just declare variables without giving them values?
+case class VariableDeclaration(variables: Seq[TypedName], values: Seq[Expression]) extends YulStatement {
     override def toString: String = {
-        s"let ${variables.map(id => id.name + ":" + id.ntype).mkString(", ")}"
+        s"let ${variables.map(id => id.name + ":" + id.ntype).mkString(", ")} := ${values.mkString(", ")}"
     }
 }
 
