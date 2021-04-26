@@ -11,12 +11,8 @@ class FuncScope(f: FunctionDefinition) {
         case _ => ("", Array[Param]())
     }
 
-    // TODO assume only one return variable for now
-    var retParams: String = if (f.returnVariables.nonEmpty) {
-        f.returnVariables.head.name
-    } else {
-        ""
-    }
+    var hasRetVal: Boolean = f.returnVariables.nonEmpty
+    var retParams: String = f.returnVariables.map(v => v.name).mkString(", ")
 
     def params(): Array[Param] = argRest
 
