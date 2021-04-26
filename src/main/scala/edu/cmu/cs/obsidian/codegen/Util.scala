@@ -59,6 +59,6 @@ object Util {
          parenthesised list of parameter types. Parameter types are split by a single comma -
          no spaces are used. */
         // todo: the keccak256 implementation seems to agree with solc, but it's never been run on functions with arguments.
-        keccak256(f.name + paren(f.parameters.map(p => mapObsTypeToABI(p.ntype)).mkString(" ")))
+        keccak256(f.name + paren(f.parameters.map(p => mapObsTypeToABI(p.ntype)).mkString(",")))
     }
 }
