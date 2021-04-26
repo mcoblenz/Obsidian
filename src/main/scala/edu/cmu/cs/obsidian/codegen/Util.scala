@@ -32,6 +32,8 @@ object Util {
     def mapObsTypeToABI(ntype: String): String = {
         // todo: this covers the primitive types from ObsidianType.scala but is hard to maintain because
         // it's basically hard coded, and doesn't traverse the structure of more complicated types.
+        //
+        // see https://docs.soliditylang.org/en/latest/abi-spec.html#types
         ntype match {
             case "bool" => "boolean"
             case "int" => "u256"
