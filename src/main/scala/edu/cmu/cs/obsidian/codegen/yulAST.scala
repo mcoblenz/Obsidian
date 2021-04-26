@@ -201,15 +201,16 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
                 // abi_decode_tuple_(4, calldatasize())
-                codegen.ExpressionStatement(FunctionCall(Identifier("abi_decode_tuple"), Seq(ilit(4), FunctionCall(Identifier("calldatasize"), Seq())))),
+                codegen.ExpressionStatement(ap("abi_decode_tuple", ilit(4), ap("calldatasize"))),
                 //    fun_retrieve_24()
-                codegen.ExpressionStatement(FunctionCall(Identifier(functionRename(f.name)), f.parameters.map(p => Identifier(p.name)))), //todo: second argument is highly speculative
+                //todo: second argument is highly speculative
+                codegen.ExpressionStatement(ap(functionRename(f.name), f.parameters.map(p => Identifier(p.name)): _*)),
                 //    let memPos := allocate_memory(0)
-                codegen.Assignment(Seq(Identifier("memPos")), FunctionCall(Identifier("allocate_memory"), Seq(ilit(0)))),
+                codegen.Assignment(Seq(Identifier("memPos")), ap("allocate_memory", ilit(0))),
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
-                codegen.Assignment(Seq(Identifier("memEnd")), FunctionCall(Identifier("abi_encode_tuple_to_fromStack"), Seq(Identifier("memPos")))),
+                codegen.Assignment(Seq(Identifier("memEnd")), ap("abi_encode_tuple_to_fromStack", Identifier("memPos"))),
                 //    return(memPos, sub(memEnd, memPos))
-                codegen.ExpressionStatement(FunctionCall(Identifier("return"), Seq(Identifier("memPos"), FunctionCall(Identifier("sub"), Seq(Identifier("memEnd"), Identifier("memPos"))))))
+                codegen.ExpressionStatement(ap("return", Identifier("memPos"), ap("sub", Identifier("memEnd"), Identifier("memPos"))))
             )
         }
 
