@@ -26,6 +26,8 @@ object CodeGenYul extends CodeGenerator {
     // we generate new temporary variables with a little bit of global state; i am making the
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
     // though that is not enforced statically.
+    //
+    // todo: this is getting redundant; better way to manage different vars we create?
     var tempCnt: Int = 0
     var retCnt: Int = 0
 
@@ -36,8 +38,8 @@ object CodeGenYul extends CodeGenerator {
 
     // todo this is getting redundant, find a better way
     def nextRet(): String = {
-        tempCnt = tempCnt + 1
-        s"_ret_${tempCnt.toString}" //todo: better naming convention?
+        retCnt = retCnt + 1
+        s"_ret_${retCnt.toString}" //todo: better naming convention?
     }
 
 

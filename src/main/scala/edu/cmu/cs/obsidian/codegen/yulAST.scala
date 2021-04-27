@@ -220,19 +220,45 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         def callValueCheck(): YulStatement = callvaluecheck
 
+        var deRetCnt = 0
+
+        def nextDeRet(): String = {
+            deRetCnt = deRetCnt + 1
+            s"_dd_ret_${deRetCnt.toString}" //todo: better naming convention?
+        }
+
         def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
+            val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
+
+            //todo: second argument to the application is highly speculative; check once you have more complex functions
+            val call_to_f: Expression = ap(functionRename(f.name), f.parameters.map(p => Identifier(p.name)): _*)
+            val call_f_and_maybe_assign: YulStatement =
+                if (f.returnVariables.nonEmpty) {
+                    codegen.Assignment(temps, call_to_f)
+                } else {
+                    ExpressionStatement(call_to_f)
+                }
+
+            val memEnd =
+                if(f.returnVariables.nonEmpty) {
+                    Identifier(memEnd)
+                } else {
+                    // todo this might not be right, i'm not sure how things get allocated on the stack
+                    temps.last
+                }
+
             Seq(
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
                 // abi_decode_tuple_(4, calldatasize())
                 codegen.ExpressionStatement(ap("abi_decode_tuple", ilit(4), ap("calldatasize"))),
                 //    fun_retrieve_24()
-                //todo: second argument is highly speculative
-                codegen.ExpressionStatement(ap(functionRename(f.name), f.parameters.map(p => Identifier(p.name)): _*)),
+                call_f_and_maybe_assign,
                 //    let memPos := allocate_memory(0)
-                codegen.Assignment(Seq(Identifier("memPos")), ap("allocate_memory", ilit(0))),
-                //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
-                codegen.Assignment(Seq(Identifier("memEnd")), ap("abi_encode_tuple_to_fromStack", Identifier("memPos"))),
+                assign1(Identifier("memPos"), ap("allocate_memory", ilit(0))),
+                //    let memEnd := abi_encode_tuple__to__fromStack(memPos) c.f.
+                //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0) // TODO iev picking up here
+                assign1(Identifier("memEnd"), ap("abi_encode_tuple_to_fromStack", Identifier("memPos"))),
                 //    return(memPos, sub(memEnd, memPos))
                 codegen.ExpressionStatement(ap("return", Identifier("memPos"), ap("sub", Identifier("memEnd"), Identifier("memPos"))))
             )
