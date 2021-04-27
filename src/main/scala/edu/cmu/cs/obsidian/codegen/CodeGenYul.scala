@@ -291,7 +291,9 @@ object CodeGenYul extends CodeGenerator {
         })
 
         // flatten the resultant sequences and do them first, then make the call to the function using the Ids
-        es_trans.flatMap(x => x._1) ++ store_then_ret(retvar, ap(s, es_trans.map(x => x._2): _*))
+            es_trans.map(x => edu.cmu.cs.obsidian.codegen.VariableDeclaration(Seq((x._2, None)), None)) ++
+            es_trans.flatMap(x => x._1) ++
+            assign1(retvar, ap(s, es_trans.map(x => x._2): _*))
     }
 
     def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
@@ -303,6 +305,7 @@ object CodeGenYul extends CodeGenerator {
         // todo: maybe there's a more elegant way to do this with less repeated code
         val e1id = nextTemp()
         val e2id = nextTemp()
+        Seq(VariableDeclaration(Seq((e1id,None)),None), VariableDeclaration(Seq((e2id,None)),None)) ++
         translateExpr(e1id, e1) ++
             translateExpr(e2id, e2) ++
             Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), ap("or", ap(s, e1id, e2id), ap("eq", e1id, e2id))))
@@ -313,16 +316,16 @@ object CodeGenYul extends CodeGenerator {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        store_then_ret(retvar, FunctionCall(Identifier("sload"), Seq(ilit(tempSymbolTable(x)))))
+                        assign1(retvar, FunctionCall(Identifier("sload"), Seq(ilit(tempSymbolTable(x)))))
                     case NumLiteral(n) =>
-                        store_then_ret(retvar, ilit(n))
+                        assign1(retvar, ilit(n))
                     case StringLiteral(value) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case TrueLiteral() =>
-                        store_then_ret(retvar, true_lit)
+                        assign1(retvar, true_lit)
                     case FalseLiteral() =>
-                        store_then_ret(retvar, false_lit)
+                        assign1(retvar, false_lit)
                     case This() =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -361,7 +364,7 @@ object CodeGenYul extends CodeGenerator {
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
             case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
-                val (seqs: Seq[Seq[YulStatement]], ids: Seq[edu.cmu.cs.obsidian.codegen.Expression]) =
+                val (seqs, ids: Seq[edu.cmu.cs.obsidian.codegen.Expression]) =
                     args.map(p => {
                         val id = nextTemp()
                         (translateExpr(id, p), ExpressionStatement(id))

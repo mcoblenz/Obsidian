@@ -24,7 +24,7 @@ object Util {
 
     def ap(n: String, es: Expression*): Expression = FunctionCall(Identifier(n), es)
 
-    def store_then_ret(retvar: Identifier, e: Expression): Seq[YulStatement] = Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), e)) //todo this may not be needed once i work out more cases
+    def assign1(retvar: Identifier, e: Expression): Seq[YulStatement] = Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), e))
 
     val true_lit: Literal = blit(true)
     val false_lit: Literal = blit(false)
