@@ -217,7 +217,7 @@ object CodeGenYul extends CodeGenerator {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
                         val e_yul = translateExpr(temp_id, e)
-                        e_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(Identifier(retVarName)), temp_id), Leave())
+                        Seq(plain_decl(temp_id)) ++ e_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(Identifier(retVarName)), temp_id), Leave())
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
@@ -291,8 +291,8 @@ object CodeGenYul extends CodeGenerator {
         })
 
         // flatten the resultant sequences and do them first, then make the call to the function using the Ids
-            es_trans.map(x => edu.cmu.cs.obsidian.codegen.VariableDeclaration(Seq((x._2, None)), None)) ++
-            es_trans.flatMap(x => x._1) ++
+        es_trans.map(x => plain_decl(x._2)) ++
+            es_trans.flatMap(x => x._1) :+
             assign1(retvar, ap(s, es_trans.map(x => x._2): _*))
     }
 
@@ -305,10 +305,10 @@ object CodeGenYul extends CodeGenerator {
         // todo: maybe there's a more elegant way to do this with less repeated code
         val e1id = nextTemp()
         val e2id = nextTemp()
-        Seq(VariableDeclaration(Seq((e1id,None)),None), VariableDeclaration(Seq((e2id,None)),None)) ++
-        translateExpr(e1id, e1) ++
-            translateExpr(e2id, e2) ++
-            Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), ap("or", ap(s, e1id, e2id), ap("eq", e1id, e2id))))
+        Seq(plain_decl(e1id), plain_decl(e2id)) ++
+            translateExpr(e1id, e1) ++
+            translateExpr(e2id, e2) :+
+            assign1(retvar, ap("or", ap(s, e1id, e2id), ap("eq", e1id, e2id)))
     }
 
     def translateExpr(retvar: Identifier, e: Expression): Seq[YulStatement] = {
@@ -316,16 +316,16 @@ object CodeGenYul extends CodeGenerator {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        assign1(retvar, FunctionCall(Identifier("sload"), Seq(ilit(tempSymbolTable(x)))))
+                        Seq(assign1(retvar, ap("sload", ilit(tempSymbolTable(x)))))
                     case NumLiteral(n) =>
-                        assign1(retvar, ilit(n))
+                        Seq(assign1(retvar, ilit(n)))
                     case StringLiteral(value) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case TrueLiteral() =>
-                        assign1(retvar, true_lit)
+                        Seq(assign1(retvar, true_lit))
                     case FalseLiteral() =>
-                        assign1(retvar, false_lit)
+                        Seq(assign1(retvar, false_lit))
                     case This() =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -364,7 +364,7 @@ object CodeGenYul extends CodeGenerator {
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
             case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
-                val (seqs, ids: Seq[edu.cmu.cs.obsidian.codegen.Expression]) =
+                val (seqs, ids: Seq[edu.cmu.cs.obsidian.codegen.Expression]) = // TODO: this is busted and i'm getting lucky. rewrite it.
                     args.map(p => {
                         val id = nextTemp()
                         (translateExpr(id, p), ExpressionStatement(id))

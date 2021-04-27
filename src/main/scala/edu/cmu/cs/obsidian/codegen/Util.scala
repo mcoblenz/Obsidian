@@ -24,7 +24,9 @@ object Util {
 
     def ap(n: String, es: Expression*): Expression = FunctionCall(Identifier(n), es)
 
-    def assign1(retvar: Identifier, e: Expression): Seq[YulStatement] = Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(retvar), e))
+    def assign1(id: Identifier, e: Expression): Assignment = codegen.Assignment(Seq(id), e)
+
+    def plain_decl(name: Identifier): VariableDeclaration = VariableDeclaration(Seq((name,None)),None)
 
     val true_lit: Literal = blit(true)
     val false_lit: Literal = blit(false)
