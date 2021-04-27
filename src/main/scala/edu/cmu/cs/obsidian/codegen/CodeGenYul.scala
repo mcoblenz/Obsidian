@@ -2,7 +2,6 @@ package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
 import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
-import edu.cmu.cs.obsidian.typecheck.{BoolType, BottomType, ContractReferenceType, GenericType, Int256Type, IntType, InterfaceContractType, NonPrimitiveType, PrimitiveType, StateType, StringType, UnitType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -189,10 +188,9 @@ object CodeGenYul extends CodeGenerator {
         var id: Option[String] = None
         val ret: Seq[TypedName] =
             transaction.retType match {
-                case Some(t) => {
+                case Some(t) =>
                     id = Some(nextRet())
                     Seq(TypedName(id.get, mapObsTypeToABI(t.toString)))
-                }
                 case None => Seq()
             }
 
@@ -206,7 +204,7 @@ object CodeGenYul extends CodeGenerator {
     /**
       * translate an obsidian statement into the corresponding sequence of yul statements
       *
-      * @param s the statement to be translated
+      * @param s      the statement to be translated
       * @param retVar the name of the variable to use for returning for the current scope, if there is one
       * @return
       */
@@ -218,8 +216,8 @@ object CodeGenYul extends CodeGenerator {
                 retVar match {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
-                        val e_yul = translateExpr(temp_id,e)
-                        e_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(Identifier(retVarName)),temp_id), Leave())
+                        val e_yul = translateExpr(temp_id, e)
+                        e_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(Identifier(retVarName)), temp_id), Leave())
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
