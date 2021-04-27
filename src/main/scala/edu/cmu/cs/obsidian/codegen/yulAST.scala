@@ -74,10 +74,33 @@ case class Assignment(variableNames: Seq[Identifier], value: Expression) extends
     }
 }
 
-// todo: can you just declare variables without giving them values?
-case class VariableDeclaration(variables: Seq[TypedName], values: Seq[Expression]) extends YulStatement {
+/**
+  * This class represents variable declarations in Yul. These take the form of one or more names,
+  * optionally paired with types, and 0 or 1 expressions to which they should be bound. Some examples
+  * are and how they would be represented by arguments to this class are shown informally below:
+  *   let x := 7                      ~~> <(x,none)>,some(7)
+  *   let x := add(y,3)               ~~> <(x,none)>,some(add(y,3))
+  *   // here, since x has no type it's assumed to be u256 and gets assigned 0
+  *   let x                           ~~> <(x,none)>,none
+  *   let v:uint32 := 0 : uint32      ~~> <(x,some(uint32)>,some(0)
+  *   let x,y = g()                   ~~> <(x,none),(y,none)>,some(g())
+  *   let v:uint256, t := f()         ~~> <(v,some(uint256),(t,none)>,some(f())
+  *
+  * @param variables the sequence of variables, paired with their optional types, to declare
+  * @param value the optional expression to which to bind the variables declared
+  */
+case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], value: Option[Expression]) extends YulStatement {
     override def toString: String = {
-        s"let ${variables.map(id => id.name + ":" + id.ntype).mkString(", ")} := ${values.mkString(", ")}"
+        s"let ${
+            variables.map(v => v._1 + (v._2 match {
+                case Some(t) => s" : $t"
+                case None => ""
+            })).mkString(", ")
+        }" +
+            (value match {
+                case Some(e) => s" := ${e.toString}"
+                case None => ""
+            })
     }
 }
 
