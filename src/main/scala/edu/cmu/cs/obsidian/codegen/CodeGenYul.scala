@@ -219,7 +219,7 @@ object CodeGenYul extends CodeGenerator {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
                         val e_yul = translateExpr(temp_id, e)
-                        Seq(plain_decl(temp_id)) ++ e_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Assignment(Seq(Identifier(retVarName)), temp_id), Leave())
+                        Seq(plain_decl(temp_id)) ++ e_yul ++ Seq(assign1(Identifier(retVarName), temp_id), Leave())
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
