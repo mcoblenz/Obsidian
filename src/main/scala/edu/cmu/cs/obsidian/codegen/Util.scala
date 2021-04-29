@@ -26,7 +26,10 @@ object Util {
 
     def assign1(id: Identifier, e: Expression): Assignment = codegen.Assignment(Seq(id), e)
 
-    def plain_decl(name: Identifier): VariableDeclaration = VariableDeclaration(Seq((name,None)),None)
+    def decl_plain(id: Identifier): VariableDeclaration = VariableDeclaration(Seq((id, None)), None)
+
+    def decl_exp(id: Identifier, e: Expression): VariableDeclaration = VariableDeclaration(Seq((id, None)), Some(e))
+
 
     val true_lit: Literal = blit(true)
     val false_lit: Literal = blit(false)

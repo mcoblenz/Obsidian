@@ -219,7 +219,7 @@ object CodeGenYul extends CodeGenerator {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
                         val e_yul = translateExpr(temp_id, e)
-                        plain_decl(temp_id) +: e_yul :+ assign1(Identifier(retVarName), temp_id) :+ Leave()
+                        decl_plain(temp_id) +: e_yul :+ assign1(Identifier(retVarName), temp_id) :+ Leave()
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
@@ -293,7 +293,7 @@ object CodeGenYul extends CodeGenerator {
         })
 
         // flatten the resultant sequences and do them first, then make the call to the function using the Ids
-        es_trans.map(x => plain_decl(x._2)) ++
+        es_trans.map(x => decl_plain(x._2)) ++
             es_trans.flatMap(x => x._1) :+
             assign1(retvar, ap(s, es_trans.map(x => x._2): _*))
     }
@@ -307,7 +307,7 @@ object CodeGenYul extends CodeGenerator {
         // todo: maybe there's a more elegant way to do this with less repeated code
         val e1id = nextTemp()
         val e2id = nextTemp()
-        Seq(plain_decl(e1id), plain_decl(e2id)) ++
+        Seq(decl_plain(e1id), decl_plain(e2id)) ++
             translateExpr(e1id, e1) ++
             translateExpr(e2id, e2) :+
             assign1(retvar, ap("or", ap(s, e1id, e2id), ap("eq", e1id, e2id)))
@@ -355,7 +355,7 @@ object CodeGenYul extends CodeGenerator {
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case Subtract(e1, e2) => call("sub", retvar, e1, e2)
-                    case Divide(e1, e2) => call("sdiv", retvar, e1, e2) // todo div is for unsigneds; i believe we have signed ints?
+                    case Divide(e1, e2) => call("sdiv", retvar, e1, e2) // todo div is for unsigned; i believe we have signed ints?
                     case Multiply(e1, e2) => call("mul", retvar, e1, e2)
                     case Mod(e1, e2) => call("smod", retvar, e1, e2) // todo as with div
                     case Equals(e1, e2) => call("eq", retvar, e1, e2)
