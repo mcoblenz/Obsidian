@@ -258,14 +258,6 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                     ExpressionStatement(call_to_f)
                 }
 
-            val memEnd =
-                if (f.returnVariables.isEmpty) {
-                    Identifier("memEnd")
-                } else {
-                    // todo this might not be right, i'm not sure how things get allocated on the stack
-                    temps.last
-                }
-
             Seq(
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
