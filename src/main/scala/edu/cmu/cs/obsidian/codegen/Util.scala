@@ -20,9 +20,9 @@ object Util {
 
     def stringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
 
-    def callvaluecheck: YulStatement = codegen.If(FunctionCall(Identifier("callvalue"), Seq()), Block(Seq(ExpressionStatement(FunctionCall(Identifier("revert"), Seq(ilit(0), ilit(0)))))))
-
     def ap(n: String, es: Expression*): Expression = FunctionCall(Identifier(n), es)
+
+    def callvaluecheck: YulStatement = codegen.If(ap("callvalue"), Block(Seq(ExpressionStatement(ap("revert", ilit(0), ilit(0))))))
 
     def assign1(id: Identifier, e: Expression): Assignment = codegen.Assignment(Seq(id), e)
 

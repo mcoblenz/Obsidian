@@ -219,7 +219,7 @@ object CodeGenYul extends CodeGenerator {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
                         val e_yul = translateExpr(temp_id, e)
-                        Seq(plain_decl(temp_id)) ++ e_yul ++ Seq(assign1(Identifier(retVarName), temp_id), Leave())
+                        plain_decl(temp_id) +: e_yul :+ assign1(Identifier(retVarName), temp_id) :+ Leave()
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
@@ -246,8 +246,8 @@ object CodeGenYul extends CodeGenerator {
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee)
                 val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar)) // todo iev be careful here this might be wrong
                 val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar))
-                scrutinee_yul ++ Seq(edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
-                    Case(false_lit, Block(neg_yul)))))
+                scrutinee_yul :+ edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
+                    Case(false_lit, Block(neg_yul))))
             case e: Expression => translateExpr(nextTemp(), e)
             case VariableDecl(typ, varName) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
