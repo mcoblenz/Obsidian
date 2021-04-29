@@ -21,7 +21,17 @@ trait Expression extends YulAST
 trait YulStatement extends YulAST
 
 // for each asm struct, create a case class
-case class TypedName(name: String, ntype: String) extends YulAST
+case class TypedName(name: String, ntype: String) extends YulAST {
+    override def toString: String = {
+        s"name ${
+            if (ntype.isEmpty) {
+                ""
+            } else {
+                s" : $ntype"
+            }
+        }"
+    }
+}
 
 case class Case(value: Literal, body: Block) extends YulAST {
     override def toString: String = {
@@ -157,7 +167,7 @@ case class ExpressionStatement(expression: Expression) extends YulStatement {
 
 case class Block(statements: Seq[YulStatement]) extends YulStatement {
     override def toString: String = {
-        statements.map(s => s.toString).mkString(" ")
+        statements.map(s => s.toString).mkString("\n")
     }
 }
 
@@ -220,6 +230,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         def callValueCheck(): YulStatement = callvaluecheck
 
+        // together, these keep track of and create temporary variables for returns in the dispatch table
         var deRetCnt = 0
 
         def nextDeRet(): String = {
@@ -227,20 +238,28 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             s"_dd_ret_${deRetCnt.toString}" //todo: better naming convention?
         }
 
+        /**
+          * compute the sequence of statements for the dispatch table for a function
+          *
+          * @param f the function to be added to dispatch
+          * @return the sequence to add to dispatch
+          */
         def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
+            // temporary variables to store the return from calling the function
             val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
 
             //todo: second argument to the application is highly speculative; check once you have more complex functions
+            // the actual call to f, and a possible declaration of the temporary variables if there are any returns
             val call_to_f: Expression = ap(functionRename(f.name), f.parameters.map(p => Identifier(p.name)): _*)
             val call_f_and_maybe_assign: YulStatement =
                 if (f.returnVariables.nonEmpty) {
-                    codegen.Assignment(temps, call_to_f)
+                    codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))
                 } else {
                     ExpressionStatement(call_to_f)
                 }
 
             val memEnd =
-                if(f.returnVariables.isEmpty) {
+                if (f.returnVariables.isEmpty) {
                     Identifier("memEnd")
                 } else {
                     // todo this might not be right, i'm not sure how things get allocated on the stack
@@ -255,10 +274,12 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
                 //    let memPos := allocate_memory(0)
-                assign1(Identifier("memPos"), ap("allocate_memory", ilit(0))),
-                //    let memEnd := abi_encode_tuple__to__fromStack(memPos) c.f.
-                //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0) // TODO iev picking up here
-                assign1(Identifier("memEnd"), ap("abi_encode_tuple_to_fromStack", Identifier("memPos"))),
+                decl_exp(Identifier("memPos"), ap("allocate_memory", ilit(0))),
+                //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
+                //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
+                // nb: the code for these is written dynamically below so we can assume that they exist before they do
+                decl_exp(Identifier("memEnd"), ap("abi_encode_tuple_to_fromStack" + f.returnVariables.length.toString,
+                    Identifier("memPos") +: temps: _*)),
                 //    return(memPos, sub(memEnd, memPos))
                 codegen.ExpressionStatement(ap("return", Identifier("memPos"), ap("sub", Identifier("memEnd"), Identifier("memPos"))))
             )
@@ -287,13 +308,18 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
 
+        var abiEncodesNeeded: Set[Int] = Set()
+
         for (sub <- obj.subobjects) { // TODO separate runtime object out as a module (make it verbose)
             for (s <- sub.code.block.statements) { // temporary fix due to issue above
                 s match {
                     case f: FunctionDefinition =>
                         dispatch = true
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
+                        // generate the dispatch table entry
                         dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
+                        // note the number of return variables so that we generate the appropriate abi encode functions (but without repetitions)
+                        abiEncodesNeeded = abiEncodesNeeded + f.returnVariables.length
                     case e: ExpressionStatement =>
                         e.expression match {
                             case _: FunctionCall =>
@@ -318,6 +344,49 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
         def codeCopy(): Expression = ap("codecopy", ilit(0), ap("dataoffset", stringlit(runtimeObject)), datasize)
 
         def defaultReturn(): Expression = ap("return", ilit(0), datasize)
+
+        /**
+          * compute the abi tuple encode function for a given number of returns. for example, for 0,
+          * 1, and 2 returns:
+          *
+          * {{{
+          * function abi_encode_tuple__to__fromStack(headStart ) -> tail {
+          *    tail := add(headStart, 0)
+          * }
+          * }}}
+          *
+          * {{{
+          * function abi_encode_tuple_t_uint256__to_t_uint256__fromStack(headStart , value0) -> tail {
+          *    tail := add(headStart, 32)
+          *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
+          * }
+          * }}}
+          *
+          * {{{
+          * function abi_encode_tuple_t_uint256_t_uint256__to_t_uint256_t_uint256__fromStack(headStart , value0, value1) -> tail {
+          *    tail := add(headStart, 64)
+          *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
+          *    abi_encode_t_uint256_to_t_uint256_fromStack(value1,  add(headStart, 32))
+          * }
+          * }}}
+          *
+          * @param n the number of returns
+          * @return the function definition for output
+          */
+        def write_abi_encode(n: Int): FunctionDefinition = {
+            val var_indices: Seq[Int] = Seq.tabulate(n)(i => i)
+            val encode_lines: Seq[YulStatement] = var_indices.map(i =>
+                ExpressionStatement(ap("abi_encode_t_uint256_to_t_uint256_fromStack",
+                    Identifier("value" + i.toString),
+                    ap("add", Identifier("headStart"), ilit(n * 32)))))
+
+            val bod: Seq[YulStatement] = assign1(Identifier("tail"), ap("add", Identifier("headStart"), ilit(32 * n))) +: encode_lines
+            FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
+                TypedName("headStart", "") +: var_indices.map(i => TypedName("value" + i.toString, "")),
+                Seq(TypedName("tail", "")), Block(bod))
+        }
+
+        def abiEncodeTupleFuncs(): YulStatement = Block(abiEncodesNeeded.map(write_abi_encode).toSeq)
 
         class Func(val code: String) {}
 
