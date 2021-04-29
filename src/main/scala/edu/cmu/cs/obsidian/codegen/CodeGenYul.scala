@@ -259,7 +259,7 @@ object CodeGenYul extends CodeGenerator {
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee)
                 val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar)) // todo iev be careful here this might be wrong
                 val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar))
-                scrutinee_yul :+ edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
+                decl_plain(id) +: scrutinee_yul :+ edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
                     Case(false_lit, Block(neg_yul))))
             case e: Expression => translateExpr(nextTemp(), e)
             case VariableDecl(typ, varName) =>
@@ -383,14 +383,19 @@ object CodeGenYul extends CodeGenerator {
                     case None =>
                         assert(assertion = false, "encountered a function name without knowing how many things it returns")
                         Seq()
-                    case Some(n) =>
+                    case Some(n) => // todo: some of this logic may be repeated in the dispatch table
                         val (seqs, ids) = {
                             args.map(p => {
                                 val id: Identifier = nextTemp()
                                 (translateExpr(id, p), id)
                             }).unzip
                         }
-                        seqs.flatten :+ decl_n_exp(Seq.tabulate(n)(_ => nextTemp()), FunctionCall(Identifier(name), ids))
+                        seqs.flatten :+
+                            (if (n == 0) {
+                                ExpressionStatement(FunctionCall(Identifier(name), ids))
+                            } else {
+                                decl_n_exp(Seq.tabulate(n)(_ => nextTemp()), FunctionCall(Identifier(name), ids))
+                            })
                 }
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
