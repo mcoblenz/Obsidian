@@ -366,10 +366,10 @@ object CodeGenYul extends CodeGenerator {
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
             case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
-                val (seqs, ids: Seq[edu.cmu.cs.obsidian.codegen.Expression]) = // TODO: this is busted and i'm getting lucky. rewrite it.
+                val (seqs, ids) =
                     args.map(p => {
-                        val id = nextTemp()
-                        (translateExpr(id, p), ExpressionStatement(id))
+                        val id: Identifier = nextTemp()
+                        (translateExpr(id, p), id)
                     }).unzip
                 seqs.flatten :+ ExpressionStatement(FunctionCall(Identifier(name), ids))
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>

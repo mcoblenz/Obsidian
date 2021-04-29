@@ -240,8 +240,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                 }
 
             val memEnd =
-                if(f.returnVariables.nonEmpty) {
-                    Identifier(memEnd)
+                if(f.returnVariables.isEmpty) {
+                    Identifier("memEnd")
                 } else {
                     // todo this might not be right, i'm not sure how things get allocated on the stack
                     temps.last
