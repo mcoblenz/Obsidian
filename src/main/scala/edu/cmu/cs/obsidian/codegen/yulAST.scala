@@ -258,6 +258,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                     ExpressionStatement(call_to_f)
                 }
 
+            val mp_id: Identifier = Identifier("memPos")
+
             Seq(
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
@@ -266,14 +268,13 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
                 //    let memPos := allocate_memory(0)
-                decl_exp(Identifier("memPos"), ap("allocate_memory", ilit(0))),
+                decl_exp(mp_id, ap("allocate_memory", ilit(0))),
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
                 //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
-                decl_exp(Identifier("memEnd"), ap("abi_encode_tuple_to_fromStack" + f.returnVariables.length.toString,
-                    Identifier("memPos") +: temps: _*)),
+                decl_exp(Identifier("memEnd"), ap("abi_encode_tuple_to_fromStack" + temps.length.toString, mp_id +: temps: _*)),
                 //    return(memPos, sub(memEnd, memPos))
-                codegen.ExpressionStatement(ap("return", Identifier("memPos"), ap("sub", Identifier("memEnd"), Identifier("memPos"))))
+                codegen.ExpressionStatement(ap("return", mp_id, ap("sub", Identifier("memEnd"), mp_id)))
             )
         }
 
@@ -293,7 +294,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                             () // TODO unimplemented
                     }
                 case _ =>
-                    assert(assertion = false, "TODO: objscope not implemented for block statement " + s.toString)
+                    assert(assertion = false, "TODO: objscope not implemented for statement " + s.toString)
                     () // TODO unimplemented
             }
         }
@@ -310,7 +311,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
                         // generate the dispatch table entry
                         dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
-                        // note the number of return variables so that we generate the appropriate abi encode functions (but without repetitions)
+                        // note the number of return variables so that we generate the appropriate abi encode functions (without repetitions)
                         abiEncodesNeeded = abiEncodesNeeded + f.returnVariables.length
                     case e: ExpressionStatement =>
                         e.expression match {
