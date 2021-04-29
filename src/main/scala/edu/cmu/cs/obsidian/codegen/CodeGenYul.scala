@@ -23,6 +23,15 @@ object CodeGenYul extends CodeGenerator {
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
     var stateEnumCounter: Int = 0 // counter indicating the next value to assign since we don't know the total num of states
 
+    /**
+      * as we translate transactions, we note their name and the number of things they return. then
+      * when we translate a call to them we can produce the right number of temporary variables to
+      * capture the result.
+      *
+      * todo: this may be too naïve but it will work for now
+      */
+    var fnNamesToReturnArity: Map[String, Int] = Map()
+
     // we generate new temporary variables with a little bit of global state; i am making the
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
     // though that is not enforced statically.
@@ -188,13 +197,17 @@ object CodeGenYul extends CodeGenerator {
 
     def translateTransaction(transaction: Transaction): Seq[YulStatement] = {
         var id: Option[String] = None
-        val ret: Seq[TypedName] =
+        val ret: Seq[TypedName] = {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
                     Seq(TypedName(id.get, mapObsTypeToABI(t.toString)))
                 case None => Seq()
             }
+        }
+
+        // update the mapping for returns
+        fnNamesToReturnArity = fnNamesToReturnArity.+((transaction.name, ret.length))
 
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
@@ -366,12 +379,19 @@ object CodeGenYul extends CodeGenerator {
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)))
                 }
             case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
-                val (seqs, ids) =
-                    args.map(p => {
-                        val id: Identifier = nextTemp()
-                        (translateExpr(id, p), id)
-                    }).unzip
-                seqs.flatten :+ ExpressionStatement(FunctionCall(Identifier(name), ids))
+                fnNamesToReturnArity.get(name) match {
+                    case None =>
+                        assert(assertion = false, "encountered a function name without knowing how many things it returns")
+                        Seq()
+                    case Some(n) =>
+                        val (seqs, ids) = {
+                            args.map(p => {
+                                val id: Identifier = nextTemp()
+                                (translateExpr(id, p), id)
+                            }).unzip
+                        }
+                        seqs.flatten :+ decl_n_exp(Seq.tabulate(n)(_ => nextTemp()), FunctionCall(Identifier(name), ids))
+                }
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()

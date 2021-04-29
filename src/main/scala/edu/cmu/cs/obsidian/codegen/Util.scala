@@ -28,8 +28,9 @@ object Util {
 
     def decl_plain(id: Identifier): VariableDeclaration = VariableDeclaration(Seq((id, None)), None)
 
-    def decl_exp(id: Identifier, e: Expression): VariableDeclaration = VariableDeclaration(Seq((id, None)), Some(e))
+    def decl_n_exp(id: Seq[Identifier], e: Expression): VariableDeclaration = VariableDeclaration(id.map(i => (i, None)), Some(e))
 
+    def decl_exp(id: Identifier, e: Expression): VariableDeclaration = decl_n_exp(Seq(id), e)
 
     val true_lit: Literal = blit(true)
     val false_lit: Literal = blit(false)
