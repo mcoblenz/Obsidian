@@ -51,10 +51,7 @@ object "{{creationObject}}" {
             function abi_decode_tuple(headStart, dataEnd)   {
                 if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
             }
-
-            function abi_encode_tuple_to_fromStack(headStart ) -> tail {
-                tail := add(headStart, 0)
-            }
+            {{abiEncodeTupleFuncs}}
 
             function allocate_memory(size) -> memPtr {
                 memPtr := allocate_unbounded()
@@ -82,6 +79,15 @@ object "{{creationObject}}" {
                 result := and(add(value, 31), not(31))
             }
 
+            function abi_encode_t_uint256_to_t_uint256_fromStack(value, pos) {
+                mstore(pos, cleanup_t_uint256(value))
+            }
+
+            {{! the "cleanup" functions enforce the invariants on the types from the abi wrt how they're encoded;
+                with uint256, there are none, so it just returns. }}
+            function cleanup_t_uint256(value) -> cleaned {
+                cleaned := value
+            }
             {{#runtimeFunctions}}
                 {{code}}
             {{/runtimeFunctions}}
