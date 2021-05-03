@@ -41,7 +41,7 @@ object Util {
         //
         // see https://docs.soliditylang.org/en/latest/abi-spec.html#types
         ntype match {
-            case "bool" => "boolean"
+            case "bool" => "bool"
             case "int" => "u256"
             case "string" => "string"
             case "Int256" => "int256"
