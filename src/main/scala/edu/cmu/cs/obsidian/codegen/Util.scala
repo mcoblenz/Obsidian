@@ -1,6 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.codegen
+import edu.cmu.cs.obsidian.typecheck.ObsidianType
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
 
@@ -133,6 +134,17 @@ object Util {
             case _ => assert(assertion = false, "yul codegen encountered an obsidian type without a mapping to the ABI"); ""
         }
     }
+
+
+    /**
+      * returns the width of an obsidian type. right now this is always 1 because obsidian
+      * does not currently implement tuples. when it does, updating this function will cause yul
+      * codegen to correctly emit code that uses tuples in yul.
+      *
+      * @param t the obsidian type of interest
+      * @return the width of the type
+      */
+    def obsTypeToWidth(t: ObsidianType): Int = { 1 }
 
     def functionRename(name: String): String = {
         name //todo some sort of alpha variation here combined with consulting a mapping; consult the ABI
