@@ -83,6 +83,8 @@ object "{{creationObject}}" {
                 mstore(pos, cleanup_t_uint256(value))
             }
 
+            {{! the "cleanup" functions enforce the invariants on the types from the abi wrt how they're encoded;
+                with uint256, there are none, so it just returns. }}
             function cleanup_t_uint256(value) -> cleaned {
                 cleaned := value
             }

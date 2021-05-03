@@ -6,34 +6,118 @@ import org.bouncycastle.util.encoders.Hex
 
 /* utility functions shared between yulAST and CodeGenYul */
 object Util {
+    /**
+      * wrap a string in balanced braces
+      *
+      * @param str the string to wrap
+      * @return the string inside balanced braces
+      */
     def brace(str: String): String = s"{$str}"
 
+    /**
+      * wrap a string in balanced parentheses
+      *
+      * @param str the string to wrap
+      * @return the string inside balanced parentheses
+      */
     def paren(str: String): String = s"($str)"
 
+    /**
+      * wrap a string in balanced quotes
+      *
+      * @param str the string to wrap
+      * @return the string inside balanced quotes
+      */
     def quote(str: String): String = "\"" + str + "\"" // escape characters are known to not work with string interpolation
 
-    def ilit(i: Int): Literal = Literal(LiteralKind.number, i.toString, "int")
+    /**
+      * shorthand for building Yul integer literals
+      *
+      * @param i the scala integer
+      * @return the corresponding Yul integer literal
+      */
+    def intlit(i: Int): Literal = Literal(LiteralKind.number, i.toString, "int")
 
-    def blit(b: Boolean): Literal = Literal(LiteralKind.boolean, b.toString, "bool")
+    /**
+      * shorthand for building Yul boolean literals
+      *
+      * @param b the scala integer
+      * @return the corresponding Yul boolean literal
+      */
+    def boollit(b: Boolean): Literal = Literal(LiteralKind.boolean, b.toString, "bool")
 
+    /**
+      * shorthand for building Yul hex literals
+      *
+      * @param s the scala hex
+      * @return the corresponding Yul hex literal
+      */
     def hexlit(s: String): Literal = Literal(LiteralKind.number, s, "int")
 
+    /**
+      * shorthand for building Yul string literals
+      *
+      * @param s the scala string
+      * @return the corresponding Yul string literal
+      */
     def stringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
 
-    def ap(n: String, es: Expression*): Expression = FunctionCall(Identifier(n), es)
+    /**
+      * shorthand for building Yul function applications
+      *
+      * @param n the name of the Yul function to apply
+      * @param es the possibly empty sequence of arguments for the function
+      * @return the expression that applies the function to the arguments
+      */
+    def apply(n: String, es: Expression*): Expression = FunctionCall(Identifier(n), es)
 
-    def callvaluecheck: YulStatement = codegen.If(ap("callvalue"), Block(Seq(ExpressionStatement(ap("revert", ilit(0), ilit(0))))))
+    /**
+      * @return the yul call value check statement, which makes sure that funds are not spent inappropriately
+      */
+    def callvaluecheck: YulStatement = codegen.If(apply("callvalue"), Block(Seq(ExpressionStatement(apply("revert", intlit(0), intlit(0))))))
 
+    /**
+      * shorthand for bulding yul assignment statements, here assigning one expression to just one
+      * identifier
+      *
+      * @param id the identifier to be assigned
+      * @param e the expression to assign to it
+      * @return the Yul assignment expression
+      */
     def assign1(id: Identifier, e: Expression): Assignment = codegen.Assignment(Seq(id), e)
 
-    def decl_plain(id: Identifier): VariableDeclaration = VariableDeclaration(Seq((id, None)), None)
+    /**
+      * shorthand for building the yul expression that declares one variable without giving it a type
+      * or an initial value
+      *
+      * @param id the name of the variable to be declared
+      * @return the expression declaring the variable
+      */
+    def decl_0exp(id: Identifier): VariableDeclaration = VariableDeclaration(Seq((id, None)), None)
 
-    def decl_n_exp(id: Seq[Identifier], e: Expression): VariableDeclaration = VariableDeclaration(id.map(i => (i, None)), Some(e))
 
-    def decl_exp(id: Identifier, e: Expression): VariableDeclaration = decl_n_exp(Seq(id), e)
+    /**
+      * shorthand for building the yul expression that declares a sequence (non-empty) of identifiers
+      * with an initial value but no typing information
+      *
+      * @param id the identifiers to be declared, which cannot be the empty sequence
+      * @param e the expression to assign the identifiers to as an initial value
+      * @return the Yul expression for the declaration
+      */
+    def decl_nexp(id: Seq[Identifier], e: Expression): VariableDeclaration = {
+        assert(id.nonEmpty, "internal error: tried to build a declaration with no identifiers")
+        VariableDeclaration(id.map(i => (i, None)), Some(e))
+    }
 
-    val true_lit: Literal = blit(true)
-    val false_lit: Literal = blit(false)
+    /**
+      * shorthand for building the yul expression that declares just identifier
+      * with an initial value but no typing information
+      *
+      * @param id the identifier to be declared
+      * @param e the expression to assign the identifier to as an initial value
+      * @return the Yul expression for the declaration
+      */
+    def decl_1exp(id: Identifier, e: Expression): VariableDeclaration = decl_nexp(Seq(id), e)
 
     def mapObsTypeToABI(ntype: String): String = {
         // todo: this covers the primitive types from ObsidianType.scala but is hard to maintain because

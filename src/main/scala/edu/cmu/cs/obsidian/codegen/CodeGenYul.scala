@@ -232,7 +232,7 @@ object CodeGenYul extends CodeGenerator {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
                         val e_yul = translateExpr(temp_id, e)
-                        decl_plain(temp_id) +: e_yul :+ assign1(Identifier(retVarName), temp_id) :+ Leave()
+                        decl_0exp(temp_id) +: e_yul :+ assign1(Identifier(retVarName), temp_id) :+ Leave()
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
@@ -249,7 +249,7 @@ object CodeGenYul extends CodeGenerator {
                                 LiteralKind.number
                         }
                         Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
-                            Seq(ilit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString))))) //todo: this is likely wrong for strings
+                            Seq(intlit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString))))) //todo: this is likely wrong for strings
                     case e =>
                         assert(assertion = false, "TODO: translate assignment case" + e.toString)
                         Seq()
@@ -257,10 +257,14 @@ object CodeGenYul extends CodeGenerator {
             case IfThenElse(scrutinee, pos, neg) =>
                 val id = nextTemp()
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee)
-                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar)) // todo iev be careful here this might be wrong
+                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar))
                 val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar))
-                decl_plain(id) +: scrutinee_yul :+ edu.cmu.cs.obsidian.codegen.Switch(id, Seq(Case(true_lit, Block(pos_yul)),
-                    Case(false_lit, Block(neg_yul))))
+                decl_0exp(id) +:
+                    scrutinee_yul :+
+                    edu.cmu.cs.obsidian.codegen.Switch(id,
+                        Seq(
+                            Case(boollit(true), Block(pos_yul)),
+                            Case(boollit(false), Block(neg_yul))))
             case e: Expression => translateExpr(nextTemp(), e)
             case VariableDecl(typ, varName) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
@@ -306,9 +310,9 @@ object CodeGenYul extends CodeGenerator {
         })
 
         // flatten the resultant sequences and do them first, then make the call to the function using the Ids
-        es_trans.map(x => decl_plain(x._2)) ++
+        es_trans.map(x => decl_0exp(x._2)) ++
             es_trans.flatMap(x => x._1) :+
-            assign1(retvar, ap(s, es_trans.map(x => x._2): _*))
+            assign1(retvar, apply(s, es_trans.map(x => x._2): _*))
     }
 
     def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression): Seq[YulStatement] = {
@@ -320,10 +324,10 @@ object CodeGenYul extends CodeGenerator {
         // todo: maybe there's a more elegant way to do this with less repeated code
         val e1id = nextTemp()
         val e2id = nextTemp()
-        Seq(decl_plain(e1id), decl_plain(e2id)) ++
+        Seq(decl_0exp(e1id), decl_0exp(e2id)) ++
             translateExpr(e1id, e1) ++
             translateExpr(e2id, e2) :+
-            assign1(retvar, ap("or", ap(s, e1id, e2id), ap("eq", e1id, e2id)))
+            assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
     def translateExpr(retvar: Identifier, e: Expression): Seq[YulStatement] = {
@@ -331,16 +335,16 @@ object CodeGenYul extends CodeGenerator {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        Seq(assign1(retvar, ap("sload", ilit(tempSymbolTable(x)))))
+                        Seq(assign1(retvar, apply("sload", intlit(tempSymbolTable(x)))))
                     case NumLiteral(n) =>
-                        Seq(assign1(retvar, ilit(n)))
+                        Seq(assign1(retvar, intlit(n)))
                     case StringLiteral(value) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case TrueLiteral() =>
-                        Seq(assign1(retvar, true_lit))
+                        Seq(assign1(retvar, boollit(true)))
                     case FalseLiteral() =>
-                        Seq(assign1(retvar, false_lit))
+                        Seq(assign1(retvar, boollit(false)))
                     case This() =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -394,7 +398,7 @@ object CodeGenYul extends CodeGenerator {
                             (if (n == 0) {
                                 ExpressionStatement(FunctionCall(Identifier(name), ids))
                             } else {
-                                decl_n_exp(Seq.tabulate(n)(_ => nextTemp()), FunctionCall(Identifier(name), ids))
+                                decl_nexp(Seq.tabulate(n)(_ => nextTemp()), FunctionCall(Identifier(name), ids))
                             })
                 }
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
