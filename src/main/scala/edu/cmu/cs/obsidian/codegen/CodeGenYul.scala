@@ -229,19 +229,13 @@ object CodeGenYul extends CodeGenerator {
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
-                        val kind: LiteralKind = e match {
-                            case NumLiteral(_) => LiteralKind.number
-                            case TrueLiteral() => LiteralKind.boolean
-                            case FalseLiteral() => LiteralKind.boolean
-                            case StringLiteral(_) => LiteralKind.string
-                            case _ =>
-                                assert(assertion = false, s"unimplemented assignment case ${assignTo.toString}")
-                                LiteralKind.number
-                        }
-                        Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
-                            Seq(intlit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString))))) //todo: this is likely wrong for strings
-                    case e =>
-                        assert(assertion = false, "TODO: translate assignment case" + e.toString)
+                        val id = nextTemp()
+                        val e_yul = translateExpr(id,e,contractName,checkedTable)
+                        decl_0exp(id) +:
+                            e_yul :+
+                            decl_1exp(Identifier(x), id)
+                    case _ =>
+                        assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
                 }
             case IfThenElse(scrutinee, pos, neg) =>
