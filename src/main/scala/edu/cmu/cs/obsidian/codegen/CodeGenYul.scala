@@ -16,7 +16,7 @@ import scala.collection.immutable.Map
 object CodeGenYul extends CodeGenerator {
 
     // TODO improve this temporary symbol table
-    var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
+    var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage //todo: deadcode?
     var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
     var stateIdx: Int = -1 // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
@@ -341,7 +341,7 @@ object CodeGenYul extends CodeGenerator {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        Seq(assign1(retvar, apply("sload", intlit(tempSymbolTable(x)))))
+                        Seq(assign1(retvar, Identifier(x))) //todo: in general this will need to know to look in memory / storage / stack
                     case NumLiteral(n) =>
                         Seq(assign1(retvar, intlit(n)))
                     case StringLiteral(value) =>
