@@ -1,5 +1,5 @@
-main contract PrimOps{
-        transaction primops() {
+main contract AssignLocalAdd{
+        transaction assignlocaladd() {
            int x;
            bool y;
 	   x = 5 + 12;
