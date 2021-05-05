@@ -197,7 +197,6 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
             transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
@@ -242,14 +241,22 @@ object CodeGenYul extends CodeGenerator {
                         Seq()
                 }
             case IfThenElse(scrutinee, pos, neg) =>
-                val id = nextTemp()
-                val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee, contractName, checkedTable)
-                // todo: why don't these recursive calls both get new temps? that's gotta be a bug
-                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
-                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
-                decl_0exp(id) +:
+                val id_scrutinee: Identifier = nextTemp()
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+                val pos_yul: Seq[YulStatement] =
+                    pos.flatMap(s => {
+                        val id_s: Identifier = nextTemp()
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                    })
+                val neg_yul: Seq[YulStatement] =
+                    neg.flatMap(s => {
+                        val id_s: Identifier = nextTemp()
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                    })
+
+                decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
-                    edu.cmu.cs.obsidian.codegen.Switch(id,
+                    edu.cmu.cs.obsidian.codegen.Switch(id_scrutinee,
                         Seq(
                             Case(boollit(true), Block(pos_yul)),
                             Case(boollit(false), Block(neg_yul))))
