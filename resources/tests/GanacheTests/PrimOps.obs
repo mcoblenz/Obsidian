@@ -1,9 +1,7 @@
 main contract PrimOps{
+        transaction primops() {
            int x;
            bool y;
-
-        transaction primops() {
-
 
            y = true && false;
            y = true || false;
