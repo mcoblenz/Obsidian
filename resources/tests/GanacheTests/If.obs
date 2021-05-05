@@ -1,0 +1,9 @@
+main contract If {
+        transaction iftest() {
+            int x;
+            if (true) {
+	       x = 1;
+	    }
+            return;
+        }
+}

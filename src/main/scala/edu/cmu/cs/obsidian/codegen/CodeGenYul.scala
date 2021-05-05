@@ -278,9 +278,18 @@ object CodeGenYul extends CodeGenerator {
             case Revert(maybeExpr) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
-            case If(eCond, s) =>
-                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
-                Seq()
+            case If(scrutinee, s) =>
+                val id_scrutinee: Identifier = nextTemp()
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+                val s_yul: Seq[YulStatement] =
+                    s.flatMap(s => {
+                        val id_s: Identifier = nextTemp()
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                    })
+
+                decl_0exp(id_scrutinee) +:
+                    scrutinee_yul :+
+                    edu.cmu.cs.obsidian.codegen.If(id_scrutinee, Block(s_yul))
             case IfInState(e, ePerm, typeState, s1, s2) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
