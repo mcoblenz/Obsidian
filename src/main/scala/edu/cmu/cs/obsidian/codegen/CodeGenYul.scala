@@ -1,7 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -230,7 +229,7 @@ object CodeGenYul extends CodeGenerator {
                 assignTo match {
                     case ReferenceIdentifier(x) =>
                         val id = nextTemp()
-                        val e_yul = translateExpr(id,e,contractName,checkedTable)
+                        val e_yul = translateExpr(id, e, contractName, checkedTable)
                         decl_0exp(id) +:
                             e_yul :+
                             decl_1exp(Identifier(x), id)
@@ -241,6 +240,7 @@ object CodeGenYul extends CodeGenerator {
             case IfThenElse(scrutinee, pos, neg) =>
                 val id = nextTemp()
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee, contractName, checkedTable)
+                // todo: why don't these recursive calls both get new temps? that's gotta be a bug
                 val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
                 val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
                 decl_0exp(id) +:
@@ -251,8 +251,7 @@ object CodeGenYul extends CodeGenerator {
                             Case(boollit(false), Block(neg_yul))))
             case e: Expression => translateExpr(nextTemp(), e, contractName, checkedTable)
             case VariableDecl(typ, varName) =>
-                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
-                Seq()
+                Seq(decl_0exp_t(Identifier(varName), typ))
             case VariableDeclWithInit(typ, varName, e) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()

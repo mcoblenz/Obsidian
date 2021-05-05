@@ -96,6 +96,15 @@ object Util {
       */
     def decl_0exp(id: Identifier): VariableDeclaration = VariableDeclaration(Seq((id, None)), None)
 
+    /**
+      * shorthand for building the yul expression that declares one variable with a type and no
+      * initial value
+      *
+      * @param id the name of the variable to be declared
+      * @return the expression declaring the variable
+      */
+    def decl_0exp_t(id: Identifier, t: ObsidianType): VariableDeclaration =
+        VariableDeclaration(Seq((id, Some(mapObsTypeToABI(t.baseTypeName)))), None)
 
     /**
       * shorthand for building the yul expression that declares a sequence (non-empty) of identifiers
