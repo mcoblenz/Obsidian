@@ -221,7 +221,10 @@ object CodeGenYul extends CodeGenerator {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
                         val e_yul = translateExpr(temp_id, e, contractName, checkedTable)
-                        decl_0exp(temp_id) +: e_yul :+ assign1(Identifier(retVarName), temp_id) :+ Leave()
+                        decl_0exp(temp_id) +:
+                            e_yul :+
+                            assign1(Identifier(retVarName), temp_id) :+
+                            Leave()
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
