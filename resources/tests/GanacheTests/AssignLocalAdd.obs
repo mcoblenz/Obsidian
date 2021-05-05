@@ -1,0 +1,8 @@
+main contract PrimOps{
+        transaction primops() {
+           int x;
+           bool y;
+	   x = 5 + 12;
+           return;
+        }
+}
