@@ -257,8 +257,11 @@ object CodeGenYul extends CodeGenerator {
             case VariableDecl(typ, varName) =>
                 Seq(decl_0exp_t(Identifier(varName), typ))
             case VariableDeclWithInit(typ, varName, e) =>
-                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
-                Seq()
+                val id = nextTemp()
+                val e_yul = translateExpr(id, e, contractName, checkedTable)
+                decl_0exp(id) +:
+                    e_yul :+
+                    decl_0exp_t_init(Identifier(varName), typ, id)
             case VariableDeclWithSpec(typIn, typOut, varName) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
