@@ -101,6 +101,7 @@ object Util {
       * initial value
       *
       * @param id the name of the variable to be declared
+      * @param t the type for id
       * @return the expression declaring the variable
       */
     def decl_0exp_t(id: Identifier, t: ObsidianType): VariableDeclaration =
@@ -110,6 +111,8 @@ object Util {
       * initial value
       *
       * @param id the name of the variable to be declared
+      * @param t the type for id
+      * @param e the expression of type t to which id will be bound
       * @return the expression declaring the variable
       */
     def decl_0exp_t_init(id: Identifier, t: ObsidianType, e: Expression): VariableDeclaration =
