@@ -102,10 +102,19 @@ case class Assignment(variableNames: Seq[Identifier], value: Expression) extends
 case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], value: Option[Expression]) extends YulStatement {
     override def toString: String = {
         s"let ${
-            variables.map(v => v._1.name + (v._2 match {
-                case Some(t) => s" : $t"
-                case None => ""
-            })).mkString(", ")
+            variables.map(v => v._1.name
+                // todo:
+                // this code correctly adds type annotations to the output Yul, but as of
+                // Version: 0.8.1+commit.df193b15.Linux.g++ of solc, you get errors like
+                // "Error: "bool" is not a valid type (user defined types are not yet supported)."
+                // when you run that code through solc even though the spec says otherwise.
+                /*
+                                + (v._2 match {
+                                    case Some(t) => s" : $t"
+                                    case None => ""
+                                })
+                */
+            ).mkString(", ")
         }" +
             (value match {
                 case Some(e) => s" := ${e.toString}"

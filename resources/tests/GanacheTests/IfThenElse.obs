@@ -1,11 +1,11 @@
 main contract IfThenElse {
-        int x;
         transaction ifthenelse() {
+            int x;
             if (true) {
-	       x = 1;
-	    } else {
-	       x = 0;
-	    }
+	            x = 1;
+	        } else {
+	            x = 0;
+	        }
             return;
         }
 }

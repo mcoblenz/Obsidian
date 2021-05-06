@@ -1,12 +1,11 @@
 main contract SimpleCall{
-        int x;
-        transaction updatex() {
-            x = 4;
-            return;
+        transaction val() returns int {
+            return 4;
         }
-        transaction main(){
+        transaction main() returns int{
+            int x;
             x = 9;
-            updatex();
-            return;
+            x = val();
+            return x;
         }
 }

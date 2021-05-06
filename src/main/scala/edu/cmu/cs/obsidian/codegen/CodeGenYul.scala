@@ -1,7 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.codegen.LiteralKind.LiteralKind
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -17,7 +16,6 @@ import scala.collection.immutable.Map
 object CodeGenYul extends CodeGenerator {
 
     // TODO improve this temporary symbol table
-    var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage
     var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
     var stateIdx: Int = -1 // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
@@ -156,7 +154,6 @@ object CodeGenYul extends CodeGenerator {
     def translateField(f: Field): Seq[YulStatement] = {
         // Reserve a slot in the storage by assigning a index in the symbol table
         // since field declaration has not yet be assigned, there is no need to do sstore
-        tempSymbolTable += f.name -> tempTableIdx
         tempTableIdx += 1
         Seq() // TODO: do we really mean to always return the empty sequence?
     }
@@ -198,7 +195,6 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
             transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
@@ -222,46 +218,55 @@ object CodeGenYul extends CodeGenerator {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
                         val e_yul = translateExpr(temp_id, e, contractName, checkedTable)
-                        decl_0exp(temp_id) +: e_yul :+ assign1(Identifier(retVarName), temp_id) :+ Leave()
+                        decl_0exp(temp_id) +:
+                            e_yul :+
+                            assign1(Identifier(retVarName), temp_id) :+
+                            Leave()
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
                 }
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
-                        val kind: LiteralKind = e match {
-                            case NumLiteral(_) => LiteralKind.number
-                            case TrueLiteral() => LiteralKind.boolean
-                            case FalseLiteral() => LiteralKind.boolean
-                            case StringLiteral(_) => LiteralKind.string
-                            case _ =>
-                                assert(assertion = false, s"unimplemented assignment case ${assignTo.toString}")
-                                LiteralKind.number
-                        }
-                        Seq(ExpressionStatement(FunctionCall(Identifier("sstore"),
-                            Seq(intlit(tempSymbolTable(x)), Literal(kind, e.toString, kind.toString))))) //todo: this is likely wrong for strings
-                    case e =>
-                        assert(assertion = false, "TODO: translate assignment case" + e.toString)
+                        //todo: easy optimization is to look at e; if it happens to be a literal we can save a temp.
+                        val id = nextTemp()
+                        val e_yul = translateExpr(id, e, contractName, checkedTable)
+                        decl_0exp(id) +:
+                            e_yul :+
+                            assign1(Identifier(x), id)
+                    case _ =>
+                        assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
                 }
             case IfThenElse(scrutinee, pos, neg) =>
-                val id = nextTemp()
-                val scrutinee_yul: Seq[YulStatement] = translateExpr(id, scrutinee, contractName, checkedTable)
-                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
-                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
-                decl_0exp(id) +:
+                val id_scrutinee: Identifier = nextTemp()
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+                val pos_yul: Seq[YulStatement] =
+                    pos.flatMap(s => {
+                        val id_s: Identifier = nextTemp()
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                    })
+                val neg_yul: Seq[YulStatement] =
+                    neg.flatMap(s => {
+                        val id_s: Identifier = nextTemp()
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                    })
+
+                decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
-                    edu.cmu.cs.obsidian.codegen.Switch(id,
+                    edu.cmu.cs.obsidian.codegen.Switch(id_scrutinee,
                         Seq(
                             Case(boollit(true), Block(pos_yul)),
                             Case(boollit(false), Block(neg_yul))))
             case e: Expression => translateExpr(nextTemp(), e, contractName, checkedTable)
             case VariableDecl(typ, varName) =>
-                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
-                Seq()
+                Seq(decl_0exp_t(Identifier(varName), typ))
             case VariableDeclWithInit(typ, varName, e) =>
-                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
-                Seq()
+                val id = nextTemp()
+                val e_yul = translateExpr(id, e, contractName, checkedTable)
+                decl_0exp(id) +:
+                    e_yul :+
+                    decl_0exp_t_init(Identifier(varName), typ, id)
             case VariableDeclWithSpec(typIn, typOut, varName) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
@@ -271,9 +276,18 @@ object CodeGenYul extends CodeGenerator {
             case Revert(maybeExpr) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
-            case If(eCond, s) =>
-                assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
-                Seq()
+            case If(scrutinee, s) =>
+                val id_scrutinee: Identifier = nextTemp()
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+                val s_yul: Seq[YulStatement] =
+                    s.flatMap(s => {
+                        val id_s: Identifier = nextTemp()
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                    })
+
+                decl_0exp(id_scrutinee) +:
+                    scrutinee_yul :+
+                    edu.cmu.cs.obsidian.codegen.If(id_scrutinee, Block(s_yul))
             case IfInState(e, ePerm, typeState, s1, s2) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
@@ -325,7 +339,7 @@ object CodeGenYul extends CodeGenerator {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        Seq(assign1(retvar, apply("sload", intlit(tempSymbolTable(x)))))
+                        Seq(assign1(retvar, Identifier(x))) //todo: in general this will need to know to look in memory / storage / stack
                     case NumLiteral(n) =>
                         Seq(assign1(retvar, intlit(n)))
                     case StringLiteral(value) =>

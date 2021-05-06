@@ -1,0 +1,8 @@
+main contract AssignLocalAdd{
+    transaction assignlocaladd() {
+        int x;
+        bool y;
+        x = 5 + 12;
+        return;
+    }
+}

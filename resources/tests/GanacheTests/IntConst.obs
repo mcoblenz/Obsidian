@@ -1,6 +1,6 @@
 main contract IntConst{
-        int x;
         transaction intconst() {
+            int x;
             x = 4;
             return;
         }

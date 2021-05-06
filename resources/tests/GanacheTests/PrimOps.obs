@@ -1,28 +1,28 @@
 main contract PrimOps{
-        int x;
-        bool y;
-
         transaction primops() {
-            y = true && false;
-            y = true || false;
+           int x;
+           bool y;
 
-            x = 4 + 4;
-            x = 4 - 4;
-            x = 4 / 4;
-            x = 4 * 4;
-            x = 4 % 4;
+           y = true && false;
+           y = true || false;
 
-            y = 1 == 2;
-            y = 1 != 2;
-            y = 3 > 4;
-            y = 3 >= 4;
-            y = 3 < 3;
-            y = 3 <= 3;
-            y = 3 != 3;
+           x = 4 + 4;
+           x = 4 - 4;
+           x = 4 / 4;
+           x = 4 * 4;
+           x = 4 % 4;
 
-            y = !y;
-            x = - x;
+           y = 1 == 2;
+           y = 1 != 2;
+           y = 3 > 4;
+           y = 3 >= 4;
+           y = 3 < 3;
+           y = 3 <= 3;
+           y = 3 != 3;
 
-            return;
+           y = !y;
+           x = - x;
+
+           return;
         }
 }
