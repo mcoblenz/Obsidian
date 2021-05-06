@@ -16,7 +16,6 @@ import scala.collection.immutable.Map
 object CodeGenYul extends CodeGenerator {
 
     // TODO improve this temporary symbol table
-    var tempSymbolTable: Map[String, Int] = Map() // map from field identifiers to index in storage //todo: deadcode?
     var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
     var stateIdx: Int = -1 // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
@@ -155,7 +154,6 @@ object CodeGenYul extends CodeGenerator {
     def translateField(f: Field): Seq[YulStatement] = {
         // Reserve a slot in the storage by assigning a index in the symbol table
         // since field declaration has not yet be assigned, there is no need to do sstore
-        tempSymbolTable += f.name -> tempTableIdx
         tempTableIdx += 1
         Seq() // TODO: do we really mean to always return the empty sequence?
     }
