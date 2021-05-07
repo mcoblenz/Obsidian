@@ -13,7 +13,21 @@ then
     exit 1
 fi
 
-for test in resources/tests/GanacheTests/*.json
+# either test only the directories named as arguments or test everything if nothing is specified.
+# since the travis.yml file doesn't give any argument here, CI will test everything, but this makes
+# local testing easier.
+tests=()
+if [ $# -gt 0 ]
+then
+  for arg in "$@"
+  do
+    tests+=("resources/tests/GanacheTests/$arg.json")
+  done
+else
+  tests=(resources/tests/GanacheTests/*.json)
+fi
+
+for test in "${tests[@]}"
 do
   echo "---------------------------------------------------------------"
   echo "running Ganache Test $test"
@@ -53,8 +67,7 @@ do
 
   # todo this is a bit of a hack. solc is supposed to output a json object
   # and it just isn't. so this is grepping through to grab the right lines
-  # with the hex that represents the output. this likely fails if the binary
-  # is more than one line long. (issue #302)
+  # with the hex that represents the output. (issue #302)
   TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
   BOT=$(grep -n "Text representation" "$NAME".evm | cut -f1 -d:)
   TOP=$((TOP+1)) # drop the line with the name
