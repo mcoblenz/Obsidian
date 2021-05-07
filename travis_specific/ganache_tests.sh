@@ -132,12 +132,13 @@ do
 	   )
 
   echo "transaction being sent is given by"
-  echo "$SEND_DATA" # | jq -M #todo why doesn't this work on travis? also below. (issue #302)
+  echo "$SEND_DATA" | jq #todo why doesn't this work on travis? also below. (issue #302)
   echo
 
   RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
-  echo "response from ganache is: $RESP"
-  # ((echo "$RESP" | tr -d '\n') ; echo) # | jq -M # (issue #302)
+  echo "response from ganache is: " #$RESP
+  echo "$RESP" | jq
+  # ((echo "$RESP" | tr -d '\n') ; echo) # | jq -M # (issue #302) #TODO
 
   # todo: this is not an exhaustive or principled way to check the output of
   # curling a post. (issue #302)
@@ -155,6 +156,25 @@ do
   fi
 
   # todo check the result of test somehow to indicate failure or not (issue #302)
+  ## todo this block is copied; make a function?
+  echo "querying ganache CLI for transaction receipt"
+
+  hash=$(echo "$RESP" | jq '.result')
+
+  SEND_DATA=$( jq -ncM \
+                  --arg "jn" "2.0" \
+                  --arg "mn" "eth_getTransactionReceipt" \
+                  --argjson "pn" "$hash" \
+                  --arg "idn" "1" \
+                  '{"jsonrpc":$jn,"method":$mn,"params":[$pn],"id":$idn}'
+	)
+  echo "eth_getTransactionReceipt is being sent"
+  echo "$SEND_DATA" | jq #todo why doesn't this work on travis? also below. (issue #302)
+  echo
+
+  RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+  echo "response from ganache is: "
+  echo "$RESP" | jq
 
   # clean up by killing ganache and the local files
   # todo: make this a subroutine that can get called at any of the exits (issue #302)
