@@ -19,15 +19,15 @@ do
   echo "running Ganache Test $test"
   echo "---------------------------------------------------------------"
 
-  NAME=$(basename -s '.json' $test)
-  GAS=$(cat "$test" | jq '.gas')
+  NAME=$(basename -s '.json' "$test")
+  GAS=$(<"$test" jq '.gas')
   GAS_HEX=$(printf '%x' "$GAS")
   # nb: we store gas price as a string because it's usually quite large so
   # it's good to have it in hex notation, but that means we need to crop
   # off the quotations.
-  GAS_PRICE=$(cat "$test" | jq '.gasprice' | tr -d '"')
-  START_ETH=$(cat "$test" | jq '.startingeth')
-  NUM_ACCT=$(cat "$test" | jq '.numaccts')
+  GAS_PRICE=$(<"$test" jq '.gasprice' | tr -d '"')
+  START_ETH=$(<"$test" jq '.startingeth')
+  NUM_ACCT=$(<"$test" jq '.numaccts')
 
   # compile the contract to yul, also creating the directory to work in
   sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
@@ -43,7 +43,7 @@ do
       exit 1
   fi
 
-  cd "$NAME"
+  cd "$NAME" || exit 1
 
   # generate the evm from yul
   echo "running solc to produce evm bytecode"
@@ -59,11 +59,11 @@ do
   # and it just isn't. so this is grepping through to grab the right lines
   # with the hex that represents the output. this likely fails if the binary
   # is more than one line long. (issue #302)
-  TOP=`grep -n "Binary representation" $NAME.evm | cut -f1 -d:`
-  BOT=`grep -n "Text representation" $NAME.evm | cut -f1 -d:`
+  TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
+  BOT=$(grep -n "Text representation" "$NAME".evm | cut -f1 -d:)
   TOP=$((TOP+1)) # drop the line with the name
   BOT=$((BOT-1)) # drop the empty line after the binary
-  EVM_BIN=`sed -n $TOP','$BOT'p' $NAME.evm`
+  EVM_BIN=$(sed -n $TOP','$BOT'p' "$NAME".evm)
   echo "binary representation is: $EVM_BIN"
 
   # start up ganache
@@ -101,7 +101,7 @@ do
   # can use that later to test the output of running more complicated
   # contracts. i'll need to make more than one account when i start up
   # ganache. (issue #302)
-  ACCT=`echo $ACCTS | jq '.result[0]' | tr -d '"'`
+  ACCT=$(echo "$ACCTS" | jq '.result[0]' | tr -d '"')
   echo "ACCT is $ACCT"
 
   # todo what's that 0x0 mean?
@@ -150,7 +150,7 @@ do
   # clean up by killing ganache and the local files
   # todo: make this a subroutine that can get called at any of the exits (issue #302)
   echo "killing ganache-cli"
-  kill -9 $(lsof -t -i:8545)
+  kill -9 "$(lsof -t -i:8545)"
 
   # todo: for debugging it's nice to be able to look at these. maybe delete
   # them by default but take a flag to keep them around. (issue #302)
