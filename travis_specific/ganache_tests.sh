@@ -29,11 +29,9 @@ do
   START_ETH=$(<"$test" jq '.startingeth')
   NUM_ACCT=$(<"$test" jq '.numaccts')
 
-  # compile the contract to yul, also creating the directory to work in
-  sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
-
-  # check to make sure that solc succeeded, failing otherwise
-  if [ $? -ne 0 ]; then
+  # compile the contract to yul, also creating the directory to work in, failing otherwise
+  if ! sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
+  then
       echo "$NAME test failed: sbt exited cannot compile obs to yul"
       exit 1
   fi
@@ -45,12 +43,10 @@ do
 
   cd "$NAME" || exit 1
 
-  # generate the evm from yul
+  # generate the evm from yul, failing if not
   echo "running solc to produce evm bytecode"
-  docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/"$NAME".yul > "$NAME".evm
-
-  # check to make sure that solc succeeded, failing otherwise
-  if [ $? -ne 0 ]; then
+  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/"$NAME".yul > "$NAME".evm
+  then
       echo "$NAME test failed: solc cannot compile yul code"
       exit 1
   fi
