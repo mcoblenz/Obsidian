@@ -14,7 +14,7 @@ import edu.cmu.cs.obsidian.typecheck.ContractType
 import scala.collection.immutable.Map
 
 object CodeGenYul extends CodeGenerator {
-    
+
     var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
     var stateIdx: Int = -1 // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
