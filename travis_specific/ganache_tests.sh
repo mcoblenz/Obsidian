@@ -115,9 +115,9 @@ do
   PARAMS=$( jq -ncM \
                --arg "fn" "$ACCT" \
                --arg "gn" "0x$GAS_HEX" \
-	       --arg "gpn" "$GAS_PRICE" \
-	       --arg "vn" "0x0" \
-	       --arg "dn" "0x$EVM_BIN" \
+	             --arg "gpn" "$GAS_PRICE" \
+       	       --arg "vn" "0x0" \
+ 	             --arg "dn" "0x$EVM_BIN" \
                '{"from":$fn,"gas":$gn,"gasPrice":$gpn,"value":$vn,"data":$dn}')
 
   ## step 2: send a transaction
@@ -171,10 +171,53 @@ do
   RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
   echo "response from ganache is: "
   echo "$RESP" | jq
-  
+
   ## step 4: get the contract address from the transaction receipt
+  CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress')
 
   ## step 5: use call and the contract address to get the result of the function
+  # todo: right now this is hard coded for simple call; in the future, each test will have a
+  # file with the expression we want to run and i'll write a script that encodes it
+  # todo: update the travis yml to install rhash or whatever other hashing utility ends up working.
+  # todo: check that this really is the right hash
+  TEXTEXP=$(<"$test" jq '.textexp')
+
+  HASH_TO_CALL=$(echo "$TESTEXP" | rhash -p "%{sha3-256}" - | cut -c1-8)
+
+  # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
+  # bytes. Which would be the following, using the number "5":"
+  PADDED_ARG=$(printf "%032g" 0)
+
+  DATA=0x"$HASH_TO_CALL""$PADDED_ARG"
+
+  echo "hash to call: $HASH_TO_CALL"
+  echo "padded arg: $PADDED_ARG"
+  echo "data: $DATA"
+
+  PARAMS=$( jq -ncM \
+               --arg "fn" "$ACCT" \
+               --arg "tn" "$ACCT" \
+ 	             --arg "dn" "0x$DATA" \
+               '{"from":$fn,"to":$tn,"data":$dn,"latest"}')
+
+  SEND_DATA=$( jq -ncM \
+                  --arg "jn" "2.0" \
+                  --arg "mn" "eth_call" \
+                  --argjson "pn" "$PARAMS" \
+                  --arg "idn" "1" \
+                  '{"jsonrpc":$jn,"method":$mn,"params":[$pn],"id":$idn}'
+	)
+  echo "eth_call is being sent"
+  echo "$SEND_DATA" | jq
+  echo
+
+  RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+  echo "response from ganache is: "
+  echo "$RESP" | jq
+
+  EXPECTED=$(<"$test" jq '.expected')
+  echo "expected $EXPECTED"
+  # todo: compare expected to what we got!
 
   # clean up by killing ganache and the local files
   # todo: make this a subroutine that can get called at any of the exits (issue #302)
