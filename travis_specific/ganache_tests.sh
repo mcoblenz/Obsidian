@@ -65,7 +65,7 @@ do
       exit 1
   fi
 
-  # todo this is a bit of a hack. solc is supposed to output a json object
+  # todo: this is a bit of a hack. solc is supposed to output a json object
   # and it just isn't. so this is grepping through to grab the right lines
   # with the hex that represents the output. (issue #302)
   TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
@@ -106,42 +106,37 @@ do
   # job passes or fails based on the last command run
   RET=0
 
-  # todo: i'm not sure what account to mark as the "to" account. i think i
-  # can use that later to test the output of running more complicated
-  # contracts. i'll need to make more than one account when i start up
-  # ganache. (issue #302)
+  ## step 1: get an account from ganache
+  # todo: i'm not sure what account to use for the "to" account. (issue #302)
   ACCT=$(echo "$ACCTS" | jq '.result[0]' | tr -d '"')
   echo "ACCT is $ACCT"
 
-  # todo what's that 0x0 mean?
+  # todo: what's that 0x0 mean?
   PARAMS=$( jq -ncM \
                --arg "fn" "$ACCT" \
                --arg "gn" "0x$GAS_HEX" \
 	       --arg "gpn" "$GAS_PRICE" \
 	       --arg "vn" "0x0" \
 	       --arg "dn" "0x$EVM_BIN" \
-               '{"from":$fn,"gas":$gn,"gasPrice":$gpn,"value":$vn,"data":$dn}'
-	)
+               '{"from":$fn,"gas":$gn,"gasPrice":$gpn,"value":$vn,"data":$dn}')
 
+  ## step 2: send a transaction
   SEND_DATA=$( jq -ncM \
                   --arg "jn" "2.0" \
                   --arg "mn" "eth_sendTransaction" \
                   --argjson "pn" "$PARAMS" \
                   --arg "idn" "1" \
-                  '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
-	   )
+                  '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}')
 
   echo "transaction being sent is given by"
-  echo "$SEND_DATA" | jq #todo why doesn't this work on travis? also below. (issue #302)
+  echo "$SEND_DATA" | jq
   echo
 
   RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
   echo "response from ganache is: " #$RESP
   echo "$RESP" | jq
-  # ((echo "$RESP" | tr -d '\n') ; echo) # | jq -M # (issue #302) #TODO
 
-  # todo: this is not an exhaustive or principled way to check the output of
-  # curling a post. (issue #302)
+  # todo: this is not an exhaustive check on the output from curl (issue #302)
   if [ "$RESP" == "400 Bad Request" ]
   then
       echo "got a 400 bad response from ganache-cli"
@@ -155,26 +150,31 @@ do
       echo "transaction produced an error: $ERROR"
   fi
 
-  # todo check the result of test somehow to indicate failure or not (issue #302)
-  ## todo this block is copied; make a function?
+  ## step 3: get a transaction receipt
+  # todo: check the result of test somehow to indicate failure or not (issue #302)
+  # todo: this block is copied; make a function?
   echo "querying ganache CLI for transaction receipt"
 
-  hash=$(echo "$RESP" | jq '.result')
+  trans_hash=$(echo "$RESP" | jq '.result')
 
   SEND_DATA=$( jq -ncM \
                   --arg "jn" "2.0" \
                   --arg "mn" "eth_getTransactionReceipt" \
-                  --argjson "pn" "$hash" \
+                  --argjson "pn" "$trans_hash" \
                   --arg "idn" "1" \
                   '{"jsonrpc":$jn,"method":$mn,"params":[$pn],"id":$idn}'
 	)
   echo "eth_getTransactionReceipt is being sent"
-  echo "$SEND_DATA" | jq #todo why doesn't this work on travis? also below. (issue #302)
+  echo "$SEND_DATA" | jq
   echo
 
   RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
   echo "response from ganache is: "
   echo "$RESP" | jq
+  
+  ## step 4: get the contract address from the transaction receipt
+
+  ## step 5: use call and the contract address to get the result of the function
 
   # clean up by killing ganache and the local files
   # todo: make this a subroutine that can get called at any of the exits (issue #302)
