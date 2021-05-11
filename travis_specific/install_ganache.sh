@@ -6,3 +6,4 @@ npm install -g ganache-cli
 npm audit fix
 
 sudo snap install jq # a commandline JSON tool
+sudo apt install sha3sum
