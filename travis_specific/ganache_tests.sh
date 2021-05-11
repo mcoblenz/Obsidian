@@ -42,6 +42,8 @@ do
   GAS_PRICE=$(<"$test" jq '.gasprice' | tr -d '"')
   START_ETH=$(<"$test" jq '.startingeth')
   NUM_ACCT=$(<"$test" jq '.numaccts')
+  TESTEXP=$(<"$test" jq '.testexp' | tr -d '"')
+  EXPECTED=$(<"$test" jq '.expected' | tr -d '"')
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
   if ! sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
@@ -180,9 +182,9 @@ do
   # file with the expression we want to run and i'll write a script that encodes it
   # todo: update the travis yml to install rhash or whatever other hashing utility ends up working.
   # todo: check that this really is the right hash
-  TEXTEXP=$(<"$test" jq '.textexp')
+  HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+  echo "hash to call: $HASH_TO_CALL"
 
-  HASH_TO_CALL=$(echo "$TESTEXP" | rhash -p "%{sha3-256}" - | cut -c1-8)
 
   # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
   # bytes. Which would be the following, using the number "5":"
@@ -190,7 +192,6 @@ do
 
   DATA=0x"$HASH_TO_CALL""$PADDED_ARG"
 
-  echo "hash to call: $HASH_TO_CALL"
   echo "padded arg: $PADDED_ARG"
   echo "data: $DATA"
 
@@ -215,8 +216,6 @@ do
   echo "response from ganache is: "
   echo "$RESP" | jq
 
-  EXPECTED=$(<"$test" jq '.expected')
-  echo "expected $EXPECTED"
   # todo: compare expected to what we got!
 
   # clean up by killing ganache and the local files
