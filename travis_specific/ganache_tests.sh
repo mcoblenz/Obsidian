@@ -45,12 +45,12 @@ do
   TESTEXP=$(<"$test" jq '.testexp' | tr -d '"')
   EXPECTED=$(<"$test" jq '.expected' | tr -d '"')
 
-  if [[ $TESTEXP == "" ]]
+  if [[ $TESTEXP == "null" ]]
   then
     echo "*****WARNING: no test expression supplied"
   fi
 
-  if [[ $EXPECTED == "" ]]
+  if [[ $EXPECTED == "null" ]]
   then
     echo "*****WARNING: no expected result supplied"
   fi
@@ -88,8 +88,8 @@ do
   echo "binary representation is: $EVM_BIN"
 
   ## todo this is a hardcoded temporary hack for my latop -- IEV
-  if [[ $(hostname) == "bruce.local " ]]
-  then 
+  if [[ $(hostname) == "bruce.local" ]]
+  then
     EVM_BIN="608060405234801561001057600080fd5b5060f08061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80633c6bb436146037578063dffeadd0146051575b600080fd5b603d606b565b604051604891906097565b60405180910390f35b60576074565b604051606291906097565b60405180910390f35b60006004905090565b600080600990506081606b565b90508091505090565b60918160b0565b82525050565b600060208201905060aa6000830184608a565b92915050565b600081905091905056fea264697066735822122009726d349b9d7bbe61577a6f0f3a038b5998d0f3901897b0df75500b2bcfd05c64736f6c63430008010033"
     echo "binary representation is now HARDCODED: $EVM_BIN"
   fi
