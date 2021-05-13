@@ -45,6 +45,16 @@ do
   TESTEXP=$(<"$test" jq '.testexp' | tr -d '"')
   EXPECTED=$(<"$test" jq '.expected' | tr -d '"')
 
+  if [[ $TESTEXP == "" ]]
+  then
+    echo "*****WARNING: no test expression supplied"
+  fi
+  
+  if [[ $EXPECTED == "" ]]
+  then
+    echo "*****WARNING: no expected result supplied"
+  fi
+
   # compile the contract to yul, also creating the directory to work in, failing otherwise
   if ! sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
   then
@@ -174,8 +184,8 @@ do
   echo "response from ganache is: "
   echo "$RESP" | jq
 
-  ## step 4: get the contract address from the transaction receipt
-  CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress')
+  ## step 4: get the contract address from the transaction receipt, stripping quotes
+  CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress' | tr -d '"' )
 
   ## step 5: use call and the contract address to get the result of the function
   # todo: right now this is hard coded for simple call; in the future, each test will have a
@@ -222,14 +232,14 @@ do
                --arg "fn" "$ACCT" \
                --arg "tn" "$CONTRACT_ADDRESS" \
  	             --arg "dn" "0x$DATA" \
-               '{"from":$fn,"to":$tn,"data":$dn,"latest"}')
+               '{"from":$fn,"to":$tn,"data":$dn}')
 
   SEND_DATA=$( jq -ncM \
                   --arg "jn" "2.0" \
                   --arg "mn" "eth_call" \
                   --argjson "pn" "$PARAMS" \
                   --arg "idn" "1" \
-                  '{"jsonrpc":$jn,"method":$mn,"params":[$pn],"id":$idn}'
+                  '{"jsonrpc":$jn,"method":$mn,"params":[$pn,"latest"],"id":$idn}'
 	)
   echo "eth_call is being sent"
   echo "$SEND_DATA" | jq
