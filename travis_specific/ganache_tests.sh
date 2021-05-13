@@ -180,11 +180,32 @@ do
   ## step 5: use call and the contract address to get the result of the function
   # todo: right now this is hard coded for simple call; in the future, each test will have a
   # file with the expression we want to run and i'll write a script that encodes it
-  # todo: update the travis yml to install rhash or whatever other hashing utility ends up working.
-  # todo: check that this really is the right hash
-  HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
-  echo "hash to call: $HASH_TO_CALL"
+  HASH_TO_CALL=""
 
+  if [[ $(uname) == "Linux" ]]
+  then
+      # this should be what happens on Travis running Ubuntu
+      if ! $(perl -e 'use Crypt::Digest::Keccak256 qw( :all )')
+      then
+        echo "the perl module Crypt::Digest::Keccak256 is not installed, Install it via cpam or 'apt install libcryptx-perl'."
+        exit 1
+      fi
+      HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")')
+  elif [[ $(uname) == "Darwin" ]]
+  then
+      # this should be what happens on OS X
+      if ! hash keccak-256sum
+      then
+        echo "keccak-256sum is not installed, Install it with 'brew install sha3sum'."
+        exit 1
+      fi
+      HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+  else
+      # if you are neither on travis nor OS X, you are on your own.
+      echo "unable to determine OS type to pick a keccak256 implementation"
+      exit 1
+  fi
+  echo "hash to call: $HASH_TO_CALL"
 
   # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
   # bytes. Which would be the following, using the number "5":"

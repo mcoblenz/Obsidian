@@ -8,4 +8,4 @@ npm audit fix
 sudo snap install jq # a commandline JSON tool
 
 sudo apt update
-sudo apt install libdigest-sha3-perl # a sha3sum implementation
+sudo apt install libcryptx-perl # perl crypto library that implements Keccak256
