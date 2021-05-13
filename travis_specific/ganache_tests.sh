@@ -185,7 +185,7 @@ do
   if [[ $(uname) == "Linux" ]]
   then
       # this should be what happens on Travis running Ubuntu
-      if ! $(perl -e 'use Crypt::Digest::Keccak256 qw( :all )')
+      if ! perl -e 'use Crypt::Digest::Keccak256 qw( :all )'
       then
         echo "the perl module Crypt::Digest::Keccak256 is not installed, Install it via cpam or 'apt install libcryptx-perl'."
         exit 1
@@ -220,7 +220,7 @@ do
 
   PARAMS=$( jq -ncM \
                --arg "fn" "$ACCT" \
-               --arg "tn" "$ACCT" \
+               --arg "tn" "$CONTRACT_ADDRESS" \
  	             --arg "dn" "0x$DATA" \
                '{"from":$fn,"to":$tn,"data":$dn,"latest"}')
 
