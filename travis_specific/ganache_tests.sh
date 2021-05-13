@@ -190,7 +190,8 @@ do
         echo "the perl module Crypt::Digest::Keccak256 is not installed, Install it via cpam or 'apt install libcryptx-perl'."
         exit 1
       fi
-      HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")')
+      echo "assuming that we are on travis and getting the Keccak256 via perl"
+      HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8)
   elif [[ $(uname) == "Darwin" ]]
   then
       # this should be what happens on OS X
@@ -199,6 +200,7 @@ do
         echo "keccak-256sum is not installed, Install it with 'brew install sha3sum'."
         exit 1
       fi
+      echo "assuming that we are on OS X and getting the Keccak256 via keccak-256sum"
       HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
   else
       # if you are neither on travis nor OS X, you are on your own.
