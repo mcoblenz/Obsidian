@@ -191,7 +191,7 @@ do
   if [[ ! $(echo "$RESP" | jq '.result.status' | tr -d '"' ) == "0x1" ]]
   then
     echo "eth_getTransactionReceipt returned an error status; aborting"
-    exit 1
+    RET=$((RET+1))
   fi
 
 
