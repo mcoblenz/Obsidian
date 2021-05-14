@@ -187,6 +187,14 @@ do
   echo "response from ganache is: "
   echo "$RESP" | jq
 
+  # check that the status code is 0x1 or else fail
+  if [[ ! $(echo "$RESP" | jq '.result.status' | tr -d '"' ) == "0x1" ]]
+  then
+    echo "eth_getTransactionReceipt returned an error status; aborting"
+    exit 1
+  fi
+
+
   ## step 4: get the contract address from the transaction receipt, stripping quotes
   CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress' | tr -d '"' )
 
@@ -253,7 +261,7 @@ do
 
   GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
   # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
-  if [[ $GOT == $EXPECTED ]]
+  if [[ "$GOT" == "$EXPECTED" ]]
   then
     echo "test passed!"
   else
