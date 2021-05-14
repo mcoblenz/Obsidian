@@ -252,7 +252,7 @@ do
   echo "$RESP" | jq
 
   GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
-  # todo: compare expected to what we got!
+  # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
   if [[ $GOT == $EXPECTED ]]
   then
     echo "test passed!"
