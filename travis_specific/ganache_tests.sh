@@ -33,12 +33,11 @@ do
   echo "running Ganache Test $test"
   echo "---------------------------------------------------------------"
 
+  # pull values out of the json file for the test; some of these are integers stored as hex strings
+  # because they're so large, which means we have to cut out the quotation marks.
   NAME=$(basename -s '.json' "$test")
   GAS=$(<"$test" jq '.gas')
   GAS_HEX=$(printf '%x' "$GAS")
-  # nb: we store gas price as a string because it's usually quite large so
-  # it's good to have it in hex notation, but that means we need to crop
-  # off the quotations.
   GAS_PRICE=$(<"$test" jq '.gasprice' | tr -d '"')
   START_ETH=$(<"$test" jq '.startingeth')
   NUM_ACCT=$(<"$test" jq '.numaccts')
@@ -77,9 +76,7 @@ do
       exit 1
   fi
 
-  # todo: this is a bit of a hack. solc is supposed to output a json object
-  # and it just isn't. so this is grepping through to grab the right lines
-  # with the hex that represents the output. (issue #302)
+  # grep through the format output by solc in yul producing mode for the binary representation
   TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
   BOT=$(grep -n "Text representation" "$NAME".evm | cut -f1 -d:)
   TOP=$((TOP+1)) # drop the line with the name
@@ -126,7 +123,7 @@ do
   ACCT=$(echo "$ACCTS" | jq '.result[0]' | tr -d '"')
   echo "ACCT is $ACCT"
 
-  # todo: what's that 0x0 mean?
+  # todo: 0x0 is the value being sent with the transaction; right now that's nothing (issue #302)
   PARAMS=$( jq -ncM \
                --arg "fn" "$ACCT" \
                --arg "gn" "0x$GAS_HEX" \
@@ -165,7 +162,7 @@ do
       echo "transaction produced an error: $ERROR"
   fi
 
-  ## step 3: get a transaction receipt
+  ## step 3: get a transaction receipt to get the contract address
   # todo: check the result of test somehow to indicate failure or not (issue #302)
   # todo: this block is copied; make a function?
   echo "querying ganache CLI for transaction receipt"
@@ -199,10 +196,11 @@ do
   CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress' | tr -d '"' )
 
   ## step 5: use call and the contract address to get the result of the function
-  # todo: right now this is hard coded for simple call; in the future, each test will have a
-  # file with the expression we want to run and i'll write a script that encodes it
   HASH_TO_CALL=""
 
+  # the keccak implementation we want to use depends on the operating system; as of
+  # May 2021 i couldn't find one that was available in both apt and homebrew and produced
+  # output that matches the ABI, so we have to be flexible. this is a little bit of a hack.
   if [[ $(uname) == "Linux" ]]
   then
       # this should be what happens on Travis running Ubuntu
@@ -231,7 +229,7 @@ do
   echo "hash to call: $HASH_TO_CALL"
 
   # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
-  # bytes. Which would be the following, using the number "5":"
+  # bytes."
   PADDED_ARG=$(printf "%032g" 0)
 
   DATA="$HASH_TO_CALL""$PADDED_ARG"
@@ -239,6 +237,8 @@ do
   echo "padded arg: $PADDED_ARG"
   echo "data: $DATA"
 
+  # build a JSON object to post to eth_call with the contract address as the to account, and
+  # padded data
   PARAMS=$( jq -ncM \
                --arg "fn" "$ACCT" \
                --arg "tn" "$CONTRACT_ADDRESS" \
