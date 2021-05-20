@@ -278,8 +278,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                 codegen.ExpressionStatement(apply("abi_decode_tuple", intlit(4), apply("calldatasize"))),
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
-                //    let memPos := allocate_memory(0)
-                decl_1exp(mp_id, apply("allocate_memory", intlit(0))),
+                //    let memPos := allocate_unbounded()
+                decl_1exp(mp_id, apply("allocate_unbounded")),
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
                 //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
