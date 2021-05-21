@@ -382,7 +382,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             val encode_lines: Seq[YulStatement] = var_indices.map(i =>
                 ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
                     Identifier("value" + i.toString),
-                    apply("add", Identifier("headStart"), intlit(n * 32)))))
+                    apply("add", Identifier("headStart"), intlit((n-1) * 32)))))
 
             val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
             FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
