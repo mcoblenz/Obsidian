@@ -386,6 +386,8 @@ object CodeGenYul extends CodeGenerator {
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable)
                 }
             case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
+                // look up the name of the function in the table, get its return type, and then compute
+                // how wide of a tuple that return type is. (currently this is always either 0 or 1)
                 val width = checkedTable.contractLookup(contractName).lookupTransaction(name) match {
                     case Some(trans) => trans.retType match {
                         case Some(typ) => obsTypeToWidth(typ)
@@ -397,18 +399,32 @@ object CodeGenYul extends CodeGenerator {
                 }
 
                 // todo: some of this logic may be repeated in the dispatch table
+
+                // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
+                // which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
+                // to fix it, i need to refactor this object so that i pass around a vector of temporary variables
+                // to assign returns to rather than just one (i think). this is OK for now, but technical debt that
+                // we'll have to address if we ever add tuples to obsidian.
+
+                // for each argument expression, produce a new temp variable and translate it to a
+                // sequence of yul statements ending in an assignment to that variable.
                 val (seqs, ids) = {
                     args.map(p => {
                         val id: Identifier = nextTemp()
                         (translateExpr(id, p, contractName, checkedTable), id)
                     }).unzip
                 }
-                seqs.flatten :+
-                    (if (width == 0) {
-                        ExpressionStatement(FunctionCall(Identifier(name), ids))
-                    } else {
-                        decl_nexp(Seq.tabulate(width)(_ => nextTemp()), FunctionCall(Identifier(name), ids))
-                    })
+
+                // grab a new temporary variable for the return in case there is one
+                val id: Identifier = nextTemp()
+
+                // the result is the recursive translation and the expression either using the temp
+                // here or not.
+                seqs.flatten ++ (width match {
+                    case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
+                    case 1 => Seq(decl_1exp(id, FunctionCall(Identifier(name), ids)), assign1(retvar,id))
+                    case _ => assert(assertion=false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
+                })
 
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
