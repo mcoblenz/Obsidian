@@ -389,10 +389,11 @@ object CodeGenYul extends CodeGenerator {
                 // look up the name of the function in the table, get its return type, and then compute
                 // how wide of a tuple that return type is. (currently this is always either 0 or 1)
                 val width = checkedTable.contractLookup(contractName).lookupTransaction(name) match {
-                    case Some(trans) => trans.retType match {
-                        case Some(typ) => obsTypeToWidth(typ)
-                        case None => 0
-                    }
+                    case Some(trans) =>
+                        trans.retType match {
+                            case Some(typ) => obsTypeToWidth(typ)
+                            case None => 0
+                        }
                     case None =>
                         assert(assertion = false, "encountered a function name without knowing how many things it returns")
                         -1
@@ -415,15 +416,14 @@ object CodeGenYul extends CodeGenerator {
                     }).unzip
                 }
 
-                // grab a new temporary variable for the return in case there is one
-                val id: Identifier = nextTemp()
-
                 // the result is the recursive translation and the expression either using the temp
                 // here or not.
                 seqs.flatten ++ (width match {
                     case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
-                    case 1 => Seq(decl_1exp(id, FunctionCall(Identifier(name), ids)), assign1(retvar,id))
-                    case _ => assert(assertion=false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
+                    case 1 =>
+                        val id: Identifier = nextTemp()
+                        Seq(decl_1exp(id, FunctionCall(Identifier(name), ids)), assign1(retvar, id))
+                    case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
                 })
 
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
