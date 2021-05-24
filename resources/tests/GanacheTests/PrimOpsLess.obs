@@ -1,0 +1,5 @@
+main contract PrimOpsLess{
+        transaction primopsless() returns bool {
+           return(9 < 10);
+        }
+}

@@ -1,0 +1,5 @@
+main contract PrimOpsAdd{
+        transaction primopsadd() returns bool {
+           return(5+8);
+        }
+}

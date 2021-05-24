@@ -1,0 +1,5 @@
+main contract PrimOpsNot{
+        transaction primopsnot() returns bool {
+           return(! (true && false));
+        }
+}

@@ -1,0 +1,5 @@
+main contract PrimOpsSub{
+        transaction primopssub() returns int {
+           return(5-20);
+        }
+}

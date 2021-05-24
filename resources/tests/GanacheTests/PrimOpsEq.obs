@@ -1,0 +1,5 @@
+main contract PrimOpsEq{
+        transaction primopseq() returns bool {
+           return(5 == 9);
+        }
+}
