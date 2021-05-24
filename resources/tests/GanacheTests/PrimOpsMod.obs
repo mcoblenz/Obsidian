@@ -1,5 +1,5 @@
 main contract PrimOpsMod{
-        transaction primopsmod() returns bool {
+        transaction primopsmod() returns int {
            return(13 % 8);
         }
 }
