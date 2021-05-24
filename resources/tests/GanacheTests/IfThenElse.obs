@@ -8,4 +8,14 @@ main contract IfThenElse {
 	        }
             return;
         }
+
+        transaction main() returns int {
+            int x = 9;
+            if (false) {
+	            x = 50;
+	        } else {
+	            x = 90;
+	        }
+            return x;
+        }
 }

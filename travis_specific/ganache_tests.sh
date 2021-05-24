@@ -267,12 +267,16 @@ do
     then
         RET=$((RET+1))
         echo "eth_call returned an error: $ERROR"
+        continue
     fi
 
-    GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
+    # pull the result out of the JSON object, delete the quotes and leading 0x, and make it upper case
+    GOT=$(echo "$RESP" | jq '.result' | tr -d '"' | sed -e "s/^0x//" | tr '[:lower:]' '[:upper:]')
+    # use BC to convert it to decimal
+    GOT_DEC=$(echo "obase=10; ibase=16;$GOT" | bc)
 
     # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
-    if [ "$GOT" == "$EXPECTED" ]
+    if [ "$GOT_DEC" == "$EXPECTED" ]
     then
       echo "test passed!"
     else
