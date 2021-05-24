@@ -1,5 +1,5 @@
 main contract PrimOpsNEq{
-        transaction primopsand() returns bool {
+        transaction primopsneq() returns bool {
            return(5 != 9);
         }
 }
