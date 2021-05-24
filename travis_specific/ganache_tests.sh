@@ -278,9 +278,10 @@ do
     # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
     if [ "$GOT_DEC" == "$EXPECTED" ]
     then
+      echo "expected $EXPECTED (in decimal)"
       echo "test passed!"
     else
-      echo "test failed! got $GOT but expected $EXPECTED"
+      echo "test failed! got $GOT_DEC but expected $EXPECTED"
       RET=$((RET+1))
     fi
   else
