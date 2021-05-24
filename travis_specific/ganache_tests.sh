@@ -44,14 +44,18 @@ do
   TESTEXP=$(<"$test" jq '.testexp' | tr -d '"')
   EXPECTED=$(<"$test" jq '.expected' | tr -d '"')
 
+  CHECK_OUTPUT=true
+
   if [[ $TESTEXP == "null" ]]
   then
     echo "*****WARNING: no test expression supplied"
+    CHECK_OUTPUT=false
   fi
 
   if [[ $EXPECTED == "null" ]]
   then
     echo "*****WARNING: no expected result supplied"
+    CHECK_OUTPUT=false
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
@@ -159,111 +163,124 @@ do
       echo "transaction produced an error: $ERROR"
   fi
 
-  ## step 3: get a transaction receipt to get the contract address
-  # todo: check the result of test somehow to indicate failure or not (issue #302)
-  # todo: this block is copied; make a function?
-  echo "querying ganache CLI for transaction receipt"
-
-  trans_hash=$(echo "$RESP" | jq '.result')
-
-  SEND_DATA=$( jq -ncM \
-                  --arg "jn" "2.0" \
-                  --arg "mn" "eth_getTransactionReceipt" \
-                  --argjson "pn" "$trans_hash" \
-                  --arg "idn" "1" \
-                  '{"jsonrpc":$jn,"method":$mn,"params":[$pn],"id":$idn}'
-	)
-  echo "eth_getTransactionReceipt is being sent"
-  echo "$SEND_DATA" | jq
-  echo
-
-  RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
-  echo "response from ganache is: "
-  echo "$RESP" | jq
-
-  # check that the status code is 0x1 or else fail
-  if [[ ! $(echo "$RESP" | jq '.result.status' | tr -d '"' ) == "0x1" ]]
+  if [ $CHECK_OUTPUT == "true" ]
   then
-    echo "eth_getTransactionReceipt returned an error status; aborting"
-    RET=$((RET+1))
-  fi
+    ## step 3: get a transaction receipt to get the contract address
+    # todo: check the result of test somehow to indicate failure or not (issue #302)
+    # todo: this block is copied; make a function?
+    echo "querying ganache CLI for transaction receipt"
+
+    trans_hash=$(echo "$RESP" | jq '.result')
+
+    SEND_DATA=$( jq -ncM \
+                    --arg "jn" "2.0" \
+                    --arg "mn" "eth_getTransactionReceipt" \
+                    --argjson "pn" "$trans_hash" \
+                    --arg "idn" "1" \
+                    '{"jsonrpc":$jn,"method":$mn,"params":[$pn],"id":$idn}'
+    )
+    echo "eth_getTransactionReceipt is being sent"
+    echo "$SEND_DATA" | jq
+    echo
+
+    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    echo "response from ganache is: "
+    echo "$RESP" | jq
+
+    # check that the status code is 0x1 or else fail
+    if [[ ! $(echo "$RESP" | jq '.result.status' | tr -d '"' ) == "0x1" ]]
+    then
+      echo "eth_getTransactionReceipt returned an error status; aborting"
+      RET=$((RET+1))
+    fi
 
 
-  ## step 4: get the contract address from the transaction receipt, stripping quotes
-  CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress' | tr -d '"' )
+    ## step 4: get the contract address from the transaction receipt, stripping quotes
+    CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress' | tr -d '"' )
 
-  ## step 5: use call and the contract address to get the result of the function
-  HASH_TO_CALL=""
+    ## step 5: use call and the contract address to get the result of the function
+    HASH_TO_CALL=""
 
-  # the keccak implementation we want to use depends on the operating system; as of
-  # May 2021 i couldn't find one that was available in both apt and homebrew and produced
-  # output that matches the ABI, so we have to be flexible. this is a little bit of a hack.
-  if [[ $(uname) == "Linux" ]]
-  then
-      # this should be what happens on Travis running Ubuntu
-      if ! perl -e 'use Crypt::Digest::Keccak256 qw( :all )'
-      then
-        echo "the perl module Crypt::Digest::Keccak256 is not installed, Install it via cpam or 'apt install libcryptx-perl'."
+    # the keccak implementation we want to use depends on the operating system; as of
+    # May 2021 i couldn't find one that was available in both apt and homebrew and produced
+    # output that matches the ABI, so we have to be flexible. this is a little bit of a hack.
+    if [[ $(uname) == "Linux" ]]
+    then
+        # this should be what happens on Travis running Ubuntu
+        if ! perl -e 'use Crypt::Digest::Keccak256 qw( :all )'
+        then
+          echo "the perl module Crypt::Digest::Keccak256 is not installed, Install it via cpam or 'apt install libcryptx-perl'."
+          exit 1
+        fi
+        echo "assuming that we are on travis and getting the Keccak256 via perl"
+        HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8)
+    elif [[ $(uname) == "Darwin" ]]
+    then
+        # this should be what happens on OS X
+        if ! hash keccak-256sum
+        then
+          echo "keccak-256sum is not installed, Install it with 'brew install sha3sum'."
+          exit 1
+        fi
+        echo "assuming that we are on OS X and getting the Keccak256 via keccak-256sum"
+        HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+    else
+        # if you are neither on travis nor OS X, you are on your own.
+        echo "unable to determine OS type to pick a keccak256 implementation"
         exit 1
-      fi
-      echo "assuming that we are on travis and getting the Keccak256 via perl"
-      HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8)
-  elif [[ $(uname) == "Darwin" ]]
-  then
-      # this should be what happens on OS X
-      if ! hash keccak-256sum
-      then
-        echo "keccak-256sum is not installed, Install it with 'brew install sha3sum'."
-        exit 1
-      fi
-      echo "assuming that we are on OS X and getting the Keccak256 via keccak-256sum"
-      HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+    fi
+    echo "hash to call: $HASH_TO_CALL"
+
+    # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
+    # bytes."
+    PADDED_ARG=$(printf "%032g" 0)
+
+    DATA="$HASH_TO_CALL""$PADDED_ARG"
+
+    echo "padded arg: $PADDED_ARG"
+    echo "data: $DATA"
+
+    # build a JSON object to post to eth_call with the contract address as the to account, and
+    # padded data
+    PARAMS=$( jq -ncM \
+                 --arg "fn" "$ACCT" \
+                 --arg "tn" "$CONTRACT_ADDRESS" \
+                 --arg "dn" "0x$DATA" \
+                 '{"from":$fn,"to":$tn,"data":$dn}')
+
+    SEND_DATA=$( jq -ncM \
+                    --arg "jn" "2.0" \
+                    --arg "mn" "eth_call" \
+                    --argjson "pn" "$PARAMS" \
+                    --arg "idn" "1" \
+                    '{"jsonrpc":$jn,"method":$mn,"params":[$pn,"latest"],"id":$idn}' )
+    echo "eth_call is being sent"
+    echo "$SEND_DATA" | jq
+    echo
+
+    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    echo "response from ganache is: "
+    echo "$RESP" | jq
+
+    ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
+    if [ "$ERROR" != "null" ]
+    then
+        RET=$((RET+1))
+        echo "eth_call returned an error: $ERROR"
+    fi
+
+    GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
+
+    # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
+    if [ "$GOT" == "$EXPECTED" ]
+    then
+      echo "test passed!"
+    else
+      echo "test failed! got $GOT but expected $EXPECTED"
+      RET=$((RET+1))
+    fi
   else
-      # if you are neither on travis nor OS X, you are on your own.
-      echo "unable to determine OS type to pick a keccak256 implementation"
-      exit 1
-  fi
-  echo "hash to call: $HASH_TO_CALL"
-
-  # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
-  # bytes."
-  PADDED_ARG=$(printf "%032g" 0)
-
-  DATA="$HASH_TO_CALL""$PADDED_ARG"
-
-  echo "padded arg: $PADDED_ARG"
-  echo "data: $DATA"
-
-  # build a JSON object to post to eth_call with the contract address as the to account, and
-  # padded data
-  PARAMS=$( jq -ncM \
-               --arg "fn" "$ACCT" \
-               --arg "tn" "$CONTRACT_ADDRESS" \
- 	             --arg "dn" "0x$DATA" \
-               '{"from":$fn,"to":$tn,"data":$dn}')
-
-  SEND_DATA=$( jq -ncM \
-                  --arg "jn" "2.0" \
-                  --arg "mn" "eth_call" \
-                  --argjson "pn" "$PARAMS" \
-                  --arg "idn" "1" \
-                  '{"jsonrpc":$jn,"method":$mn,"params":[$pn,"latest"],"id":$idn}' )
-  echo "eth_call is being sent"
-  echo "$SEND_DATA" | jq
-  echo
-
-  RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
-  echo "response from ganache is: "
-  echo "$RESP" | jq
-
-  GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
-  # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
-  if [[ "$GOT" == "$EXPECTED" ]]
-  then
-    echo "test passed!"
-  else
-    echo "test failed! got $GOT but expected $EXPECTED"
-    RET=$((RET+1))
+    echo "*****WARNING: not checking the output of running this code because the JSON describing the test didn't include it"
   fi
 
   # clean up by killing ganache and the local files
