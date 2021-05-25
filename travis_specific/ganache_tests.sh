@@ -27,6 +27,11 @@ else
   tests=(resources/tests/GanacheTests/*.json)
 fi
 
+
+# keep track of which tests pass and fail so that we can output that at the bottom of the log
+passed=()
+failed=()
+
 for test in "${tests[@]}"
 do
   echo "---------------------------------------------------------------"
@@ -62,11 +67,13 @@ do
   if ! sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
   then
       echo "$NAME test failed: sbt exited cannot compile obs to yul"
+      failed+=("$test [sbt]")
       exit 1
   fi
 
   if [ ! -d "$NAME" ]; then
       echo "$NAME directory failed to get created"
+      failed+=("$test [directory]")
       exit 1
   fi
 
@@ -77,6 +84,7 @@ do
   if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/"$NAME".yul > "$NAME".evm
   then
       echo "$NAME test failed: solc cannot compile yul code"
+      failed+=("$test [solc]")
       exit 1
   fi
 
@@ -153,7 +161,9 @@ do
   if [ "$RESP" == "400 Bad Request" ]
   then
       echo "got a 400 bad response from ganache-cli"
-      exit 1
+      failed+=("$test [400]")
+      RET=1
+      continue
   fi
 
   ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
@@ -161,6 +171,8 @@ do
   then
       RET=1
       echo "transaction produced an error: $ERROR"
+      failed+=("$test [transaction]")
+      continue
   fi
 
   if [ $CHECK_OUTPUT == "true" ]
@@ -192,6 +204,8 @@ do
     then
       echo "eth_getTransactionReceipt returned an error status; aborting"
       RET=$((RET+1))
+      failed+=("$test [eth_getTransactionReceipt]")
+      continue
     fi
 
 
@@ -210,6 +224,7 @@ do
         if ! perl -e 'use Crypt::Digest::Keccak256 qw( :all )'
         then
           echo "the perl module Crypt::Digest::Keccak256 is not installed, Install it via cpam or 'apt install libcryptx-perl'."
+          failed+=("$test [perl hash]")
           exit 1
         fi
         echo "assuming that we are on travis and getting the Keccak256 via perl"
@@ -220,6 +235,7 @@ do
         if ! hash keccak-256sum
         then
           echo "keccak-256sum is not installed, Install it with 'brew install sha3sum'."
+          failed+=("$test [os x hash]")
           exit 1
         fi
         echo "assuming that we are on OS X and getting the Keccak256 via keccak-256sum"
@@ -227,6 +243,7 @@ do
     else
         # if you are neither on travis nor OS X, you are on your own.
         echo "unable to determine OS type to pick a keccak256 implementation"
+        failed+=("$test [no hash]")
         exit 1
     fi
     echo "hash to call: $HASH_TO_CALL"
@@ -267,6 +284,7 @@ do
     then
         RET=$((RET+1))
         echo "eth_call returned an error: $ERROR"
+        failed+=("$test [eth_call]")
         continue
     fi
 
@@ -283,10 +301,13 @@ do
     else
       echo "test failed! got $GOT_DEC but expected $EXPECTED"
       RET=$((RET+1))
+      failed+=("$test [wrong answer]")
     fi
   else
     echo "*****WARNING: not checking the output of running this code because the JSON describing the test didn't include it"
   fi
+
+  passed+=("$test []")
 
   # clean up by killing ganache and the local files
   # todo: make this a subroutine that can get called at any of the exits (issue #302)
@@ -305,5 +326,10 @@ do
       ANY_FAILURES=1
   fi
 done
+
+echo "test summary:"
+echo "----------------------"
+echo "passed: $passed"
+echo "failed: $failed"
 
 exit "$ANY_FAILURES"
