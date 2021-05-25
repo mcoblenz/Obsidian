@@ -28,8 +28,7 @@ else
 fi
 
 
-# keep track of which tests pass and fail so that we can output that at the bottom of the log
-passed=()
+# keep track of which tests fail so that we can output that at the bottom of the log
 failed=()
 
 for test in "${tests[@]}"
@@ -162,14 +161,14 @@ do
   then
       echo "got a 400 bad response from ganache-cli"
       failed+=("$test [400]")
-      RET=1
+      RET=$((RET+1))
       continue
   fi
 
   ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
   if [ "$ERROR" != "null" ]
   then
-      RET=1
+      RET=$((RET+1))
       echo "transaction produced an error: $ERROR"
       failed+=("$test [transaction]")
       continue
@@ -307,8 +306,6 @@ do
     echo "*****WARNING: not checking the output of running this code because the JSON describing the test didn't include it"
   fi
 
-  passed+=("$test []")
-
   # clean up by killing ganache and the local files
   # todo: make this a subroutine that can get called at any of the exits (issue #302)
   echo "killing ganache-cli"
@@ -327,9 +324,19 @@ do
   fi
 done
 
-echo "test summary:"
-echo "----------------------"
-echo "passed: $passed"
-echo "failed: $failed"
+echo
+echo "----------------------------"
+echo "ganache test quick summary:"
+echo "----------------------------"
+if [ ${#failed[@]} -ne 0 ]
+then
+  echo "failed tests:"
+  for failure in "${failed[@]}"
+  do
+    echo "$failure"
+  done
+else
+  echo "no failed tests!"
+fi
 
 exit "$ANY_FAILURES"
