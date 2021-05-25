@@ -243,12 +243,22 @@ object CodeGenYul extends CodeGenerator {
                 val pos_yul: Seq[YulStatement] =
                     pos.flatMap(s => {
                         val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                        decl_0exp(id_s) +:
+                            (translateStatement(s, Some(id_s.name), contractName, checkedTable) ++
+                                (retVar match {
+                                    case Some(value) => Seq(assign1(Identifier(value), id_s))
+                                    case None => Seq()
+                                }))
                     })
                 val neg_yul: Seq[YulStatement] =
                     neg.flatMap(s => {
                         val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                        decl_0exp(id_s) +:
+                            (translateStatement(s, Some(id_s.name), contractName, checkedTable) ++
+                                (retVar match {
+                                    case Some(value) => Seq(assign1(Identifier(value), id_s))
+                                    case None => Seq()
+                                }))
                     })
 
                 decl_0exp(id_scrutinee) +:
@@ -257,7 +267,9 @@ object CodeGenYul extends CodeGenerator {
                         Seq(
                             Case(boollit(true), Block(pos_yul)),
                             Case(boollit(false), Block(neg_yul))))
-            case e: Expression => translateExpr(nextTemp(), e, contractName, checkedTable)
+            case e: Expression =>
+                val id = nextTemp()
+                decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable)
             case VariableDecl(typ, varName) =>
                 Seq(decl_0exp_t(Identifier(varName), typ))
             case VariableDeclWithInit(typ, varName, e) =>
@@ -282,11 +294,13 @@ object CodeGenYul extends CodeGenerator {
                     s.flatMap(s => {
                         val id_s: Identifier = nextTemp()
                         decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                        //todo: this also does not assign afterwards; likely the same bug as fixed in IfThenElse
                     })
 
                 decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.If(id_scrutinee, Block(s_yul))
+                // todo: also no assignment here
             case IfInState(e, ePerm, typeState, s1, s2) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
@@ -357,7 +371,7 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    case LogicalNegation(e) => call("not", retvar, contractName, checkedTable, e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
+                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable)
                     case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable)
                     case Dereference(_, _) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
