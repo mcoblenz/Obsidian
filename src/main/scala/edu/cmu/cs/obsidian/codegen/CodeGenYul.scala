@@ -394,7 +394,8 @@ object CodeGenYul extends CodeGenerator {
             case e: UnaryExpression =>
                 e match {
                     case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable)
-                    case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable)
+                    case Negate(e) =>
+                        translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable)
                     case Dereference(_, _) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
