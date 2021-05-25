@@ -209,6 +209,7 @@ object CodeGenYul extends CodeGenerator {
       * @return
       */
     def translateStatement(s: Statement, retVar: Option[String], contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
+        //todo: why is retVar an option and why is it a string not an identifier?
         s match {
             case Return() =>
                 Seq(Leave())
@@ -238,38 +239,59 @@ object CodeGenYul extends CodeGenerator {
                         Seq()
                 }
             case IfThenElse(scrutinee, pos, neg) =>
+                // generate a temp to store the last assignment used in either block
+                val id_last = nextTemp()
+                // generate a temp for the scrutinee
                 val id_scrutinee: Identifier = nextTemp()
-                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
-                val pos_yul: Seq[YulStatement] =
-                    pos.flatMap(s => {
-                        val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +:
-                            (translateStatement(s, Some(id_s.name), contractName, checkedTable) ++
-                                (retVar match {
-                                    case Some(value) => Seq(assign1(Identifier(value), id_s))
-                                    case None => Seq()
-                                }))
-                    })
-                val neg_yul: Seq[YulStatement] =
-                    neg.flatMap(s => {
-                        val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +:
-                            (translateStatement(s, Some(id_s.name), contractName, checkedTable) ++
-                                (retVar match {
-                                    case Some(value) => Seq(assign1(Identifier(value), id_s))
-                                    case None => Seq()
-                                }))
-                    })
 
-                decl_0exp(id_scrutinee) +:
+                // translate the scrutinee
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+
+                // todo: this may be useful elsewhere, too
+
+                /**
+                  * translate a statement into a new temporary variable along with its declaration
+                  *
+                  * @param s the statement to be translated
+                  * @return a pair of the new variable and the sequence of yulstatements resulting
+                  *         from the translation; inductively that sequence will end in an assignment
+                  *         to the declared variable.
+                  */
+                def trans_store(s: Statement): (Identifier, Seq[YulStatement]) = {
+                    val id_s: Identifier = nextTemp()
+                    (id_s, decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable))
+                }
+
+                // translate each block and generate an extra assignment for the last statement
+                val pos_yul: Seq[(Identifier, Seq[YulStatement])] = pos.map(trans_store)
+                val pos_assign = assign1(id_last, pos_yul.last._1)
+
+                val neg_yul: Seq[(Identifier, Seq[YulStatement])] = neg.map(trans_store)
+                val neg_assign = assign1(id_last, neg_yul.last._1)
+
+                // assign back from which ever last statement gets run, or not depending on the inductive requirements
+                val assign_back = retVar match {
+                    case Some(value) => Seq(assign1(Identifier(value), id_last))
+                    case None => Seq()
+                }
+
+                // put the pieces together into a switch statement, preceeded by the evaluation of the
+                // scrutinee
+                (decl_0exp(id_last) +:
+                    decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.Switch(id_scrutinee,
-                        Seq(
-                            Case(boollit(true), Block(pos_yul)),
-                            Case(boollit(false), Block(neg_yul))))
+                        Seq(Case(boollit(true), Block(pos_yul.flatMap(x => x._2) :+ pos_assign)),
+                            Case(boollit(false), Block(neg_yul.flatMap(x => x._2) :+ neg_assign))))) ++
+                    assign_back
             case e: Expression =>
-                val id = nextTemp()
-                decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable)
+                // todo: tighten up this logic, there's repeated code here
+                retVar match {
+                    case Some(value) => translateExpr(Identifier(value), e, contractName, checkedTable)
+                    case None =>
+                        val id = nextTemp()
+                        decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable)
+                }
             case VariableDecl(typ, varName) =>
                 Seq(decl_0exp_t(Identifier(varName), typ))
             case VariableDeclWithInit(typ, varName, e) =>
@@ -300,7 +322,7 @@ object CodeGenYul extends CodeGenerator {
                 decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.If(id_scrutinee, Block(s_yul))
-                // todo: also no assignment here
+            // todo: also no assignment here
             case IfInState(e, ePerm, typeState, s1, s2) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
