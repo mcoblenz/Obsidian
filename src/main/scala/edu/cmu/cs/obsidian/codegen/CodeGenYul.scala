@@ -15,7 +15,6 @@ import scala.collection.immutable.Map
 
 object CodeGenYul extends CodeGenerator {
 
-    // TODO improve this temporary symbol table
     var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
     var stateIdx: Int = -1 // whether or not there is a state
     var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
@@ -210,6 +209,7 @@ object CodeGenYul extends CodeGenerator {
       * @return
       */
     def translateStatement(s: Statement, retVar: Option[String], contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
+        //todo: why is retVar an option and why is it a string not an identifier?
         s match {
             case Return() =>
                 Seq(Leave())
@@ -239,26 +239,59 @@ object CodeGenYul extends CodeGenerator {
                         Seq()
                 }
             case IfThenElse(scrutinee, pos, neg) =>
+                // generate a temp to store the last assignment used in either block
+                val id_last = nextTemp()
+                // generate a temp for the scrutinee
                 val id_scrutinee: Identifier = nextTemp()
-                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
-                val pos_yul: Seq[YulStatement] =
-                    pos.flatMap(s => {
-                        val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
-                    })
-                val neg_yul: Seq[YulStatement] =
-                    neg.flatMap(s => {
-                        val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
-                    })
 
-                decl_0exp(id_scrutinee) +:
+                // translate the scrutinee
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+
+                // todo: this may be useful elsewhere, too
+
+                /**
+                  * translate a statement into a new temporary variable along with its declaration
+                  *
+                  * @param s the statement to be translated
+                  * @return a pair of the new variable and the sequence of yulstatements resulting
+                  *         from the translation; inductively that sequence will end in an assignment
+                  *         to the declared variable.
+                  */
+                def trans_store(s: Statement): (Identifier, Seq[YulStatement]) = {
+                    val id_s: Identifier = nextTemp()
+                    (id_s, decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable))
+                }
+
+                // translate each block and generate an extra assignment for the last statement
+                val pos_yul: Seq[(Identifier, Seq[YulStatement])] = pos.map(trans_store)
+                val pos_assign = assign1(id_last, pos_yul.last._1)
+
+                val neg_yul: Seq[(Identifier, Seq[YulStatement])] = neg.map(trans_store)
+                val neg_assign = assign1(id_last, neg_yul.last._1)
+
+                // assign back from which ever last statement gets run, or not depending on the inductive requirements
+                val assign_back = retVar match {
+                    case Some(value) => Seq(assign1(Identifier(value), id_last))
+                    case None => Seq()
+                }
+
+                // put the pieces together into a switch statement, preceeded by the evaluation of the
+                // scrutinee
+                (decl_0exp(id_last) +:
+                    decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.Switch(id_scrutinee,
-                        Seq(
-                            Case(boollit(true), Block(pos_yul)),
-                            Case(boollit(false), Block(neg_yul))))
-            case e: Expression => translateExpr(nextTemp(), e, contractName, checkedTable)
+                        Seq(Case(boollit(true), Block(pos_yul.flatMap(x => x._2) :+ pos_assign)),
+                            Case(boollit(false), Block(neg_yul.flatMap(x => x._2) :+ neg_assign))))) ++
+                    assign_back
+            case e: Expression =>
+                // todo: tighten up this logic, there's repeated code here
+                retVar match {
+                    case Some(value) => translateExpr(Identifier(value), e, contractName, checkedTable)
+                    case None =>
+                        val id = nextTemp()
+                        decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable)
+                }
             case VariableDecl(typ, varName) =>
                 Seq(decl_0exp_t(Identifier(varName), typ))
             case VariableDeclWithInit(typ, varName, e) =>
@@ -283,11 +316,13 @@ object CodeGenYul extends CodeGenerator {
                     s.flatMap(s => {
                         val id_s: Identifier = nextTemp()
                         decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                        //todo: this also does not assign afterwards; likely the same bug as fixed in IfThenElse
                     })
 
                 decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.If(id_scrutinee, Block(s_yul))
+            // todo: also no assignment here
             case IfInState(e, ePerm, typeState, s1, s2) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
@@ -358,8 +393,9 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    case LogicalNegation(e) => call("not", retvar, contractName, checkedTable, e) // todo "bitwise “not” of x (every bit of x is negated)", which may be wrong
-                    case Negate(e) => translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable)
+                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable)
+                    case Negate(e) =>
+                        translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable)
                     case Dereference(_, _) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -387,29 +423,47 @@ object CodeGenYul extends CodeGenerator {
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable)
                 }
             case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
+                // look up the name of the function in the table, get its return type, and then compute
+                // how wide of a tuple that return type is. (currently this is always either 0 or 1)
                 val width = checkedTable.contractLookup(contractName).lookupTransaction(name) match {
-                    case Some(trans) => trans.retType match {
-                        case Some(typ) => obsTypeToWidth(typ)
-                        case None => 0
-                    }
+                    case Some(trans) =>
+                        trans.retType match {
+                            case Some(typ) => obsTypeToWidth(typ)
+                            case None => 0
+                        }
                     case None =>
                         assert(assertion = false, "encountered a function name without knowing how many things it returns")
                         -1
                 }
 
                 // todo: some of this logic may be repeated in the dispatch table
+
+                // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
+                // which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
+                // to fix it, i need to refactor this object so that i pass around a vector of temporary variables
+                // to assign returns to rather than just one (i think). this is OK for now, but technical debt that
+                // we'll have to address if we ever add tuples to obsidian.
+
+                // for each argument expression, produce a new temp variable and translate it to a
+                // sequence of yul statements ending in an assignment to that variable.
                 val (seqs, ids) = {
                     args.map(p => {
                         val id: Identifier = nextTemp()
                         (translateExpr(id, p, contractName, checkedTable), id)
                     }).unzip
                 }
-                seqs.flatten :+
-                    (if (width == 0) {
-                        ExpressionStatement(FunctionCall(Identifier(name), ids))
-                    } else {
-                        decl_nexp(Seq.tabulate(width)(_ => nextTemp()), FunctionCall(Identifier(name), ids))
-                    })
+
+                // the result is the recursive translation and the expression either using the temp
+                // here or not.
+                //
+                // todo: this does not work with non-void functions that are called without binding their results, ie "f()" if f returns an int
+                seqs.flatten ++ (width match {
+                    case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
+                    case 1 =>
+                        val id: Identifier = nextTemp()
+                        Seq(decl_1exp(id, FunctionCall(Identifier(name), ids)), assign1(retvar, id))
+                    case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
+                })
 
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")

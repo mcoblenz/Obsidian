@@ -35,7 +35,6 @@ object "{{creationObject}}" {
 
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
             if iszero(lt(calldatasize(), 4)) {
-            {
                 {{#dispatch}}
                     {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
                     let selector := shr(224, calldataload(0))
@@ -95,5 +94,4 @@ object "{{creationObject}}" {
         {{runtimeSubObjects}}
     }
     {{subObjects}}
-}
 }

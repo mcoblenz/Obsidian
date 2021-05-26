@@ -2,8 +2,16 @@ main contract If {
         transaction iftest() {
             int x;
             if (true) {
-	       x = 1;
-	    }
+	           x = 1;
+	        }
             return;
+        }
+
+        transaction main() returns int {
+            int x = 0;
+            if (true) {
+                x = 1;
+            }
+            return x;
         }
 }

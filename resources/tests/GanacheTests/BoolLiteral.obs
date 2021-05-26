@@ -4,4 +4,8 @@ main contract BoolLiteral{
 	     x = true;
 	     x = false;
 	 }
+
+	 transaction main() returns bool {
+        return false;
+	 }
 }

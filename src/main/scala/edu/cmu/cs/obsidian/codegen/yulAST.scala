@@ -101,26 +101,28 @@ case class Assignment(variableNames: Seq[Identifier], value: Expression) extends
   */
 case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], value: Option[Expression]) extends YulStatement {
     override def toString: String = {
+        // todo:
+        // added below after ._1.name, this code correctly adds type annotations to the output Yul,
+        // but as of Version: 0.8.1+commit.df193b15.Linux.g++ of solc, you get errors like
+        // "Error: "bool" is not a valid type (user defined types are not yet supported)."
+        // when you run that code through solc even though the spec says otherwise.
+        /*
+                        + (v._2 match {
+                            case Some(t) => s" : $t"
+                            case None => ""
+                        })
+        */
+
         s"let ${
-            variables.map(v => v._1.name
-                // todo:
-                // this code correctly adds type annotations to the output Yul, but as of
-                // Version: 0.8.1+commit.df193b15.Linux.g++ of solc, you get errors like
-                // "Error: "bool" is not a valid type (user defined types are not yet supported)."
-                // when you run that code through solc even though the spec says otherwise.
-                /*
-                                + (v._2 match {
-                                    case Some(t) => s" : $t"
-                                    case None => ""
-                                })
-                */
-            ).mkString(", ")
+            variables.map(v => v._1.name).mkString(", ")
         }" +
             (value match {
-                case Some(e) => s" := ${e.toString}"
-                case None => ""
-            })
+            case Some (e) => s" := ${e.toString}"
+        case None => ""
     }
+
+    )
+}
 }
 
 case class FunctionDefinition(name: String,
@@ -276,8 +278,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                 codegen.ExpressionStatement(apply("abi_decode_tuple", intlit(4), apply("calldatasize"))),
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
-                //    let memPos := allocate_memory(0)
-                decl_1exp(mp_id, apply("allocate_memory", intlit(0))),
+                //    let memPos := allocate_unbounded()
+                decl_1exp(mp_id, apply("allocate_unbounded")),
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
                 //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
@@ -380,7 +382,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             val encode_lines: Seq[YulStatement] = var_indices.map(i =>
                 ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
                     Identifier("value" + i.toString),
-                    apply("add", Identifier("headStart"), intlit(n * 32)))))
+                    apply("add", Identifier("headStart"), intlit((n-1) * 32)))))
 
             val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
             FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,

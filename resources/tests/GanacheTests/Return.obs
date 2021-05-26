@@ -3,7 +3,11 @@ main contract Return {
             return (4+4);
         }
         transaction g(){
-	        f();
+	        int x = f();
             return;
+        }
+
+        transaction main() returns int{
+            return f();
         }
 }
