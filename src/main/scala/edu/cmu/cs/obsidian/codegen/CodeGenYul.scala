@@ -258,8 +258,12 @@ object CodeGenYul extends CodeGenerator {
                   *         to the declared variable.
                   */
                 def trans_store(s: Statement): (Identifier, Seq[YulStatement]) = {
-                    val id_s: Identifier = nextTemp()
-                    (id_s, decl_0exp(id_s) +: translateStatement(s, Some(id_last.name), contractName, checkedTable))
+                    val id_s: Identifier = nextTemp() //todo this is now unused
+                    // todo this first projection is now also unused; if i really don't need it then i can clean this code up a lot
+                    // todo: i think the fix is to just pass in retvar to every statement; that's where they should write if any of them
+                    // returns.
+                    //(id_s, decl_0exp(id_s) +: translateStatement(s, Some(id_last.name), contractName, checkedTable))
+                    (id_s, decl_0exp(id_s) +: translateStatement(s, retVar, contractName, checkedTable))
                 }
 
                 // translate each block and generate an extra assignment for the last statement
@@ -282,8 +286,7 @@ object CodeGenYul extends CodeGenerator {
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.Switch(id_scrutinee,
                         Seq(Case(boollit(true), Block(pos_yul.flatMap(x => x._2))),
-                            Case(boollit(false), Block(neg_yul.flatMap(x => x._2)))))) ++
-                    assign_back
+                            Case(boollit(false), Block(neg_yul.flatMap(x => x._2)))))) // ++ assign_back
             case e: Expression =>
                 // todo: tighten up this logic, there's repeated code here
                 retVar match {
