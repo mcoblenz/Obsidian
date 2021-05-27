@@ -259,15 +259,15 @@ object CodeGenYul extends CodeGenerator {
                   */
                 def trans_store(s: Statement): (Identifier, Seq[YulStatement]) = {
                     val id_s: Identifier = nextTemp()
-                    (id_s, decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable))
+                    (id_s, decl_0exp(id_s) +: translateStatement(s, Some(id_last.name), contractName, checkedTable))
                 }
 
                 // translate each block and generate an extra assignment for the last statement
                 val pos_yul: Seq[(Identifier, Seq[YulStatement])] = pos.map(trans_store)
-                val pos_assign = assign1(id_last, pos_yul.last._1)
+                //val pos_assign = assign1(id_last, pos_yul.last._1)
 
                 val neg_yul: Seq[(Identifier, Seq[YulStatement])] = neg.map(trans_store)
-                val neg_assign = assign1(id_last, neg_yul.last._1)
+                //val neg_assign = assign1(id_last, neg_yul.last._1)
 
                 // assign back from which ever last statement gets run, or not depending on the inductive requirements
                 val assign_back = retVar match {
@@ -281,8 +281,8 @@ object CodeGenYul extends CodeGenerator {
                     decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.Switch(id_scrutinee,
-                        Seq(Case(boollit(true), Block(pos_yul.flatMap(x => x._2) :+ pos_assign)),
-                            Case(boollit(false), Block(neg_yul.flatMap(x => x._2) :+ neg_assign))))) ++
+                        Seq(Case(boollit(true), Block(pos_yul.flatMap(x => x._2))),
+                            Case(boollit(false), Block(neg_yul.flatMap(x => x._2)))))) ++
                     assign_back
             case e: Expression =>
                 // todo: tighten up this logic, there's repeated code here
