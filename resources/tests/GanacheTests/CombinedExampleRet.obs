@@ -1,4 +1,4 @@
-main contract CombinedExample {
+main contract CombinedExampleRet {
         transaction val() returns int {
 	    if ( true && ! false ) {
                 return 4 + 20;
