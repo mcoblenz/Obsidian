@@ -30,7 +30,8 @@ fi
 missing_json=$(comm -13 <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
 if [ "$missing_json" ]
 then
-  echo "******** warning: some tests are defined but do not have json files and will not be run: $missing_json"
+  echo "******** warning: some tests are defined but do not have json files and will not be run:"
+  echo "$missing_json"
 fi
 # keep track of which tests fail so that we can output that at the bottom of the log
 failed=()
