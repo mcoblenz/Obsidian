@@ -1,3 +1,8 @@
+/* this test shows the same amount of compositionality of the simple
+ * language features as CombinedBasics, but also with multiple exit points
+ * from different branches of an if-then-else.
+ */
+
 main contract CombinedBasicsRet {
     transaction val() returns int {
         if ( true && ! false ) {

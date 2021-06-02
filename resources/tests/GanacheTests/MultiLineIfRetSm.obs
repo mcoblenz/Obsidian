@@ -1,3 +1,9 @@
+/* this test demonstrates that if-then-else blocks can have more than one
+ * line in them and still function correctly; it stops short of having much
+ * more than 1 line because of a limit on the number of stack
+ * variables. (https://github.com/mcoblenz/Obsidian/issues/341)
+ */
+
 main contract MultiLineIfRetSm {
     transaction val() returns int {
         int x = 0;
