@@ -251,8 +251,7 @@ object CodeGenYul extends CodeGenerator {
                 val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
                 val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
 
-                // put the pieces together into a switch statement, proceeded by the evaluation of the
-                // scrutinee
+                // put the pieces together into a switch statement, preceded by the evaluation of the scrutinee
                 decl_0exp(id_last) +:
                     decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
