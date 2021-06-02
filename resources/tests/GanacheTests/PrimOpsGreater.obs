@@ -1,5 +1,5 @@
 main contract PrimOpsGreater{
-        transaction primopsgreater() returns bool {
-           return(12 > 19);
-        }
+    transaction primopsgreater() returns bool {
+        return(12 > 19);
+    }
 }

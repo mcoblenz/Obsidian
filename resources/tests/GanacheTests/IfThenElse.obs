@@ -1,21 +1,21 @@
 main contract IfThenElse {
-        transaction ifthenelse() {
-            int x;
-            if (true) {
-	            x = 1;
-	        } else {
-	            x = 0;
-	        }
-            return;
+    transaction ifthenelse() {
+        int x;
+        if (true) {
+            x = 1;
+        } else {
+            x = 0;
         }
+        return;
+    }
 
-        transaction main() returns int {
-            int x = 9;
-            if (false) {
-	            x = 50;
-	        } else {
-	            x = 90;
-	        }
-            return x;
+    transaction main() returns int {
+        int x = 9;
+        if (false) {
+            x = 50;
+        } else {
+            x = 90;
         }
+        return x;
+    }
 }

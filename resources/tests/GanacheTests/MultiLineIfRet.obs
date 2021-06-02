@@ -1,0 +1,20 @@
+main contract MultiLineIfRet {
+    transaction val() returns int {
+        int x = 0;
+        if ( true && ! false ) {
+            x = 4+20;
+            x = 11;
+            return 4 + x;
+        } else {
+            x = 13;
+            x = 90;
+            return 13;
+        }
+    }
+    transaction main() returns int{
+        int x;
+        x = 9 + 0;
+        x = val();
+        return x;
+    }
+}

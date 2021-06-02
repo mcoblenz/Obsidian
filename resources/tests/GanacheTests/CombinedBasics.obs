@@ -1,0 +1,22 @@
+/* this test combines the features of the other smaller tests that all come
+ * conceptually prior to structure types into one file, showing that they
+ * still work when they also interact.
+ */
+
+main contract CombinedBasics {
+    transaction val() returns int {
+        int x = 70;
+        if ( true && ! false ) {
+            x = 4 + 20;
+        } else {
+            x = 13;
+        }
+        return x;
+    }
+    transaction main() returns int{
+        int x;
+        x = 9 + 0;
+        x = val();
+        return x;
+    }
+}

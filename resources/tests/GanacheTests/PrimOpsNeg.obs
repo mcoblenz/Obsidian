@@ -1,5 +1,5 @@
 main contract PrimOpsNeg{
-        transaction primopsneg() returns int {
-           return(-20);
-        }
+    transaction primopsneg() returns int {
+        return(-20);
+    }
 }

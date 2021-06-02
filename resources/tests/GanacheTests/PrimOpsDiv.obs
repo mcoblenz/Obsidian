@@ -1,5 +1,5 @@
 main contract PrimOpsDiv{
-        transaction primopsdiv() returns int {
-           return(4/2);
-        }
+    transaction primopsdiv() returns int {
+        return(4/2);
+    }
 }
