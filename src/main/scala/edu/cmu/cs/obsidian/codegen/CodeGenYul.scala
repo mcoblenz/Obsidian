@@ -247,13 +247,9 @@ object CodeGenYul extends CodeGenerator {
                 // translate the scrutinee
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
 
-                def trans_store(s: Statement): Seq[YulStatement] = {
-                    translateStatement(s, retVar, contractName, checkedTable)
-                }
-
                 // translate each block and generate an extra assignment for the last statement
-                val pos_yul: Seq[YulStatement] = pos.flatMap(trans_store)
-                val neg_yul: Seq[YulStatement] = neg.flatMap(trans_store)
+                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
+                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
 
                 // put the pieces together into a switch statement, proceeded by the evaluation of the
                 // scrutinee
