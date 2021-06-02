@@ -1,13 +1,13 @@
 main contract Return {
-        transaction f() returns int{
-            return (4+4);
-        }
-        transaction g(){
-	        int x = f();
-            return;
-        }
+    transaction f() returns int{
+        return (4+4);
+    }
+    transaction g(){
+        int x = f();
+        return;
+    }
 
-        transaction main() returns int{
-            return f();
-        }
+    transaction main() returns int{
+        return f();
+    }
 }
