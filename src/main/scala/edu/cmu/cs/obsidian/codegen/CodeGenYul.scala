@@ -247,43 +247,18 @@ object CodeGenYul extends CodeGenerator {
                 // translate the scrutinee
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
 
-                // todo: this may be useful elsewhere, too
-
-                /**
-                  * translate a statement into a new temporary variable along with its declaration
-                  *
-                  * @param s the statement to be translated
-                  * @return a pair of the new variable and the sequence of yulstatements resulting
-                  *         from the translation; inductively that sequence will end in an assignment
-                  *         to the declared variable.
-                  */
-                def trans_store(s: Statement): (Identifier, Seq[YulStatement]) = {
-                    val id_s: Identifier = nextTemp()
-                    (id_s, decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable))
-                }
-
                 // translate each block and generate an extra assignment for the last statement
-                val pos_yul: Seq[(Identifier, Seq[YulStatement])] = pos.map(trans_store)
-                val pos_assign = assign1(id_last, pos_yul.last._1)
+                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
+                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
 
-                val neg_yul: Seq[(Identifier, Seq[YulStatement])] = neg.map(trans_store)
-                val neg_assign = assign1(id_last, neg_yul.last._1)
-
-                // assign back from which ever last statement gets run, or not depending on the inductive requirements
-                val assign_back = retVar match {
-                    case Some(value) => Seq(assign1(Identifier(value), id_last))
-                    case None => Seq()
-                }
-
-                // put the pieces together into a switch statement, preceeded by the evaluation of the
-                // scrutinee
-                (decl_0exp(id_last) +:
+                // put the pieces together into a switch statement, preceded by the evaluation of the scrutinee
+                decl_0exp(id_last) +:
                     decl_0exp(id_scrutinee) +:
                     scrutinee_yul :+
                     edu.cmu.cs.obsidian.codegen.Switch(id_scrutinee,
-                        Seq(Case(boollit(true), Block(pos_yul.flatMap(x => x._2) :+ pos_assign)),
-                            Case(boollit(false), Block(neg_yul.flatMap(x => x._2) :+ neg_assign))))) ++
-                    assign_back
+                        Seq(Case(boollit(true), Block(pos_yul)),
+                            Case(boollit(false), Block(neg_yul))))
+
             case e: Expression =>
                 // todo: tighten up this logic, there's repeated code here
                 retVar match {

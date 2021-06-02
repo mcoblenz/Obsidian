@@ -1,5 +1,5 @@
 main contract PrimOpsAnd{
-        transaction primopsand() returns bool {
-           return(true && false);
-        }
+    transaction primopsand() returns bool {
+        return(true && false);
+    }
 }
