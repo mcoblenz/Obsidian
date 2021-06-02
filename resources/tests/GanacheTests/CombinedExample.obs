@@ -1,12 +1,12 @@
 main contract CombinedExample {
         transaction val() returns int {
             int x = 70;
-	    if ( true && ! false ) {
+	        if ( true && ! false ) {
                 x = 4 + 20;
-	    } else {
-	        x = 13;
+	        } else {
+	            x = 13;
             }
-	    return x;
+	        return x;
         }
         transaction main() returns int{
             int x;
