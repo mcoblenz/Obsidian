@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 plugins {
+    // <= 4.0.4 is needed to support Gradle < 5.0, which is in use in the Fabric 1.4.1 images.
     id 'com.github.johnrengelman.shadow' version '4.0.4'
     id 'java'
 }
@@ -16,9 +17,9 @@ targetCompatibility = 1.8
 
 repositories {
     maven {
-        url 'http://obsidian-lang.com/repository'
+        url 'https://obsidian-lang.com/repository'
     }
-    jcenter()
+
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
     maven { url 'https://jitpack.io' }
 
@@ -27,9 +28,8 @@ repositories {
 
 dependencies {
     implementation 'edu.cmu.cs.obsidian:runtime:0.1'
-    compile group: 'org.hyperledger.fabric-chaincode-java', name: 'fabric-chaincode-shim', version: '1.4.4'
-    compile group: 'com.google.protobuf', name: 'protobuf-java', version: '3.11.4'
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+    implementation group: 'org.hyperledger.fabric-chaincode-java', name: 'fabric-chaincode-shim', version: '1.4.4'
+    implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '3.11.4'
 }
 
 shadowJar {
