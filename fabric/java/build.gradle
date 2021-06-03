@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 plugins {
-    id 'com.github.johnrengelman.shadow' version '5.2.0'
+    // <= 4.0.4 is needed to support Gradle < 5.0, which is in use in the Fabric 1.4.1 images.
+    id 'com.github.johnrengelman.shadow' version '4.0.4'
     id 'java'
 }
 
@@ -32,9 +33,9 @@ dependencies {
 }
 
 shadowJar {
-    archiveBaseName = 'chaincode'
-    archiveVersion = null
-    archiveClassifier = null
+    baseName = 'chaincode'
+    version = null
+    classifier = null
 
     manifest {
         attributes 'Main-Class': 'org.hyperledger.fabric.example.{{CLASS_NAME}}'
