@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 plugins {
-    id 'com.github.johnrengelman.shadow' version '4.0.4'
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
     id 'java'
 }
 
