@@ -36,6 +36,19 @@ fi
 # keep track of which tests fail so that we can output that at the bottom of the log
 failed=()
 
+obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
+
+if [[ -z "$obsidian_jar" ]]; then
+    (
+        sbt assembly
+    )
+
+    if [[ "$?" != "0" ]]; then
+        echo "Error building jar file, exiting."
+        exit 1
+    fi
+fi
+
 for test in "${tests[@]}"
 do
   echo "---------------------------------------------------------------"
@@ -68,16 +81,16 @@ do
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
-  if ! sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
+  if ! $(java -jar $obsidian_jar --yul resources/tests/GanacheTests/$NAME.obs)
   then
-      echo "$NAME test failed: sbt exited cannot compile obs to yul"
-      failed+=("$test [sbt]")
+      echo "$NAME test failed: cannot compile obs to yul"
+      failed+=("$test [compile obs to yul]")
       exit 1
   fi
 
   if [ ! -d "$NAME" ]; then
       echo "$NAME directory failed to get created"
-      failed+=("$test [directory]")
+      failed+=("$test [output directory]")
       exit 1
   fi
 
