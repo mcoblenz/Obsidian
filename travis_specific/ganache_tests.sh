@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
@@ -27,7 +27,7 @@ else
   tests=(resources/tests/GanacheTests/*.json)
 fi
 
-missing_json=$(comm -13 <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
+missing_json=$(comm -13 <(ls resources/tests/GanacheTests/*.json | sort | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | sort | xargs basename -s '.obs'))
 if [ "$missing_json" ]
 then
   echo "******** warning: some tests are defined but do not have json files and will not be run:"
@@ -44,7 +44,7 @@ if [[ -z "$obsidian_jar" ]]; then
     )
 
     if [[ "$?" != "0" ]]; then
-        echo "Error building jar file, exiting."
+        echo "Error building Obsidian jar file, exiting."
         exit 1
     fi
 fi
