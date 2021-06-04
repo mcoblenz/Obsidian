@@ -31,8 +31,8 @@ install:
   - sbt ++$TRAVIS_SCALA_VERSION test # this actually builds Obsidian
 
 env:
-  - TEST_SUITE=tests
-  - TEST_SUITE=ganache_tests
+  - TEST_SUITE=tests.sh
+  - TEST_SUITE=ganache_tests.sh
 
 script: "bash travis_specific/$TEST_SUITE"
 
