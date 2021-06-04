@@ -34,7 +34,7 @@ env:
   - TEST_SUITE=tests
   - TEST_SUITE=ganache_tests
 
-script: "bundle exec bash travis_specific/$TEST_SUITE"
+script: "bash travis_specific/$TEST_SUITE"
 
 cache:
   directories:
