@@ -34,7 +34,7 @@ env:
   - TEST_SUITE=tests.sh
   - TEST_SUITE=ganache_tests.sh
 
-script: "bash travis_specific/$TEST_SUITE"
+script: "travis_specific/$TEST_SUITE"
 
 cache:
   directories:
