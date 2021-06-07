@@ -1,10 +1,8 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
-echo $(pwd -P)
 cd "$TRAVIS_BUILD_DIR" || exit 1
-echo $(pwd -P)
 
 ANY_FAILURES=0
 
@@ -29,7 +27,7 @@ else
   tests=(resources/tests/GanacheTests/*.json)
 fi
 
-missing_json=$(comm -13 <(ls resources/tests/GanacheTests/*.json | sort | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | sort | xargs basename -s '.obs'))
+missing_json=$(diff --changed-group-format='%<%>' --unchanged-group-format='' <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
 if [ "$missing_json" ]
 then
   echo "******** warning: some tests are defined but do not have json files and will not be run:"
@@ -38,17 +36,12 @@ fi
 # keep track of which tests fail so that we can output that at the bottom of the log
 failed=()
 
+# check that the jar file for obsidian exists; `sbt assembly` ought to have been run before this script gets run
 obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
-
-if [[ -z "$obsidian_jar" ]]; then
-    (
-        sbt assembly
-    )
-
-    if [[ "$?" != "0" ]]; then
+if [[ ! "$obsidian_jar" ]]
+then
         echo "Error building Obsidian jar file, exiting."
         exit 1
-    fi
 fi
 
 for test in "${tests[@]}"
