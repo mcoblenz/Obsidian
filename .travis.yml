@@ -7,7 +7,7 @@ node_js:
      - 15.11.0
 
 jdk:
-  - oraclejdk13 ## as of 9 march 2021, up to jdk12 seems to work but 13/14/15 fail
+  - oraclejdk12 ## as of 9 march 2021, up to jdk12 seems to work but 13/14/15 fail
 
 before_install:
   - ./travis_specific/install-protobuf.sh
