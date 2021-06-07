@@ -2,7 +2,9 @@
 
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
+echo $(pwd -P)
 cd "$TRAVIS_BUILD_DIR" || exit 1
+echo $(pwd -P)
 
 ANY_FAILURES=0
 
