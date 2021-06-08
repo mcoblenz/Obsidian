@@ -19,7 +19,7 @@ before_install:
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle
-  - sbt ++$TRAVIS_SCALA_VERSION assembly # this builds the Obsidian jar
+  # - sbt ++$TRAVIS_SCALA_VERSION assembly # this builds the Obsidian jar
 
 env:
   - TEST_SUITE=tests.sh

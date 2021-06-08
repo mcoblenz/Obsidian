@@ -36,6 +36,8 @@ fi
 # keep track of which tests fail so that we can output that at the bottom of the log
 failed=()
 
+sbt 'set assembly / test := {}' ++$TRAVIS_SCALA_VERSION assembly
+
 # check that the jar file for obsidian exists; `sbt assembly` ought to have been run before this script gets run
 obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
 if [[ ! "$obsidian_jar" ]]
