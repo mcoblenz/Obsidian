@@ -27,7 +27,7 @@ else
   tests=(resources/tests/GanacheTests/*.json)
 fi
 
-missing_json=$(comm -13 <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
+missing_json=$(diff --changed-group-format='%<%>' --unchanged-group-format='' <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
 if [ "$missing_json" ]
 then
   echo "******** warning: some tests are defined but do not have json files and will not be run:"
@@ -35,6 +35,14 @@ then
 fi
 # keep track of which tests fail so that we can output that at the bottom of the log
 failed=()
+
+# check that the jar file for obsidian exists; `sbt assembly` ought to have been run before this script gets run
+obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
+if [[ ! "$obsidian_jar" ]]
+then
+        echo "Error building Obsidian jar file, exiting."
+        exit 1
+fi
 
 for test in "${tests[@]}"
 do
@@ -68,16 +76,16 @@ do
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
-  if ! sbt "runMain edu.cmu.cs.obsidian.Main --yul resources/tests/GanacheTests/$NAME.obs"
+  if ! $(java -jar $obsidian_jar --yul resources/tests/GanacheTests/$NAME.obs)
   then
-      echo "$NAME test failed: sbt exited cannot compile obs to yul"
-      failed+=("$test [sbt]")
+      echo "$NAME test failed: cannot compile obs to yul"
+      failed+=("$test [compile obs to yul]")
       exit 1
   fi
 
   if [ ! -d "$NAME" ]; then
       echo "$NAME directory failed to get created"
-      failed+=("$test [directory]")
+      failed+=("$test [output directory]")
       exit 1
   fi
 
