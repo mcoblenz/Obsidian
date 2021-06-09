@@ -54,3 +54,6 @@ buildscript/build
 *.swp
 
 .bsp
+
+# corpus study
+corpus_studies/solidity_state_study/slither_plugins/__pycache__/
