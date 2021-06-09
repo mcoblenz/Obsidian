@@ -10,13 +10,12 @@ jdk:
   - oraclejdk12 ## as of 9 march 2021, up to jdk12 seems to work but 13/14/15 fail
 
 before_install:
-  - echo "before install"
-#  - ./travis_specific/install-protobuf.sh
-#  - curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s
-#  - mv bin/* $HOME/bin/
-#  - export PATH=${PATH}:${HOME}/protobuf/
-#  - export PATH=${PATH}:${HOME}/bin/
-#  - ./travis_specific/install_ganache.sh
+  - ./travis_specific/install-protobuf.sh
+  - curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.1 -s
+  - mv bin/* $HOME/bin/
+  - export PATH=${PATH}:${HOME}/protobuf/
+  - export PATH=${PATH}:${HOME}/bin/
+  - ./travis_specific/install_ganache.sh
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle
