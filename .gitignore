@@ -49,3 +49,6 @@ buildscript/.gradle
 buildscript/build
 # Vim
 *.swp
+
+# corpus study
+corpus_studies/solidity_state_study/slither_plugins/__pycache__
