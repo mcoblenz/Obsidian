@@ -1,7 +1,7 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 from slither.core.expressions import *
-from functools import reduce
 from slither.core.declarations.solidity_variables import SOLIDITY_VARIABLES,SOLIDITY_VARIABLES_COMPOSED
+from functools import reduce
 
 # Solidity variables that are used as state variables instead of 
 # local variables, and thus must be explicitly checked for when
@@ -14,32 +14,36 @@ SOLIDITY_VARIABLE_WHITELIST = ["now", "this", "block.number", "block.timestamp"]
 # It takes a Solidity AST used inside of a conditional check, exp, 
 # and traverses it to find all of the variables used in the check.
 # It converts the variables to strings and returns them in a set.
-def get_vars_used(exp) :
+def get_vars_used(exp, enum_names) :
     if isinstance(exp, Identifier) :
         return {str(exp)}
     elif isinstance(exp, CallExpression) :
-        vars = [get_vars_used(arg) for arg in exp.arguments]
+        vars = [get_vars_used(arg, enum_names) for arg in exp.arguments]
         return reduce(lambda s,x : s.union(x), vars, set())
     elif isinstance(exp, UnaryOperation) :
-        return get_vars_used(exp.expression)
+        return get_vars_used(exp.expression, enum_names)
     elif isinstance(exp, BinaryOperation) :
-        return (get_vars_used(exp.expression_left)
-                    .union(get_vars_used(exp.expression_right))
+        return (get_vars_used(exp.expression_left, enum_names)
+                    .union(get_vars_used(exp.expression_right, enum_names))
                 )
     elif isinstance(exp, Literal) :
         return set()
     elif isinstance(exp, IndexAccess) :
-        return (get_vars_used(exp.expression_left)
-                    .union(get_vars_used(exp.expression_right))
+        return (get_vars_used(exp.expression_left, enum_names)
+                    .union(get_vars_used(exp.expression_right, enum_names))
                 )
     elif isinstance(exp, MemberAccess) :
+        # If the expression is an enum value that is defined in the contract or a parent
+        # contract, do not include it in the set of variables.
+        if (isinstance(exp.expression, Identifier) and str(exp.expression) in enum_names):
+            return set()
         return {str(exp)}
     elif isinstance(exp, TupleExpression) :
         # There should be exactly one element in the tuple 
         #     (that is, they should act as parenthesis).
         # Comparing tuples for equality as a Solidity language feature
         #     does not exist at the time of writing.
-        return get_vars_used(exp.expressions[0])
+        return get_vars_used(exp.expressions[0], enum_names)
     return set()
 
 # Class implemented as a detector plugin for Slither. This detector detects,
@@ -52,7 +56,7 @@ class HasState(AbstractDetector):
     # Variables declared for use in Slither
     ARGUMENT = 'hasstate'
     HELP = 'Help printed by slither'
-    IMPACT = DetectorClassification.HIGH
+    IMPACT = DetectorClassification.INFORMATIONAL
     CONFIDENCE = DetectorClassification.HIGH
 
     WIKI = 'STATE TEST'
@@ -105,7 +109,7 @@ class HasState(AbstractDetector):
     
     # Checks if the node makes a stateful check, and gives the result of
     # that check
-    def is_stateful_node(self, node, state_vars) :
+    def is_stateful_node(self, node, state_vars, enum_names) :
         str_vars = [str(sv) for sv in state_vars]
         constant_vars = [str(sv) for sv in state_vars if sv.is_constant]
         nonconstant_vars = [str(sv) for sv in state_vars if not sv.is_constant]
@@ -117,7 +121,7 @@ class HasState(AbstractDetector):
             argument = node.expression
         
         if argument :
-            vars = get_vars_used(argument)
+            vars = get_vars_used(argument, enum_names)
             uses_state = False
             for var in vars :
                 if not (var in str_vars or var in SOLIDITY_VARIABLE_WHITELIST) :
@@ -129,14 +133,15 @@ class HasState(AbstractDetector):
         return False
 
     # Checks if the function has a stateful check, returns the result of that check
-    def is_stateful_function(self, func, state_vars) :
-        nodes = list(map(lambda n : self.is_stateful_node(n, state_vars), func.nodes))
+    def is_stateful_function(self, func, state_vars, enum_names) :
+        nodes = list(map(lambda n : self.is_stateful_node(n, state_vars, enum_names), func.nodes))
         return True in nodes
 
     # Checks if the contract has a function or modifier that makes a stateful check.
     def is_stateful_contract(self, contract) :
+        enum_names = [e.name for e in contract.enums]
         state_vars = [sv for sv in contract.state_variables]
-        functions = list(map(lambda f : self.is_stateful_function(f, state_vars), contract.modifiers + contract.functions))
+        functions = list(map(lambda f : self.is_stateful_function(f, state_vars, enum_names), contract.modifiers + contract.functions))
         return True in functions
 
     # Function called by Slither framework. Checks all contracts in scope of 

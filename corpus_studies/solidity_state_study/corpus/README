@@ -1,2 +1,0 @@
-The corpus was gathered using the Google BigData query found in https://arxiv.org/pdf/1910.10601.pdf. In order to run smaller versions, the query size was cut down to 1000 and 10000 for the small and medium corpus respectively.
-The small corpus was then filtered for addresses that had code in a .sol format that could be compiled with solc. 
