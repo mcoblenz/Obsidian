@@ -20,8 +20,8 @@ script: "travis_specific/$TEST_SUITE"
 
 jobs:
   exclude:
-    - branch != master
-      env: tests.sh
+    - if: branch != master
+      env: TEST_SUITE=tests.sh
 
 cache:
   directories:
