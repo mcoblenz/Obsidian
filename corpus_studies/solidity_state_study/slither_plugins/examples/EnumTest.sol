@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BSD-3
 pragma solidity ^0.8.4;
 
 contract Foo {
@@ -11,26 +11,10 @@ contract Foo {
         x = 0;
     }
 
+    //We expect that this function will be marked as evidence of state since
+    //it has a require statement, comparing a state variable to an enum value.
     function moveToB() public {
-        //require(x == 0);
         require(state == State.A);
         state = State.B;
     }
-
-   /*
-    struct S2 {
-      uint x;
-    }
-
-    struct S1 {
-      S2 s2;
-    }
-
-    S1 s1;
-
-    function foo() public view returns (uint) {
-      require(s1.s2.x == 0);
-      return 0;
-    }
-    */
 }
