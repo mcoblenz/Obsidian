@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# this should only happen when this gets run on Travis; for now it's enough to check that the uname
-# is Linux
-if [[ $(uname) == "Linux" ]]
+# travis makes this env var available to all builds, so this stops us from installing things locally
+if [[ $CI == "true" ]]
 then
   ./travis_specific/install_ganache.sh
 fi

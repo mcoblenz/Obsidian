@@ -13,7 +13,7 @@ install:
   - gradle publish -b Obsidian_Runtime/build.gradle
 
 env:
-  - TEST_SUITE=tests.sh
+  - TEST_SUITE=fabric_tests.sh
   - TEST_SUITE=ganache_tests.sh
 
 script: "travis_specific/$TEST_SUITE"
@@ -21,7 +21,7 @@ script: "travis_specific/$TEST_SUITE"
 jobs:
   exclude:
     - if: branch != master
-      env: TEST_SUITE=tests.sh
+      env: TEST_SUITE=fabric_tests.sh
 
 cache:
   directories:
