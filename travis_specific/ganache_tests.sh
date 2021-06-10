@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# travis makes this env var available to all builds, so this stops us from installing things locally
+if [[ $CI == "true" ]]
+then
+  ./travis_specific/install_ganache.sh
+fi
+
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
 cd "$TRAVIS_BUILD_DIR" || exit 1
@@ -35,6 +41,9 @@ then
 fi
 # keep track of which tests fail so that we can output that at the bottom of the log
 failed=()
+
+# build a jar of Obsidian but removing all the tests; that happens in the other Travis matrix job, so we can assume it works here.
+sbt 'set assembly / test := {}' ++$TRAVIS_SCALA_VERSION assembly
 
 # check that the jar file for obsidian exists; `sbt assembly` ought to have been run before this script gets run
 obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
