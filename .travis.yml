@@ -18,6 +18,11 @@ env:
 
 script: "travis_specific/$TEST_SUITE"
 
+jobs:
+  exclude:
+    - branch != master
+      env: tests.sh
+
 cache:
   directories:
     - $HOME/.cache/coursier
