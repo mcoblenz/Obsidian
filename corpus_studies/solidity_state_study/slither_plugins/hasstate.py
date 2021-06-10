@@ -1,6 +1,8 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 from slither.core.expressions import *
+from slither.core.cfg.node import *
 from slither.core.declarations.solidity_variables import SOLIDITY_VARIABLES,SOLIDITY_VARIABLES_COMPOSED
+from slither.detectors.functions.modifier import is_revert
 from functools import reduce
 
 # Solidity variables that are used as state variables instead of 
@@ -45,6 +47,10 @@ def get_vars_used(exp, enum_names) :
         #     does not exist at the time of writing.
         return get_vars_used(exp.expressions[0], enum_names)
     return set()
+
+# Checks whether a throw/assert is reachable from the current node.
+def can_reach_revert(node):
+    return any(is_revert(e) for e in recheable(node))
 
 # Class implemented as a detector plugin for Slither. This detector detects,
 # for the given contracts, which contracts have state checks and 
@@ -117,23 +123,23 @@ class HasState(AbstractDetector):
         if node.contains_require_or_assert() :
             #require and assert both only have one argument.
             argument = node.expression.arguments[0]
-        elif node.contains_if() :
+        # If the node is an if expression, we check that either branch leads to a throw/revert.
+        elif node.contains_if(include_loop=False) and can_reach_revert(node): 
             argument = node.expression
         
-        if argument :
+        if argument:
             vars = get_vars_used(argument, enum_names)
-            uses_state = False
-            for var in vars :
-                if not (var in str_vars or var in SOLIDITY_VARIABLE_WHITELIST) :
-                    return False
-                elif var in nonconstant_vars :
-                    uses_state = True
-            return uses_state
+            # returns True if all variables are either state variables or on the whitelist
+            # AND at least one of them is nonconstant
+            return all(var in str_vars or var in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
+                   any(var in nonconstant_vars for var in vars)
 
         return False
 
     # Checks if the function has a stateful check, returns the result of that check
     def is_stateful_function(self, func, state_vars, enum_names) :
+        # print("function %s: parameters: %s" % (func.name, list(map(str, func.parameters))))
+        # print("function %s: modifiers: %s" % (func.name, [m.parameters for m in func.modifiers]))
         nodes = list(map(lambda n : self.is_stateful_node(n, state_vars, enum_names), func.nodes))
         return True in nodes
 
@@ -141,6 +147,7 @@ class HasState(AbstractDetector):
     def is_stateful_contract(self, contract) :
         enum_names = [e.name for e in contract.enums]
         state_vars = [sv for sv in contract.state_variables]
+        # print("State vars: %s" % [str(s) for s in state_vars])
         functions = list(map(lambda f : self.is_stateful_function(f, state_vars, enum_names), contract.modifiers + contract.functions))
         return True in functions
 
