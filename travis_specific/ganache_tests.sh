@@ -309,10 +309,10 @@ do
         continue
     fi
 
-    # pull the result out of the JSON object, delete the quotes and leading 0x, and make it upper case
-    GOT=$(echo "$RESP" | jq '.result' | tr -d '"' | sed -e "s/^0x//" | tr '[:lower:]' '[:upper:]')
+    # pull the result out of the JSON object, removing the quotation marks
+    GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
     # use BC to convert it to decimal
-    GOT_DEC=$(echo "obase=10; ibase=16;$GOT" | bc)
+    GOT_DEC=$(python ../bin/2sc.py "$GOT")
 
     # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
     if [ "$GOT_DEC" == "$EXPECTED" ]
