@@ -5,7 +5,7 @@ contract A {
     enum Stage {NotStarted, InProgress, Ended}
     Stage stage;
 
-    //This contract is currently not flagged as having state.
+    //This function is currently not flagged as having state.
     //Even though this modifier takes a parameter, this doesn't necessarily mean
     //that it depends on function parameters--we need to look at how the modifier
     //is used. In the function startGame, the enum value Stage.NotStarted is being
@@ -15,7 +15,12 @@ contract A {
       _;
     }
 
-    function startGame() public inStage(Stage.NotStarted) {
+    modifier blah() {
+      require(stage == Stage.Ended);
+      _;
+    }
+
+    function startGame() public inStage(Stage.NotStarted) blah {
       stage = Stage.InProgress;
     }
 }

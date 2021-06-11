@@ -3,6 +3,7 @@ from slither.core.expressions import *
 from slither.core.cfg.node import *
 from slither.core.declarations.solidity_variables import SOLIDITY_VARIABLES,SOLIDITY_VARIABLES_COMPOSED
 from slither.detectors.functions.modifier import is_revert
+from slither.analyses.data_dependency.data_dependency import *
 from functools import reduce
 
 # Solidity variables that are used as state variables instead of 
@@ -51,6 +52,60 @@ def get_vars_used(exp, enum_names) :
 # Checks whether a throw/assert is reachable from the current node.
 def can_reach_revert(node):
     return any(is_revert(e) for e in recheable(node))
+
+# This class determines whether a contract is using states, and if so, will
+# provide additional information about the states.
+# The function used by the hasstate detector is is_stateful_contract.
+class ContractStateDetector: 
+    def __init__(self, contract):
+        self.contract = contract
+        self.enum_names = [e.name for e in contract.enums]
+        self.state_vars = [sv for sv in contract.state_variables]
+
+    # Checks if the node makes a stateful check, and gives the result of
+    # that check
+    def is_stateful_node(self, node) :
+        # print("Node: %s" % node)
+        str_vars = [str(sv) for sv in self.state_vars]
+        constant_vars = [str(sv) for sv in self.state_vars if sv.is_constant]
+        nonconstant_vars = [str(sv) for sv in self.state_vars if not sv.is_constant]
+        argument = None
+        if node.contains_require_or_assert() :
+            #require and assert both only have one argument.
+            argument = node.expression.arguments[0]
+        # If the node is an if expression, we check that either branch leads to a throw/revert.
+        elif node.contains_if(include_loop=False) and can_reach_revert(node): 
+            argument = node.expression
+        elif len(node.internal_calls) > 0:
+            pass
+            # print("node type: %s" % node.type)
+            # print("arguments: %s" % [str(a) for a in node.arguments])
+            # print("modifier stateful: %s" % self.is_stateful_function(node.internal_calls[0],state_vars,enum_names))
+            # print("Internal calls parameters: %s" % ([list(map(str,x.parameters)) for x in node.internal_calls]))
+            # print("Internal calls arguments: %s" % ([list(map(str,x.arguments)) for x in node.internal_calls_as_expressions]))
+        
+        if argument:
+            vars = get_vars_used(argument, self.enum_names)
+            # print("Vars: %s" % vars)
+            # returns True if all variables are either state variables or on the whitelist
+            # AND at least one of them is nonconstant
+            return all(var in str_vars or var in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
+                   any(var in nonconstant_vars for var in vars)
+
+        return False
+
+    # Checks if the function has a stateful check, returns the result of that check
+    def is_stateful_function(self, func) :
+        # print("function %s: parameters: %s" % (func.name, list(map(str, func.parameters))))
+        # print("function %s: modifiers: %s" % (func.name, [str(m) for m in func.modifiers]))
+        nodes = list(map(lambda n : self.is_stateful_node(n), func.nodes))
+        return any(nodes)
+
+    # Checks if the contract has a function or modifier that makes a stateful check.
+    def is_stateful_contract(self):
+        functions = list(map(lambda f : self.is_stateful_function(f), \
+                             self.contract.modifiers + self.contract.functions))
+        return any(functions)
 
 # Class implemented as a detector plugin for Slither. This detector detects,
 # for the given contracts, which contracts have state checks and 
@@ -113,50 +168,12 @@ class HasState(AbstractDetector):
         inherited = [str(c) for c in contract.inheritance]
         return bool([elem for elem in inherited if elem in stateful])
     
-    # Checks if the node makes a stateful check, and gives the result of
-    # that check
-    def is_stateful_node(self, node, state_vars, enum_names) :
-        str_vars = [str(sv) for sv in state_vars]
-        constant_vars = [str(sv) for sv in state_vars if sv.is_constant]
-        nonconstant_vars = [str(sv) for sv in state_vars if not sv.is_constant]
-        argument = None
-        if node.contains_require_or_assert() :
-            #require and assert both only have one argument.
-            argument = node.expression.arguments[0]
-        # If the node is an if expression, we check that either branch leads to a throw/revert.
-        elif node.contains_if(include_loop=False) and can_reach_revert(node): 
-            argument = node.expression
-        
-        if argument:
-            vars = get_vars_used(argument, enum_names)
-            # returns True if all variables are either state variables or on the whitelist
-            # AND at least one of them is nonconstant
-            return all(var in str_vars or var in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
-                   any(var in nonconstant_vars for var in vars)
-
-        return False
-
-    # Checks if the function has a stateful check, returns the result of that check
-    def is_stateful_function(self, func, state_vars, enum_names) :
-        # print("function %s: parameters: %s" % (func.name, list(map(str, func.parameters))))
-        # print("function %s: modifiers: %s" % (func.name, [m.parameters for m in func.modifiers]))
-        nodes = list(map(lambda n : self.is_stateful_node(n, state_vars, enum_names), func.nodes))
-        return True in nodes
-
-    # Checks if the contract has a function or modifier that makes a stateful check.
-    def is_stateful_contract(self, contract) :
-        enum_names = [e.name for e in contract.enums]
-        state_vars = [sv for sv in contract.state_variables]
-        # print("State vars: %s" % [str(s) for s in state_vars])
-        functions = list(map(lambda f : self.is_stateful_function(f, state_vars, enum_names), contract.modifiers + contract.functions))
-        return True in functions
-
     # Function called by Slither framework. Checks all contracts in scope of 
     # the detector and gives the result of the check on those contracts.
     def _detect(self):
         stateful_contracts = []
         for c in self.contracts :
-            if self.is_stateful_contract(c) or self.inherited_state(c, stateful_contracts):
+            if ContractStateDetector(c).is_stateful_contract() or self.inherited_state(c, stateful_contracts):
                 stateful_contracts.append(c.name)
 
         stateful_contracts = [self.STATEFUL_MESSAGE % sc for sc in stateful_contracts]
