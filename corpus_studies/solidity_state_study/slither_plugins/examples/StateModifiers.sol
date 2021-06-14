@@ -15,12 +15,12 @@ contract A {
       _;
     }
 
-    modifier blah() {
+    modifier blah(uint x, Stage _stage) {
       require(stage == Stage.Ended);
       _;
     }
 
-    function startGame() public inStage(Stage.NotStarted) blah {
+    function startGame() public inStage(Stage.NotStarted) {
       stage = Stage.InProgress;
     }
 }

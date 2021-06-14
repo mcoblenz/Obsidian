@@ -19,7 +19,7 @@ SOLIDITY_VARIABLE_WHITELIST = ["now", "this", "block.number", "block.timestamp"]
 # It converts the variables to strings and returns them in a set.
 def get_vars_used(exp, enum_names) :
     if isinstance(exp, Identifier) :
-        return {str(exp)}
+        return {exp}
     elif isinstance(exp, CallExpression) :
         vars = [get_vars_used(arg, enum_names) for arg in exp.arguments]
         return reduce(lambda s,x : s.union(x), vars, set())
@@ -40,7 +40,7 @@ def get_vars_used(exp, enum_names) :
         # contract, do not include it in the set of variables.
         if (isinstance(exp.expression, Identifier) and str(exp.expression) in enum_names):
             return set()
-        return {str(exp)}
+        return {exp}
     elif isinstance(exp, TupleExpression) :
         # There should be exactly one element in the tuple 
         #     (that is, they should act as parenthesis).
@@ -62,13 +62,27 @@ class ContractStateDetector:
         self.enum_names = [e.name for e in contract.enums]
         self.state_vars = [sv for sv in contract.state_variables]
 
+        self.str_vars = [str(sv) for sv in self.state_vars]
+        self.constant_vars = [str(sv) for sv in self.state_vars if sv.is_constant]
+        self.nonconstant_vars = [str(sv) for sv in self.state_vars if not sv.is_constant]
+
+    # Determines if an expression is constant, 
+    # meaning the only variables used are constant variables.
+    def is_constant_node(self, node):
+        vars = get_vars_used(node, self.enum_names)
+        # return all(v.value.is_constant for v in vars)
+        for v in vars:
+            try:
+                if not v.value.is_constant:
+                    return False
+            except AttributeError:
+                return False
+        return True
+
     # Checks if the node makes a stateful check, and gives the result of
     # that check
-    def is_stateful_node(self, node) :
+    def is_stateful_node(self, node, whitelist_parameters=set()) :
         # print("Node: %s" % node)
-        str_vars = [str(sv) for sv in self.state_vars]
-        constant_vars = [str(sv) for sv in self.state_vars if sv.is_constant]
-        nonconstant_vars = [str(sv) for sv in self.state_vars if not sv.is_constant]
         argument = None
         if node.contains_require_or_assert() :
             #require and assert both only have one argument.
@@ -76,35 +90,76 @@ class ContractStateDetector:
         # If the node is an if expression, we check that either branch leads to a throw/revert.
         elif node.contains_if(include_loop=False) and can_reach_revert(node): 
             argument = node.expression
-        elif len(node.internal_calls) > 0:
-            pass
-            # print("node type: %s" % node.type)
-            # print("arguments: %s" % [str(a) for a in node.arguments])
-            # print("modifier stateful: %s" % self.is_stateful_function(node.internal_calls[0],state_vars,enum_names))
-            # print("Internal calls parameters: %s" % ([list(map(str,x.parameters)) for x in node.internal_calls]))
-            # print("Internal calls arguments: %s" % ([list(map(str,x.arguments)) for x in node.internal_calls_as_expressions]))
+
+        # Moved modifier check to is_stateful_function
+        # elif len(node.internal_calls) > 0 and node.internal_calls[0].canonical_name in self.modifier_names:
+        #     modifier = node.internal_calls[0]
+        #     params = list(map(str,modifier.parameters))
+        #     args = node.internal_calls_as_expressions[0].arguments
+        #     assert(len(params) == len(args))
+        #     whitelist = set()
+        #     for (arg,param) in zip(args,params):
+        #         if self.is_constant_node(arg):
+        #             whitelist.add(param)
+        #     if self.is_stateful_modifier(modifier,whitelist):
+        #         return True
         
         if argument:
-            vars = get_vars_used(argument, self.enum_names)
-            # print("Vars: %s" % vars)
+            vars = set(map(str,get_vars_used(argument, self.enum_names))) - whitelist_parameters
+            # print("Vars: %s %s" % (vars, get_dependencies(vars,self.contract)))
+            # a = self.contract.get_state_variable_from_name('a')
+            # print("%s %s" % (a, [x.name for x in get_dependencies(a,func)]))
+            # for var in vars:
+            #     v = self.contract.get_state_variable_from_name(var)
+            #     print("%s %s" % (v, [x.name for x in get_dependencies(v,func)]))
+                # print("%s %s" % (var, is_tainted(var, func)))
             # returns True if all variables are either state variables or on the whitelist
             # AND at least one of them is nonconstant
-            return all(var in str_vars or var in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
-                   any(var in nonconstant_vars for var in vars)
+            return all(var in self.str_vars or var in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
+                   any(var in self.nonconstant_vars for var in vars)
 
         return False
 
+    # Checks if the modifier has a stateful check, knowing that the parameters in
+    # whitelist_parameters are instantiated with constant values
+    def is_stateful_modifier(self, func, whitelist_parameters):
+        nodes = list(map(lambda n : self.is_stateful_node(n,whitelist_parameters), func.nodes))
+        return any(nodes)
+
     # Checks if the function has a stateful check, returns the result of that check
     def is_stateful_function(self, func) :
-        # print("function %s: parameters: %s" % (func.name, list(map(str, func.parameters))))
-        # print("function %s: modifiers: %s" % (func.name, [str(m) for m in func.modifiers]))
+        ret = False
+        # Check modifiers, ignoring parameters whose inputs are constant values.
+        # For instance, in this example, the modifier inStage is being called with a constant value Stage.NotStarted,
+        # so when checking the modifier, the require statement is flagged as evidence of state.
+        #   Stage stage;
+        #   modifier inStage(Stage _stage) {
+        #     require(stage == _stage);
+        #     _;
+        #   }
+        #   function startGame(Stage s) public inStage(Stage.NotStarted) {
+        #     stage = Stage.InProgress;
+        #   }
+        for m in func.modifiers:
+            params = list(map(str,m.parameters))
+            args = next(c.arguments for c in func.calls_as_expressions if str(c.called) == m.name)
+            assert(args != None)
+            assert(len(args) == len(params))
+
+            whitelist = set()
+            for (arg,param) in zip(args,params):
+                if self.is_constant_node(arg):
+                    whitelist.add(param)
+            if self.is_stateful_modifier(m,whitelist):
+                ret = True
+
         nodes = list(map(lambda n : self.is_stateful_node(n), func.nodes))
-        return any(nodes)
+        ret |= any(nodes)
+        return ret
 
     # Checks if the contract has a function or modifier that makes a stateful check.
     def is_stateful_contract(self):
-        functions = list(map(lambda f : self.is_stateful_function(f), \
-                             self.contract.modifiers + self.contract.functions))
+        functions = list(map(lambda f : self.is_stateful_function(f), self.contract.functions))
         return any(functions)
 
 # Class implemented as a detector plugin for Slither. This detector detects,
@@ -122,7 +177,7 @@ class HasState(AbstractDetector):
 
     WIKI = 'STATE TEST'
 
-    WIKI_TITLE = 'TODO'
+    WIKI_TITLE = 'Detects contracts possibly using state'
     WIKI_DESCRIPTION = 'Detects whether or not a contract is stateful'
     WIKI_EXPLOIT_SCENARIO = '''
     contract Pausable {
