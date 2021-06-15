@@ -8,9 +8,8 @@ contract Foo {
         x = 0;
     }
 
-    //Currently, this function will be flagged as evidence for state, since 
+    //Currently, this function should not be flagged as evidence for state, since 
     //x is used in an if statement, but neither branch leads to a throw/revert.
-    //I think I have a fix for this, but it's not included in this current patch.
     function bar() public view returns (uint) {
         if (x == 0) {
             return 0; 
