@@ -18,7 +18,7 @@ contract A {
       require(stage == Stage.Ended);
       _;
     }
-
+    
     function startGame() public inStage(Stage.NotStarted) {
       stage = Stage.InProgress;
     }

@@ -37,7 +37,7 @@ contract Ownable {
     }
 
     function geUnlockTime() public view returns (uint256) {
-        return _lockTime;
+        return _lockTime;   
     }
 
     function lock(uint256 time) public virtual onlyOwner {

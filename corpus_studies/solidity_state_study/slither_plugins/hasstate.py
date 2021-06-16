@@ -10,43 +10,8 @@ from functools import reduce
 # local variables, and thus must be explicitly checked for when
 # checking for state usage.
 SOLIDITY_VARIABLE_WHITELIST = ["now", "this", "block.number", "block.timestamp"]
-
-# This is a function used to check for state in multiple plugins, 
-# and thus belongs on this level for easy code reuse.
-#
-# It takes a Solidity AST used inside of a conditional check, exp, 
-# and traverses it to find all of the variables used in the check.
-def get_vars_used(exp: Expression) -> Set[Variable]:
-    if isinstance(exp, Identifier) :
-        return {exp.value}
-    elif isinstance(exp, CallExpression) :
-        vars = [get_vars_used(arg) for arg in exp.arguments]
-        return reduce(lambda s,x : s.union(x), vars, set())
-    elif isinstance(exp, UnaryOperation) :
-        return get_vars_used(exp.expression)
-    elif isinstance(exp, BinaryOperation) :
-        return (get_vars_used(exp.expression_left)
-                    .union(get_vars_used(exp.expression_right))
-                )
-    elif isinstance(exp, Literal) :
-        return set()
-    elif isinstance(exp, IndexAccess) :
-        return (get_vars_used(exp.expression_left)
-                    .union(get_vars_used(exp.expression_right))
-                )
-    # elif isinstance(exp, MemberAccess) :
-    #     # If the expression is an enum value that is defined in the contract or a parent
-    #     # contract, do not include it in the set of variables.
-    #     if (isinstance(exp.expression, Identifier) and str(exp.expression) in enum_names):
-    #         return set()
-    #     return {exp}
-    elif isinstance(exp, TupleExpression) :
-        # There should be exactly one element in the tuple 
-        #     (that is, they should act as parenthesis).
-        # Comparing tuples for equality as a Solidity language feature
-        #     does not exist at the time of writing.
-        return get_vars_used(exp.expressions[0])
-    return set()
+# Solidity variables that are not allowed to appear in a require condition.
+SOLIDITY_VARIABLE_BLACKLIST = ["msg.sender", "tx.origin"]
 
 # Checks whether a throw/assert is reachable from the current node.
 def can_reach_revert(node) -> bool:
@@ -60,34 +25,112 @@ class ContractStateDetector:
         self.contract = contract
         self.enum_names = [e.name for e in contract.enums]
         self.state_vars = [sv for sv in contract.state_variables]
-
-        self.str_vars = [str(sv) for sv in self.state_vars]
         self.nonconstant_vars = [sv for sv in self.state_vars if not sv.is_constant]
+
+
+    # Gets all variables used in an expression, returning whether the expression
+    # is a valid condition for a state check.
+    # In particular, all calls in the expression must be getters defined by the contract.
+    # TODO: should this instead return an Optional[Set[Variable]]? Don't have to pass around vars, makes it easier to use at call sites. Probably have to make a "bind" function...
+    def gather_vars(self, exp: Expression, vars: Set[Variable]) -> bool:
+        if isinstance(exp, Identifier):
+            vars.add(exp.value)
+            return True
+        elif isinstance(exp, CallExpression):
+            if str(exp.called) in self.getters:
+                vars |= (self.getters[str(exp.called)])
+                return all(self.gather_vars(arg, vars) for arg in exp.arguments)
+            return False
+        elif isinstance(exp, UnaryOperation):
+            return self.gather_vars(exp.expression, vars)
+        elif isinstance(exp, BinaryOperation):
+            return self.gather_vars(exp.expression_left, vars) and self.gather_vars(exp.expression_right, vars)
+        elif isinstance(exp, Literal):
+            return True
+        elif isinstance(exp, IndexAccess):
+            return self.gather_vars(exp.expression_left, vars) and self.gather_vars(exp.expression_right, vars)
+        elif isinstance(exp, MemberAccess):
+            return True
+        elif isinstance(exp, TupleExpression):
+            # There should be exactly one element in the tuple 
+            #     (that is, they should act as parenthesis).
+            # Comparing tuples for equality as a Solidity language feature
+            #     does not exist at the time of writing.
+            return self.gather_vars(exp.expressions[0], vars)
+        elif isinstance(exp, TypeConversion):
+            return self.gather_vars(exp.expression, vars)
+        else: #TODO: add other expressions
+            raise Exception("Unexpected expression: %s, type: %s" % (exp, type(exp)))
+        return False
 
     # Determines if an expression is constant, 
     # meaning the only variables used are constant variables.
-    def is_constant_node(self, node: Node):
-        vars = get_vars_used(node)
+    def is_constant_expr(self, exp: Expression):
+        vars = set()
+        self.gather_vars(exp, vars)
         for v in vars:
             try:
-                if not v.value.is_constant:
+                if not v.is_constant:
                     return False
             except AttributeError:
                 return False
         return True
 
+    # Check if a function is a getter, and if so, returns a list of state variables used.
+    # Otherwise returns None
+    def is_getter(self, func: Function) -> Optional[Set[Variable]]:
+        # print("checking %s" % func.name)
+        def is_getter_node(node: Node) -> Set[Variable]:
+            if (node.type == NodeType.RETURN):
+                if node.expression is not None:
+                    vars = set()
+                    if self.gather_vars(node.expression, vars):
+                        return vars
+                    else: return None
+                else: return None
+            return set()
+        if func.view:
+            vars:Set[Variable] = set()
+            for node in func.nodes:
+                node_vars = is_getter_node(node)
+                if node_vars is None:
+                    return None
+                else:
+                    vars |= node_vars
+            return vars
+        return None
+
+    # Getters are functions where all return statements contain values that flow from fields
+    @property
+    def getters(self):
+        return {str(m):fields for m in self.contract.functions
+                              for fields in (self.is_getter(m),) if fields is not None}
+
     # Checks if the node makes a stateful check, and gives the result of
     # that check
     def is_stateful_node(self, node: Node, func: Function, whitelist_parameters: Set[Variable] = set()) -> bool:
         # Check if a variable is dependent only on state variables
-        def is_dependent_on_state_vars(var):
+        def is_dependent_on_state_vars(var: Variable):
             # print("%s: %s" % (var,list(map(str,get_dependencies(var,func)))))
-            if var in func.parameters:
+            if var in func.parameters or var.name in SOLIDITY_VARIABLE_BLACKLIST:
                 return False
             return var in self.state_vars or all(map(is_dependent_on_state_vars, get_dependencies(var,func)))
         # Check if a variable is dependent on at least one nonconstant state variable
-        def is_dependent_on_nonconstant(var):
+        def is_dependent_on_nonconstant(var: Variable):
             return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant, get_dependencies(var,func)))
+        def is_stateful_argument(argument: Expression):
+            # Really, we should be requiring that the expression be of a few certain forms, not just check that the 
+            # variables used are dependent on state vars.
+            vars:Set[Variable] = set()
+            if self.gather_vars(argument, vars):
+                vars -= whitelist_parameters
+                # returns True if all variables are either dependent only on state variables or on the whitelist
+                # AND at least one of them is nonconstant (or dependent on nonconstant variables)
+                #print("arg: %s" % argument)
+                #print("vars: %s" % [v.name for v in vars])
+                return all(is_dependent_on_state_vars(var) or str(var) in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
+                    any(is_dependent_on_nonconstant(var) for var in vars)
+            else: return False
             
         argument = None
         if node.contains_require_or_assert() :
@@ -98,12 +141,7 @@ class ContractStateDetector:
             argument = node.expression
         
         if argument:
-            vars = get_vars_used(argument) - whitelist_parameters
-            # returns True if all variables are either dependent only on state variables or on the whitelist
-            # AND at least one of them is nonconstant (or dependent on nonconstant variables)
-            return all(is_dependent_on_state_vars(var) or str(var) in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
-                   any(is_dependent_on_nonconstant(var) for var in vars)
-
+            return is_stateful_argument(argument)
         return False
 
     # Checks if the modifier has a stateful check, knowing that the parameters in
@@ -134,7 +172,7 @@ class ContractStateDetector:
 
             whitelist = set()
             for (arg,param) in zip(args,params):
-                if self.is_constant_node(arg):
+                if self.is_constant_expr(arg):
                     whitelist.add(param)
             if self.is_stateful_modifier(m,whitelist):
                 ret = True
@@ -145,7 +183,8 @@ class ContractStateDetector:
 
     # Checks if the contract has a function or modifier that makes a stateful check.
     def is_stateful_contract(self) -> bool:
-        functions = list(map(lambda f : self.is_stateful_function(f), self.contract.functions))
+        # print("GETTERS: %s" % [(k,[m.name for m in v]) for k,v in self.getters.items()])
+        functions = list(map(self.is_stateful_function, self.contract.functions))
         return any(functions)
 
 # Class implemented as a detector plugin for Slither. This detector detects,

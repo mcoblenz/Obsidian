@@ -26,14 +26,14 @@ def test_nostate():
 if __name__ == '__main__':
     print("Testing contracts (expecting state):")
     should_detect = test_state()
-    if len(should_detect) == 0:
+    if not should_detect:
         print("Passed")
     else:
         print("Failed: ", should_detect)
     
     print("Testing contracts (expecting no state):")
     should_detect = test_nostate()
-    if len(should_detect) == 0:
+    if not should_detect:
         print("Passed")
     else:
         print("Failed: ", should_detect)
