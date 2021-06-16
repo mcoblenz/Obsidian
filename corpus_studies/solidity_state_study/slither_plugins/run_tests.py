@@ -9,6 +9,7 @@ def test_state():
     failed = []
     files = [f for f in glob.glob("tests/state/*.sol")]
     for f in files:
+        print("testing %s..." % f)
         slither = Slither(f)
         if not any(ContractStateDetector(c).is_stateful_contract() for c in slither.contracts):
             failed.append(f)
@@ -18,6 +19,7 @@ def test_nostate():
     failed = []
     files = [f for f in glob.glob("tests/nostate/*.sol")]
     for f in files:
+        print("testing %s..." % f)
         slither = Slither(f)
         if any(ContractStateDetector(c).is_stateful_contract() for c in slither.contracts):
             failed.append(f)
