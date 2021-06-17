@@ -19,19 +19,24 @@ def can_reach_revert(node) -> bool:
 
 # This class determines whether a contract is using states, and if so, will
 # provide additional information about the states.
-# The function used by the hasstate detector is is_stateful_contract.
+# The function used by the hasstate detector is is_stateful_contract().
 class ContractStateDetector: 
     def __init__(self, contract: Contract):
         self.contract = contract
         self.enum_names = [e.name for e in contract.enums]
         self.state_vars = [sv for sv in contract.state_variables]
         self.nonconstant_vars = [sv for sv in self.state_vars if not sv.is_constant]
-
+        # Getters are functions where all return statements contain values that flow from fields
+        # Returns a dictionary from function names (strings) to fields that appear in them
+        self.getters = {}
+        for m in self.contract.functions:
+            fields = self.is_getter(m)
+            if fields is not None:
+                self.getters[str(m)] = fields
 
     # Gets all variables used in an expression, returning whether the expression
     # is a valid condition for a state check.
     # In particular, all calls in the expression must be getters defined by the contract.
-    # TODO: should this instead return an Optional[Set[Variable]]? Don't have to pass around vars, makes it easier to use at call sites. Probably have to make a "bind" function...
     def gather_vars(self, exp: Expression, vars: Set[Variable]) -> bool:
         if isinstance(exp, Identifier):
             vars.add(exp.value)
@@ -59,30 +64,34 @@ class ContractStateDetector:
             return self.gather_vars(exp.expressions[0], vars)
         elif isinstance(exp, TypeConversion):
             return self.gather_vars(exp.expression, vars)
-        else: #TODO: add other expressions
-            raise Exception("Unexpected expression: %s, type: %s" % (exp, type(exp)))
         return False
 
     # Determines if an expression is constant, 
     # meaning the only variables used are constant variables.
     def is_constant_expr(self, exp: Expression):
         vars = set()
-        self.gather_vars(exp, vars)
-        for v in vars:
-            try:
-                if not v.is_constant:
+        if self.gather_vars(exp, vars):
+            for v in vars:
+                if isinstance(v, SolidityVariableComposed):
                     return False
-            except AttributeError:
-                return False
-        return True
+                elif not v.is_constant:
+                    return False
+            return True
+        else: return False
 
     # Check if a function is a getter, and if so, returns a list of state variables used.
     # Otherwise returns None
     def is_getter(self, func: Function) -> Optional[Set[Variable]]:
-        # print("checking %s" % func.name)
+        # Check if a node is a return statement.
+        # Returns None if the return statement does not rely on state variables,
+        # and returns empty set if the node is not a return statement.
         def is_getter_node(node: Node) -> Set[Variable]:
             if (node.type == NodeType.RETURN) and node.expression is not None:
                 vars = set()
+                # There is a potential bug here: at this point, getters is still being initialized, but 
+                # gather_vars assumes getters is initialized to check if any function calls are to getters.
+                # This may be resolved by iterating over the functions according to a topological ordering of function dependencies.
+                # On the other hand, it's not clear how often a getter function actually calls other getter functions.
                 if self.gather_vars(node.expression, vars):
                     return vars
                 else: return None
@@ -98,30 +107,15 @@ class ContractStateDetector:
             return vars
         return None
 
-    # Getters are functions where all return statements contain values that flow from fields
-    @property
-    def getters(self):
-        return {str(m):fields for m in self.contract.functions
-                              for fields in (self.is_getter(m),) if fields is not None}
-
-
-    # Checks if the node makes a stateful check, and gives the result of
-    # that check
+    # Checks if the node makes a stateful check
+    # Returns a set of state variables used, or an empty set if none are found
     def is_stateful_node(self, node: Node, func: Function, whitelist_parameters: Set[Variable] = set()) -> Set[StateVariable]:
         # Return a set of all the state vars that the variable is dependent on
         def get_state_vars_used(var: Variable) -> Set[StateVariable]:
             if var in self.state_vars:
-                return set([var])
+                return {var}
             else:
-                # print("TYPE:", type(list(map(get_state_vars_used, get_dependencies(var, func)))))
                 return set().union(*map(get_state_vars_used, get_dependencies(var, func)))
-                # ret = set()
-                # print("TYPE: ", type(var))
-                # assert(isinstance(var, Variable))
-                
-                # for v in get_dependencies(var, func):
-                #    ret |= get_state_vars_used(v)
-                # return ret
         # Check if a variable is dependent only on state variables
         def is_dependent_on_state_vars(var: Variable):
             # print("%s: %s" % (var,list(map(str,get_dependencies(var,func)))))
@@ -132,8 +126,6 @@ class ContractStateDetector:
         def is_dependent_on_nonconstant(var: Variable):
             return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant, get_dependencies(var,func)))
         def is_stateful_argument(argument: Expression) -> Set[Variable]:
-            # Really, we should be requiring that the expression be of a few certain forms, not just check that the 
-            # variables used are dependent on state vars.
             vars:Set[Variable] = set()
             if self.gather_vars(argument, vars):
                 vars -= whitelist_parameters
@@ -142,8 +134,7 @@ class ContractStateDetector:
                 # print("arg: %s" % argument)
                 # print("vars: %s" % [v.name for v in vars])
                 if all(is_dependent_on_state_vars(var) or str(var) in SOLIDITY_VARIABLE_WHITELIST for var in vars) and \
-                    any(is_dependent_on_nonconstant(var) for var in vars):
-                    # print("TYPE: ", list(map(get_state_vars_used, vars)))
+                   any(is_dependent_on_nonconstant(var) for var in vars):
                     return set().union(*map(get_state_vars_used, vars))
                 else: return set()
             else: return set()
@@ -165,9 +156,8 @@ class ContractStateDetector:
     def is_stateful_modifier(self, func: Function, whitelist_parameters: Set[Variable]) -> Set[StateVariable]:
         return set().union(*map(lambda n : self.is_stateful_node(n,func,whitelist_parameters), func.nodes))
 
-    # Checks if the function has a stateful check, returns the result of that check
-    # TODO: Change all these to return Set[StateVariable], either empty (not stateful)
-    # or a set of variables thought to be use in the state
+    # Checks if the function  or any called modifiers has a stateful check
+    # Returns a set of state variables used, or an empty set if none are found
     def is_stateful_function(self, func: Function) -> Set[StateVariable]:
         ret = set()
         # Check modifiers, ignoring parameters whose inputs are constant values.
@@ -199,8 +189,13 @@ class ContractStateDetector:
     # Checks if the contract has a function or modifier that makes a stateful check.
     def is_stateful_contract(self) -> bool:
         # print("GETTERS: %s" % [(k,[m.name for m in v]) for k,v in self.getters.items()])
-        functions = set().union(*map(self.is_stateful_function, self.contract.functions))
-        return len(functions) > 0
+        ret = set()
+        for f in self.contract.functions:
+            # TODO: Return this information for the detector
+            vars = self.is_stateful_function(f)
+            # print("Function %s: fields: %s" % (f.name, [v.name for v in vars]))
+            ret |= vars
+        return len(ret) > 0
 
 # Class implemented as a detector plugin for Slither. This detector detects,
 # for the given contracts, which contracts have state checks and 
