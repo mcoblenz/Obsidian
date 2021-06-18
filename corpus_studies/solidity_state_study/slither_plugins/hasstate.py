@@ -115,21 +115,27 @@ class ContractStateDetector:
             if var in self.state_vars:
                 return {var}
             else:
-                return set().union(*map(get_state_vars_used, get_dependencies(var, func)))
+                # If var is dependent on itself, remove it to stop an infinite loop
+                next_vars = get_dependencies(var,func) - {var}
+                return set().union(*map(get_state_vars_used, next_vars))
         # Check if a variable is dependent only on state variables
         def is_dependent_on_state_vars(var: Variable):
             # print("%s: %s" % (var,list(map(str,get_dependencies(var,func)))))
             if var in func.parameters or var.name in SOLIDITY_VARIABLE_BLACKLIST:
                 return False
-            return var in self.state_vars or all(map(is_dependent_on_state_vars, get_dependencies(var,func)))
+            # If var is dependent on itself, remove it to stop an infinite loop
+            next_vars = get_dependencies(var,func) - {var}
+            return var in self.state_vars or all(map(is_dependent_on_state_vars, next_vars))
         # Check if a variable is dependent on at least one nonconstant state variable
         def is_dependent_on_nonconstant(var: Variable):
-            return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant, get_dependencies(var,func)))
+            # If var is dependent on itself, remove it to stop an infinite loop
+            next_vars = get_dependencies(var,func) - {var}   
+            return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant,next_vars))
         def is_stateful_argument(argument: Expression) -> Set[Variable]:
             vars:Set[Variable] = set()
             if self.gather_vars(argument, vars):
                 vars -= whitelist_parameters
-                # returns True if all variables are either dependent only on state variables or on the whitelist
+                # returns set of used state variables if all variables are either dependent only on state variables or on the whitelist
                 # AND at least one of them is nonconstant (or dependent on nonconstant variables)
                 # print("arg: %s" % argument)
                 # print("vars: %s" % [v.name for v in vars])
@@ -193,7 +199,7 @@ class ContractStateDetector:
         for f in self.contract.functions:
             # TODO: Return this information for the detector
             vars = self.is_stateful_function(f)
-            # print("Function %s: fields: %s" % (f.name, [v.name for v in vars]))
+            print("Function %s: fields: %s" % (f.name, [v.name for v in vars]))
             ret |= vars
         return len(ret) > 0
 
