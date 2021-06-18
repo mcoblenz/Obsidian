@@ -110,10 +110,13 @@ class ContractStateDetector:
     # Checks if the node makes a stateful check
     # Returns a set of state variables used, or an empty set if none are found
     def is_stateful_node(self, node: Node, func: Function, whitelist_parameters: Set[Variable] = set()) -> Set[StateVariable]:
-        # Return a set of all the state vars that the variable is dependent on
+        # Return a set of all (nonconstant) state vars that the variable is dependent on
         def get_state_vars_used(var: Variable) -> Set[StateVariable]:
             if var in self.state_vars:
-                return {var}
+                if var in self.nonconstant_vars:
+                    return {var}
+                else:
+                    return set()
             else:
                 # If var is dependent on itself, remove it to stop an infinite loop
                 next_vars = get_dependencies(var,func) - {var}
