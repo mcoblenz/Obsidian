@@ -1,7 +1,7 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
 from slither.core.expressions import *
 from slither.core.cfg.node import *
-from slither.core.declarations.solidity_variables import SOLIDITY_VARIABLES,SOLIDITY_VARIABLES_COMPOSED
+from slither.core.declarations.solidity_variables import SOLIDITY_VARIABLES, SOLIDITY_VARIABLES_COMPOSED
 from slither.detectors.functions.modifier import is_revert
 from slither.analyses.data_dependency.data_dependency import *
 from functools import reduce
@@ -119,21 +119,20 @@ class ContractStateDetector:
                     return set()
             else:
                 # If var is dependent on itself, remove it to stop an infinite loop
-                next_vars = get_dependencies(var,func) - {var}
+                next_vars = get_dependencies(var, func) - {var}
                 return set().union(*map(get_state_vars_used, next_vars))
         # Check if a variable is dependent only on state variables
         def is_dependent_on_state_vars(var: Variable):
-            # print("%s: %s" % (var,list(map(str,get_dependencies(var,func)))))
             if var in func.parameters or var.name in SOLIDITY_VARIABLE_BLACKLIST:
                 return False
             # If var is dependent on itself, remove it to stop an infinite loop
-            next_vars = get_dependencies(var,func) - {var}
+            next_vars = get_dependencies(var, func) - {var}
             return var in self.state_vars or all(map(is_dependent_on_state_vars, next_vars))
         # Check if a variable is dependent on at least one nonconstant state variable
         def is_dependent_on_nonconstant(var: Variable):
             # If var is dependent on itself, remove it to stop an infinite loop
-            next_vars = get_dependencies(var,func) - {var}   
-            return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant,next_vars))
+            next_vars = get_dependencies(var, func) - {var}   
+            return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant, next_vars))
         def is_stateful_argument(argument: Expression) -> Set[Variable]:
             vars:Set[Variable] = set()
             if self.gather_vars(argument, vars):
@@ -163,7 +162,7 @@ class ContractStateDetector:
     # Checks if the modifier has a stateful check, knowing that the parameters in
     # whitelist_parameters are instantiated with constant values
     def is_stateful_modifier(self, func: Function, whitelist_parameters: Set[Variable]) -> Set[StateVariable]:
-        return set().union(*map(lambda n : self.is_stateful_node(n,func,whitelist_parameters), func.nodes))
+        return set().union(*map(lambda n : self.is_stateful_node(n, func, whitelist_parameters), func.nodes))
 
     # Checks if the function  or any called modifiers has a stateful check
     # Returns a set of state variables used, or an empty set if none are found
@@ -187,17 +186,16 @@ class ContractStateDetector:
             assert(len(args) == len(params))
 
             whitelist = set()
-            for (arg,param) in zip(args,params):
+            for (arg, param) in zip(args, params):
                 if self.is_constant_expr(arg):
                     whitelist.add(param)
-            ret |= self.is_stateful_modifier(m,whitelist)
+            ret |= self.is_stateful_modifier(m, whitelist)
 
-        ret |= set().union(*map(lambda n : self.is_stateful_node(n,func), func.nodes))
+        ret |= set().union(*map(lambda n : self.is_stateful_node(n, func), func.nodes))
         return ret
 
     # Checks if the contract has a function or modifier that makes a stateful check.
     def is_stateful_contract(self) -> bool:
-        # print("GETTERS: %s" % [(k,[m.name for m in v]) for k,v in self.getters.items()])
         ret = set()
         for f in self.contract.functions:
             # TODO: Return this information for the detector
