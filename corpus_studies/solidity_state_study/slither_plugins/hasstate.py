@@ -37,42 +37,51 @@ class ContractStateDetector:
     # Gets all variables used in an expression, returning whether the expression
     # is a valid condition for a state check.
     # In particular, all calls in the expression must be getters defined by the contract.
-    def gather_vars(self, exp: Expression, vars: Set[Variable]) -> bool:
+    # Returns a boolean, which indicates whether the expression is valid (does not contain getters
+    # or unexpected expressions), and a set of variables used.
+    def gather_vars(self, exp: Expression) -> Tuple[bool, Set[Variable]]:
+        # Merge the two return values; the result is valid if both a and b are valid.
+        def merge(a: Tuple[bool, Set[Variable]], b: Tuple[bool, Set[Variable]]) -> Tuple[bool, Set[Variable]]:
+            return (a[0] and b[0], a[1] | b[1])
         if isinstance(exp, Identifier):
-            vars.add(exp.value)
-            return True
+            if isinstance(exp.value, Variable) or isinstance(exp.value, SolidityVariable):
+                return (True,{exp.value})
+            else:
+                return (True,set())
         elif isinstance(exp, CallExpression):
             if str(exp.called) in self.getters:
-                vars |= (self.getters[str(exp.called)])
-                return all(self.gather_vars(arg, vars) for arg in exp.arguments)
-            return False
+                ret = (True,self.getters[str(exp.called)])
+                for arg in exp.arguments:
+                    ret = merge(ret,self.gather_vars(arg))
+                return ret
+            else: return (False,set())
         elif isinstance(exp, UnaryOperation):
-            return self.gather_vars(exp.expression, vars)
+            return self.gather_vars(exp.expression)
         elif isinstance(exp, BinaryOperation):
-            return self.gather_vars(exp.expression_left, vars) and self.gather_vars(exp.expression_right, vars)
+            return merge(self.gather_vars(exp.expression_left),self.gather_vars(exp.expression_right))
         elif isinstance(exp, Literal):
-            return True
+            return (True,set())
         elif isinstance(exp, IndexAccess):
-            return self.gather_vars(exp.expression_left, vars) and self.gather_vars(exp.expression_right, vars)
+            return merge(self.gather_vars(exp.expression_left),self.gather_vars(exp.expression_right))
         elif isinstance(exp, MemberAccess):
-            return True
+            return self.gather_vars(exp.expression)
         elif isinstance(exp, TupleExpression):
             # There should be exactly one element in the tuple 
             #     (that is, they should act as parenthesis).
             # Comparing tuples for equality as a Solidity language feature
             #     does not exist at the time of writing.
-            return self.gather_vars(exp.expressions[0], vars)
+            return self.gather_vars(exp.expressions[0])
         elif isinstance(exp, TypeConversion):
-            return self.gather_vars(exp.expression, vars)
-        return False
+            return self.gather_vars(exp.expression)
+        return (False,set())
 
     # Determines if an expression is constant, 
     # meaning the only variables used are constant variables.
     def is_constant_expr(self, exp: Expression):
-        vars = set()
-        if self.gather_vars(exp, vars):
+        (valid, vars) = self.gather_vars(exp)
+        if valid:
             for v in vars:
-                if isinstance(v, SolidityVariableComposed):
+                if isinstance(v, SolidityVariable):
                     return False
                 elif not v.is_constant:
                     return False
@@ -87,12 +96,12 @@ class ContractStateDetector:
         # and returns empty set if the node is not a return statement.
         def fields_in_getter_node(node: Node) -> Set[Variable]:
             if (node.type == NodeType.RETURN) and node.expression is not None:
-                vars = set()
                 # There is a potential bug here: at this point, getters is still being initialized, but 
                 # gather_vars assumes getters is initialized to check if any function calls are to getters.
                 # This may be resolved by iterating over the functions according to a topological ordering of function dependencies.
                 # On the other hand, it's not clear how often a getter function actually calls other getter functions.
-                if self.gather_vars(node.expression, vars):
+                (valid, vars) = self.gather_vars(node.expression)
+                if valid:
                     return vars
                 else: return None
             return set()
@@ -137,8 +146,8 @@ class ContractStateDetector:
             next_vars = get_dependencies(var, func) - {var}   
             return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant, next_vars))
         def is_stateful_expression(expression: Expression) -> Set[Variable]:
-            vars: Set[Variable] = set()
-            if self.gather_vars(expression, vars):
+            (valid, vars) = self.gather_vars(expression)
+            if valid:
                 vars -= constant_parameters
                 # returns set of used state variables if all variables are either dependent only on state variables or are constant
                 # AND at least one of them is nonconstant (or dependent on nonconstant variables)
@@ -182,6 +191,7 @@ class ContractStateDetector:
         #   }
         for m in func.modifiers:
             params = m.parameters
+            # Find the internal call to the modifier and get the list of arguments.
             args = next(c.arguments for c in func.calls_as_expressions if isinstance(c, CallExpression) and str(c.called) == m.name)
             assert(args != None)
             assert(len(args) == len(params))
