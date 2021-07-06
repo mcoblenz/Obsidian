@@ -13,17 +13,20 @@ import os
 import re
 import semantic_version as sv
 
-def is_compatable_version(version_range, version) :
-    range = sv.NpmSpec(version_range)
-    try : 
+def is_compatible_version(version_range, version):
+    try:
+        range = sv.NpmSpec(version_range)
         version_obj = sv.Version(version)
-    except ValueError :
+        return range.match(version_obj)
+    except ValueError:
         return False
-    return range.match(version_obj)
 
 def get_solc_versions() :
-    process = sub.run(["solc", "--versions"], stdout=sub.PIPE, encoding='ascii')
-    return process.stdout.split("\n")
+    process = sub.run(["solc-select", "versions"], stdout=sub.PIPE, encoding='ascii')
+    versions = process.stdout.split("\n")
+    versions = filter(len, versions)
+    versions = list(map(lambda v: v.split(' ',1)[0],versions))
+    return versions
 
 def get_solc_pragma(file) :
     while True :
@@ -31,11 +34,16 @@ def get_solc_pragma(file) :
 
         if not line :
             break
-        if "pragma" in line and "//" not in line:
-            version = line.replace(";","")
+        if line.startswith("pragma solidity"):
+            line.replace('"','')
+            version = line.split(';')[0]
             return version
 
     return ""
+
+def set_version_from_string(version):
+    sub.run(["solc-select", "use", version], stdout=sub.PIPE, encoding='ascii')
+
 
 def set_version(file_path) :
     file = open(file_path, "r")
@@ -49,12 +57,12 @@ def set_version(file_path) :
     version_groups = version_line.replace("pragma solidity ", "")
     versions_available = get_solc_versions()
 
-    compatable_versions = list(filter(lambda vers : vers != "nightly" and is_compatable_version(version_groups, vers), versions_available))
-    if compatable_versions :
+    compatible_versions = list(filter(lambda vers : vers != "nightly" and is_compatible_version(version_groups, vers), versions_available))
+    if compatible_versions :
         #Set the solc version to the first available version
-        sub.run(["solc", "use", compatable_versions[0]], stdout=sub.PIPE, encoding='ascii')
+        set_version_from_string(compatible_versions[0])
     else :
-        #No compatable version of solc found
+        #No compatible version of solc found
         return False
 
     return True
