@@ -57,3 +57,5 @@ buildscript/build
 
 # corpus study
 corpus_studies/solidity_state_study/slither_plugins/__pycache__/
+corpus_studies/solidity_state_study/__pycache__/
+corpus_studies/solidity_state_study/tests/__pycache__/
