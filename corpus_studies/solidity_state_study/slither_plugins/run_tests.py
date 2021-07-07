@@ -1,10 +1,10 @@
-from ContractStateDetector import ContractStateDetector
+from .ContractStateDetector import ContractStateDetector
 from ..tests.set_solc_version import set_version
 import glob
 import pytest
 from slither import Slither
 
-# To run tests, run python3 -m pytest run_tests.py
+# To run tests, run pytest run_tests.py
 
 # We assume we are checking the last contract in the file.
 # For those in the state directory, we expect the last contract to be detected with state.
