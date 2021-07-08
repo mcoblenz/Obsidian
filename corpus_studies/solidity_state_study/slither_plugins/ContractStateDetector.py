@@ -4,6 +4,18 @@ from slither.core.declarations.solidity_variables import SOLIDITY_VARIABLES, SOL
 from slither.detectors.functions.modifier import is_revert
 from slither.analyses.data_dependency.data_dependency import *
 
+# A StateEvidence is evidence that a node contains a stateful pattern.
+# It has the expression (the condition in the if/require statement) 
+# and the set of state variables used.
+class StateEvidence:
+    def __init__(self, exp, vars):
+        self.exp: Expression = exp
+        self.vars: Set[StateVariable] = vars
+    def __repr__(self):
+        return str(self)
+    def __str__(self):
+        return f'exp: {self.exp}, vars: {[s.name for s in self.vars]}'
+
 # Solidity variables that are used as state variables instead of 
 # local variables, and thus must be explicitly checked for when
 # checking for state usage.
@@ -56,11 +68,11 @@ class ContractStateDetector:
         elif isinstance(exp, UnaryOperation):
             return self.gather_vars(exp.expression)
         elif isinstance(exp, BinaryOperation):
-            return merge(self.gather_vars(exp.expression_left),self.gather_vars(exp.expression_right))
+            return merge(self.gather_vars(exp.expression_left), self.gather_vars(exp.expression_right))
         elif isinstance(exp, Literal):
             return (True,set())
         elif isinstance(exp, IndexAccess):
-            return merge(self.gather_vars(exp.expression_left),self.gather_vars(exp.expression_right))
+            return merge(self.gather_vars(exp.expression_left), self.gather_vars(exp.expression_right))
         elif isinstance(exp, MemberAccess):
             return self.gather_vars(exp.expression)
         elif isinstance(exp, TupleExpression):
@@ -117,33 +129,45 @@ class ContractStateDetector:
     # Checks if the node makes a stateful check
     # Returns a set of state variables used, or an empty set if none are found
     # constant_parameters are the variables (in modifiers) which we know to be constant values.
-    def statevars_in_node(self, node: Node, func: Function, constant_parameters: Set[Variable] = None) -> Set[StateVariable]:
+    def statevars_in_node(self, node: Node, func: Function, constant_parameters: Set[Variable] = None) -> Optional[StateEvidence]:
         if constant_parameters is None:
             constant_parameters = set()
         # Return a set of all (nonconstant) state vars that the variable is dependent on
-        def state_vars_used(var: Variable) -> Set[StateVariable]:
+        def state_vars_used(var: Variable, seen = None) -> Set[StateVariable]:
+            if seen is None: seen = set()
             if var in self.state_vars:
                 if var in self.nonconstant_vars:
                     return {var}
                 else:
                     return set()
             else:
-                # If var is dependent on itself, remove it to stop infinite recursion
-                next_vars = get_dependencies(var, func) - {var}
-                return set().union(*map(state_vars_used, next_vars))
+                # If var has been seen before, stop to prevent infinite recursion
+                if var in seen:
+                    return set()
+                seen.add(var)
+                next_vars = get_dependencies(var, func)
+                return set().union(*map(lambda v: state_vars_used(v, seen), next_vars))
         # Check if a variable is dependent only on state variables
-        def is_dependent_on_state_vars(var: Variable):
+        def is_dependent_on_state_vars(var: Variable, seen = None):
+            if seen is None: seen = set()
             if var in func.parameters or var.name in SOLIDITY_VARIABLE_GLOBAL_NOTSTATES:
                 return False
-            # If var is dependent on itself, remove it to stop infinite recursion
-            next_vars = get_dependencies(var, func) - {var}
-            return var in self.state_vars or all(map(is_dependent_on_state_vars, next_vars))
+            # If var has been seen before, stop to prevent infinite recursion
+            if var in seen:
+                return True
+            seen.add(var)
+            next_vars = get_dependencies(var, func)
+            return var in self.state_vars or all(map(lambda v: is_dependent_on_state_vars(v, seen), next_vars))
         # Check if a variable is dependent on at least one nonconstant state variable
-        def is_dependent_on_nonconstant(var: Variable):
-            # If var is dependent on itself, remove it to stop infinite recursion
-            next_vars = get_dependencies(var, func) - {var}   
-            return var in self.nonconstant_vars or any(map(is_dependent_on_nonconstant, next_vars))
-        def is_stateful_expression(expression: Expression) -> Set[Variable]:
+        def is_dependent_on_nonconstant(var: Variable, seen = None):
+            if seen is None: seen = set()
+            # If var has been seen before, stop to prevent infinite recursion
+            if var in seen:
+                return False
+            seen.add(var)
+            next_vars = get_dependencies(var, func)
+            return var in self.nonconstant_vars or any(map(lambda v: is_dependent_on_nonconstant(v, seen), next_vars))
+        def is_stateful_expression(expression: Expression) -> Optional[StateEvidence]:
             (valid, vars) = self.gather_vars(expression)
             if valid:
                 vars -= constant_parameters
@@ -151,9 +175,9 @@ class ContractStateDetector:
                 # AND at least one of them is nonconstant (or dependent on nonconstant variables)
                 if all(is_dependent_on_state_vars(var) or str(var) in SOLIDITY_VARIABLE_GLOBAL_STATES for var in vars) and \
                    any(is_dependent_on_nonconstant(var) for var in vars):
-                    return set().union(*map(state_vars_used, vars))
-                else: return set()
-            else: return set()
+                    vars_used = set().union(*map(state_vars_used, vars))
+                    return StateEvidence(expression, vars_used)
+            return None
             
         expression = None
         if node.contains_require_or_assert() :
@@ -165,17 +189,18 @@ class ContractStateDetector:
         
         if expression is not None:
             return is_stateful_expression(expression)
-        return set()
+        return None
 
     # Checks if the modifier has a stateful check
     # Returns a set of state variables used, or an empty set if none are found
-    def statevars_in_modifier(self, func: Function, constant_parameters: Set[Variable]) -> Set[StateVariable]:
-        return set().union(*map(lambda n: self.statevars_in_node(n, func, constant_parameters), func.nodes))
+    def statevars_in_modifier(self, func: Function, constant_parameters: Set[Variable]) -> List[StateEvidence]:
+        evs = map(lambda n: self.statevars_in_node(n,func,constant_parameters),func.nodes)
+        return [ev for ev in evs if ev is not None]
 
     # Checks if the function  or any called modifiers has a stateful check
     # Returns a set of state variables used, or an empty set if none are found
-    def statevars_in_function(self, func: Function) -> Set[StateVariable]:
-        ret = set()
+    def statevars_in_function(self, func: Function) -> List[StateEvidence]:
+        ret = []
         # Check modifiers, ignoring parameters whose inputs are constant values.
         # For instance, in this example, the modifier inStage is being called with a constant value Stage.NotStarted,
         # so when checking the modifier, the require statement is flagged as evidence of state.
@@ -198,17 +223,18 @@ class ContractStateDetector:
             for (arg, param) in zip(args, params):
                 if self.is_constant_expr(arg):
                     constant_parameters.add(param)
-            ret |= self.statevars_in_modifier(m, constant_parameters)
+            ret += self.statevars_in_modifier(m, constant_parameters)
 
-        ret |= set().union(*map(lambda n: self.statevars_in_node(n, func), func.nodes))
+        evs = map(lambda n: self.statevars_in_node(n,func),func.nodes)
+        ret += [ev for ev in evs if ev is not None]
+
         return ret
 
     # Checks if the contract has a function or modifier that makes a stateful check.
-    def is_stateful_contract(self) -> bool:
-        ret = set()
+    def is_stateful_contract(self) -> Dict[Function, List[StateEvidence]]:
+        ret = {}
         for f in self.contract.functions:
-            # TODO: Return this information for the detector
-            vars = self.statevars_in_function(f)
-            print("Function %s: fields: %s" % (f.name, [v.name for v in vars]))
-            ret |= vars
-        return len(ret) > 0
+            evs = self.statevars_in_function(f)
+            if len(evs) > 0:
+                ret[f] = evs
+        return ret
