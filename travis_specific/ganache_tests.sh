@@ -102,7 +102,7 @@ do
 
   # generate the evm from yul, failing if not
   echo "running solc to produce evm bytecode"
-  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/"$NAME".yul > "$NAME".evm
+  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
   then
       echo "$NAME test failed: solc cannot compile yul code"
       failed+=("$test [solc]")
