@@ -151,7 +151,8 @@ object Util {
             case "string" => "string"
             case "Int256" => "int256"
             case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ""
-            case _ => assert(assertion = false, "yul codegen encountered an obsidian type without a mapping to the ABI"); ""
+            case ntype => ntype // fall through here and return the type unmodified; it'll be a structure that is defined by the file in question
+            //case _ => assert(assertion = false, s"yul codegen encountered an obsidian type without a mapping to the ABI: ${ntype}"); ""
         }
     }
 

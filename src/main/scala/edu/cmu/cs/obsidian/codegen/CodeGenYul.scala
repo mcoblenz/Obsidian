@@ -1,6 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.parser.ContractTable
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -344,6 +345,19 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
+
+    /**
+      * Given the type of a contract and a table, compute the size that we need to allocate for it in memory.
+      * TODO: as a simplifying assumption, for now this always returns 256.
+      *
+      * @param t the contract type of interest
+      * @param symTab the symbol table to look in
+      * @return the size of memory needed for the contract
+      */
+    def contractSize(t : ContractType, symTab: SymbolTable) : Int = {
+        256
+    }
+
     def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -444,8 +458,37 @@ object CodeGenYul extends CodeGenerator {
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()
             case Construction(contractType, args, isFFIInvocation) =>
-                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                Seq()
+                val ct: ContractTable = checkedTable.contractLookup(contractType.contractName)
+
+                val max_addr = "0xffffffffffffffff"
+                val id_alloc = nextTemp()
+                val id_newbound = nextTemp()
+                val id_addr = nextTemp()
+
+                // check if either the new bound is bigger than the max address or less than the previous allocated range
+                val addr_check = apply("or", apply("gt", id_newbound, stringlit(max_addr)),
+                                             apply("lt", id_newbound, id_alloc))
+
+                // size of the structure we're allocating
+                val struct_size = apply("datasize",stringlit(contractType.contractName))
+
+                // size of the structure we're allocating
+                val struct_offset = apply("dataoffset",stringlit(contractType.contractName))
+                Seq(
+                    // let _2 := allocate_unbounded()
+                    decl_1exp(id_alloc, apply("allocate_unbounded")),
+                    // let _3 := add(_2, datasize("IntContainer_22"))
+                    decl_1exp(id_newbound, struct_size),
+                    // if or(gt(_3, 0xffffffffffffffff), lt(_3, _2)) { panic_error_0x41() }
+                    edu.cmu.cs.obsidian.codegen.If(addr_check, Block(Seq(ExpressionStatement(apply("panic_error_0x41"))))),
+                    // datacopy(_2, dataoffset("IntContainer_22"), datasize("IntContainer_22"))
+                    ExpressionStatement(apply("datacopy",id_alloc,struct_offset,struct_size)),
+                    // _3 := abi_encode_tuple__to__fromStack(_3) // todo this adds 0, so i'm going to ignore it for now?
+                    // let expr_33_address := create(0, _2, sub(_3, _2))
+                    decl_1exp(id_addr, apply("create", intlit(0), id_alloc, apply("sub", id_newbound, id_alloc))),
+                    // if iszero(expr_33_address) { revert_forward_1() }
+                    edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_addr),Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
+                )
             case StateInitializer(stateName, fieldName) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()

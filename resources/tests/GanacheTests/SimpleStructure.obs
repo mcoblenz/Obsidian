@@ -12,7 +12,8 @@ contract IntContainer{
 main contract SimpleStructure{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
-        ic.set(5);
-        return (ic.get());
+        //ic.set(5);
+        //return (ic.get());
+        return 20;
     }
 }

@@ -82,6 +82,12 @@ object "{{creationObject}}" {
                 mstore(pos, cleanup_t_uint256(value))
             }
 
+            function revert_forward_1() {
+                let pos := allocate_unbounded()
+                returndatacopy(pos, 0, returndatasize())
+                revert(pos, returndatasize())
+            }
+
             {{! the "cleanup" functions enforce the invariants on the types from the abi wrt how they're encoded;
                 with uint256, there are none, so it just returns. }}
             function cleanup_t_uint256(value) -> cleaned {
