@@ -129,7 +129,7 @@ class ContractStateDetector:
     # Checks if the node makes a stateful check
     # Returns a set of state variables used, or an empty set if none are found
     # constant_parameters are the variables (in modifiers) which we know to be constant values.
-    def statevars_in_node(self, node: Node, func: Function, constant_parameters: Set[Variable] = None) -> Optional[StateEvidence]:
+    def states_in_node(self, node: Node, func: Function, constant_parameters: Set[Variable] = None) -> Optional[StateEvidence]:
         if constant_parameters is None:
             constant_parameters = set()
         # Return a set of all (nonconstant) state vars that the variable is dependent on
@@ -193,13 +193,13 @@ class ContractStateDetector:
 
     # Checks if the modifier has a stateful check
     # Returns a set of state variables used, or an empty set if none are found
-    def statevars_in_modifier(self, func: Function, constant_parameters: Set[Variable]) -> List[StateEvidence]:
-        evs = map(lambda n: self.statevars_in_node(n,func,constant_parameters),func.nodes)
+    def states_in_modifier(self, func: Function, constant_parameters: Set[Variable]) -> List[StateEvidence]:
+        evs = map(lambda n: self.states_in_node(n,func,constant_parameters),func.nodes)
         return [ev for ev in evs if ev is not None]
 
     # Checks if the function  or any called modifiers has a stateful check
     # Returns a set of state variables used, or an empty set if none are found
-    def statevars_in_function(self, func: Function) -> List[StateEvidence]:
+    def states_in_function(self, func: Function) -> List[StateEvidence]:
         ret = []
         # Check modifiers, ignoring parameters whose inputs are constant values.
         # For instance, in this example, the modifier inStage is being called with a constant value Stage.NotStarted,
@@ -223,18 +223,19 @@ class ContractStateDetector:
             for (arg, param) in zip(args, params):
                 if self.is_constant_expr(arg):
                     constant_parameters.add(param)
-            ret += self.statevars_in_modifier(m, constant_parameters)
+            ret += self.states_in_modifier(m, constant_parameters)
 
-        evs = map(lambda n: self.statevars_in_node(n,func),func.nodes)
+        evs = map(lambda n: self.states_in_node(n,func),func.nodes)
         ret += [ev for ev in evs if ev is not None]
 
         return ret
 
-    # Checks if the contract has a function or modifier that makes a stateful check.
-    def is_stateful_contract(self) -> Dict[Function, List[StateEvidence]]:
+    # Checks if the contract has a function that makes a stateful check.
+    # Returns a dictionary from stateful functions to evidence of state found by the detector.
+    def states_in_contract(self) -> Dict[Function, List[StateEvidence]]:
         ret = {}
         for f in self.contract.functions:
-            evs = self.statevars_in_function(f)
+            evs = self.states_in_function(f)
             if len(evs) > 0:
                 ret[f] = evs
         return ret

@@ -16,7 +16,7 @@ def test_state(f):
     set_version(f)
     slither = Slither(f)
     c = slither.contracts[-1]
-    assert(ContractStateDetector(c).is_stateful_contract())
+    assert(len(ContractStateDetector(c).states_in_contract()) > 0)
 
 nostate_files = glob.glob("tests/nostate/*.sol")
 @pytest.mark.parametrize('f', nostate_files)
@@ -24,4 +24,4 @@ def test_nostate(f):
     set_version(f)
     slither = Slither(f)
     c = slither.contracts[-1]
-    assert(not ContractStateDetector(c).is_stateful_contract())
+    assert(len(ContractStateDetector(c).states_in_contract()) == 0)
