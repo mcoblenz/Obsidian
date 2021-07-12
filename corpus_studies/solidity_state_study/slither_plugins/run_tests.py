@@ -41,11 +41,11 @@ def test_BranchingStates1():
     slither = Slither(file)
     c = slither.contracts[0]
     (_, graph) = inferTransitionGraph(c)
-    expGraph = TransitionGraph(states={"A","B","C"}, 
+    expGraph = TransitionGraph(states={"A", "B", "C"}, 
                                initial_states={"B"},
                                edges={
-                                   Edge("A","A","moveToB"),
-                                   Edge("A","B","moveToB")
+                                   Edge("A", "A", "moveToB"),
+                                   Edge("A", "B", "moveToB")
                                })
     assert(equal_graph(graph, expGraph))
 
@@ -55,11 +55,22 @@ def test_BranchingStates2():
     slither = Slither(file)
     c = slither.contracts[0]
     (_, graph) = inferTransitionGraph(c)
-    expGraph = TransitionGraph(states={"A","B","C"}, 
+    expGraph = TransitionGraph(states={"A", "B", "C"}, 
                                initial_states={"A"},
                                edges={
-                                   Edge("B","C","moveToC")
+                                   Edge("B", "C", "moveToC")
                                })
     assert(equal_graph(graph, expGraph))
 
-# test_BranchingStates2()
+def test_constructorTest():
+    file = "tests/enums/ConstructorTest.sol"
+    set_version(file)
+    slither = Slither(file)
+    c = slither.contracts[-1]
+    (_, graph) = inferTransitionGraph(c)
+    expGraph = TransitionGraph(states={"A", "B", "C", "D", "E"}, 
+                               initial_states={"C"},
+                               edges={
+                                   Edge("C","A","foo")
+                               })
+    assert(equal_graph(graph, expGraph))

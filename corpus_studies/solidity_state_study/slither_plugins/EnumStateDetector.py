@@ -1,5 +1,4 @@
 from collections import Counter, deque
-
 from slither.core.solidity_types import UserDefinedType
 from slither.core.cfg.node import *
 from slither.core.declarations import *
@@ -33,22 +32,26 @@ def inferTransitionGraph(contract) -> Optional[Tuple[StateVariable, TransitionGr
         enum_explorer = EnumExplorer(contract, enum_state_var, enum_type)
         return (enum_state_var, enum_explorer.inferTransitionGraph())
 
-def vars_used_in_function(func: Function) -> Set[StateVariable]:
+# Get all the state variables used in a function.
+def state_vars_used_in_function(func: Function) -> Set[StateVariable]:
     return set(func.state_variables_read + func.state_variables_written)
 
+# An EnumStateDetector takes a contract and its transition graph.
+# It has methods to compute states which are unreachable from the initial states,
+# and also to compute variables which are no longer used after a state transition.
 class EnumStateDetector:
     def __init__(self, contract, state_var, graph):
         self.contract: Contract = contract
         self.state_var: StateVariable = state_var
         self.graph: TransitionGraph = graph
         # Dictionary from functions to state variables used in the function/modifiers.
-        self.state_vars_used: Dict[Function, Set[StateVariable]] = {f:vars_used_in_function(f).union(*(vars_used_in_function(m) for m in f.modifiers)) for f in self.contract.functions}
+        self.state_vars_used: Dict[Function, Set[StateVariable]] = {f:state_vars_used_in_function(f).union(*(state_vars_used_in_function(m) for m in f.modifiers)) for f in self.contract.functions}
 
     # Check if a state variable is used in a certain state (i.e., if any function that can be called
     # at that state use this variable)
     def varUsedInState(self, var: StateVariable, state: str) -> bool:
         state_vars_used: Dict[Function, Set[StateVariable]] = \
-                {f:vars_used_in_function(f).union(*(vars_used_in_function(m) for m in f.modifiers)) 
+                {f:state_vars_used_in_function(f).union(*(state_vars_used_in_function(m) for m in f.modifiers)) 
                 for f in self.contract.functions}
         for (_, func) in self.graph.adj[state]:
             if var in state_vars_used[func]:
@@ -82,3 +85,19 @@ class EnumStateDetector:
                 if var != self.state_var and not var.is_constant and all(not self.varUsedInState(var, s) for s in reachableStates):
                     ret[s].append(var)
         return ret
+
+# Returns a string containing information about the contract and the inferred
+# state graph in a readable format.
+def enumStateInfo(contract, state_var, graph) -> str:
+    detector = EnumStateDetector(contract, state_var, graph)
+    message = "Contract %s\n" % contract
+    message += "Identified enum: %s\n" % state_var.canonical_name
+    message += "Identified states: %s\n" % graph.states
+    message += "Initial states: %s\n" % graph.initial_states
+    message += str(graph) + "\n"
+    message += "Unreachable states: %s\n" % [s for s in detector.unreachableStatesFromInit()]
+    message += "Unused variables:\n"
+    unused = detector.getUnusedVariables()
+    for (s,vars) in unused.items():
+        message += "%s %s\n" % (s, [v.name for v in vars])
+    return message

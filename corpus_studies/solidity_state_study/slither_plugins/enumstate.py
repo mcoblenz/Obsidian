@@ -1,5 +1,5 @@
 from slither.detectors.abstract_detector import AbstractDetector, DetectorClassification
-from .EnumStateDetector import EnumStateDetector, inferTransitionGraph
+from .EnumStateDetector import EnumStateDetector, inferTransitionGraph, enumStateInfo
 
 # Class implemented as a detector plugin for Slither. This detector detects,
 # for the given contracts, which contracts have an abstract state controlled
@@ -64,17 +64,7 @@ class EnumState(AbstractDetector):
             inferGraph = inferTransitionGraph(c)
             if inferGraph is not None:
                 (state_var, graph) = inferGraph
-                detector = EnumStateDetector(c, state_var, graph)
-                message = "Contract %s\n" % c
-                message += "Identified enum: %s\n" % state_var.canonical_name
-                message += "Identified states: %s\n" % graph.states
-                message += "Initial states: %s\n" % graph.initial_states
-                message += str(graph) + "\n"
-                message += "Unreachable states: %s\n" % [s for s in detector.unreachableStatesFromInit()]
-                message += "Unused variables:\n"
-                unused = detector.getUnusedVariables()
-                for (s,vars) in unused.items():
-                    message += "%s %s\n" % (s, [v.name for v in vars])
+                message = enumStateInfo(c, state_var, graph)
                 
                 stateful_contracts.append(message)
 

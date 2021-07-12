@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from slither.core.expressions import *
 from slither.core.cfg.node import *
 from slither.core.declarations import *
@@ -25,8 +24,13 @@ class EnumExplorer:
         self.enum_type = enum_type
 
     def inferTransitionGraph(self) -> TransitionGraph:
+        # Find the variable constructor, if it exists (where fields are initialized when they are declared).
         constructor_vars = next((f for f in self.contract.functions if f.is_constructor_variables), None)
-        constructor = next((f for f in self.contract.functions if f.is_constructor), None)
+        # Find the contract's constructor, if it exists.
+        # A contract can have a most one constructor, not counting inherited constructors.
+        # For a contract C, we are looking for a function with canonical name "C.constructor()"
+        # or "C.C()", depending on the version of Solidity.
+        constructor = next((f for f in self.contract.functions if f.is_constructor and f.canonical_name.startswith(self.contract.name)), None)
         initial_states = self.find_initial_states(constructor_vars, constructor)
 
         graph = TransitionGraph(set(self.enum_type.values), initial_states)
@@ -39,7 +43,7 @@ class EnumExplorer:
         return graph
 
     def find_initial_states(self, constructor_vars, constructor) -> Set[str]:
-        initial_states = self.enum_type.values[0]
+        initial_states = {self.enum_type.values[0]}
         if constructor_vars is not None:
             edges = self.exploreFunction(constructor_vars)
             initial_states = {edge.s_to for edge in edges if edge.s_from in initial_states}
@@ -49,40 +53,35 @@ class EnumExplorer:
         return initial_states
 
     def exploreFunction(self, func: Function) -> List[Edge]:
-        # return self.exploreNode(func.entry_point, self.initialContext())
         self.edges = set()
         self.func = func
-        # print("Function %s: %s" % (func.name, func.entry_point))
         if func.entry_point is not None:
-            self.exploreNode(func.entry_point, self.initialContext(), {None})
+            self.exploreNode(func.entry_point, self.all_states, {None})
             return list(self.edges)
         else:
             return [Edge(s,s,func) for s in self.all_states]
 
-    # Here, the context is the set of states the state_var can initially be in
-    # when the function is called
-    def initialContext(self):
-        return self.all_states
-
-    def completeCodePath(self, context: Set[str], ending_states: Set[Optional[str]]):
-        for start in context:
+    def completeCodePath(self, starting_states: Set[str], ending_states: Set[Optional[str]]):
+        for start in starting_states:
             for end in ending_states:
-                if end is None:
+                if end is None: 
+                    # A value of none means the value of the state variable has not changed
                     self.edges.add(Edge(start, start, self.func))
                 else:
                     self.edges.add(Edge(start, end, self.func))
-        # print("Finished code path: %s" % [str(x) for x in context])
-        # print("Ending states: %s" % [x for x in ending_states])
 
+    # Explore an execution path starting at the given node, maintaining the set of
+    # possible starting and ending states.
+    # Once we have reached the end of an execution path, call completeCodePath to add the 
+    # starting and ending states as edges to the graph.
     def exploreNode(self, 
                     node: Node, 
-                    context: Set[str], 
+                    starting_states: Set[str], 
                     ending_states: Set[Optional[str]], 
                     subs: Dict[Variable, Expression] = None,
                     level: int = 0) -> Set[str]:
         if subs is None: subs = {}
-        # print("Exploring node %s: %s" % (node, [str(x) for x in context]))
-        newCtx = self.mergeInfo(node, context, ending_states, subs, level)
+        new_starting_states = self.mergeInfo(node, starting_states, ending_states, subs, level)
         new_ending_states = self.mergeEndingStates(node, ending_states, subs)
         
         if is_revert(node):
@@ -90,36 +89,39 @@ class EnumExplorer:
 
         if len(node.sons) == 0:
             if level == 0:
-                self.completeCodePath(newCtx, new_ending_states)
-            return newCtx
+                self.completeCodePath(new_starting_states, new_ending_states)
+            return new_starting_states
         elif len(node.sons) == 1:
-            return self.exploreNode(node.sons[0], newCtx, new_ending_states, subs, level)
+            return self.exploreNode(node.sons[0], new_starting_states, new_ending_states, subs, level)
         else:
+            # If we reach an if statement, add the condition/negated condition to the
+            # list of assumptions for the respective branches, refining the set of 
+            # possible starting states.
             if node.type == NodeType.IF:
-                ctx_true = newCtx & self.possibleStates(node.expression, subs)
-                res_true = self.exploreNode(node.sons[0], ctx_true, new_ending_states, subs, level)
+                starting_states_true = new_starting_states & self.possibleStates(node.expression, subs)
+                res_true = self.exploreNode(node.sons[0], starting_states_true, new_ending_states, subs, level)
                 negated_exp = UnaryOperation(node.expression, UnaryOperationType.BANG)
-                ctx_false = newCtx & self.possibleStates(negated_exp, subs)
-                res_false = self.exploreNode(node.sons[1], ctx_false, new_ending_states, subs, level)
+                starting_states_false = new_starting_states & self.possibleStates(negated_exp, subs)
+                res_false = self.exploreNode(node.sons[1], starting_states_false, new_ending_states, subs, level)
                 return res_true | res_false
             elif node.type == NodeType.IFLOOP:
                 # Ignore loop body and go to ENDLOOP node
-                return self.exploreNode(node.son_false, newCtx, new_ending_states, subs, level)
+                return self.exploreNode(node.son_false, new_starting_states, new_ending_states, subs, level)
             else:
                 raise Exception("Unexpected node: %s" % node)
                 # TODO: Handle other node types
         
-    # Given a node and a set of possible states, return a refined set of possible states
+    # Given a node and a set of possible states, return a refined set of possible initial states
     # If the node is a require/assert, return the set of states that can make the condition true
-    # If the node is a function/modifier call, return the preconditions for the function/modifier.
-    def mergeInfo(self, node: Node, context: Set[str], ending_states: Set[Optional[str]], subs: Dict[Variable, Expression], level: int) -> Set[str]:
+    # If the node is a modifier call, return the preconditions for the function/modifier.
+    def mergeInfo(self, node: Node, starting_states: Set[str], ending_states: Set[Optional[str]], subs: Dict[Variable, Expression], level: int) -> Set[str]:
         if node.contains_require_or_assert():
             #require and assert both only have one argument.
             states = self.possibleStates(node.expression.arguments[0], subs)
-            return context & states
+            return starting_states & states
         elif isinstance(node.expression, CallExpression) and \
              isinstance(node.expression.called, Identifier) and \
-             isinstance(node.expression.called.value, Function):
+             isinstance(node.expression.called.value, Modifier):
             func = node.expression.called.value
             params = func.parameters
             arguments = node.expression.arguments
@@ -127,14 +129,16 @@ class EnumExplorer:
             # may need to merge the two subs somehow
             subs: Dict[LocalVariable, Expression] = dict(zip(params, arguments))
             # print("Call %s: %s" % (func, [str(x) for x in arguments]))
-            return context & self.exploreNode(func.entry_point, context, ending_states, subs, level+1)
+            return starting_states & self.exploreNode(func.entry_point, starting_states, ending_states, subs, level+1)
         else:
-            return context.copy()
+            return starting_states.copy()
 
+    # Look for expressions assigning a constant enum value to the state var.
+    # If the RHS of an assignment is not recognized to be a constant value, assume the variable could hold any value.
     def mergeEndingStates(self, 
                           node: Node, 
                           ending_states: Set[Optional[str]], 
-                          subs: Dict[Variable, Expression]) -> Optional[Set[str]]:
+                          subs: Dict[Variable, Expression]) -> Set[Optional[str]]:
         if isinstance(node.expression, AssignmentOperation) and \
            node.expression.type == AssignmentOperationType.ASSIGN and \
            expr_is_var(node.expression.expression_left, self.state_var):
@@ -147,6 +151,7 @@ class EnumExplorer:
         else:
             return ending_states.copy()
     
+    # Call the helper function _possibleStates, returning the set of all states if the result is None
     def possibleStates(self, exp: Expression, subs: Optional[Dict[Variable, Expression]]) -> Set[str]:
         states = self._possibleStates(exp, subs)
         if states is not None:

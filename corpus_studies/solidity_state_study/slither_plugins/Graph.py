@@ -31,4 +31,5 @@ class TransitionGraph:
         self.adj[s_from].append((s_to, label))
 
     def __str__(self):
-        return '\n'.join(map(str,self.edges))
+        edges = sorted(self.edges, key=lambda e:str(e.label))
+        return '\n'.join(map(str,edges))
