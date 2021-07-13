@@ -5,7 +5,7 @@ contract IntContainer{
         x = value;
     }
     transaction get() returns int{
-        return x;
+        return value;
     }
 }
 
