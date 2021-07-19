@@ -13,7 +13,7 @@ def expr_is_enum_val(exp: Expression, enum_type: EnumContract) -> bool:
 def expr_is_var(exp: Expression, var: Variable) -> bool:
     return isinstance(exp, Identifier) and exp.value == var
 
-class EnumExplorer:
+class EnumGraphInferrer:
     def __init__(self, 
                 contract: Contract,
                 state_var: StateVariable, 
@@ -24,7 +24,7 @@ class EnumExplorer:
         self.enum_type = enum_type
 
     def inferTransitionGraph(self) -> TransitionGraph:
-        # Find the variable constructor, if it exists (where fields are initialized when they are declared).
+        # Find the variable constructor, if it exists (this is where fields are initialized when they are declared).
         constructor_vars = next((f for f in self.contract.functions if f.is_constructor_variables), None)
         # Find the contract's constructor, if it exists.
         # A contract can have a most one constructor, not counting inherited constructors.
@@ -37,7 +37,7 @@ class EnumExplorer:
 
         for func in self.contract.functions:
             if not (func.is_constructor or func.is_constructor_variables):
-                edges = self.exploreFunction(func)
+                edges = self.inferEdgesFromFunction(func)
                 for edge in edges:
                     graph.addEdge(edge.s_from, edge.s_to, edge.label)
         return graph
@@ -45,23 +45,26 @@ class EnumExplorer:
     def find_initial_states(self, constructor_vars, constructor) -> Set[str]:
         initial_states = {self.enum_type.values[0]}
         if constructor_vars is not None:
-            edges = self.exploreFunction(constructor_vars)
+            edges = self.inferEdgesFromFunction(constructor_vars)
             initial_states = {edge.s_to for edge in edges if edge.s_from in initial_states}
         if constructor is not None:
-            edges = self.exploreFunction(constructor)
+            edges = self.inferEdgesFromFunction(constructor)
             initial_states = {edge.s_to for edge in edges if edge.s_from in initial_states}
         return initial_states
 
-    def exploreFunction(self, func: Function) -> List[Edge]:
+    def inferEdgesFromFunction(self, func: Function) -> List[Edge]:
         self.edges = set()
         self.func = func
         if func.entry_point is not None:
-            self.exploreNode(func.entry_point, self.all_states, {None})
+            self.inferEdgesFromNode(func.entry_point, self.all_states, {None})
             return list(self.edges)
         else:
             return [Edge(s,s,func) for s in self.all_states]
 
-    def completeCodePath(self, starting_states: Set[str], ending_states: Set[Optional[str]]):
+    # Add edges to the graph from connecting the possible starting states to the possible ending states.
+    def addEdgesFromCodePath(self, 
+                             starting_states: Set[str], 
+                             ending_states: Set[Optional[str]]):
         for start in starting_states:
             for end in ending_states:
                 if end is None: 
@@ -72,9 +75,9 @@ class EnumExplorer:
 
     # Explore an execution path starting at the given node, maintaining the set of
     # possible starting and ending states.
-    # Once we have reached the end of an execution path, call completeCodePath to add the 
+    # Once we have reached the end of an execution path, call addEdgesFromCodePath to add the 
     # starting and ending states as edges to the graph.
-    def exploreNode(self, 
+    def inferEdgesFromNode(self, 
                     node: Node, 
                     starting_states: Set[str], 
                     ending_states: Set[Optional[str]], 
@@ -82,31 +85,31 @@ class EnumExplorer:
                     level: int = 0) -> Set[str]:
         if subs is None: subs = {}
         new_starting_states = self.mergeInfo(node, starting_states, ending_states, subs, level)
-        new_ending_states = self.mergeEndingStates(node, ending_states, subs)
+        new_ending_states = self.mergeEndingStates(node, ending_states)
         
         if is_revert(node):
             return set()
 
         if len(node.sons) == 0:
             if level == 0:
-                self.completeCodePath(new_starting_states, new_ending_states)
+                self.addEdgesFromCodePath(new_starting_states, new_ending_states)
             return new_starting_states
         elif len(node.sons) == 1:
-            return self.exploreNode(node.sons[0], new_starting_states, new_ending_states, subs, level)
+            return self.inferEdgesFromNode(node.sons[0], new_starting_states, new_ending_states, subs, level)
         else:
             # If we reach an if statement, add the condition/negated condition to the
             # list of assumptions for the respective branches, refining the set of 
             # possible starting states.
             if node.type == NodeType.IF:
                 starting_states_true = new_starting_states & self.possibleStates(node.expression, subs)
-                res_true = self.exploreNode(node.sons[0], starting_states_true, new_ending_states, subs, level)
+                res_true = self.inferEdgesFromNode(node.sons[0], starting_states_true, new_ending_states, subs, level)
                 negated_exp = UnaryOperation(node.expression, UnaryOperationType.BANG)
                 starting_states_false = new_starting_states & self.possibleStates(negated_exp, subs)
-                res_false = self.exploreNode(node.sons[1], starting_states_false, new_ending_states, subs, level)
+                res_false = self.inferEdgesFromNode(node.sons[1], starting_states_false, new_ending_states, subs, level)
                 return res_true | res_false
             elif node.type == NodeType.IFLOOP:
                 # Ignore loop body and go to ENDLOOP node
-                return self.exploreNode(node.son_false, new_starting_states, new_ending_states, subs, level)
+                return self.inferEdgesFromNode(node.son_false, new_starting_states, new_ending_states, subs, level)
             else:
                 raise Exception("Unexpected node: %s" % node)
                 # TODO: Handle other node types
@@ -114,7 +117,12 @@ class EnumExplorer:
     # Given a node and a set of possible states, return a refined set of possible initial states
     # If the node is a require/assert, return the set of states that can make the condition true
     # If the node is a modifier call, return the preconditions for the function/modifier.
-    def mergeInfo(self, node: Node, starting_states: Set[str], ending_states: Set[Optional[str]], subs: Dict[Variable, Expression], level: int) -> Set[str]:
+    def mergeInfo(self, 
+                  node: Node, 
+                  starting_states: Set[str], 
+                  ending_states: Set[Optional[str]], 
+                  subs: Dict[Variable, Expression], 
+                  level: int) -> Set[str]:
         if node.contains_require_or_assert():
             #require and assert both only have one argument.
             states = self.possibleStates(node.expression.arguments[0], subs)
@@ -126,10 +134,8 @@ class EnumExplorer:
             params = func.parameters
             arguments = node.expression.arguments
             assert(len(params) == len(arguments))
-            # may need to merge the two subs somehow
             subs: Dict[LocalVariable, Expression] = dict(zip(params, arguments))
-            # print("Call %s: %s" % (func, [str(x) for x in arguments]))
-            return starting_states & self.exploreNode(func.entry_point, starting_states, ending_states, subs, level+1)
+            return starting_states & self.inferEdgesFromNode(func.entry_point, starting_states, ending_states, subs, level+1)
         else:
             return starting_states.copy()
 
@@ -137,8 +143,7 @@ class EnumExplorer:
     # If the RHS of an assignment is not recognized to be a constant value, assume the variable could hold any value.
     def mergeEndingStates(self, 
                           node: Node, 
-                          ending_states: Set[Optional[str]], 
-                          subs: Dict[Variable, Expression]) -> Set[Optional[str]]:
+                          ending_states: Set[Optional[str]]) -> Set[Optional[str]]:
         if isinstance(node.expression, AssignmentOperation) and \
            node.expression.type == AssignmentOperationType.ASSIGN and \
            expr_is_var(node.expression.expression_left, self.state_var):

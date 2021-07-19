@@ -5,7 +5,7 @@ from slither.core.declarations import *
 
 from .ContractStateDetector import ContractStateDetector
 from .Graph import TransitionGraph
-from .EnumExplorer import EnumExplorer
+from .EnumGraphInferrer import EnumGraphInferrer
 
 def getEnumStateVar(contract) -> Optional[StateVariable]:
     enum_types_names = [e.canonical_name for e in contract.enums]
@@ -29,7 +29,7 @@ def inferTransitionGraph(contract) -> Optional[Tuple[StateVariable, TransitionGr
         assert(isinstance(enum_state_var.type.type, EnumContract))
         enum_type = enum_state_var.type.type
 
-        enum_explorer = EnumExplorer(contract, enum_state_var, enum_type)
+        enum_explorer = EnumGraphInferrer(contract, enum_state_var, enum_type)
         return (enum_state_var, enum_explorer.inferTransitionGraph())
 
 # Get all the state variables used in a function.
@@ -37,7 +37,7 @@ def state_vars_used_in_function(func: Function) -> Set[StateVariable]:
     return set(func.state_variables_read + func.state_variables_written)
 
 # An EnumStateDetector takes a contract and its transition graph.
-# It has methods to compute states which are unreachable from the initial states,
+# It has methods to compute states that are unreachable from the initial states,
 # and also to compute variables which are no longer used after a state transition.
 class EnumStateDetector:
     def __init__(self, contract, state_var, graph):
