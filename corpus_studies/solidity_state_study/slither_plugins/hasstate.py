@@ -67,7 +67,7 @@ class HasState(AbstractDetector):
     def _detect(self):
         stateful_contracts = []
         for c in self.contracts:
-            if ContractStateDetector(c).is_stateful_contract() or self.inherited_state(c, stateful_contracts):
+            if len(ContractStateDetector(c).states_in_contract()) > 0 or self.inherited_state(c, stateful_contracts):
                 stateful_contracts.append(c.name)
 
         stateful_contracts = [self.STATEFUL_MESSAGE % sc for sc in stateful_contracts]
