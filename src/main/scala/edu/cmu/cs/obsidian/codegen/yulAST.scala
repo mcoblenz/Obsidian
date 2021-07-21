@@ -210,7 +210,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             replaceAll("&gt;", ">").
             replaceAll("&#10;", "\n").
             replaceAll("&#61;", "=").
-            replaceAll("&quot;", "\"")
+            replaceAll("&quot;", "\"").
+            replaceAll("&#13;", "\r")
     }
 
     // ObjScope and FuncScope are designed to facilitate mustache templates, with the following rules
