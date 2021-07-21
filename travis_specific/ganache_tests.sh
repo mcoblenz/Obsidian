@@ -85,7 +85,7 @@ do
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
-  if ! $(java -jar $obsidian_jar --yul resources/tests/GanacheTests/$NAME.obs)
+  if ! $(java -jar $obsidian_jar --yul "resources/tests/GanacheTests/$NAME.obs")
   then
       echo "$NAME test failed: cannot compile obs to yul"
       failed+=("$test [compile obs to yul]")
