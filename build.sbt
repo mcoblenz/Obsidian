@@ -53,3 +53,6 @@ assembly / assemblyMergeStrategy := {
     	oldStrategy(x)
 }
 
+// adding this to squelch a warning per https://github.com/sbt/sbt/pull/6237
+
+ThisBuild / packageTimestamp := Package.keepTimestamps
