@@ -3,30 +3,31 @@ from slither.core.cfg.node import *
 from slither.core.declarations import *
 from slither.detectors.functions.modifier import is_revert
 from .Graph import Edge, TransitionGraph
-from .GraphInferrer import GraphInferrer, expr_is_var
+from .GraphInferrer import GraphInferrer
 
-# Checks if the expression is an enum constant of the type enum_type.
-def expr_is_enum_val(exp: Expression, enum_type: EnumContract) -> bool:
-    return isinstance(exp, MemberAccess) and isinstance(exp.expression, Identifier) and \
-        exp.expression.value == enum_type
+# Checks if the expression is either true or false.
+def expr_is_bool_val(exp: Expression) -> bool:
+    return isinstance(exp, Literal) and exp.value in ['true', 'false']
 
-class EnumGraphInferrer(GraphInferrer):
+# Checks if the expression is equal to the variable var.
+def expr_is_var(exp: Expression, var: Variable) -> bool:
+    return isinstance(exp, Identifier) and exp.value == var
+
+class BoolGraphInferrer(GraphInferrer):
     def __init__(self, 
                 contract: Contract,
-                state_var: StateVariable, 
-                enum_type: EnumContract):
+                state_var: StateVariable):
         super().__init__(contract, state_var)
-        self.enum_type = enum_type
 
     @property
     def all_states(self) -> Set[str]:
-        return set(self.enum_type.values)
+        return {'true', 'false'}
 
     @property
     def uninitialized_state(self) -> str:
-        return self.enum_type.values[0]
+        return 'false'
 
-    # Look for expressions assigning a constant enum value to the state var.
+    # Look for expressions assigning a constant boolean value to the state var.
     # If the RHS of an assignment is not recognized to be a constant value, assume the variable could hold any value.
     def mergeEndingStates(self, 
                           node: Node, 
@@ -35,9 +36,9 @@ class EnumGraphInferrer(GraphInferrer):
            node.expression.type == AssignmentOperationType.ASSIGN and \
            expr_is_var(node.expression.expression_left, self.state_var):
             rhs = node.expression.expression_right
-            if expr_is_enum_val(rhs, self.enum_type):
-                assert(isinstance(rhs, MemberAccess))
-                return {rhs.member_name}
+            if expr_is_bool_val(rhs):
+                assert(isinstance(rhs, Literal))
+                return {rhs.value}
             else:
                 return self.all_states
         else:
@@ -47,10 +48,15 @@ class EnumGraphInferrer(GraphInferrer):
     # return a set of state values that will make the expression true, or None if
     # the expression is not relevant.
     # In particular, we look for expressions comparing the state var to a constant 
-    # enum value, or any boolean combination of such expressions.
+    # boolean value, or any boolean combination of such expressions.
     def _possibleStates(self, exp: Expression, subs: Dict[Variable, Expression]) -> Optional[Set[str]]:
         if subs is None: subs = {}
-        if isinstance(exp, UnaryOperation) and exp.type == UnaryOperationType.BANG: # !; Take complement
+
+        if expr_is_var(exp, self.state_var):
+            return {'true'}
+        elif isinstance(exp, TupleExpression):
+            return self._possibleStates(exp.expressions[0], subs)
+        elif isinstance(exp, UnaryOperation) and exp.type == UnaryOperationType.BANG: # !; Take complement
             ret = self._possibleStates(exp.expression, subs)
             if ret is None:
                 return None
@@ -80,10 +86,10 @@ class EnumGraphInferrer(GraphInferrer):
                     # Check if the RHS is either an enum value, or a variable which we know is a constant enum value (from the subs dictionary)
                     if isinstance(exp_right, Identifier) and exp_right.value in subs:
                         exp_right = subs[exp_right.value]
-                    # Check if exp_right is an enum value.
-                    if expr_is_enum_val(exp_right, self.enum_type):
+                    # Check if exp_right is an bool value.
+                    if expr_is_bool_val(exp_right):
                         if exp.type == BinaryOperationType.EQUAL:
-                            return {exp_right.member_name}
+                            return {exp_right.value}
                         elif exp.type == BinaryOperationType.NOT_EQUAL:
-                            return self.all_states - {exp_right.member_name}
+                            return self.all_states - {exp_right.value}
         return None

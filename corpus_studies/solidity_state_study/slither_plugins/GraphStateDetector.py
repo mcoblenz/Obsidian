@@ -3,9 +3,11 @@ from slither.core.solidity_types import UserDefinedType
 from slither.core.cfg.node import *
 from slither.core.declarations import *
 
+from .ImmutableChecker import ImmutableChecker
 from .ContractStateDetector import ContractStateDetector
 from .Graph import TransitionGraph
 from .EnumGraphInferrer import EnumGraphInferrer
+from .BoolGraphInferrer import BoolGraphInferrer
 
 def getEnumStateVar(contract) -> Optional[StateVariable]:
     enum_types_names = [e.canonical_name for e in contract.enums]
@@ -20,7 +22,7 @@ def getEnumStateVar(contract) -> Optional[StateVariable]:
     else:
         return freq.most_common(1)[0][0]
 
-def inferTransitionGraph(contract) -> Optional[Tuple[StateVariable, TransitionGraph]]:
+def inferEnumTransitionGraph(contract) -> Optional[Tuple[StateVariable, TransitionGraph]]:
     enum_state_var = getEnumStateVar(contract)
     if enum_state_var is None:
         return None
@@ -32,14 +34,27 @@ def inferTransitionGraph(contract) -> Optional[Tuple[StateVariable, TransitionGr
         enum_explorer = EnumGraphInferrer(contract, enum_state_var, enum_type)
         return (enum_state_var, enum_explorer.inferTransitionGraph())
 
+def getBoolStateVars(contract) -> List[StateVariable]:
+    ret = set()
+    for evs in ContractStateDetector(contract).states_in_contract().values():
+        for ev in evs:
+            for sv in ev.vars:
+                if isinstance(sv.type, ElementaryType) and sv.type.type == 'bool':
+                    ret.add(sv)
+    return list(ret)
+
+def inferBoolTransitionGraph(contract, state_var) -> TransitionGraph:
+    bool_explorer = BoolGraphInferrer(contract, state_var)
+    return bool_explorer.inferTransitionGraph()
+
 # Get all the state variables used in a function.
 def state_vars_used_in_function(func: Function) -> Set[StateVariable]:
     return set(func.state_variables_read + func.state_variables_written)
 
-# An EnumStateDetector takes a contract and its transition graph.
+# An GraphStateDetector takes a contract and its transition graph.
 # It has methods to compute states that are unreachable from the initial states,
 # and also to compute variables which are no longer used after a state transition.
-class EnumStateDetector:
+class GraphStateDetector:
     def __init__(self, contract, state_var, graph):
         self.contract: Contract = contract
         self.state_var: StateVariable = state_var
@@ -89,7 +104,7 @@ class EnumStateDetector:
 # Returns a string containing information about the contract and the inferred
 # state graph in a readable format.
 def enumStateInfo(contract, state_var, graph) -> str:
-    detector = EnumStateDetector(contract, state_var, graph)
+    detector = GraphStateDetector(contract, state_var, graph)
     message = "Contract %s\n" % contract
     message += "Identified enum: %s\n" % state_var.canonical_name
     message += "Identified states: %s\n" % graph.states
@@ -99,5 +114,34 @@ def enumStateInfo(contract, state_var, graph) -> str:
     message += "Unused variables:\n"
     unused = detector.getUnusedVariables()
     for (s,vars) in unused.items():
+        message += "%s %s\n" % (s, [v.name for v in vars])
+    return message
+
+def boolStateInfo(contract, state_var, graph):
+    detector = GraphStateDetector(contract, state_var, graph)
+    ret = {}
+    ret['Contract'] = contract.name
+    ret['Statevar'] = state_var.name
+    ret['Initial states'] = graph.initial_states
+    ret['Graph'] = graph
+    ret['Unreachable states'] = detector.unreachableStatesFromInit()
+    unused = detector.getUnusedVariables()
+    immutable_checker = ImmutableChecker(contract)
+    for var in contract.state_variables:
+        if immutable_checker.could_be_immutable(var) or all(var in unused[s] for s in graph.states):
+            for s in graph.states:
+                if var in unused[s]:
+                    unused[s].remove(var)
+    ret['Unused variables'] = {k:v for (k,v) in unused.items() if len(v) > 0}
+    return ret
+
+def formatBoolInfo(info) -> str:
+    message = "Contract: %s\n" % info['Contract']
+    message += "State variable: %s\n" % info['Statevar']
+    message += "Initial states: %s\n" % info['Initial states']
+    message += "Graph:\n%s\n" % info['Graph']
+    message += "Unreachable states: %s\n" % info['Unreachable states']
+    message += "Unused variables:\n"
+    for (s,vars) in info['Unused variables'].items():
         message += "%s %s\n" % (s, [v.name for v in vars])
     return message
