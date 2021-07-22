@@ -23,33 +23,8 @@ class EnumGraphInferrer(GraphInferrer):
         return set(self.enum_type.values)
 
     @property
-    def uninitialized_state(self) -> Set[str]:
+    def uninitialized_state(self) -> str:
         return self.enum_type.values[0]
-        
-    # Given a node and a set of possible states, return a refined set of possible initial states
-    # If the node is a require/assert, return the set of states that can make the condition true
-    # If the node is a modifier call, return the preconditions for the function/modifier.
-    def mergeInfo(self, 
-                  node: Node, 
-                  starting_states: Set[str],    
-                  ending_states: Set[Optional[str]], 
-                  subs: Dict[Variable, Expression], 
-                  level: int) -> Set[str]:
-        if node.contains_require_or_assert():
-            #require and assert both only have one argument.
-            states = self.possibleStates(node.expression.arguments[0], subs)
-            return starting_states & states
-        elif isinstance(node.expression, CallExpression) and \
-             isinstance(node.expression.called, Identifier) and \
-             isinstance(node.expression.called.value, Modifier):
-            func = node.expression.called.value
-            params = func.parameters
-            arguments = node.expression.arguments
-            assert(len(params) == len(arguments))
-            subs: Dict[LocalVariable, Expression] = dict(zip(params, arguments))
-            return starting_states & self.inferEdgesFromNode(func.entry_point, starting_states, ending_states, subs, level+1)
-        else:
-            return starting_states.copy()
 
     # Look for expressions assigning a constant enum value to the state var.
     # If the RHS of an assignment is not recognized to be a constant value, assume the variable could hold any value.
