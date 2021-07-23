@@ -61,7 +61,7 @@ object CodeGenJava extends CodeGenerator{
             //place the correct class name in the build.gradle
             val gradlePath = Paths.get(outputPath.toString, "build.gradle")
             val replaceClassNameInGradleBuild: String =
-                "sed -i.backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
+                "C:\\Users\\Jason\\GnuWin32\\bin\\sed.exe -i.backup s/{{CLASS_NAME}}/" + mainName + "/g " + gradlePath.toString
 
             //sed automatically creates a backup of the original file, has to be deleted
             val gradleBackupPath = Paths.get(outputPath.toString, "build.gradle.backup")
@@ -118,7 +118,7 @@ object CodeGenJava extends CodeGenerator{
             // Invoke protoc to compile from protobuf to Java.
             val protoPath = protobufPath.getParent.toString
             val protocInvocation: String =
-                "protoc --java_out=" + srcDir + " -I=" + protoPath + " " + protobufPath.toString
+                "C:\\Users\\Jason\\protobuf\\protoc-3.17.3-win64\\bin\\protoc.exe --java_out=" + srcDir + " -I=" + protoPath + " " + protobufPath.toString
 
             try {
                 val exitCode = protocInvocation.!
@@ -156,7 +156,7 @@ object CodeGenJava extends CodeGenerator{
             .resolve("protos")
         // Invoke protoc to compile from protobuf to Java.
         val wrapperProtocInvocation: String =
-            "protoc --java_out=" + srcDir + " -I=" + wrapperProtoPath + " InterfaceImplementerWrapper.proto"
+            "C:\\Users\\Jason\\protobuf\\protoc-3.17.3-win64\\bin\\protoc.exe --java_out=" + srcDir + " -I=" + wrapperProtoPath + " InterfaceImplementerWrapper.proto"
 
         try {
             val exitCode = wrapperProtocInvocation.!

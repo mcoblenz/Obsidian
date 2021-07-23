@@ -14,10 +14,10 @@ class CompilerTests extends JUnitSuite {
         val inputArgs: Array[String] = Array(s"--output-path", s"obs_output/", contractPath) ++ args
         result = Main.compileProgram(inputArgs)
         assertTrue(result)
-        val gradleCmd = s"gradle compileJava -b obs_output/$contractName/build.gradle"
+        val gradleCmd = s"C:\\Gradle\\gradle-4.10\\bin\\gradle.bat compileJava -b obs_output/$contractName/build.gradle"
         val gradleResult = gradleCmd.!
         assertTrue(gradleResult == 0)
-        val deleteCmd = s"rm -rf obs_output/$contractName"
+        val deleteCmd = s"C:\\Users\\Jason\\GnuCoreUtils\\bin\\rm.exe -rf obs_output/$contractName"
         deleteCmd.!
     }
 

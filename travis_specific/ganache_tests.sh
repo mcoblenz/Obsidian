@@ -277,6 +277,37 @@ do
 
     echo "padded arg: $PADDED_ARG"
     echo "data: $DATA"
+	
+	PARAMS=$( jq -ncM \
+                 --arg "fn" "$ACCT" \
+                 --arg "tn" "$CONTRACT_ADDRESS" \
+                 --arg "dn" "0x$DATA" \
+				 --arg "gn" "0x$GAS_HEX" \
+					--arg "gpn" "$GAS_PRICE" \
+                 '{"from":$fn,"to":$tn, "gas": $gn, "gasPrice": $gpn, "data":$dn}')
+
+    SEND_DATA=$( jq -ncM \
+                    --arg "jn" "2.0" \
+                    --arg "mn" "eth_estimateGas" \
+                    --argjson "pn" "$PARAMS" \
+                    --arg "idn" "1" \
+                    '{"jsonrpc":$jn,"method":$mn,"params":[$pn,"latest"],"id":$idn}' )
+    echo "eth_estimateGas is being sent"
+    echo "$SEND_DATA" | jq
+    echo
+
+    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    echo "response from ganache is: "
+    echo "$RESP" | jq
+
+    ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
+    if [ "$ERROR" != "null" ]
+    then
+        RET=$((RET+1))
+        echo "eth_estimateGas returned an error: $ERROR"
+        failed+=("$test [eth_estimateGas]")
+        continue
+    fi
 
     # build a JSON object to post to eth_call with the contract address as the to account, and
     # padded data
