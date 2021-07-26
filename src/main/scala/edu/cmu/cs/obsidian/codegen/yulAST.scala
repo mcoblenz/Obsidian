@@ -342,6 +342,14 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             }
         }
 
+        var acc = ""
+        for (sub <- obj.subobjects){
+            acc = acc + sub.yulString()
+        }
+        
+        def subObjects = acc
+
+
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
         val datasize: Expression = apply("datasize", stringlit(runtimeObject))
