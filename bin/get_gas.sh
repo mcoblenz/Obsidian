@@ -30,7 +30,7 @@ then
     tests+=("resources/tests/GanacheTests/$arg.json")
   done
 else
-  tests=(resources/tests/GanacheTests/BoolLiteral.json)
+  tests=(resources/tests/GanacheTests/*.json)
 fi
 
 missing_json=$(diff --changed-group-format='%<%>' --unchanged-group-format='' <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
