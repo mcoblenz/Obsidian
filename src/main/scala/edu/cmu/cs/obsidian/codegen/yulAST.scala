@@ -342,13 +342,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             }
         }
 
-        var acc = ""
-        for (sub <- obj.subobjects){
-            acc = acc + sub.yulString()
-        }
-        
-        def subObjects = acc
-
+        def subObjects: String = obj.subobjects.foldRight(""){ (o, str) => o.yulString() + str }
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
