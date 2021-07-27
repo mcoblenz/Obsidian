@@ -53,6 +53,8 @@ then
         exit 1
 fi
 
+echo "Test Name,Gas Estimate,Gas Used" > gasStats.csv
+
 for test in "${tests[@]}"
 do
   echo "---------------------------------------------------------------"
@@ -228,7 +230,8 @@ do
       failed+=("$test [eth_getTransactionReceipt]")
       continue
     fi
-
+	
+	gas_used=$(echo "$RESP" | jq '.result.gasUsed')
 
     ## step 4: get the contract address from the transaction receipt, stripping quotes
     CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress' | tr -d '"' )
@@ -310,53 +313,9 @@ do
         failed+=("$test [eth_estimateGas]")
         continue
     fi
+	
+	gas_estimate=$(echo "$RESP" | jq '.result')
 
-    # build a JSON object to post to eth_call with the contract address as the to account, and
-    # padded data
-    PARAMS=$( jq -ncM \
-                 --arg "fn" "$ACCT" \
-                 --arg "tn" "$CONTRACT_ADDRESS" \
-                 --arg "dn" "0x$DATA" \
-                 '{"from":$fn,"to":$tn,"data":$dn}')
-
-    SEND_DATA=$( jq -ncM \
-                    --arg "jn" "2.0" \
-                    --arg "mn" "eth_call" \
-                    --argjson "pn" "$PARAMS" \
-                    --arg "idn" "1" \
-                    '{"jsonrpc":$jn,"method":$mn,"params":[$pn,"latest"],"id":$idn}' )
-    echo "eth_call is being sent"
-    echo "$SEND_DATA" | jq
-    echo
-
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
-    echo "response from ganache is: "
-    echo "$RESP" | jq
-
-    ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
-    if [ "$ERROR" != "null" ]
-    then
-        RET=$((RET+1))
-        echo "eth_call returned an error: $ERROR"
-        failed+=("$test [eth_call]")
-        continue
-    fi
-
-    # pull the result out of the JSON object, removing the quotation marks
-    GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
-    # use BC to convert it to decimal
-    GOT_DEC=$(python ../bin/2sc.py "$GOT")
-
-    # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
-    if [ "$GOT_DEC" == "$EXPECTED" ]
-    then
-      echo "expected $EXPECTED (in decimal)"
-      echo "test passed!"
-    else
-      echo "test failed! got $GOT_DEC but expected $EXPECTED"
-      RET=$((RET+1))
-      failed+=("$test [wrong answer]")
-    fi
   else
     echo "*****WARNING: not checking the output of running this code because the JSON describing the test didn't include it"
   fi
@@ -372,6 +331,8 @@ do
   rm "$NAME.evm"
   cd "../"
   rmdir "$NAME"
+  
+  echo "$NAME.obs,$gas_estimate,$gas_used" >> gasStats.csv
 
   if [ $RET -ne 0 ]
   then
@@ -547,6 +508,7 @@ do
       continue
     fi
 
+	gas_used=$(echo "$RESP" | jq '.result.gasUsed')
 
     ## step 4: get the contract address from the transaction receipt, stripping quotes
     CONTRACT_ADDRESS=$(echo "$RESP" | jq '.result.contractAddress' | tr -d '"' )
@@ -628,53 +590,9 @@ do
         failed+=("$test [eth_estimateGas]")
         continue
     fi
+	
+	gas_estimate=$(echo "$RESP" | jq '.result')
 
-    # build a JSON object to post to eth_call with the contract address as the to account, and
-    # padded data
-    PARAMS=$( jq -ncM \
-                 --arg "fn" "$ACCT" \
-                 --arg "tn" "$CONTRACT_ADDRESS" \
-                 --arg "dn" "0x$DATA" \
-                 '{"from":$fn,"to":$tn,"data":$dn}')
-
-    SEND_DATA=$( jq -ncM \
-                    --arg "jn" "2.0" \
-                    --arg "mn" "eth_call" \
-                    --argjson "pn" "$PARAMS" \
-                    --arg "idn" "1" \
-                    '{"jsonrpc":$jn,"method":$mn,"params":[$pn,"latest"],"id":$idn}' )
-    echo "eth_call is being sent"
-    echo "$SEND_DATA" | jq
-    echo
-
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
-    echo "response from ganache is: "
-    echo "$RESP" | jq
-
-    ERROR=$(echo "$RESP" | tr -d '\n' | jq '.error.message')
-    if [ "$ERROR" != "null" ]
-    then
-        RET=$((RET+1))
-        echo "eth_call returned an error: $ERROR"
-        failed+=("$test [eth_call]")
-        continue
-    fi
-
-    # pull the result out of the JSON object, removing the quotation marks
-    GOT=$(echo "$RESP" | jq '.result' | tr -d '"')
-    # use BC to convert it to decimal
-    GOT_DEC=$(python ../bin/2sc.py "$GOT")
-
-    # todo: extend JSON object with a decode field so that we can have expected values that aren't integers more easily
-    if [ "$GOT_DEC" == "$EXPECTED" ]
-    then
-      echo "expected $EXPECTED (in decimal)"
-      echo "test passed!"
-    else
-      echo "test failed! got $GOT_DEC but expected $EXPECTED"
-      RET=$((RET+1))
-      failed+=("$test [wrong answer]")
-    fi
   else
     echo "*****WARNING: not checking the output of running this code because the JSON describing the test didn't include it"
   fi
@@ -689,6 +607,8 @@ do
   rm "$NAME.evm"
   cd "../"
   rmdir "$NAME"
+  
+  echo "$NAME.sol,$gas_estimate,$gas_used" >> gasStats.csv
 
   if [ $RET -ne 0 ]
   then
