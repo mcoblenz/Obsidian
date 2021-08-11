@@ -9,11 +9,10 @@ contract IntContainer{
     }
 }
 
-main contract SimpleStructure{
+main contract SetGet{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
         ic.set(5);
         return (ic.get());
-        return 20;
     }
 }

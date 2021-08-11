@@ -13,7 +13,7 @@ contract IntContainer{
     }
 }
 
-main contract TrivialSetGet{
+main contract SetGetNoArgs{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
         ic.set();
