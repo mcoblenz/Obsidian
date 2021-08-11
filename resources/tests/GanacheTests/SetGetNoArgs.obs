@@ -1,7 +1,7 @@
 contract IntContainer{
     int x;
 
-    IntContainer() {
+    IntContainer@Owned() {
         x = 0;
     }
 
@@ -13,7 +13,7 @@ contract IntContainer{
     }
 }
 
-main contract SimpleStructure{
+main contract TrivialSetGet{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
         ic.set();
