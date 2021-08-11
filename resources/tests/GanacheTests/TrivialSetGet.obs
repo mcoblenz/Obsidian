@@ -1,0 +1,22 @@
+contract IntContainer{
+    int x;
+
+    IntContainer() {
+        x = 0;
+    }
+
+    transaction set() { // take no parameters
+        x = 5;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+main contract SimpleStructure{
+    transaction main() returns int{
+        IntContainer ic = new IntContainer();
+        ic.set();
+        return (ic.get());
+    }
+}
