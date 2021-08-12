@@ -455,8 +455,8 @@ object CodeGenYul extends CodeGenerator {
                 })
 
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
-                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                Seq()
+                //assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
+                Seq(ExpressionStatement(stringlit("xxx")))
             case Construction(contractType, args, isFFIInvocation) =>
                 val ct: ContractTable = checkedTable.contractLookup(contractType.contractName)
 
