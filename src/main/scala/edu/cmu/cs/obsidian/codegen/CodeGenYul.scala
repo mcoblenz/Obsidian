@@ -447,10 +447,10 @@ object CodeGenYul extends CodeGenerator {
                 // todo: some of this logic may be repeated in the dispatch table
 
                 // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
-                // which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
-                // to fix it, i need to refactor this object so that i pass around a vector of temporary variables
-                // to assign returns to rather than just one (i think). this is OK for now, but technical debt that
-                // we'll have to address if we ever add tuples to obsidian.
+                //  which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
+                //  to fix it, i need to refactor this object so that i pass around a vector of temporary variables
+                //  to assign returns to rather than just one (i think). this is OK for now, but technical debt that
+                //  we'll have to address if we ever add tuples to obsidian.
 
                 // for each argument expression, produce a new temp variable and translate it to a
                 // sequence of yul statements ending in an assignment to that variable.
@@ -463,8 +463,9 @@ object CodeGenYul extends CodeGenerator {
 
                 // the result is the recursive translation and the expression either using the temp
                 // here or not.
-                //
-                // todo: this does not work with non-void functions that are called without binding their results, ie "f()" if f returns an int
+
+                // todo: this does not work with non-void functions that are called without binding
+                //  their results, ie "f()" if f returns an int
                 seqs.flatten ++ (width match {
                     case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
                     case 1 =>
