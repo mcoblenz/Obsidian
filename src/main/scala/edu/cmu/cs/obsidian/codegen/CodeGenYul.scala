@@ -229,7 +229,6 @@ object CodeGenYul extends CodeGenerator {
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
-                        //todo: easy optimization is to look at e; if it happens to be a literal we can save a temp.
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         decl_0exp(id) +:
