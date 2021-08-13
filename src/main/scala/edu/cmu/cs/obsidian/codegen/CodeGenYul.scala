@@ -363,7 +363,20 @@ object CodeGenYul extends CodeGenerator {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        Seq(assign1(retvar, Identifier(x))) //todo: in general this will need to know to look in memory / storage / stack
+                        // todo: this assumes that all indentifiers are either fields or stack variables;
+                        //  we store nothing in memory. this is also very likely not doing the right thing
+                        //  with name shadowing
+
+                        // todo: this also assumes that everything is a u256 and does no type-directed
+                        //  cleaning in the way that solc does
+                        if(checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                            println("found a use of field: " + x)
+                            val store_id = nextTemp()
+                            Seq(decl_1exp(store_id,apply("sload",hexlit(keccak256(x)))),
+                                assign1(retvar, store_id))
+                        } else {
+                            Seq(assign1(retvar, Identifier(x)))
+                        }
                     case NumLiteral(n) =>
                         Seq(assign1(retvar, intlit(n)))
                     case StringLiteral(value) =>
