@@ -229,11 +229,18 @@ object CodeGenYul extends CodeGenerator {
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
+                        // todo: this assumes that all identifiers are either fields or stack variables.
+                        //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         decl_0exp(id) +:
                             e_yul :+
-                            assign1(Identifier(x), id)
+                            (if(checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                                //todo: compute offsets
+                                ExpressionStatement(apply("sstore",hexlit(keccak256(contractName+x)),id))
+                            } else {
+                                assign1(Identifier(x), id)
+                            })
                     case _ =>
                         assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
@@ -371,7 +378,8 @@ object CodeGenYul extends CodeGenerator {
                         if(checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
                             println("found a use of field: " + x)
                             val store_id = nextTemp()
-                            Seq(decl_1exp(store_id,apply("sload",hexlit(keccak256(x)))),
+                            //todo: compute offsets
+                            Seq(decl_1exp(store_id,apply("sload",hexlit(keccak256(contractName+x)))),
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
