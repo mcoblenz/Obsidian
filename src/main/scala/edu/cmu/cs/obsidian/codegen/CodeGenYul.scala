@@ -475,8 +475,45 @@ object CodeGenYul extends CodeGenerator {
                 })
 
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
-                //assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                Seq(ExpressionStatement(stringlit("xxx")))
+                val id_mstore = nextTemp()
+                val id_call = nextTemp()
+                val id_recipient_addr = nextTemp()
+                Seq(
+                    // todo these three lines i'm skipping because they propagate the result of the
+                    //  create() call from construct. i can get that from the recipient name here;
+                    //  it does mean there's a bug in the output from create, however. "        let ic := _tmp_1" should be "        let ic := _tmp_4"
+                    //  so that means that i'm ignoring the return. fix that!
+                    // let var_ic_27_address := expr_31_address// skip
+                    // let _4_address := var_ic_27_address // skip
+                    // let expr_33_address := _4_address // skip
+                    // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
+                    decl_1exp(id_recipient_addr, intlit(-1)), // this intlit is a place holder until the above todo gets fixed
+                    // let expr_35_functionSelector := 0xb8e010de // skipping this, i'll just inline it below
+                    // if iszero(extcodesize(expr_35_address)) { revert_error_0cc013b6b3b6beabea4e3a74a6d380f0df81852ca99887912475e1f66b2a2c20() }
+                    edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_recipient_addr),Block(Seq(ExpressionStatement(apply("revert",intlit(0),intlit(0)))))),
+
+                    //// storage for arguments and returned data
+                    // let _5 := allocate_unbounded()
+                    // mstore(_5, shift_left_224(expr_35_functionSelector))
+                    ExpressionStatement(apply("mstore", id_mstore, intlit(-1))), // todo place holder
+
+                    // let _6 := abi_encode_tuple__to__fromStack(add(_5, 4) )
+
+                    // let _7 := call(gas(), expr_35_address,  0,  _5, sub(_6, _5), _5, 0)
+                    // todo i'm starting here, since this is the guts, and working backwards; clean up the place holders as you go
+                    decl_1exp(id_call, apply("call", apply("gas"), intlit(-1), intlit(0), intlit(-1), apply("sub", intlit(-1), intlit(-1)), intlit(-1) , intlit(0))) // todo placeholders
+
+                    // if iszero(_7) { revert_forward_1() }
+
+                    // if _7 {
+                    //    // update freeMemoryPointer according to dynamic return size
+                    //    finalize_allocation(_5, returndatasize())
+                    //
+                    //    // decode return parameters from external try-call into retVars
+                    //    abi_decode_tuple__fromMemory(_5, add(_5, returndatasize()))
+                    // }
+                )
+
             case Construction(contractType, args, isFFIInvocation) =>
                 val ct: ContractTable = checkedTable.contractLookup(contractType.contractName)
 
