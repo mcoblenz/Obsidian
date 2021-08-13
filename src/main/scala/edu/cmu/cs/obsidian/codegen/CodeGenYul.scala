@@ -376,7 +376,6 @@ object CodeGenYul extends CodeGenerator {
                         // todo: this also assumes that everything is a u256 and does no type-directed
                         //  cleaning in the way that solc does
                         if(checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
-                            println("found a use of field: " + x)
                             val store_id = nextTemp()
                             //todo: compute offsets
                             Seq(decl_1exp(store_id,apply("sload",hexlit(keccak256(contractName+x)))),
