@@ -497,7 +497,8 @@ object CodeGenYul extends CodeGenerator {
 //                    case None => None
 //                }
 
-                recipient_yul ++
+
+                (decl_0exp(id_recipient) +: recipient_yul) ++
                     Seq(
                         // todo these three lines i'm skipping because they propagate the result of the
                         //  create() call from construct. i can get that from the recipient name here.
@@ -549,10 +550,11 @@ object CodeGenYul extends CodeGenerator {
                         edu.cmu.cs.obsidian.codegen.If(id_call, Block(
                             Seq(
                                 ExpressionStatement(apply("finalize_allocation", id_mstore_in, apply("returndatasize"))),
-                                ExpressionStatement(apply("mload", intlit(0))) // todo this has to be wrong
+                                assign1(id_call, apply("mload", intlit(0))), // todo this has to be wrong
+                                assign1(retvar, id_call) // todo: maybe just doing it up here instead of always? is that right?
                             )
-                        )),
-                        assign1(retvar, id_call) // todo: this is wrong; it means that i'm always assigning to the return var, even if the context doesn't make that the right thing to do. eg. both set() and return(get()) assign to the retvar. i've solved this problem before, i just need to remember how.
+                        ))
+                        //assign1(retvar, id_call) // todo: this is wrong; it means that i'm always assigning to the return var, even if the context doesn't make that the right thing to do. eg. both set() and return(get()) assign to the retvar. i've solved this problem before, i just need to remember how.
                 )
 
             case Construction(contractType, args, isFFIInvocation) =>
