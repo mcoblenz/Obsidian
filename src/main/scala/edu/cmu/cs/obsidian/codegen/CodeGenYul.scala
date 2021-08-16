@@ -492,7 +492,7 @@ object CodeGenYul extends CodeGenerator {
                         // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
                         // let expr_35_functionSelector := 0xb8e010de // skipping this, i'll just inline it below
                         // if iszero(extcodesize(expr_35_address)) { revert_error_0cc013b6b3b6beabea4e3a74a6d380f0df81852ca99887912475e1f66b2a2c20() }
-                        edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_recipient),Block(Seq(ExpressionStatement(apply("revert",intlit(0),intlit(0)))))),
+                        edu.cmu.cs.obsidian.codegen.If(apply("iszero",apply("extcodesize", id_recipient)),Block(Seq(ExpressionStatement(apply("revert",intlit(0),intlit(0)))))),
 
                         //// storage for arguments and returned data
                         // let _5 := allocate_unbounded()
