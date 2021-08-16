@@ -50,6 +50,12 @@ object "{{creationObject}}" {
             function abi_decode_tuple(headStart, dataEnd)   {
                 if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
             }
+
+            function abi_decode_t_uint256_fromMemory(offset, end) -> value {
+                value := mload(offset)
+            }
+
+
             {{abiEncodeTupleFuncs}}
 
             function allocate_memory(size) -> memPtr {

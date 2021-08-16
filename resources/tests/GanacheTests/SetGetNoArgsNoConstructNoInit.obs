@@ -14,7 +14,6 @@ main contract SetGetNoArgsNoConstructNoInit{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
         ic.set();
-        return 0;
-        //return (ic.get());
+        return ic.get();
     }
 }

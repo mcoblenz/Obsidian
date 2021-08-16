@@ -480,8 +480,22 @@ object CodeGenYul extends CodeGenerator {
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable)
 
                 val id_fnselc = nextTemp()
-                val id_mstore = nextTemp() // todo add this back in when we have args / rets
+                val id_mstore_in = nextTemp() // todo: check this with args / rets
                 val id_call = nextTemp()
+                val id_mstore_out = nextTemp()
+
+                // todo this may be busted; test it
+                // check the return type of the function being called; the yul emitted by solc
+                //   deals with this by just checking the result of call, i think.
+//                val store_return = checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
+//                    case Some(value) => value.retType match {
+//                        case Some(value) =>
+//                            val abi_type = mapObsTypeToABI(value.baseTypeName)
+//
+//                        case None => None
+//                    }
+//                    case None => None
+//                }
 
                 recipient_yul ++
                     Seq(
@@ -499,10 +513,12 @@ object CodeGenYul extends CodeGenerator {
                         // let _5 := allocate_unbounded()
                         // mstore(_5, shift_left_224(expr_35_functionSelector))
                         decl_1exp(id_fnselc, hexlit(hashOfFunctionName(name, params.map(t => mapObsTypeToABI(t.baseTypeName))))),
-                        decl_1exp(id_mstore, apply("allocate_unbounded")),
-                        ExpressionStatement(apply("mstore", id_mstore, apply("shl", intlit(224), id_fnselc))), // todo: 224 is a magic number
+                        decl_1exp(id_mstore_in, apply("allocate_unbounded")),
+                        ExpressionStatement(apply("mstore", id_mstore_in, apply("shl", intlit(224), id_fnselc))), // todo: 224 is a magic number
 
                         // let _6 := abi_encode_tuple__to__fromStack(add(_5, 4) )
+                        // todo: this seems to just add 4 and i have no idea why right now; it's probably type-directed.
+                        decl_1exp(id_mstore_out, apply("add", id_mstore_in, intlit(4))),
 
                         // let _7 := call(gas(), expr_35_address,  0,  _5, sub(_6, _5), _5, 0)
                         decl_1exp(id_call,
@@ -510,14 +526,17 @@ object CodeGenYul extends CodeGenerator {
                                 apply("gas"), // all the gas we have right now
                                 id_recipient, // address of the contract being called
                                 intlit(0),    // amount of money being passed
-                                id_mstore, // todo: update when we support parameters
-                                intlit(0), // todo: update when we support parameters
-                                id_mstore, // todo: update when we support returns
-                                intlit(0)) // todo: update when we support returns
+                                id_mstore_in, // todo: check this
+                                apply("sub",id_mstore_out, id_mstore_in), // todo: check this
+                                id_mstore_in, // check this
+                                intlit(0)) // todo: update when we support returns; needs to be the size of the thing returned.
                         ),
 
                         // if iszero(_7) { revert_forward_1() }
-                        revertForwardIfZero(id_call)
+                        revertForwardIfZero(id_call),
+
+                        // if there's a return, it needs to be mloaded into the retvar. maybe just load it no matter what? and then if
+                        // the source doesn't use it then nothing subsequent will check that temp.
 
                         // if _7 {
                         //    // update freeMemoryPointer according to dynamic return size
@@ -526,6 +545,14 @@ object CodeGenYul extends CodeGenerator {
                         //    // decode return parameters from external try-call into retVars
                         //    abi_decode_tuple__fromMemory(_5, add(_5, returndatasize()))
                         // }
+
+                        edu.cmu.cs.obsidian.codegen.If(id_call, Block(
+                            Seq(
+                                ExpressionStatement(apply("finalize_allocation", id_mstore_in, apply("returndatasize"))),
+                                ExpressionStatement(apply("mload", intlit(0))) // todo this has to be wrong
+                            )
+                        )),
+                        assign1(retvar, id_call) // todo: this is wrong; it means that i'm always assigning to the return var, even if the context doesn't make that the right thing to do. eg. both set() and return(get()) assign to the retvar. i've solved this problem before, i just need to remember how.
                 )
 
             case Construction(contractType, args, isFFIInvocation) =>
