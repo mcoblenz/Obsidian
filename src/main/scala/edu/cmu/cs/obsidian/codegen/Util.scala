@@ -73,9 +73,20 @@ object Util {
     def apply(n: String, es: Expression*): Expression = FunctionCall(Identifier(n), es)
 
     /**
+      * helper function for a common subexpression that checks if a condition holds and calls revert if so
+      *
+      * @param id the expresion to check for being zero
+      * @return the yul if-statement doing the check
+      */
+    def revertIf(cond: Expression): YulStatement =
+        edu.cmu.cs.obsidian.codegen.If(cond, Block(Seq(ExpressionStatement(apply("revert", intlit(0), intlit(0))))))
+
+    /**
       * @return the yul call value check statement, which makes sure that funds are not spent inappropriately
       */
-    def callvaluecheck: YulStatement = codegen.If(apply("callvalue"), Block(Seq(ExpressionStatement(apply("revert", intlit(0), intlit(0))))))
+    def callvaluecheck: YulStatement = {
+        revertIf(apply("callvalue"))
+    }
 
     /**
       * helper function for a common subexpression that checks if something is zero and calls revert forward if so

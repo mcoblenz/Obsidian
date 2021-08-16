@@ -478,6 +478,7 @@ object CodeGenYul extends CodeGenerator {
 
                 val id_recipient = nextTemp()
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable)
+                val id_fnsecl = nextTemp()
 
                 /// val id_mstore = nextTemp() // todo add this back in when we have args / rets
                 val id_call = nextTemp()
@@ -492,12 +493,12 @@ object CodeGenYul extends CodeGenerator {
                         // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
                         // let expr_35_functionSelector := 0xb8e010de // skipping this, i'll just inline it below
                         // if iszero(extcodesize(expr_35_address)) { revert_error_0cc013b6b3b6beabea4e3a74a6d380f0df81852ca99887912475e1f66b2a2c20() }
-                        edu.cmu.cs.obsidian.codegen.If(apply("iszero",apply("extcodesize", id_recipient)),Block(Seq(ExpressionStatement(apply("revert",intlit(0),intlit(0)))))),
+                        revertIf(apply("iszero",apply("extcodesize", id_recipient))),
 
                         //// storage for arguments and returned data
                         // let _5 := allocate_unbounded()
                         // mstore(_5, shift_left_224(expr_35_functionSelector))
-                        decl_1exp(Identifier("fnselc"),hexlit(hashOfFunctionName(name,params.map(obstype => mapObsTypeToABI(obstype.baseTypeName))))),
+                        decl_1exp(id_fnsecl, hexlit(hashOfFunctionName(name, params.map(t => mapObsTypeToABI(t.baseTypeName))))),
 
                         // ExpressionStatement(apply("mstore", id_mstore, intlit(-1))), // todo: this is going to be space for the args / ret data
 
