@@ -515,7 +515,7 @@ object CodeGenYul extends CodeGenerator {
                 )
 
             case Construction(contractType, args, isFFIInvocation) =>
-                val ct: ContractTable = checkedTable.contractLookup(contractType.contractName)
+                // todo: currently we ignore the arguments to the constructor
 
                 val max_addr = "0xffffffffffffffff"
                 val id_alloc = nextTemp()
@@ -544,7 +544,8 @@ object CodeGenYul extends CodeGenerator {
                     // let expr_33_address := create(0, _2, sub(_3, _2))
                     decl_1exp(id_addr, apply("create", intlit(0), id_alloc, apply("sub", id_newbound, id_alloc))),
                     // if iszero(expr_33_address) { revert_forward_1() }
-                    edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_addr),Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
+                    edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_addr),Block(Seq(ExpressionStatement(apply("revert_forward_1"))))),
+                    assign1(retvar, id_addr)
                 )
             case StateInitializer(stateName, fieldName) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
