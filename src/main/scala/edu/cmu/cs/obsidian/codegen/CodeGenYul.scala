@@ -478,9 +478,9 @@ object CodeGenYul extends CodeGenerator {
 
                 val id_recipient = nextTemp()
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable)
-                val id_fnsecl = nextTemp()
 
-                /// val id_mstore = nextTemp() // todo add this back in when we have args / rets
+                val id_fnselc = nextTemp()
+                val id_mstore = nextTemp() // todo add this back in when we have args / rets
                 val id_call = nextTemp()
 
                 recipient_yul ++
@@ -498,22 +498,21 @@ object CodeGenYul extends CodeGenerator {
                         //// storage for arguments and returned data
                         // let _5 := allocate_unbounded()
                         // mstore(_5, shift_left_224(expr_35_functionSelector))
-                        decl_1exp(id_fnsecl, hexlit(hashOfFunctionName(name, params.map(t => mapObsTypeToABI(t.baseTypeName))))),
-
-                        // ExpressionStatement(apply("mstore", id_mstore, intlit(-1))), // todo: this is going to be space for the args / ret data
+                        decl_1exp(id_fnselc, hexlit(hashOfFunctionName(name, params.map(t => mapObsTypeToABI(t.baseTypeName))))),
+                        decl_1exp(id_mstore, apply("allocate_unbounded")),
+                        ExpressionStatement(apply("mstore", id_mstore, apply("shl", intlit(224), id_fnselc))), // todo: 224 is a magic number
 
                         // let _6 := abi_encode_tuple__to__fromStack(add(_5, 4) )
 
                         // let _7 := call(gas(), expr_35_address,  0,  _5, sub(_6, _5), _5, 0)
-                        // todo i'm starting here, since this is the guts, and working backwards; clean up the place holders as you go
                         decl_1exp(id_call,
                             apply("call",
                                 apply("gas"), // all the gas we have right now
                                 id_recipient, // address of the contract being called
                                 intlit(0),    // amount of money being passed
+                                id_mstore, // todo: update when we support parameters
                                 intlit(0), // todo: update when we support parameters
-                                intlit(0), // todo: update when we support parameters
-                                intlit(0), // todo: update when we support returns
+                                id_mstore, // todo: update when we support returns
                                 intlit(0)) // todo: update when we support returns
                         ),
 
