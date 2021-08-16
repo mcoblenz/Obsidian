@@ -475,43 +475,57 @@ object CodeGenYul extends CodeGenerator {
                 })
 
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
-                val id_mstore = nextTemp()
+
+                val id_recipient = nextTemp()
+                val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable)
+
+                /// val id_mstore = nextTemp() // todo add this back in when we have args / rets
                 val id_call = nextTemp()
-                val id_recipient_addr = nextTemp()
-                Seq(
-                    // todo these three lines i'm skipping because they propagate the result of the
-                    //  create() call from construct. i can get that from the recipient name here;
-                    //  it does mean there's a bug in the output from create, however. "        let ic := _tmp_1" should be "        let ic := _tmp_4"
-                    //  so that means that i'm ignoring the return. fix that!
-                    // let var_ic_27_address := expr_31_address// skip
-                    // let _4_address := var_ic_27_address // skip
-                    // let expr_33_address := _4_address // skip
-                    // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
-                    decl_1exp(id_recipient_addr, intlit(-1)), // this intlit is a place holder until the above todo gets fixed
-                    // let expr_35_functionSelector := 0xb8e010de // skipping this, i'll just inline it below
-                    // if iszero(extcodesize(expr_35_address)) { revert_error_0cc013b6b3b6beabea4e3a74a6d380f0df81852ca99887912475e1f66b2a2c20() }
-                    edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_recipient_addr),Block(Seq(ExpressionStatement(apply("revert",intlit(0),intlit(0)))))),
 
-                    //// storage for arguments and returned data
-                    // let _5 := allocate_unbounded()
-                    // mstore(_5, shift_left_224(expr_35_functionSelector))
-                    ExpressionStatement(apply("mstore", id_mstore, intlit(-1))), // todo place holder
+                recipient_yul ++
+                    Seq(
+                        // todo these three lines i'm skipping because they propagate the result of the
+                        //  create() call from construct. i can get that from the recipient name here.
+                        // let var_ic_27_address := expr_31_address// skip
+                        // let _4_address := var_ic_27_address // skip
+                        // let expr_33_address := _4_address // skip
+                        // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
+                        // let expr_35_functionSelector := 0xb8e010de // skipping this, i'll just inline it below
+                        // if iszero(extcodesize(expr_35_address)) { revert_error_0cc013b6b3b6beabea4e3a74a6d380f0df81852ca99887912475e1f66b2a2c20() }
+                        edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_recipient),Block(Seq(ExpressionStatement(apply("revert",intlit(0),intlit(0)))))),
 
-                    // let _6 := abi_encode_tuple__to__fromStack(add(_5, 4) )
+                        //// storage for arguments and returned data
+                        // let _5 := allocate_unbounded()
+                        // mstore(_5, shift_left_224(expr_35_functionSelector))
+                        decl_1exp(Identifier("fnselc"),hexlit(hashOfFunctionName(name,params.map(obstype => mapObsTypeToABI(obstype.baseTypeName))))),
 
-                    // let _7 := call(gas(), expr_35_address,  0,  _5, sub(_6, _5), _5, 0)
-                    // todo i'm starting here, since this is the guts, and working backwards; clean up the place holders as you go
-                    decl_1exp(id_call, apply("call", apply("gas"), intlit(-1), intlit(0), intlit(-1), apply("sub", intlit(-1), intlit(-1)), intlit(-1) , intlit(0))) // todo placeholders
+                        // ExpressionStatement(apply("mstore", id_mstore, intlit(-1))), // todo: this is going to be space for the args / ret data
 
-                    // if iszero(_7) { revert_forward_1() }
+                        // let _6 := abi_encode_tuple__to__fromStack(add(_5, 4) )
 
-                    // if _7 {
-                    //    // update freeMemoryPointer according to dynamic return size
-                    //    finalize_allocation(_5, returndatasize())
-                    //
-                    //    // decode return parameters from external try-call into retVars
-                    //    abi_decode_tuple__fromMemory(_5, add(_5, returndatasize()))
-                    // }
+                        // let _7 := call(gas(), expr_35_address,  0,  _5, sub(_6, _5), _5, 0)
+                        // todo i'm starting here, since this is the guts, and working backwards; clean up the place holders as you go
+                        decl_1exp(id_call,
+                            apply("call",
+                                apply("gas"), // all the gas we have right now
+                                id_recipient, // address of the contract being called
+                                intlit(0),    // amount of money being passed
+                                intlit(0), // todo: update when we support parameters
+                                intlit(0), // todo: update when we support parameters
+                                intlit(0), // todo: update when we support returns
+                                intlit(0)) // todo: update when we support returns
+                        ),
+
+                        // if iszero(_7) { revert_forward_1() }
+                        revertForwardIfZero(id_call)
+
+                        // if _7 {
+                        //    // update freeMemoryPointer according to dynamic return size
+                        //    finalize_allocation(_5, returndatasize())
+                        //
+                        //    // decode return parameters from external try-call into retVars
+                        //    abi_decode_tuple__fromMemory(_5, add(_5, returndatasize()))
+                        // }
                 )
 
             case Construction(contractType, args, isFFIInvocation) =>
@@ -544,7 +558,7 @@ object CodeGenYul extends CodeGenerator {
                     // let expr_33_address := create(0, _2, sub(_3, _2))
                     decl_1exp(id_addr, apply("create", intlit(0), id_alloc, apply("sub", id_newbound, id_alloc))),
                     // if iszero(expr_33_address) { revert_forward_1() }
-                    edu.cmu.cs.obsidian.codegen.If(apply("iszero",id_addr),Block(Seq(ExpressionStatement(apply("revert_forward_1"))))),
+                    revertForwardIfZero(id_addr),
                     assign1(retvar, id_addr)
                 )
             case StateInitializer(stateName, fieldName) =>
