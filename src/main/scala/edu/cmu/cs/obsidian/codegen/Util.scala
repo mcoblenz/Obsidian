@@ -78,6 +78,15 @@ object Util {
     def callvaluecheck: YulStatement = codegen.If(apply("callvalue"), Block(Seq(ExpressionStatement(apply("revert", intlit(0), intlit(0))))))
 
     /**
+      * helper function for a common subexpression that checks if something is zero and calls revert forward if so
+      *
+      * @param id the expresion to check for being zero
+      * @return the yul if-statement doing the check
+      */
+    def revertForwardIfZero(id: Expression): YulStatement =
+        edu.cmu.cs.obsidian.codegen.If(apply("iszero",id),Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
+
+    /**
       * shorthand for bulding yul assignment statements, here assigning one expression to just one
       * identifier
       *
@@ -176,14 +185,30 @@ object Util {
         s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0, 4))}"
     }
 
-    def hashOfFunctionDef(f: FunctionDefinition): String = {
-        /* The first four bytes of the call data for a function call specifies the function to be
+    /**
+      * given the name of a function and the sequence of its argument types, computes the function
+      *   selector hash
+      *
+      * @param name the name of the function
+      * @param types the sequence of types
+      * @return from the spec: "The first four bytes of the call data for a function call specifies the function to be
          called. It is the first (left, high-order in big-endian) four bytes of the Keccak-256 hash
          of the signature of the function. The signature is defined as the canonical expression of
          the basic prototype without data location specifier, i.e. the function name with the
          parenthesised list of parameter types. Parameter types are split by a single comma -
-         no spaces are used. */
+         no spaces are used"
+      */
+    def hashOfFunctionName(name : String, types : Seq[String]): String = {
         // todo: the keccak256 implementation seems to agree with solc, but it's never been run on functions with arguments.
-        keccak256(f.name + paren(f.parameters.map(p => mapObsTypeToABI(p.ntype)).mkString(",")))
+        keccak256(name + paren(types.mkString(",")))
+    }
+
+    /**
+      * given a full function definition, produce its function selector hash.
+      * @param f the function definition
+      * @return its selector hash
+      */
+    def hashOfFunctionDef(f: FunctionDefinition): String = {
+        hashOfFunctionName(f.name,f.parameters.map(p => mapObsTypeToABI(p.ntype)))
     }
 }
