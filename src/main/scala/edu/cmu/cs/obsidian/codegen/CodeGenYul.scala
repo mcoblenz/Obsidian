@@ -88,13 +88,13 @@ object CodeGenYul extends CodeGenerator {
         for (c <- program.contracts) { // todo: this collection always contains a contract that looks like ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,) and i do not know why
             c match {
                 case obsContract: ObsidianContractImpl =>
-                    println("contract: " + obsContract.toString)
+                    //println("contract: " + obsContract.toString)
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
-                        println("actually adding this contract to subObjects")
+                        //println("actually adding this contract to subObjects")
                         //new_subObjects = main_contract_ast.subobjects :+ translateContract(obsContract, checkedTable)
                         new_subObjects = new_subObjects :+ translateContract(obsContract, checkedTable)
                     }
-                    println("\n")
+                    //println("\n")
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
