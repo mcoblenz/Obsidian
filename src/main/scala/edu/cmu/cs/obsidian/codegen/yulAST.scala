@@ -325,16 +325,6 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                         dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                         // note the number of return variables so that we generate the appropriate abi encode functions (without repetitions)
                         abiEncodesNeeded = abiEncodesNeeded + f.returnVariables.length
-                    case e: ExpressionStatement =>
-                        e.expression match {
-                            case _: FunctionCall =>
-                                //TODO what was this line doing?
-                                //memoryInitRuntime = f.toString
-                                ()
-                            case _ =>
-                                assert(assertion = false, "TODO: " + e.toString())
-                                () // TODO unimplemented
-                        }
                     case x =>
                         assert(assertion = false, s"subobject case for ${x.toString} unimplemented")
                         ()
