@@ -1,7 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.parser.ContractTable
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -235,9 +234,9 @@ object CodeGenYul extends CodeGenerator {
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         decl_0exp(id) +:
                             e_yul :+
-                            (if(checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                            (if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
                                 //todo: compute offsets
-                                ExpressionStatement(apply("sstore",hexlit(keccak256(contractName+x)),id))
+                                ExpressionStatement(apply("sstore", hexlit(keccak256(contractName + x)), id))
                             } else {
                                 assign1(Identifier(x), id)
                             })
@@ -356,11 +355,11 @@ object CodeGenYul extends CodeGenerator {
       * Given the type of a contract and a table, compute the size that we need to allocate for it in memory.
       * TODO: as a simplifying assumption, for now this always returns 256.
       *
-      * @param t the contract type of interest
+      * @param t      the contract type of interest
       * @param symTab the symbol table to look in
       * @return the size of memory needed for the contract
       */
-    def contractSize(t : ContractType, symTab: SymbolTable) : Int = {
+    def contractSize(t: ContractType, symTab: SymbolTable): Int = {
         256
     }
 
@@ -375,10 +374,10 @@ object CodeGenYul extends CodeGenerator {
 
                         // todo: this also assumes that everything is a u256 and does no type-directed
                         //  cleaning in the way that solc does
-                        if(checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                        if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
                             //todo: compute offsets
-                            Seq(decl_1exp(store_id,apply("sload",hexlit(keccak256(contractName+x)))),
+                            Seq(decl_1exp(store_id, apply("sload", hexlit(keccak256(contractName + x)))),
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
@@ -487,15 +486,15 @@ object CodeGenYul extends CodeGenerator {
                 // todo this may be busted; test it
                 // check the return type of the function being called; the yul emitted by solc
                 //   deals with this by just checking the result of call, i think.
-//                val store_return = checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
-//                    case Some(value) => value.retType match {
-//                        case Some(value) =>
-//                            val abi_type = mapObsTypeToABI(value.baseTypeName)
-//
-//                        case None => None
-//                    }
-//                    case None => None
-//                }
+                //                val store_return = checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
+                //                    case Some(value) => value.retType match {
+                //                        case Some(value) =>
+                //                            val abi_type = mapObsTypeToABI(value.baseTypeName)
+                //
+                //                        case None => None
+                //                    }
+                //                    case None => None
+                //                }
 
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
@@ -508,7 +507,7 @@ object CodeGenYul extends CodeGenerator {
                         // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
                         // let expr_35_functionSelector := 0xb8e010de // skipping this, i'll just inline it below
                         // if iszero(extcodesize(expr_35_address)) { revert_error_0cc013b6b3b6beabea4e3a74a6d380f0df81852ca99887912475e1f66b2a2c20() }
-                        revertIf(apply("iszero",apply("extcodesize", id_recipient))),
+                        revertIf(apply("iszero", apply("extcodesize", id_recipient))),
 
                         //// storage for arguments and returned data
                         // let _5 := allocate_unbounded()
@@ -526,9 +525,9 @@ object CodeGenYul extends CodeGenerator {
                             apply("call",
                                 apply("gas"), // all the gas we have right now
                                 id_recipient, // address of the contract being called
-                                intlit(0),    // amount of money being passed
+                                intlit(0), // amount of money being passed
                                 id_mstore_in, // todo: check this
-                                apply("sub",id_mstore_out, id_mstore_in), // todo: check this
+                                apply("sub", id_mstore_out, id_mstore_in), // todo: check this
                                 id_mstore_in, // check this
                                 intlit(0)) // todo: update when we support returns; needs to be the size of the thing returned.
                         ),
@@ -555,7 +554,7 @@ object CodeGenYul extends CodeGenerator {
                             )
                         ))
                         //assign1(retvar, id_call) // todo: this is wrong; it means that i'm always assigning to the return var, even if the context doesn't make that the right thing to do. eg. both set() and return(get()) assign to the retvar. i've solved this problem before, i just need to remember how.
-                )
+                    )
 
             case Construction(contractType, args, isFFIInvocation) =>
                 // todo: currently we ignore the arguments to the constructor
@@ -567,13 +566,13 @@ object CodeGenYul extends CodeGenerator {
 
                 // check if either the new bound is bigger than the max address or less than the previous allocated range
                 val addr_check = apply("or", apply("gt", id_newbound, stringlit(max_addr)),
-                                             apply("lt", id_newbound, id_alloc))
+                    apply("lt", id_newbound, id_alloc))
 
                 // size of the structure we're allocating
-                val struct_size = apply("datasize",stringlit(contractType.contractName))
+                val struct_size = apply("datasize", stringlit(contractType.contractName))
 
                 // size of the structure we're allocating
-                val struct_offset = apply("dataoffset",stringlit(contractType.contractName))
+                val struct_offset = apply("dataoffset", stringlit(contractType.contractName))
                 Seq(
                     // let _2 := allocate_unbounded()
                     decl_1exp(id_alloc, apply("allocate_unbounded")),
@@ -582,7 +581,7 @@ object CodeGenYul extends CodeGenerator {
                     // if or(gt(_3, 0xffffffffffffffff), lt(_3, _2)) { panic_error_0x41() }
                     edu.cmu.cs.obsidian.codegen.If(addr_check, Block(Seq(ExpressionStatement(apply("panic_error_0x41"))))),
                     // datacopy(_2, dataoffset("IntContainer_22"), datasize("IntContainer_22"))
-                    ExpressionStatement(apply("datacopy",id_alloc,struct_offset,struct_size)),
+                    ExpressionStatement(apply("datacopy", id_alloc, struct_offset, struct_size)),
                     // _3 := abi_encode_tuple__to__fromStack(_3) // todo this adds 0, so i'm going to ignore it for now?
                     // let expr_33_address := create(0, _2, sub(_3, _2))
                     decl_1exp(id_addr, apply("create", intlit(0), id_alloc, apply("sub", id_newbound, id_alloc))),

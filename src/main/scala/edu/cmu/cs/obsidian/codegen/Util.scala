@@ -66,7 +66,7 @@ object Util {
     /**
       * shorthand for building Yul function applications
       *
-      * @param n the name of the Yul function to apply
+      * @param n  the name of the Yul function to apply
       * @param es the possibly empty sequence of arguments for the function
       * @return the expression that applies the function to the arguments
       */
@@ -95,14 +95,14 @@ object Util {
       * @return the yul if-statement doing the check
       */
     def revertForwardIfZero(id: Expression): YulStatement =
-        edu.cmu.cs.obsidian.codegen.If(apply("iszero",id),Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
+        edu.cmu.cs.obsidian.codegen.If(apply("iszero", id), Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
 
     /**
       * shorthand for bulding yul assignment statements, here assigning one expression to just one
       * identifier
       *
       * @param id the identifier to be assigned
-      * @param e the expression to assign to it
+      * @param e  the expression to assign to it
       * @return the Yul assignment expression
       */
     def assign1(id: Identifier, e: Expression): Assignment = codegen.Assignment(Seq(id), e)
@@ -121,28 +121,30 @@ object Util {
       * initial value
       *
       * @param id the name of the variable to be declared
-      * @param t the type for id
+      * @param t  the type for id
       * @return the expression declaring the variable
       */
     def decl_0exp_t(id: Identifier, t: ObsidianType): VariableDeclaration =
         VariableDeclaration(Seq((id, Some(mapObsTypeToABI(t.baseTypeName)))), None)
+
     /**
       * shorthand for building the yul expression that declares one variable with a type and no
       * initial value
       *
       * @param id the name of the variable to be declared
-      * @param t the type for id
-      * @param e the expression of type t to which id will be bound
+      * @param t  the type for id
+      * @param e  the expression of type t to which id will be bound
       * @return the expression declaring the variable
       */
     def decl_0exp_t_init(id: Identifier, t: ObsidianType, e: Expression): VariableDeclaration =
         VariableDeclaration(Seq((id, Some(mapObsTypeToABI(t.baseTypeName)))), Some(e))
+
     /**
       * shorthand for building the yul expression that declares a sequence (non-empty) of identifiers
       * with an initial value but no typing information
       *
       * @param id the identifiers to be declared, which cannot be the empty sequence
-      * @param e the expression to assign the identifiers to as an initial value
+      * @param e  the expression to assign the identifiers to as an initial value
       * @return the Yul expression for the declaration
       */
     def decl_nexp(id: Seq[Identifier], e: Expression): VariableDeclaration = {
@@ -155,7 +157,7 @@ object Util {
       * with an initial value but no typing information
       *
       * @param id the identifier to be declared
-      * @param e the expression to assign the identifier to as an initial value
+      * @param e  the expression to assign the identifier to as an initial value
       * @return the Yul expression for the declaration
       */
     def decl_1exp(id: Identifier, e: Expression): VariableDeclaration = decl_nexp(Seq(id), e)
@@ -185,7 +187,9 @@ object Util {
       * @param t the obsidian type of interest
       * @return the width of the type
       */
-    def obsTypeToWidth(t: ObsidianType): Int = { 1 }
+    def obsTypeToWidth(t: ObsidianType): Int = {
+        1
+    }
 
     def functionRename(name: String): String = {
         name //todo some sort of alpha variation here combined with consulting a mapping; consult the ABI
@@ -198,28 +202,29 @@ object Util {
 
     /**
       * given the name of a function and the sequence of its argument types, computes the function
-      *   selector hash
+      * selector hash
       *
-      * @param name the name of the function
+      * @param name  the name of the function
       * @param types the sequence of types
       * @return from the spec: "The first four bytes of the call data for a function call specifies the function to be
-         called. It is the first (left, high-order in big-endian) four bytes of the Keccak-256 hash
-         of the signature of the function. The signature is defined as the canonical expression of
-         the basic prototype without data location specifier, i.e. the function name with the
-         parenthesised list of parameter types. Parameter types are split by a single comma -
-         no spaces are used"
+      *         called. It is the first (left, high-order in big-endian) four bytes of the Keccak-256 hash
+      *         of the signature of the function. The signature is defined as the canonical expression of
+      *         the basic prototype without data location specifier, i.e. the function name with the
+      *         parenthesised list of parameter types. Parameter types are split by a single comma -
+      *         no spaces are used"
       */
-    def hashOfFunctionName(name : String, types : Seq[String]): String = {
+    def hashOfFunctionName(name: String, types: Seq[String]): String = {
         // todo: the keccak256 implementation seems to agree with solc, but it's never been run on functions with arguments.
         keccak256(name + paren(types.mkString(",")))
     }
 
     /**
       * given a full function definition, produce its function selector hash.
+      *
       * @param f the function definition
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-        hashOfFunctionName(f.name,f.parameters.map(p => mapObsTypeToABI(p.ntype)))
+        hashOfFunctionName(f.name, f.parameters.map(p => mapObsTypeToABI(p.ntype)))
     }
 }

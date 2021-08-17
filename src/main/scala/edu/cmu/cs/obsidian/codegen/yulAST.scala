@@ -117,12 +117,12 @@ case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], val
             variables.map(v => v._1.name).mkString(", ")
         }" +
             (value match {
-            case Some (e) => s" := ${e.toString}"
-        case None => ""
-    }
+                case Some(e) => s" := ${e.toString}"
+                case None => ""
+            }
 
-    )
-}
+                )
+    }
 }
 
 case class FunctionDefinition(name: String,
@@ -332,7 +332,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             }
         }
 
-        def subObjects: String = obj.subobjects.foldRight(""){ (o, str) => o.yulString() + str }
+        def subObjects: String = obj.subobjects.foldRight("") { (o, str) => o.yulString() + str }
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
@@ -375,7 +375,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             val encode_lines: Seq[YulStatement] = var_indices.map(i =>
                 ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
                     Identifier("value" + i.toString),
-                    apply("add", Identifier("headStart"), intlit((n-1) * 32)))))
+                    apply("add", Identifier("headStart"), intlit((n - 1) * 32)))))
 
             val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
             FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,

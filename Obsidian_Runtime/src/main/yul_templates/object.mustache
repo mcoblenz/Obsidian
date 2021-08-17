@@ -55,7 +55,6 @@ object "{{creationObject}}" {
                 value := mload(offset)
             }
 
-
             {{abiEncodeTupleFuncs}}
 
             function allocate_memory(size) -> memPtr {
@@ -107,5 +106,8 @@ object "{{creationObject}}" {
         {{runtimeSubObjects}}
         // bottom of runtime subobjects
     }
+
+    // top of subobjects
     {{subObjects}}
+    // bottom of subobjects
 }
