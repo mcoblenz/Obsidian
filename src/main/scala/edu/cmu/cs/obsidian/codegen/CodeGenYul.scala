@@ -492,7 +492,8 @@ object CodeGenYul extends CodeGenerator {
 
                 // look up the return type of the function being called in the contract and compute the
                 //    amount of space it will need. todo: this is rough and ready, it is not robust at all.
-                val return_value_size: Int = {
+                val return_value_size: Int =
+                try {
                     // todo: this contractLookup call fails. in the case of an invocation like "ic.set()", recipient
                     //  is "ic". but checkedTable only contains the names of the contracts, like "IntContainer", not
                     //  anything mapping variable names to the contracts they represent. what i need to know is the
@@ -511,6 +512,8 @@ object CodeGenYul extends CodeGenerator {
                             assert(assertion = false, "contract lookup failed on function: " + name)
                             -1
                     }
+                } catch {
+                    case _: Throwable => 32 // todo this is a WILD hack that happens to work for right now
                 }
 
 
