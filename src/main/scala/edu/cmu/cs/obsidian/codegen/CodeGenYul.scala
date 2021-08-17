@@ -492,16 +492,26 @@ object CodeGenYul extends CodeGenerator {
 
                 // look up the return type of the function being called in the contract and compute the
                 //    amount of space it will need. todo: this is rough and ready, it is not robust at all.
-                val return_value_size: Int =
+                val return_value_size: Int = {
+                    // todo: this contractLookup call fails. in the case of an invocation like "ic.set()", recipient
+                    //  is "ic". but checkedTable only contains the names of the contracts, like "IntContainer", not
+                    //  anything mapping variable names to the contracts they represent. what i need to know is the
+                    //  return type of the transaction in the right contract, in this case that "ic.set()" is void and
+                    //  therefore needs 0 bytes of space but "ic.get()" returns an integer and therefore needs 32 bytes.
+                    //  so i need a way to make variables to their contracts. looking at this in the debugger, nothing in
+                    //  scope right now seems to include the string "IntContainer" or something that might reference it. so
+                    //  either i need to refactor to get that information somehow or there's a library call i could make
+                    //  that i don't know about.
                     checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
                         case Some(value) => value.retType match {
                             case Some(value) => mapObsTypeToABI(value.baseTypeName)._2
                             case None => 0 // we don't need to allocate space if there's no return
                         }
                         case None =>
-                            assert(false, "contract lookup failed on function: " + name)
+                            assert(assertion = false, "contract lookup failed on function: " + name)
                             -1
                     }
+                }
 
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
