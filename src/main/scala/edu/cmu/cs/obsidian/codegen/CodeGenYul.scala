@@ -84,24 +84,27 @@ object CodeGenYul extends CodeGenerator {
 
         // TODO ignore imports, data for now
         // translate other contracts (if any) and add them to the subObjects
-        var new_subObjects: Seq[YulObject] = main_contract_ast.subobjects
-        for (c <- program.contracts) {
+        var new_subObjects: Seq[YulObject] = Seq() // maybe Seq() ?
+        for (c <- program.contracts) { // todo: this collection always contains a contract that looks like ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,) and i do not know why
             c match {
                 case obsContract: ObsidianContractImpl =>
-                    if (!c.modifiers.contains(IsMain())) { // if not main contract
-                        // this is a top level contract object
-                        // note: interfaces are not translated;
-                        // TODO detect an extra contract named "Contract", skip that as a temporary fix
-                        if (c.name != ContractType.topContractName) {
-                            new_subObjects = main_contract_ast.subobjects :+ translateContract(obsContract, checkedTable)
-                        }
+                    println("contract: " + obsContract.toString)
+                    if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
+                        println("actually adding this contract to subObjects")
+                        //new_subObjects = main_contract_ast.subobjects :+ translateContract(obsContract, checkedTable)
+                        new_subObjects = new_subObjects :+ translateContract(obsContract, checkedTable)
                     }
+                    println("\n")
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
-        YulObject(main_contract_ast.name, main_contract_ast.code, new_subObjects, main_contract_ast.data)
+        YulObject(main_contract_ast.name,
+                  main_contract_ast.code,
+                  subobjects = main_contract_ast.subobjects,
+                  childObjects = new_subObjects,
+                  main_contract_ast.data) // todo RIGHT NOW
     }
 
     def translateContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
@@ -118,10 +121,10 @@ object CodeGenYul extends CodeGenerator {
 
         // create runtime object
         val runtime_name = contract.name + "_deployedCodeGenYul"
-        val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq())
+        val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq(), Seq()) // todo RIGHT NOW
         subObjects = runtime_obj +: subObjects
 
-        YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq())
+        YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq(), Seq()) // todo RIGHT NOW
     }
 
     // return statements that go to deploy object, and statements that go to runtime object

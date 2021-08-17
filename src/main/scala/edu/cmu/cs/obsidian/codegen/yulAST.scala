@@ -198,7 +198,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data: Seq[Data]) extends YulAST {
+case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], childObjects: Seq[YulObject], data: Seq[Data]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -332,7 +332,9 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             }
         }
 
-        def subObjects: String = "" // obj.subobjects.foldRight("") { (o, str) => o.yulString() + str }
+        def childObjects: String = obj.childObjects.foldRight("") { (o, str) => o.yulString() + str }
+
+        def subObjects: String = ""
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
