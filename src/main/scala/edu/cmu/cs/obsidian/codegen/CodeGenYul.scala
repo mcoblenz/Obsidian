@@ -101,7 +101,7 @@ object CodeGenYul extends CodeGenerator {
         // todo: we do not process imports
         YulObject(name = main_contract_ast.name,
             code = main_contract_ast.code,
-            subobjects = main_contract_ast.subobjects,
+            runtimesubobj = main_contract_ast.runtimesubobj,
             childcontracts = childContracts,
             data = main_contract_ast.data) // todo this is always empty, we ignore data
     }
@@ -120,13 +120,13 @@ object CodeGenYul extends CodeGenerator {
         // create runtime object
         val runtime_obj = YulObject(name = contract.name + "_deployed",
             code = Code(Block(statement_seq_runtime)),
-            subobjects = Seq(),
+            runtimesubobj = Seq(),
             childcontracts = Seq(),
             data = Seq())
 
         YulObject(name = contract.name,
             code = Code(Block(statement_seq_deploy)),
-            subobjects = Seq(runtime_obj),
+            runtimesubobj = Seq(runtime_obj),
             childcontracts = Seq(),
             data = Seq())
     }

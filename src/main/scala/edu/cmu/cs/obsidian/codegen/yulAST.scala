@@ -198,7 +198,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], childcontracts: Seq[YulObject], data: Seq[Data]) extends YulAST {
+case class YulObject(name: String, code: Code, runtimesubobj: Seq[YulObject], childcontracts: Seq[YulObject], data: Seq[Data]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -220,7 +220,6 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], child
     //   named by the section tag, let it return an array of object, the object name does not matter,
     //   but the it must contain a val named by the tag inside the section tag (the best way to understand
     //   this is to track down an example)
-    // temporary function, not designed for a full recursive walk through of the object
     class ObjScope(obj: YulObject) {
 
         val mainContractName: String = obj.name
@@ -315,8 +314,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], child
 
         var abiEncodesNeeded: Set[Int] = Set()
 
-        // process the runtime object
-        for (sub <- obj.subobjects) {
+        // process the runtime object; todo this may only ever be a singleton
+        for (sub <- obj.runtimesubobj) {
             for (s <- sub.code.block.statements) {
                 s match {
                     case f: FunctionDefinition =>
@@ -333,7 +332,8 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], child
             }
         }
 
-        def childObjects: String = obj.childcontracts.foldRight("") { (o, str) => o.yulString() + str }
+        // recursively compute the strings for the child contracts
+        def childcontracts: String = obj.childcontracts.foldRight("") { (o, str) => o.yulString() + str }
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 

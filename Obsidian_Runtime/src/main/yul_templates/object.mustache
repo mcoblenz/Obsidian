@@ -98,15 +98,12 @@ object "{{creationObject}}" {
             function cleanup_t_uint256(value) -> cleaned {
                 cleaned := value
             }
-            // top of runtime functions
+
             {{#runtimeFunctions}}
                 {{code}}
             {{/runtimeFunctions}}
-            // bottom of runtime functions
         }
 
-        // top of childObjects
-        {{childObjects}}
-        // bottom of childObjects
+        {{childcontracts}}
     }
 }
