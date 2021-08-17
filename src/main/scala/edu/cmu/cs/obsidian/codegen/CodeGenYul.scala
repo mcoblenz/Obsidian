@@ -118,7 +118,7 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // create runtime object
-        val runtime_name = contract.name + "_deployed"
+        val runtime_name = contract.name + "_deployedCodeGenYul"
         val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq())
         subObjects = runtime_obj +: subObjects
 

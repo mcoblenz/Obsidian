@@ -225,7 +225,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         val mainContractName: String = obj.name
         val creationObject: String = mainContractName
-        val runtimeObject: String = mainContractName + "_deployed"
+        val runtimeObjectName: String = mainContractName + "_deployedYulAST"
         var runtimeFunctionArray: Array[Func] = Array[Func]()
         var deployFunctionArray: Array[Func] = Array[Func]()
         var dispatch = false
@@ -346,9 +346,9 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        val datasize: Expression = apply("datasize", stringlit(runtimeObject))
+        val datasize: Expression = apply("datasize", stringlit(runtimeObjectName))
 
-        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", stringlit(runtimeObject)), datasize)
+        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", stringlit(runtimeObjectName)), datasize)
 
         def defaultReturn(): Expression = apply("return", intlit(0), datasize)
 
