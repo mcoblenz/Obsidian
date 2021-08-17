@@ -185,7 +185,7 @@ object CodeGenYul extends CodeGenerator {
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
+                constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString)._1)),
                 Seq(), //todo/iev: why is this always empty?
                 Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
@@ -196,14 +196,14 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get, mapObsTypeToABI(t.toString)))
+                    Seq(TypedName(id.get, mapObsTypeToABI(t.toString)._1))
                 case None => Seq()
             }
         }
 
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
-            transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
+            transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString)._1)),
             ret,
             Block(transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))))) //todo iev temp vars: likely a hack to work around something wrong
     }
@@ -490,18 +490,18 @@ object CodeGenYul extends CodeGenerator {
                 val id_call = nextTemp()
                 val id_mstore_out = nextTemp()
 
-                // todo this may be busted; test it
-                // check the return type of the function being called; the yul emitted by solc
-                //   deals with this by just checking the result of call, i think.
-                //                val store_return = checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
-                //                    case Some(value) => value.retType match {
-                //                        case Some(value) =>
-                //                            val abi_type = mapObsTypeToABI(value.baseTypeName)
-                //
-                //                        case None => None
-                //                    }
-                //                    case None => None
-                //                }
+                // look up the return type of the function being called in the contract and compute the
+                //    amount of space it will need. todo: this is rough and ready, it is not robust at all.
+                val return_value_size: Int =
+                    checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
+                        case Some(value) => value.retType match {
+                            case Some(value) => mapObsTypeToABI(value.baseTypeName)._2
+                            case None => 0 // we don't need to allocate space if there's no return
+                        }
+                        case None =>
+                            assert(false, "contract lookup failed on function: " + name)
+                            -1
+                    }
 
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
@@ -519,7 +519,7 @@ object CodeGenYul extends CodeGenerator {
                         //// storage for arguments and returned data
                         // let _5 := allocate_unbounded()
                         // mstore(_5, shift_left_224(expr_35_functionSelector))
-                        decl_1exp(id_fnselc, hexlit(hashOfFunctionName(name, params.map(t => mapObsTypeToABI(t.baseTypeName))))),
+                        decl_1exp(id_fnselc, hexlit(hashOfFunctionName(name, params.map(t => mapObsTypeToABI(t.baseTypeName)._1)))),
                         decl_1exp(id_mstore_in, apply("allocate_unbounded")),
                         ExpressionStatement(apply("mstore", id_mstore_in, apply("shl", intlit(224), id_fnselc))), // todo: 224 is a magic number
 
@@ -532,11 +532,11 @@ object CodeGenYul extends CodeGenerator {
                             apply("call",
                                 apply("gas"), // all the gas we have right now
                                 id_recipient, // address of the contract being called
-                                intlit(0), // amount of money being passed
+                                intlit(0),    // amount of money being passed
                                 id_mstore_in, // todo: check this
                                 apply("sub", id_mstore_out, id_mstore_in), // todo: check this
-                                id_mstore_in, // check this
-                                intlit(0)) // todo: update when we support returns; needs to be the size of the thing returned.
+                                id_mstore_in, // todo: check this
+                                intlit(return_value_size)) // todo: needs to be the size of the thing returned.
                         ),
 
                         // if iszero(_7) { revert_forward_1() }
