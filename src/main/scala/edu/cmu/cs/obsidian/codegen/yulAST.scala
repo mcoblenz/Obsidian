@@ -198,7 +198,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], childObjects: Seq[YulObject], data: Seq[Data]) extends YulAST {
+case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], childcontracts: Seq[YulObject], data: Seq[Data]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -225,7 +225,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], child
 
         val mainContractName: String = obj.name
         val creationObject: String = mainContractName
-        val runtimeObjectName: String = mainContractName + "_deployedYulAST"
+        val runtimeObjectName: String = mainContractName + "_deployed"
         var runtimeFunctionArray: Array[Func] = Array[Func]()
         var deployFunctionArray: Array[Func] = Array[Func]()
         var dispatch = false
@@ -315,8 +315,9 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], child
 
         var abiEncodesNeeded: Set[Int] = Set()
 
-        for (sub <- obj.subobjects) { // TODO separate runtime object out as a module (make it verbose)
-            for (s <- sub.code.block.statements) { // temporary fix due to issue above
+        // process the runtime object
+        for (sub <- obj.subobjects) {
+            for (s <- sub.code.block.statements) {
                 s match {
                     case f: FunctionDefinition =>
                         dispatch = true
@@ -332,9 +333,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], child
             }
         }
 
-        def childObjects: String = obj.childObjects.foldRight("") { (o, str) => o.yulString() + str }
-
-        def subObjects: String = ""
+        def childObjects: String = obj.childcontracts.foldRight("") { (o, str) => o.yulString() + str }
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 

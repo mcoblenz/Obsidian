@@ -82,33 +82,31 @@ object CodeGenYul extends CodeGenerator {
                 case None => throw new RuntimeException("No main contract found")
             }
 
-        // TODO ignore imports, data for now
-        // translate other contracts (if any) and add them to the subObjects
-        var new_subObjects: Seq[YulObject] = Seq() // maybe Seq() ?
-        for (c <- program.contracts) { // todo: this collection always contains a contract that looks like ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,) and i do not know why
+        // translate other contracts (if any) and add them to the childObjects
+        var childContracts: Seq[YulObject] = Seq()
+        // todo: this collection always contains a contract that looks like
+        //   ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,)
+        //   and i do not know why
+        for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
-                    //println("contract: " + obsContract.toString)
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
-                        //println("actually adding this contract to subObjects")
-                        //new_subObjects = main_contract_ast.subobjects :+ translateContract(obsContract, checkedTable)
-                        new_subObjects = new_subObjects :+ translateContract(obsContract, checkedTable)
+                        childContracts = childContracts :+ translateContract(obsContract, checkedTable)
                     }
-                    //println("\n")
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
-        YulObject(main_contract_ast.name,
-                  main_contract_ast.code,
-                  subobjects = main_contract_ast.subobjects,
-                  childObjects = new_subObjects,
-                  main_contract_ast.data) // todo RIGHT NOW
+        // todo: we do not process imports
+        YulObject(name = main_contract_ast.name,
+            code = main_contract_ast.code,
+            subobjects = main_contract_ast.subobjects,
+            childcontracts = childContracts,
+            data = main_contract_ast.data) // todo this is always empty, we ignore data
     }
 
     def translateContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var subObjects: Seq[YulObject] = Seq()
         var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
 
@@ -120,11 +118,17 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // create runtime object
-        val runtime_name = contract.name + "_deployedCodeGenYul"
-        val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq(), Seq()) // todo RIGHT NOW
-        subObjects = runtime_obj +: subObjects
+        val runtime_obj = YulObject(name = contract.name + "_deployed",
+            code = Code(Block(statement_seq_runtime)),
+            subobjects = Seq(),
+            childcontracts = Seq(),
+            data = Seq())
 
-        YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq(), Seq()) // todo RIGHT NOW
+        YulObject(name = contract.name,
+            code = Code(Block(statement_seq_deploy)),
+            subobjects = Seq(runtime_obj),
+            childcontracts = Seq(),
+            data = Seq())
     }
 
     // return statements that go to deploy object, and statements that go to runtime object
