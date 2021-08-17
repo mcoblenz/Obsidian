@@ -27,7 +27,7 @@ object "{{creationObject}}" {
         {{codeCopy}}
         {{defaultReturn}}
     }
-    object "{{runtimeObject}}" {
+    object "{{runtimeObjectName}}" {
         code {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
             {{memoryInitRuntime}}
@@ -103,7 +103,9 @@ object "{{creationObject}}" {
                 {{code}}
             {{/runtimeFunctions}}
         }
+        // top of runtime subobjects
         {{runtimeSubObjects}}
+        // bottom of runtime subobjects
     }
     {{subObjects}}
 }
