@@ -556,7 +556,7 @@ object CodeGenYul extends CodeGenerator {
                         edu.cmu.cs.obsidian.codegen.If(id_call, Block(
                             Seq(
                                 ExpressionStatement(apply("finalize_allocation", id_mstore_in, apply("returndatasize"))),
-                                assign1(id_call, apply("mload", intlit(0))), // todo this has to be wrong
+                                assign1(id_call, apply("mload", id_mstore_in)),
                                 assign1(retvar, id_call) // todo: maybe just doing it up here instead of always? is that right?
                             )
                         ))
