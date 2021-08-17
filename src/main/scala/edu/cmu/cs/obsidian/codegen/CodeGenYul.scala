@@ -584,7 +584,7 @@ object CodeGenYul extends CodeGenerator {
                     // let _2 := allocate_unbounded()
                     decl_1exp(id_alloc, apply("allocate_unbounded")),
                     // let _3 := add(_2, datasize("IntContainer_22"))
-                    decl_1exp(id_newbound, struct_size),
+                    decl_1exp(id_newbound, apply("add", id_alloc, struct_size)),
                     // if or(gt(_3, 0xffffffffffffffff), lt(_3, _2)) { panic_error_0x41() }
                     edu.cmu.cs.obsidian.codegen.If(addr_check, Block(Seq(ExpressionStatement(apply("panic_error_0x41"))))),
                     // datacopy(_2, dataoffset("IntContainer_22"), datasize("IntContainer_22"))
