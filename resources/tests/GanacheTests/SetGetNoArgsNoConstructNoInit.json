@@ -4,5 +4,5 @@
     "startingeth" : 500000000,
     "numaccts" : 1,
     "testexp" : "main()",
-    "expected" : "10"
+    "expected" : "5"
 }
