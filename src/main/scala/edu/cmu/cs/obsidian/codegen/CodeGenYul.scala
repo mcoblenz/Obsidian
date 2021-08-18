@@ -101,8 +101,8 @@ object CodeGenYul extends CodeGenerator {
         // todo: we do not process imports
         YulObject(name = main_contract_ast.name,
             code = main_contract_ast.code,
-            runtimesubobj = main_contract_ast.runtimesubobj,
-            childcontracts = childContracts,
+            runtimeSubobj = main_contract_ast.runtimeSubobj,
+            childContracts = childContracts,
             data = main_contract_ast.data) // todo this is always empty, we ignore data
     }
 
@@ -120,14 +120,14 @@ object CodeGenYul extends CodeGenerator {
         // create runtime object
         val runtime_obj = YulObject(name = contract.name + "_deployed",
             code = Code(Block(statement_seq_runtime)),
-            runtimesubobj = Seq(),
-            childcontracts = Seq(),
+            runtimeSubobj = Seq(),
+            childContracts = Seq(),
             data = Seq())
 
         YulObject(name = contract.name,
             code = Code(Block(statement_seq_deploy)),
-            runtimesubobj = Seq(runtime_obj),
-            childcontracts = Seq(),
+            runtimeSubobj = Seq(runtime_obj),
+            childContracts = Seq(),
             data = Seq())
     }
 
@@ -185,7 +185,7 @@ object CodeGenYul extends CodeGenerator {
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString)._1)),
+                constructor.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
                 Seq(), //todo/iev: why is this always empty?
                 Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
@@ -196,14 +196,14 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get, mapObsTypeToABI(t.toString)._1))
+                    Seq(TypedName(id.get, obsTypeToYulTypeAndSize(t.toString)._1))
                 case None => Seq()
             }
         }
 
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
-            transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString)._1)),
+            transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
             ret,
             Block(transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))))) //todo iev temp vars: likely a hack to work around something wrong
     }
@@ -505,7 +505,7 @@ object CodeGenYul extends CodeGenerator {
                     //  that i don't know about.
                     checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
                         case Some(value) => value.retType match {
-                            case Some(value) => mapObsTypeToABI(value.baseTypeName)._2
+                            case Some(value) => obsTypeToYulTypeAndSize(value.baseTypeName)._2
                             case None => 0 // we don't need to allocate space if there's no return
                         }
                         case None =>
@@ -532,7 +532,7 @@ object CodeGenYul extends CodeGenerator {
                         //// storage for arguments and returned data
                         // let _5 := allocate_unbounded()
                         // mstore(_5, shift_left_224(expr_35_functionSelector))
-                        decl_1exp(id_fnselc, hexlit(hashOfFunctionName(name, params.map(t => mapObsTypeToABI(t.baseTypeName)._1)))),
+                        decl_1exp(id_fnselc, hexlit(hashOfFunctionName(name, params.map(t => obsTypeToYulTypeAndSize(t.baseTypeName)._1)))),
                         decl_1exp(id_mstore_in, apply("allocate_unbounded")),
                         ExpressionStatement(apply("mstore", id_mstore_in, apply("shl", intlit(224), id_fnselc))), // todo: 224 is a magic number
 
@@ -545,7 +545,7 @@ object CodeGenYul extends CodeGenerator {
                             apply("call",
                                 apply("gas"), // all the gas we have right now
                                 id_recipient, // address of the contract being called
-                                intlit(0),    // amount of money being passed
+                                intlit(0), // amount of money being passed
                                 id_mstore_in, // todo: check this
                                 apply("sub", id_mstore_out, id_mstore_in), // todo: check this
                                 id_mstore_in, // todo: check this

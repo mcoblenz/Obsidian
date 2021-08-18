@@ -198,7 +198,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, runtimesubobj: Seq[YulObject], childcontracts: Seq[YulObject], data: Seq[Data]) extends YulAST {
+case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], childContracts: Seq[YulObject], data: Seq[Data]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -315,7 +315,7 @@ case class YulObject(name: String, code: Code, runtimesubobj: Seq[YulObject], ch
         var abiEncodesNeeded: Set[Int] = Set()
 
         // process the runtime object; todo this may only ever be a singleton
-        for (sub <- obj.runtimesubobj) {
+        for (sub <- obj.runtimeSubobj) {
             for (s <- sub.code.block.statements) {
                 s match {
                     case f: FunctionDefinition =>
@@ -333,7 +333,7 @@ case class YulObject(name: String, code: Code, runtimesubobj: Seq[YulObject], ch
         }
 
         // recursively compute the strings for the child contracts
-        def childcontracts: String = obj.childcontracts.foldRight("") { (o, str) => o.yulString() + str }
+        def childContracts: String = obj.childContracts.foldRight("") { (o, str) => o.yulString() + str }
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 

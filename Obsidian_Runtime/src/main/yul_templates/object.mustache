@@ -87,6 +87,7 @@ object "{{creationObject}}" {
                 mstore(pos, cleanup_t_uint256(value))
             }
 
+            {{! revert, but also include the return data from the most recent call }}
             function revert_forward_1() {
                 let pos := allocate_unbounded()
                 returndatacopy(pos, 0, returndatasize())
@@ -104,6 +105,6 @@ object "{{creationObject}}" {
             {{/runtimeFunctions}}
         }
 
-        {{childcontracts}}
+        {{childContracts}}
     }
 }

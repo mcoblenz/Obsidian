@@ -125,7 +125,7 @@ object Util {
       * @return the expression declaring the variable
       */
     def decl_0exp_t(id: Identifier, t: ObsidianType): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(mapObsTypeToABI(t.baseTypeName)._1))), None)
+        VariableDeclaration(Seq((id, Some(obsTypeToYulTypeAndSize(t.baseTypeName)._1))), None)
 
     /**
       * shorthand for building the yul expression that declares one variable with a type and no
@@ -137,7 +137,7 @@ object Util {
       * @return the expression declaring the variable
       */
     def decl_0exp_t_init(id: Identifier, t: ObsidianType, e: Expression): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(mapObsTypeToABI(t.baseTypeName)._1))), Some(e))
+        VariableDeclaration(Seq((id, Some(obsTypeToYulTypeAndSize(t.baseTypeName)._1))), Some(e))
 
     /**
       * shorthand for building the yul expression that declares a sequence (non-empty) of identifiers
@@ -162,7 +162,14 @@ object Util {
       */
     def decl_1exp(id: Identifier, e: Expression): VariableDeclaration = decl_nexp(Seq(id), e)
 
-    def mapObsTypeToABI(ntype: String): (String, Int) = {
+    /**
+      * given the string name of an obsidian type, provide the name of the Yul type that it maps to
+      * paired with the number of bytes needed to store a value of that type in Yul.
+      *
+      * @param ntype the name of the obsidian type
+      * @return a pair of the name of the corresponding Yul type and the size of its values
+      */
+    def obsTypeToYulTypeAndSize(ntype: String): (String, Int) = {
         // todo: this covers the primitive types from ObsidianType.scala but is hard to maintain because
         // it's basically hard coded, and doesn't traverse the structure of more complicated types.
         //
@@ -170,11 +177,11 @@ object Util {
         ntype match {
             case "bool" => ("bool", 1)
             case "int" => ("u256", 32)
-            case "string" => ("string",-1) // todo this -1 is a place holder
+            case "string" => ("string", -1) // todo this -1 is a place holder
             case "Int256" => ("int256", 32)
-            case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ("",-1)
+            case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ("", -1)
             // fall through here and return the type unmodified; it'll be a structure that is defined by the file in question
-            case ntype => (ntype, -1)  // todo need to compute the size of richer types, too.
+            case ntype => (ntype, -1) // todo need to compute the size of richer types, too.
         }
     }
 
@@ -225,6 +232,6 @@ object Util {
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-        hashOfFunctionName(f.name, f.parameters.map(p => mapObsTypeToABI(p.ntype)._1))
+        hashOfFunctionName(f.name, f.parameters.map(p => obsTypeToYulTypeAndSize(p.ntype)._1))
     }
 }
