@@ -1,3 +1,5 @@
 #!/bin/bash
 
+# solc_bin runs solc on a solidity program and produces a binary
+
 docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin /sources/"$1"

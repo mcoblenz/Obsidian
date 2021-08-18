@@ -1,6 +1,10 @@
 #!/bin/bash -x
 
 
+#  travisdebug kicks a travis instance into debug mode so that you can in
+#  to it.
+
+
 # chrome-cli list tabs | grep -i travis | grep -i job  | grab the id
 # chrome-cli id | grab the url, take the end of it
 

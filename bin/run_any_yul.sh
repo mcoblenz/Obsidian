@@ -1,5 +1,11 @@
 #!/bin/bash
 
+  # run_any_yul.sh takes two arguments, the path to a yul file and a
+  #     decimal-represented integer, compiles that yul to evm, starts ganache,
+  #     ships that evm to gananch, calls `main()`, and checks to see if the
+  #     result is the same as the integer passed. this is a restricted fragment
+  #     of the travis testing script but much faster and helpful for development.
+
 if [ "$#" -ne 2 ]; then
     echo "usage: run_any_yul.sh fileOfYulCode.yul expectedValueInDecimalNotation"
     exit 1

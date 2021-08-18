@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# this script takes an obsidian file as an argument, runs obsidian on it to
+# produce yul, then runs that output yul through solc to pretty-print it
+# and outputs that to stdout. this also incurrs some static checks that
+# solc does. this will fail or at least produce angry looking output on
+# files that are OK after optimization because of things like too many
+# stack variables.
+
 if [ ! $(basename $(pwd -P)) == "Obsidian" ]
 then
     echo "don't run this unless you're in the obsidian tld"
