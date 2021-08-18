@@ -490,43 +490,14 @@ object CodeGenYul extends CodeGenerator {
                 val id_call = nextTemp()
                 val id_mstore_out = nextTemp()
 
-                // look up the return type of the function being called in the contract and compute the
-                //    amount of space it will need. todo: this is rough and ready, it is not robust at all.
-                val return_value_size: Int =
-                try {
-                    // todo: this contractLookup call fails. in the case of an invocation like "ic.set()", recipient
-                    //  is "ic". but checkedTable only contains the names of the contracts, like "IntContainer", not
-                    //  anything mapping variable names to the contracts they represent. what i need to know is the
-                    //  return type of the transaction in the right contract, in this case that "ic.set()" is void and
-                    //  therefore needs 0 bytes of space but "ic.get()" returns an integer and therefore needs 32 bytes.
-                    //  so i need a way to make variables to their contracts. looking at this in the debugger, nothing in
-                    //  scope right now seems to include the string "IntContainer" or something that might reference it. so
-                    //  either i need to refactor to get that information somehow or there's a library call i could make
-                    //  that i don't know about.
-                    checkedTable.contractLookup(recipient.toString).lookupTransaction(name) match {
-                        case Some(value) => value.retType match {
-                            case Some(value) => obsTypeToYulTypeAndSize(value.baseTypeName)._2
-                            case None => 0 // we don't need to allocate space if there's no return
-                        }
-                        case None =>
-                            assert(assertion = false, "contract lookup failed on function: " + name)
-                            -1
-                    }
-                } catch {
-                    case _: Throwable => 32 // todo this is a WILD hack that happens to work for right now
-                }
-
+                // the number of bytes needed to store a value of the return type of the function
+                // being called.
+                val return_value_size: Int = 32 // todo: this is a hard coded value. we need to know the type of recipient so that we can compute this, and we currently do not.
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
                     Seq(
-                        // todo these three lines i'm skipping because they propagate the result of the
-                        //  create() call from construct. i can get that from the recipient name here.
-                        // let var_ic_27_address := expr_31_address// skip
-                        // let _4_address := var_ic_27_address // skip
-                        // let expr_33_address := _4_address // skip
                         // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
-                        // let expr_35_functionSelector := 0xb8e010de // skipping this, i'll just inline it below
-                        // if iszero(extcodesize(expr_35_address)) { revert_error_0cc013b6b3b6beabea4e3a74a6d380f0df81852ca99887912475e1f66b2a2c20() }
+                        // if iszero(extcodesize(expr_35_address)) { revert_error() }
                         revertIf(apply("iszero", apply("extcodesize", id_recipient))),
 
                         //// storage for arguments and returned data
@@ -549,14 +520,11 @@ object CodeGenYul extends CodeGenerator {
                                 id_mstore_in, // todo: check this
                                 apply("sub", id_mstore_out, id_mstore_in), // todo: check this
                                 id_mstore_in, // todo: check this
-                                intlit(return_value_size)) // todo: needs to be the size of the thing returned.
+                                intlit(return_value_size))
                         ),
 
                         // if iszero(_7) { revert_forward_1() }
                         revertForwardIfZero(id_call),
-
-                        // if there's a return, it needs to be mloaded into the retvar. maybe just load it no matter what? and then if
-                        // the source doesn't use it then nothing subsequent will check that temp.
 
                         // if _7 {
                         //    // update freeMemoryPointer according to dynamic return size
@@ -568,12 +536,15 @@ object CodeGenYul extends CodeGenerator {
 
                         edu.cmu.cs.obsidian.codegen.If(id_call, Block(
                             Seq(
+                                // if there's a return, it needs to be mloaded into the retvar. maybe just
+                                // load it no matter what? and then if the source doesn't use it then nothing
+                                // subsequent will check that temp.
                                 ExpressionStatement(apply("finalize_allocation", id_mstore_in, apply("returndatasize"))),
                                 assign1(id_call, apply("mload", id_mstore_in)),
                                 assign1(retvar, id_call) // todo: maybe just doing it up here instead of always? is that right?
                             )
                         ))
-                        //assign1(retvar, id_call) // todo: this is wrong; it means that i'm always assigning to the return var, even if the context doesn't make that the right thing to do. eg. both set() and return(get()) assign to the retvar. i've solved this problem before, i just need to remember how.
+                        // todo: there is no assignment to retvar at the end here; i'm not sure that's right.
                     )
 
             case Construction(contractType, args, isFFIInvocation) =>
