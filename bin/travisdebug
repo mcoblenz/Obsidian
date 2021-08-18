@@ -1,0 +1,19 @@
+#!/bin/bash -x
+
+
+# chrome-cli list tabs | grep -i travis | grep -i job  | grab the id
+# chrome-cli id | grab the url, take the end of it
+
+if [ $# -eq 0 ]
+  then
+    echo "No arguments supplied"
+    exit 1
+fi
+
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Travis-API-Version: 3" \
+  -H "Authorization: token 02SYM6emVjU86GDSLEFTbw" \
+  -d "{\"quiet\": true}" \
+  https://api.travis-ci.com/job/$1/debug
