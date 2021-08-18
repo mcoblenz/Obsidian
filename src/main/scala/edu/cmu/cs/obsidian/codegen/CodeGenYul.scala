@@ -82,30 +82,31 @@ object CodeGenYul extends CodeGenerator {
                 case None => throw new RuntimeException("No main contract found")
             }
 
-        // TODO ignore imports, data for now
-        // translate other contracts (if any) and add them to the subObjects
-        var new_subObjects: Seq[YulObject] = main_contract_ast.subobjects
+        // translate other contracts (if any) and add them to the childObjects
+        var childContracts: Seq[YulObject] = Seq()
+        // todo: this collection always contains a contract that looks like
+        //   ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,)
+        //   and i do not know why
         for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
-                    if (!c.modifiers.contains(IsMain())) { // if not main contract
-                        // this is a top level contract object
-                        // note: interfaces are not translated;
-                        // TODO detect an extra contract named "Contract", skip that as a temporary fix
-                        if (c.name != ContractType.topContractName) {
-                            new_subObjects = main_contract_ast.subobjects :+ translateContract(obsContract, checkedTable)
-                        }
+                    if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
+                        childContracts = childContracts :+ translateContract(obsContract, checkedTable)
                     }
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
-        YulObject(main_contract_ast.name, main_contract_ast.code, new_subObjects, main_contract_ast.data)
+        // todo: we do not process imports
+        YulObject(name = main_contract_ast.name,
+            code = main_contract_ast.code,
+            runtimeSubobj = main_contract_ast.runtimeSubobj,
+            childContracts = childContracts,
+            data = main_contract_ast.data) // todo this is always empty, we ignore data
     }
 
     def translateContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var subObjects: Seq[YulObject] = Seq()
         var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
 
@@ -117,11 +118,17 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // create runtime object
-        val runtime_name = contract.name + "_deployed"
-        val runtime_obj = YulObject(runtime_name, Code(Block(statement_seq_runtime)), Seq(), Seq())
-        subObjects = runtime_obj +: subObjects
+        val runtime_obj = YulObject(name = contract.name + "_deployed",
+            code = Code(Block(statement_seq_runtime)),
+            runtimeSubobj = Seq(),
+            childContracts = Seq(),
+            data = Seq())
 
-        YulObject(contract.name, Code(Block(statement_seq_deploy)), subObjects, Seq())
+        YulObject(name = contract.name,
+            code = Code(Block(statement_seq_deploy)),
+            runtimeSubobj = Seq(runtime_obj),
+            childContracts = Seq(),
+            data = Seq())
     }
 
     // return statements that go to deploy object, and statements that go to runtime object
@@ -178,7 +185,7 @@ object CodeGenYul extends CodeGenerator {
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
+                constructor.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
                 Seq(), //todo/iev: why is this always empty?
                 Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
@@ -189,14 +196,14 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get, mapObsTypeToABI(t.toString)))
+                    Seq(TypedName(id.get, obsTypeToYulTypeAndSize(t.toString)._1))
                 case None => Seq()
             }
         }
 
         Seq(FunctionDefinition(
             transaction.name, // TODO rename transaction name (by adding prefix/suffix)
-            transaction.args.map(v => TypedName(v.varName, mapObsTypeToABI(v.typIn.toString))),
+            transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
             ret,
             Block(transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))))) //todo iev temp vars: likely a hack to work around something wrong
     }
@@ -228,12 +235,18 @@ object CodeGenYul extends CodeGenerator {
             case Assignment(assignTo, e) =>
                 assignTo match {
                     case ReferenceIdentifier(x) =>
-                        //todo: easy optimization is to look at e; if it happens to be a literal we can save a temp.
+                        // todo: this assumes that all identifiers are either fields or stack variables.
+                        //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         decl_0exp(id) +:
                             e_yul :+
-                            assign1(Identifier(x), id)
+                            (if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                                //todo: compute offsets
+                                ExpressionStatement(apply("sstore", hexlit(keccak256(contractName + x)), id))
+                            } else {
+                                assign1(Identifier(x), id)
+                            })
                     case _ =>
                         assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
@@ -344,12 +357,38 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
+
+    /**
+      * Given the type of a contract and a table, compute the size that we need to allocate for it in memory.
+      * TODO: as a simplifying assumption, for now this always returns 256.
+      *
+      * @param t      the contract type of interest
+      * @param symTab the symbol table to look in
+      * @return the size of memory needed for the contract
+      */
+    def contractSize(t: ContractType, symTab: SymbolTable): Int = {
+        256
+    }
+
     def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
                 e match {
                     case ReferenceIdentifier(x) =>
-                        Seq(assign1(retvar, Identifier(x))) //todo: in general this will need to know to look in memory / storage / stack
+                        // todo: this assumes that all indentifiers are either fields or stack variables;
+                        //  we store nothing in memory. this is also very likely not doing the right thing
+                        //  with name shadowing
+
+                        // todo: this also assumes that everything is a u256 and does no type-directed
+                        //  cleaning in the way that solc does
+                        if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                            val store_id = nextTemp()
+                            //todo: compute offsets
+                            Seq(decl_1exp(store_id, apply("sload", hexlit(keccak256(contractName + x)))),
+                                assign1(retvar, store_id))
+                        } else {
+                            Seq(assign1(retvar, Identifier(x)))
+                        }
                     case NumLiteral(n) =>
                         Seq(assign1(retvar, intlit(n)))
                     case StringLiteral(value) =>
@@ -414,10 +453,10 @@ object CodeGenYul extends CodeGenerator {
                 // todo: some of this logic may be repeated in the dispatch table
 
                 // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
-                // which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
-                // to fix it, i need to refactor this object so that i pass around a vector of temporary variables
-                // to assign returns to rather than just one (i think). this is OK for now, but technical debt that
-                // we'll have to address if we ever add tuples to obsidian.
+                //  which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
+                //  to fix it, i need to refactor this object so that i pass around a vector of temporary variables
+                //  to assign returns to rather than just one (i think). this is OK for now, but technical debt that
+                //  we'll have to address if we ever add tuples to obsidian.
 
                 // for each argument expression, produce a new temp variable and translate it to a
                 // sequence of yul statements ending in an assignment to that variable.
@@ -430,8 +469,9 @@ object CodeGenYul extends CodeGenerator {
 
                 // the result is the recursive translation and the expression either using the temp
                 // here or not.
-                //
-                // todo: this does not work with non-void functions that are called without binding their results, ie "f()" if f returns an int
+
+                // todo: this does not work with non-void functions that are called without binding
+                //  their results, ie "f()" if f returns an int
                 seqs.flatten ++ (width match {
                     case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
                     case 1 =>
@@ -441,11 +481,105 @@ object CodeGenYul extends CodeGenerator {
                 })
 
             case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
-                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                Seq()
+
+                val id_recipient = nextTemp()
+                val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable)
+
+                val id_fnselc = nextTemp()
+                val id_mstore_in = nextTemp() // todo: check this with args / rets
+                val id_call = nextTemp()
+                val id_mstore_out = nextTemp()
+
+                // the number of bytes needed to store a value of the return type of the function
+                // being called.
+                val return_value_size: Int = 32 // todo: this is a hard coded value. we need to know the type of recipient so that we can compute this, and we currently do not.
+
+                (decl_0exp(id_recipient) +: recipient_yul) ++
+                    Seq(
+                        // let expr_35_address := convert_t_contract$_IntContainer_$20_to_t_address(expr_33_address)
+                        // if iszero(extcodesize(expr_35_address)) { revert_error() }
+                        revertIf(apply("iszero", apply("extcodesize", id_recipient))),
+
+                        //// storage for arguments and returned data
+                        // let _5 := allocate_unbounded()
+                        // mstore(_5, shift_left_224(expr_35_functionSelector))
+                        decl_1exp(id_fnselc, hexlit(hashOfFunctionName(name, params.map(t => obsTypeToYulTypeAndSize(t.baseTypeName)._1)))),
+                        decl_1exp(id_mstore_in, apply("allocate_unbounded")),
+                        ExpressionStatement(apply("mstore", id_mstore_in, apply("shl", intlit(224), id_fnselc))), // todo: 224 is a magic number
+
+                        // let _6 := abi_encode_tuple__to__fromStack(add(_5, 4) )
+                        // todo: this seems to just add 4 and i have no idea why right now; it's probably type-directed.
+                        decl_1exp(id_mstore_out, apply("add", id_mstore_in, intlit(4))),
+
+                        // let _7 := call(gas(), expr_35_address,  0,  _5, sub(_6, _5), _5, 0)
+                        decl_1exp(id_call,
+                            apply("call",
+                                apply("gas"), // all the gas we have right now
+                                id_recipient, // address of the contract being called
+                                intlit(0), // amount of money being passed
+                                id_mstore_in, // todo: check this
+                                apply("sub", id_mstore_out, id_mstore_in), // todo: check this
+                                id_mstore_in, // todo: check this
+                                intlit(return_value_size))
+                        ),
+
+                        // if iszero(_7) { revert_forward_1() }
+                        revertForwardIfZero(id_call),
+
+                        // if _7 {
+                        //    // update freeMemoryPointer according to dynamic return size
+                        //    finalize_allocation(_5, returndatasize())
+                        //
+                        //    // decode return parameters from external try-call into retVars
+                        //    abi_decode_tuple__fromMemory(_5, add(_5, returndatasize()))
+                        // }
+
+                        edu.cmu.cs.obsidian.codegen.If(id_call, Block(
+                            Seq(
+                                // if there's a return, it needs to be mloaded into the retvar. maybe just
+                                // load it no matter what? and then if the source doesn't use it then nothing
+                                // subsequent will check that temp.
+                                ExpressionStatement(apply("finalize_allocation", id_mstore_in, apply("returndatasize"))),
+                                assign1(id_call, apply("mload", id_mstore_in)),
+                                assign1(retvar, id_call) // todo: maybe just doing it up here instead of always? is that right?
+                            )
+                        ))
+                        // todo: there is no assignment to retvar at the end here; i'm not sure that's right.
+                    )
+
             case Construction(contractType, args, isFFIInvocation) =>
-                assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                Seq()
+                // todo: currently we ignore the arguments to the constructor
+
+                val max_addr = "0xffffffffffffffff"
+                val id_alloc = nextTemp()
+                val id_newbound = nextTemp()
+                val id_addr = nextTemp()
+
+                // check if either the new bound is bigger than the max address or less than the previous allocated range
+                val addr_check = apply("or", apply("gt", id_newbound, stringlit(max_addr)),
+                    apply("lt", id_newbound, id_alloc))
+
+                // size of the structure we're allocating
+                val struct_size = apply("datasize", stringlit(contractType.contractName))
+
+                // size of the structure we're allocating
+                val struct_offset = apply("dataoffset", stringlit(contractType.contractName))
+                Seq(
+                    // let _2 := allocate_unbounded()
+                    decl_1exp(id_alloc, apply("allocate_unbounded")),
+                    // let _3 := add(_2, datasize("IntContainer_22"))
+                    decl_1exp(id_newbound, apply("add", id_alloc, struct_size)),
+                    // if or(gt(_3, 0xffffffffffffffff), lt(_3, _2)) { panic_error_0x41() }
+                    edu.cmu.cs.obsidian.codegen.If(addr_check, Block(Seq(ExpressionStatement(apply("panic_error_0x41"))))),
+                    // datacopy(_2, dataoffset("IntContainer_22"), datasize("IntContainer_22"))
+                    ExpressionStatement(apply("datacopy", id_alloc, struct_offset, struct_size)),
+                    // _3 := abi_encode_tuple__to__fromStack(_3) // todo this adds 0, so i'm going to ignore it for now?
+                    // let expr_33_address := create(0, _2, sub(_3, _2))
+                    decl_1exp(id_addr, apply("create", intlit(0), id_alloc, apply("sub", id_newbound, id_alloc))),
+                    // if iszero(expr_33_address) { revert_forward_1() }
+                    revertForwardIfZero(id_addr),
+                    assign1(retvar, id_addr)
+                )
             case StateInitializer(stateName, fieldName) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()

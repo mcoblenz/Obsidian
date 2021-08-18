@@ -117,12 +117,12 @@ case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], val
             variables.map(v => v._1.name).mkString(", ")
         }" +
             (value match {
-            case Some (e) => s" := ${e.toString}"
-        case None => ""
-    }
+                case Some(e) => s" := ${e.toString}"
+                case None => ""
+            }
 
-    )
-}
+                )
+    }
 }
 
 case class FunctionDefinition(name: String,
@@ -198,7 +198,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data: Seq[Data]) extends YulAST {
+case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], childContracts: Seq[YulObject], data: Seq[Data]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -220,12 +220,11 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
     //   named by the section tag, let it return an array of object, the object name does not matter,
     //   but the it must contain a val named by the tag inside the section tag (the best way to understand
     //   this is to track down an example)
-    // temporary function, not designed for a full recursive walk through of the object
     class ObjScope(obj: YulObject) {
 
         val mainContractName: String = obj.name
         val creationObject: String = mainContractName
-        val runtimeObject: String = mainContractName + "_deployed"
+        val runtimeObjectName: String = mainContractName + "_deployed"
         var runtimeFunctionArray: Array[Func] = Array[Func]()
         var deployFunctionArray: Array[Func] = Array[Func]()
         var dispatch = false
@@ -315,8 +314,9 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
 
         var abiEncodesNeeded: Set[Int] = Set()
 
-        for (sub <- obj.subobjects) { // TODO separate runtime object out as a module (make it verbose)
-            for (s <- sub.code.block.statements) { // temporary fix due to issue above
+        // process the runtime object; todo this may only ever be a singleton
+        for (sub <- obj.runtimeSubobj) {
+            for (s <- sub.code.block.statements) {
                 s match {
                     case f: FunctionDefinition =>
                         dispatch = true
@@ -325,16 +325,6 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                         dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
                         // note the number of return variables so that we generate the appropriate abi encode functions (without repetitions)
                         abiEncodesNeeded = abiEncodesNeeded + f.returnVariables.length
-                    case e: ExpressionStatement =>
-                        e.expression match {
-                            case _: FunctionCall =>
-                                //TODO what was this line doing?
-                                //memoryInitRuntime = f.toString
-                                ()
-                            case _ =>
-                                assert(assertion = false, "TODO: " + e.toString())
-                                () // TODO unimplemented
-                        }
                     case x =>
                         assert(assertion = false, s"subobject case for ${x.toString} unimplemented")
                         ()
@@ -342,11 +332,14 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             }
         }
 
+        // recursively compute the strings for the child contracts
+        def childContracts: String = obj.childContracts.foldRight("") { (o, str) => o.yulString() + str }
+
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        val datasize: Expression = apply("datasize", stringlit(runtimeObject))
+        val datasize: Expression = apply("datasize", stringlit(runtimeObjectName))
 
-        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", stringlit(runtimeObject)), datasize)
+        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", stringlit(runtimeObjectName)), datasize)
 
         def defaultReturn(): Expression = apply("return", intlit(0), datasize)
 
@@ -383,7 +376,7 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             val encode_lines: Seq[YulStatement] = var_indices.map(i =>
                 ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
                     Identifier("value" + i.toString),
-                    apply("add", Identifier("headStart"), intlit((n-1) * 32)))))
+                    apply("add", Identifier("headStart"), intlit((n - 1) * 32)))))
 
             val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
             FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,

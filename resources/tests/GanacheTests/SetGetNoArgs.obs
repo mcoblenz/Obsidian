@@ -1,18 +1,22 @@
 contract IntContainer{
     int x;
 
-    transaction set(int value) {
-        x = value;
+    IntContainer@Owned() {
+        x = 0;
+    }
+
+    transaction set() { // take no parameters
+        x = 5;
     }
     transaction get() returns int{
         return x;
     }
 }
 
-main contract SimpleStructure{
+main contract SetGetNoArgs{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
-        ic.set(5);
+        ic.set();
         return (ic.get());
     }
 }

@@ -85,7 +85,7 @@ do
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
-  if ! $(java -jar $obsidian_jar --yul resources/tests/GanacheTests/$NAME.obs)
+  if ! $(java -jar $obsidian_jar --yul "resources/tests/GanacheTests/$NAME.obs")
   then
       echo "$NAME test failed: cannot compile obs to yul"
       failed+=("$test [compile obs to yul]")
@@ -102,7 +102,7 @@ do
 
   # generate the evm from yul, failing if not
   echo "running solc to produce evm bytecode"
-  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/"$NAME".yul > "$NAME".evm
+  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
   then
       echo "$NAME test failed: solc cannot compile yul code"
       failed+=("$test [solc]")

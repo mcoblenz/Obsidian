@@ -27,7 +27,7 @@ object "{{creationObject}}" {
         {{codeCopy}}
         {{defaultReturn}}
     }
-    object "{{runtimeObject}}" {
+    object "{{runtimeObjectName}}" {
         code {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
             {{memoryInitRuntime}}
@@ -50,6 +50,11 @@ object "{{creationObject}}" {
             function abi_decode_tuple(headStart, dataEnd)   {
                 if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
             }
+
+            function abi_decode_t_uint256_fromMemory(offset, end) -> value {
+                value := mload(offset)
+            }
+
             {{abiEncodeTupleFuncs}}
 
             function allocate_memory(size) -> memPtr {
@@ -82,16 +87,24 @@ object "{{creationObject}}" {
                 mstore(pos, cleanup_t_uint256(value))
             }
 
+            {{! revert, but also include the return data from the most recent call }}
+            function revert_forward_1() {
+                let pos := allocate_unbounded()
+                returndatacopy(pos, 0, returndatasize())
+                revert(pos, returndatasize())
+            }
+
             {{! the "cleanup" functions enforce the invariants on the types from the abi wrt how they're encoded;
                 with uint256, there are none, so it just returns. }}
             function cleanup_t_uint256(value) -> cleaned {
                 cleaned := value
             }
+
             {{#runtimeFunctions}}
                 {{code}}
             {{/runtimeFunctions}}
         }
-        {{runtimeSubObjects}}
+
+        {{childContracts}}
     }
-    {{subObjects}}
 }
