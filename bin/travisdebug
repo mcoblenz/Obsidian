@@ -2,7 +2,9 @@
 
 
 #  travisdebug kicks a travis instance into debug mode so that you can in
-#  to it.
+#  to it. it takes two arguments, first the authorization token and then
+#  the job number. see https://docs.travis-ci.com/user/triggering-builds/
+#  for details.
 
 
 # chrome-cli list tabs | grep -i travis | grep -i job  | grab the id
@@ -18,6 +20,6 @@ curl -s -X POST \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -H "Travis-API-Version: 3" \
-  -H "Authorization: token 02SYM6emVjU86GDSLEFTbw" \
+  -H "Authorization: token $1" \
   -d "{\"quiet\": true}" \
-  https://api.travis-ci.com/job/$1/debug
+  https://api.travis-ci.com/job/$2/debug
