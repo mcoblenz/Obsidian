@@ -1,21 +1,50 @@
 #!/bin/bash
 
-  # run_any_yul.sh takes two arguments, the path to a yul file and a
-  #     decimal-represented integer, compiles that yul to evm, starts ganache,
-  #     ships that evm to gananch, calls `main()`, and checks to see if the
-  #     result is the same as the integer passed. this is a restricted fragment
-  #     of the travis testing script but much faster and helpful for development.
+# run_any_yul.sh takes two arguments, the path to a yul file and a
+#     decimal-represented integer, compiles that yul to evm, starts ganache,
+#     ships that evm to gananch, calls `main()`, and checks to see if the
+#     result is the same as the integer passed. this is a restricted fragment
+#     of the travis testing script but much faster and helpful for development.
+#
+# by default we pass the yul through the optimizer since that's what the
+# travis script does, but we take the [-n] flag for "no optimizer" to omit
+# this when we're interested in running litearlly the file passed.
 
-if [ "$#" -ne 2 ]; then
-    echo "usage: run_any_yul.sh fileOfYulCode.yul expectedValueInDecimalNotation"
+if [ "$#" -lt 2 ]; then
+    echo "usage: run_any_yul.sh [-n] [-y fileOfYulCode.yul] [-o expectedValueInDecimalNotation]"
     exit 1
 fi
 
-if ! output=$(docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$1")
+OPTIMIZE="--optimize"
+YULFILE=""
+OUTCOME=""
+
+while getopts "ny:o:" option; do
+    case $option in
+      n) # optimize the yul before running it
+         OPTIMIZE="";;
+      y)
+         YULFILE=$OPTARG;;
+      o)
+         OUTCOME=$OPTARG;;
+     \?) # Invalid option
+         echo "Error: Invalid option $OPTARG"
+         exit;;
+   esac
+done
+
+if ! output=$(docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly $OPTIMIZE /sources/"$YULFILE")
 then
     echo "Exiting because solc returned non-zero"
     exit 1
 fi
+
+echo "Yul that produced the binary:"
+TOP=$(echo "$output" | grep -n "Pretty printed source:" | cut -f1 -d:)
+BOT=$(echo "$output" | grep -n "Binary representation:" | cut -f1 -d:)
+TOP=$((TOP+1)) # drop the line with the name
+BOT=$((BOT-2)) # drop the empty line after the binary
+echo -ne "$output" | sed -n $TOP','$BOT'p' | bat -l javascript --style=plain
 
 TOP=$(echo "$output" | grep -n "Binary representation" | cut -f1 -d:)
 BOT=$(echo "$output" | grep -n "Text representation" | cut -f1 -d:)
@@ -34,7 +63,7 @@ GAS_PRICE=0x9184e72a000
 START_ETH=50000000000000
 NUM_ACCT=1
 TESTEXP="main()"
-EXPECTED="0x"$(printf '%064x' "$2")
+EXPECTED="0x"$(printf '%064x' "$OUTCOME")
 
 # start up ganache
 echo "starting ganache-cli"
@@ -214,13 +243,13 @@ else
     echo -ne "\t$GOT\n"
     if hash 2sc.py
     then
-	echo -ne "\t(decimal: $(2sc.py $GOT))\n"
+	echo -ne "\t(decimal: $(2sc.py "$GOT"))\n"
     fi
     echo "but we expected:"
     echo -ne "\t$EXPECTED\n"
     if hash 2sc.py
     then
-	echo -ne "\t(decimal: $(2sc.py $EXPECTED))\n"
+	echo -ne "\t(decimal: $(2sc.py "$EXPECTED"))\n"
     fi
     echo
 fi
