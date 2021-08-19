@@ -11,8 +11,11 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
-
-output=$(docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$1")
+if ! output=$(docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$1")
+then
+    echo "Exiting because solc returned non-zero"
+    exit 1
+fi
 
 TOP=$(echo "$output" | grep -n "Binary representation" | cut -f1 -d:)
 BOT=$(echo "$output" | grep -n "Text representation" | cut -f1 -d:)
@@ -25,7 +28,6 @@ echo "$EVM_BIN"
 #--------------
 
 
-NAME=$(basename -s '.json' "$test")
 GAS=300000000000000
 GAS_HEX=$(printf '%x' "$GAS")
 GAS_PRICE=0x9184e72a000
