@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# solc_optmized_yul runs solc on an argument yul file with the optimizer
+# fully enabled and prints the result to stdout
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: solc_optimized_yul fileOfYulCode.yul"
+    exit 1
+fi
+
+if ! output=$(docker run -v "$( pwd -P )":/sources ethereum/solc:stable --strict-assembly --optimize /sources/"$1")
+then
+    echo "Exiting because solc returned non-zero"
+    exit 1
+fi
+
+TOP=$(echo "$output" | grep -n "Pretty printed source:" | cut -f1 -d:)
+BOT=$(echo "$output" | grep -n "Binary representation:" | cut -f1 -d:)
+TOP=$((TOP+1)) # drop the line with the name
+BOT=$((BOT-2)) # drop the empty line after the binary
+echo -ne "$output" | sed -n $TOP','$BOT'p' | bat -l javascript --style=plain
