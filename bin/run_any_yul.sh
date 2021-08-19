@@ -210,7 +210,19 @@ if [[ "$GOT" == "$EXPECTED" ]]
 then
     echo "test passed!"
 else
-    echo -ne "test failed! got: \n\t$GOT\nbut expected: \n\t$EXPECTED\n\n"
+    echo "test failed! got:"
+    echo -ne "\t$GOT\n"
+    if hash 2sc.py
+    then
+	echo -ne "\t(decimal: $(2sc.py $GOT))\n"
+    fi
+    echo "but we expected:"
+    echo -ne "\t$EXPECTED\n"
+    if hash 2sc.py
+    then
+	echo -ne "\t(decimal: $(2sc.py $EXPECTED))\n"
+    fi
+    echo
 fi
 
 # clean up by killing ganache and the local files
