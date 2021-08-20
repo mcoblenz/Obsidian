@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# solc_bin runs solc on a solidity program and produces yul
+
+bn=$(basename -s '.sol' "$1")
+docker run -v "$( pwd -P )":/sources ethereum/solc:stable --ir /sources/"$1" > "$bn-sol.yul"
