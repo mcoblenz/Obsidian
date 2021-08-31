@@ -575,7 +575,7 @@ object CodeGenYul extends CodeGenerator {
                     ExpressionStatement(apply("datacopy", id_alloc, struct_offset, struct_size)),
                     // _3 := abi_encode_tuple__to__fromStack(_3) // todo this adds 0, so i'm going to ignore it for now?
                     // let expr_33_address := create(0, _2, sub(_3, _2))
-                    decl_1exp(id_addr, apply("create", intlit(0), id_alloc, apply("sub", id_newbound, id_alloc))),
+                    //decl_1exp(id_addr, apply("create", intlit(0), id_alloc, apply("sub", id_newbound, id_alloc))),
                     // if iszero(expr_33_address) { revert_forward_1() }
                     revertForwardIfZero(id_addr),
                     assign1(retvar, id_addr)
