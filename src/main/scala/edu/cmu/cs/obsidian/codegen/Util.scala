@@ -234,4 +234,15 @@ object Util {
     def hashOfFunctionDef(f: FunctionDefinition): String = {
         hashOfFunctionName(f.name, f.parameters.map(p => obsTypeToYulTypeAndSize(p.ntype)._1))
     }
+
+    /**
+      * given a contract type, compute the number of bytes needed to store it in memory in the yul
+      * object. WARNING: right now this is a stub, it just returns 32 always.
+      *
+      * @param ct the contract of interest
+      * @return the number of bytes needed to store the fields of the contract
+      */
+    def sizeOfContractType(ct: edu.cmu.cs.obsidian.typecheck.ContractType): Int = {
+        32
+    }
 }
