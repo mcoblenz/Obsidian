@@ -71,39 +71,70 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateProgram(program: Program, checkedTable: SymbolTable): YulObject = {
-        // translate main contract, or fail if none is found or only a java contract is present
-        val main_contract_ast: YulObject =
+        // find the main contract, failing if it's a Java FFI or there isn't one
+        val main_contract =
             findMainContract(program) match {
                 case Some(p) => p match {
-                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c, checkedTable)
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => c
                     case JavaFFIContractImpl(_, _, _, _, _) =>
                         throw new RuntimeException("Java contract not supported in yul translation")
                 }
                 case None => throw new RuntimeException("No main contract found")
             }
 
-        // translate other contracts (if any) and add them to the childObjects
-        var childContracts: Seq[YulObject] = Seq()
+        // translate non-main contracts (if any) and add them to the main contract before translating it
         // todo: this collection always contains a contract that looks like
         //   ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,)
         //   and i do not know why
+        var new_decls: Seq[Declaration] = Seq()
+
         for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
-                        childContracts = childContracts // :+ translateContract(obsContract, checkedTable)
+                        for (d <- c.declarations) {
+                            d match {
+                                case id: InvokableDeclaration =>
+                                    id match {
+                                        case Constructor(name, args, resultType, body) =>
+                                            // todo also translate uses in body
+                                            new_decls = new_decls :+ Constructor(transactionNameMapping(c.name, name), args, resultType, body)
+                                        case Transaction(name, params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes) =>
+                                            // todo also translate uses in body
+                                            new_decls = new_decls :+ Transaction(transactionNameMapping(c.name, name), params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes)
+                                    }
+                                case TypeDecl(_, _) =>
+                                    assert(assertion = false, "subcontracts with type declarations")
+                                case Field(isConst, typ, name, availableIn) =>
+                                    new_decls = new_decls :+ Field(isConst, typ, transactionNameMapping(c.name, name), availableIn)
+                                case State(_, _, _) =>
+                                    assert(assertion = false, "subcontracts with state not supported")
+                                case _: Contract =>
+                                    assert(assertion = false, "subcontracts with subcontracts not suppoted")
+                            }
+                        }
+
+                        // copy over the transactions, renaming them and also renaming the field uses.
+                        // todo: this should be capture avoiding, a là de Bruiin, but it is not.
                     }
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
-        // todo: we do not process imports
-        YulObject(name = main_contract_ast.name,
-            code = main_contract_ast.code,
-            runtimeSubobj = main_contract_ast.runtimeSubobj,
-            childContracts = childContracts,
-            data = main_contract_ast.data) // todo this is always empty, we ignore data
+        // return the translated main contract with the added declarations. note that the returned
+        //  childContracts and data will always be empty; we can probably remove the former and
+        //  todo: we ignore data but shouldn't
+        translateContract(
+            ObsidianContractImpl(main_contract.modifiers,
+                main_contract.name,
+                main_contract.params,
+                main_contract.bound,
+                main_contract.declarations ++ new_decls,
+                main_contract.transitions,
+                main_contract.isInterface,
+                main_contract.sp),
+            checkedTable)
     }
 
     def translateContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
