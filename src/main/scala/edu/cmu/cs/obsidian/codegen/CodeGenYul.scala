@@ -1,6 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.typecheck.{StringType, UnitType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -90,18 +91,40 @@ object CodeGenYul extends CodeGenerator {
 
         for (c <- program.contracts) {
             c match {
-                case obsContract: ObsidianContractImpl =>
+                case _: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
                         for (d <- c.declarations) {
                             d match {
                                 case id: InvokableDeclaration =>
                                     id match {
                                         case Constructor(name, args, resultType, body) =>
-                                            // todo also translate uses in body
-                                            new_decls = new_decls :+ Constructor(transactionNameMapping(c.name, name), args, resultType, body)
+                                            // todo also translate uses in body?  translateStatement should do that, actually.
+                                            new_decls = new_decls :+
+                                                Constructor(transactionNameMapping(c.name, name),
+                                                    // todo: string type is kind of wrong; it should be addr but that's not an
+                                                    //  obsidan type
+                                                    // todo: this isn't capture-avoiding
+                                                    VariableDeclWithSpec(StringType(), StringType(), "this") +: args,
+                                                    resultType,
+                                                    body)
                                         case Transaction(name, params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes) =>
-                                            // todo also translate uses in body
-                                            new_decls = new_decls :+ Transaction(transactionNameMapping(c.name, name), params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes)
+                                            // todo also translate uses in body? translateStatement should do that, actually.
+                                            new_decls = new_decls :+
+                                                Transaction(transactionNameMapping(c.name, name),
+                                                    params,
+                                                    // todo: string type is kind of wrong; it should be addr but that's not an
+                                                    //  obsidan type
+                                                    // todo: this isn't capture-avoiding
+                                                    VariableDeclWithSpec(StringType(), StringType(), "this") +: args,
+                                                    retType,
+                                                    ensures,
+                                                    body,
+                                                    isStatic,
+                                                    isPrivate,
+                                                    thisType,
+                                                    thisFinalType,
+                                                    initialFieldTypes,
+                                                    finalFieldTypes)
                                     }
                                 case TypeDecl(_, _) =>
                                     assert(assertion = false, "subcontracts with type declarations")
