@@ -23,13 +23,15 @@ trait YulStatement extends YulAST
 // for each asm struct, create a case class
 case class TypedName(name: String, ntype: String) extends YulAST {
     override def toString: String = {
-        s"$name ${
+        name
+        //todo: solc does not currently support type annotations in yul; this will be the right thing when it does.
+/*        s"$name ${
             if (ntype.isEmpty) {
                 ""
             } else {
                 s" : $ntype"
             }
-        }"
+        }"*/
     }
 }
 
