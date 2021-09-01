@@ -136,8 +136,6 @@ object CodeGenYul extends CodeGenerator {
                                     assert(assertion = false, "subcontracts with subcontracts not suppoted")
                             }
                         }
-
-                        // copy over the transactions, renaming them and also renaming the field uses.
                         // todo: this should be capture avoiding, a là de Bruiin, but it is not.
                     }
                 case _: JavaFFIContractImpl =>
