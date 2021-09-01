@@ -392,8 +392,7 @@ object CodeGenYul extends CodeGenerator {
                     case NumLiteral(n) =>
                         Seq(assign1(retvar, intlit(n)))
                     case StringLiteral(value) =>
-                        assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
-                        Seq()
+                        Seq(assign1(retvar, stringlit(value)))
                     case TrueLiteral() =>
                         Seq(assign1(retvar, boollit(true)))
                     case FalseLiteral() =>
