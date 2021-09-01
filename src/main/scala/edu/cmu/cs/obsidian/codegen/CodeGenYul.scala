@@ -435,7 +435,7 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable)
                 }
-            case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
+            case LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
                 // look up the name of the function in the table, get its return type, and then compute
                 // how wide of a tuple that return type is. (currently this is always either 0 or 1).
                 //
@@ -447,7 +447,7 @@ object CodeGenYul extends CodeGenerator {
                             case None => 0
                         }
                     case None =>
-                        // this is an absolute kludge just to get a proof of concept working today for a specific test case
+                        // this is an absolute kludge just to get a proof of concept working for a specific test case
                         if (name == transactionNameMapping("IntContainer", "set")) {
                             0
                         } else if (name == transactionNameMapping("IntContainer", "get")) {
@@ -506,10 +506,13 @@ object CodeGenYul extends CodeGenerator {
 
                 ((decl_0exp(id_recipient) +: recipient_yul) ++
                     translateExpr(retvar,
-                        LocalInvocation(transactionNameMapping(getContractName(recipient),name), genericParams, params, this_address +: args),
+                        LocalInvocation(transactionNameMapping(getContractName(recipient), name),
+                            genericParams,
+                            params,
+                            this_address +: args),
                         contractName,
                         checkedTable))
-                
+
             case Construction(contractType, args, isFFIInvocation) =>
                 // todo: currently we ignore the arguments to the constructor
                 assert(args.isEmpty, "contracts that take arguments are not yet supported")
@@ -517,7 +520,7 @@ object CodeGenYul extends CodeGenerator {
                 val id_memaddr = nextTemp()
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
-                    decl_1exp(id_memaddr, apply("allocate_memory",intlit(sizeOfContractType(contractType)))),
+                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractType(contractType)))),
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)
