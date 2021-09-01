@@ -269,7 +269,7 @@ object Util {
       * given a contract name and a transaction name, produce the name of the contract in the flat
       * yul object that corresponds to it
       *
-      * @param contractName the name of the contract
+      * @param contractName    the name of the contract
       * @param transactionName the name of the transaction
       * @return the name of the Yul transaction for that contract
       */
