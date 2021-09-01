@@ -275,4 +275,20 @@ object Util {
       */
     def transactionNameMapping(contractName: String, transactionName: String): String =
         s"${contractName}___${transactionName}"
+
+    /**
+      * if a and b do not contain "___", then
+      *    transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
+      *
+      * @param s
+      * @return
+      */
+    def transactionNameUnmapping(s: String): Option[(String, String)] = {
+        val halves: Array[String] = s.split("___")
+        if(halves.length != 2) {
+            None
+        } else {
+            Some(halves(0), halves(1))
+        }
+    }
 }
