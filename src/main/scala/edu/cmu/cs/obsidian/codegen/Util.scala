@@ -61,7 +61,16 @@ object Util {
       * @param s the scala string
       * @return the corresponding Yul string literal
       */
-    def stringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
+    def stringlit(s: String): Literal = Literal(LiteralKind.string, quote(s), "string")
+
+    /**
+      * shorthand for inserting strings into the Yul directly, without quotations to make them a
+      * string literal
+      *
+      * @param s the scala string
+      * @return the corresponding Yul string literal
+      */
+    def rawstringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
 
     /**
       * shorthand for building Yul function applications

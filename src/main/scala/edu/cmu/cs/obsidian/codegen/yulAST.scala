@@ -337,9 +337,9 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        val datasize: Expression = apply("datasize", stringlit(runtimeObjectName))
+        val datasize: Expression = apply("datasize", rawstringlit(runtimeObjectName))
 
-        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", stringlit(runtimeObjectName)), datasize)
+        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(runtimeObjectName)), datasize)
 
         def defaultReturn(): Expression = apply("return", intlit(0), datasize)
 
