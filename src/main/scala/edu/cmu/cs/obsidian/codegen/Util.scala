@@ -234,4 +234,36 @@ object Util {
     def hashOfFunctionDef(f: FunctionDefinition): String = {
         hashOfFunctionName(f.name, f.parameters.map(p => obsTypeToYulTypeAndSize(p.ntype)._1))
     }
+
+    /**
+      * given a contract type, compute the number of bytes needed to store it in memory in the yul
+      * object. WARNING: right now this is a stub, it just returns 32 always.
+      *
+      * @param ct the contract of interest
+      * @return the number of bytes needed to store the fields of the contract
+      */
+    def sizeOfContractType(ct: edu.cmu.cs.obsidian.typecheck.ContractType): Int = {
+        32
+    }
+
+    /**
+      * given an expression, produce the name of the contract that it associates with.
+      * WARNING: this is a stub! actually implementing this means reworking the translation to yul
+      * to carry around type information for the expression being elaborated.
+      *
+      * @param e the expression of interest
+      * @return the name of the contract for the expression, if there is one; raises an error otherwise
+      */
+    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = "IntContainer"
+
+    /**
+      * given a contract name and a transaction name, produce the name of the contract in the flat
+      * yul object that corresponds to it
+      *
+      * @param contractName the name of the contract
+      * @param transactionName the name of the transaction
+      * @return the name of the Yul transaction for that contract
+      */
+    def transactionNameMapping(contractName: String, transactionName: String): String =
+        s"${contractName}___${transactionName}"
 }
