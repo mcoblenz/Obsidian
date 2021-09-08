@@ -75,7 +75,7 @@ object CodeGenYul extends CodeGenerator {
         val main_contract_ast: YulObject =
             findMainContract(program) match {
                 case Some(p) => p match {
-                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateContract(c, checkedTable)
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateMainContract(c, checkedTable)
                     case JavaFFIContractImpl(_, _, _, _, _) =>
                         throw new RuntimeException("Java contract not supported in yul translation")
                 }
@@ -106,13 +106,13 @@ object CodeGenYul extends CodeGenerator {
             data = main_contract_ast.data) // todo this is always empty, we ignore data
     }
 
-    def translateContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var statement_seq_deploy: Seq[YulStatement] = Seq()
+    def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
+        var statement_seq_deploy: Seq[YulStatement] = Seq() //todo i think the translation never actually adds anything to this, and possibly never will. if so, remove it for simplicity.
         var statement_seq_runtime: Seq[YulStatement] = Seq()
 
         // translate declarations
         for (d <- contract.declarations) {
-            val (deploy_seq, runtime_seq) = translateDeclaration(d, contract.name, checkedTable)
+            val (deploy_seq, runtime_seq) = translateDeclaration(d, contract.name, checkedTable, true)
             statement_seq_deploy = statement_seq_deploy ++ deploy_seq
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
@@ -131,8 +131,21 @@ object CodeGenYul extends CodeGenerator {
             data = Seq())
     }
 
+    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable, mainContract : YulObject): YulObject = {
+        var statement_seq_deploy: Seq[YulStatement] = Seq()
+        var statement_seq_runtime: Seq[YulStatement] = Seq()
+
+        for (d <- c.declarations){
+            val (deploy_seq, runtime_seq) = translateDeclaration(d, c.name, checkedTable, false)
+            statement_seq_deploy = statement_seq_deploy ++ deploy_seq
+            statement_seq_runtime = statement_seq_runtime ++ runtime_seq
+        }
+
+        mainContract
+    }
+
     // return statements that go to deploy object, and statements that go to runtime object
-    def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable): (Seq[YulStatement], Seq[YulStatement]) = {
+    def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): (Seq[YulStatement], Seq[YulStatement]) = {
         declaration match {
             case f: Field => (Seq(), translateField(f))
             case t: Transaction =>
