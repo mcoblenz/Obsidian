@@ -129,10 +129,10 @@ object CodeGenYul extends CodeGenerator {
     }
 
 
-    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable, mainContract : YulObject): YulObject = {
+    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable, mainContract: YulObject): YulObject = {
         var statement_seq_runtime: Seq[YulStatement] = Seq()
 
-        for (d <- c.declarations){
+        for (d <- c.declarations) {
             val runtime_seq = translateDeclaration(d, c.name, checkedTable, false)
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
@@ -144,10 +144,8 @@ object CodeGenYul extends CodeGenerator {
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
             case f: Field => translateField(f)
-            case t: Transaction =>
-                translateTransaction(t, contractName, checkedTable)
-            case s: State =>
-               translateState(s)
+            case t: Transaction => translateTransaction(t, contractName, checkedTable)
+            case s: State => translateState(s)
             case c: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -157,11 +155,11 @@ object CodeGenYul extends CodeGenerator {
             case _: Constructor =>
                 assert(assertion = false, "constructors not supported in Yul translation")
                 Seq()
-                // todo: previously this returned a pair of sequences, and this was the only clause
-                //   in which the left element was not empty. the left sequence would go in the code
-                //   part of the output object rather than the runtime, but that's not where we
-                //   want constructors to go.
-                // (translateConstructor(c, contractName, checkedTable), Seq())
+            // todo: previously this returned a pair of sequences, and this was the only clause
+            //   in which the left element was not empty. the left sequence would go in the code
+            //   part of the output object rather than the runtime, but that's not where we
+            //   want constructors to go.
+            // (translateConstructor(c, contractName, checkedTable), Seq())
             case _: TypeDecl =>
                 assert(assertion = false, "TODO")
                 Seq()
