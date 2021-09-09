@@ -107,37 +107,33 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var statement_seq_deploy: Seq[YulStatement] = Seq() //todo i think the translation never actually adds anything to this, and possibly never will. if so, remove it for simplicity.
-        var statement_seq_runtime: Seq[YulStatement] = Seq()
+        var decls: Seq[YulStatement] = Seq()
 
         // translate declarations
         for (d <- contract.declarations) {
-            val (deploy_seq, runtime_seq) = translateDeclaration(d, contract.name, checkedTable, true)
-            statement_seq_deploy = statement_seq_deploy ++ deploy_seq
-            statement_seq_runtime = statement_seq_runtime ++ runtime_seq
+            decls = decls ++ translateDeclaration(d, contract.name, checkedTable, true)
         }
 
         // create runtime object
         val runtime_obj = YulObject(name = contract.name + "_deployed",
-            code = Code(Block(statement_seq_runtime)),
+            code = Code(Block(decls)),
             runtimeSubobj = Seq(),
             childContracts = Seq(),
             data = Seq())
 
         YulObject(name = contract.name,
-            code = Code(Block(statement_seq_deploy)),
+            code = Code(Block(Seq())),
             runtimeSubobj = Seq(runtime_obj),
             childContracts = Seq(),
             data = Seq())
     }
 
+
     def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable, mainContract : YulObject): YulObject = {
-        var statement_seq_deploy: Seq[YulStatement] = Seq()
         var statement_seq_runtime: Seq[YulStatement] = Seq()
 
         for (d <- c.declarations){
-            val (deploy_seq, runtime_seq) = translateDeclaration(d, c.name, checkedTable, false)
-            statement_seq_deploy = statement_seq_deploy ++ deploy_seq
+            val runtime_seq = translateDeclaration(d, c.name, checkedTable, false)
             statement_seq_runtime = statement_seq_runtime ++ runtime_seq
         }
 
@@ -145,28 +141,30 @@ object CodeGenYul extends CodeGenerator {
     }
 
     // return statements that go to deploy object, and statements that go to runtime object
-    def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): (Seq[YulStatement], Seq[YulStatement]) = {
+    def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
-            case f: Field => (Seq(), translateField(f))
+            case f: Field => translateField(f)
             case t: Transaction =>
-                (Seq(), translateTransaction(t, contractName, checkedTable))
+                translateTransaction(t, contractName, checkedTable)
             case s: State =>
-                (Seq(), translateState(s))
+               translateState(s)
             case c: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
-                (Seq(), Seq())
+                Seq()
             case _: JavaFFIContractImpl =>
                 assert(assertion = false, "Java contracts not supported in Yul translation")
-                (Seq(), Seq())
-            case c: Constructor =>
-                (translateConstructor(c, contractName, checkedTable), Seq())
-            case t: TypeDecl =>
+                Seq()
+            case _: Constructor =>
+                assert(assertion = false, "constructors not supported in Yul translation")
+                Seq()
+                // todo: previously this returned a pair of sequences, and this was the only clause
+                //   in which the left element was not empty. the left sequence would go in the code
+                //   part of the output object rather than the runtime, but that's not where we
+                //   want constructors to go.
+                // (translateConstructor(c, contractName, checkedTable), Seq())
+            case _: TypeDecl =>
                 assert(assertion = false, "TODO")
-                (Seq(), Seq())
-            // This should never be hit.
-            case _ =>
-                assert(assertion = false, "Translating unexpected declaration: " + declaration)
-                (Seq(), Seq())
+                Seq()
         }
     }
 
