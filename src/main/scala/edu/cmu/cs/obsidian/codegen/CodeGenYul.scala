@@ -140,7 +140,17 @@ object CodeGenYul extends CodeGenerator {
         mainContract
     }
 
-    // return statements that go to deploy object, and statements that go to runtime object
+
+    /**
+      * compute the translation of a declaration into yul with respect to its context in the larger
+      * obsidian program
+      *
+      * @param declaration  the declaration to translate
+      * @param contractName the name of the contract in which the declaration appears
+      * @param checkedTable the symbol table for the contract in which the declaration appears
+      * @param inMain       whether or not the contract in which the declaration apepars is the main one
+      * @return the yul statements corresponding to the declaration
+      */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
             case f: Field => translateField(f)
