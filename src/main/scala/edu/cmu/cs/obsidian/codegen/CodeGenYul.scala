@@ -196,6 +196,7 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateConstructor(constructor: Constructor, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
+        assert(false) // todo: this is never getting called as far as i know, and i don't really think it should be so i want to know about it if it is
         val new_name: String = "constructor_" + constructor.name
         val deployExpr = FunctionCall(
             Identifier(new_name), // TODO change how to find constructor function name after adding randomized suffix/prefix
