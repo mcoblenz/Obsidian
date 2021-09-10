@@ -214,7 +214,7 @@ object CodeGenYul extends CodeGenerator {
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
                 constructor.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
                 Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
+                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
 
     def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
@@ -247,7 +247,7 @@ object CodeGenYul extends CodeGenerator {
             } ++ transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1))
 
         // form the body of the transaction by translating each statement found
-        val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))
+        val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
 
         // return the function definition formed from the above parts
         Seq(FunctionDefinition(name, args, ret, Block(body)))
@@ -260,7 +260,7 @@ object CodeGenYul extends CodeGenerator {
       * @param retVar the name of the variable to use for returning for the current scope, if there is one
       * @return
       */
-    def translateStatement(s: Statement, retVar: Option[String], contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
+    def translateStatement(s: Statement, retVar: Option[String], contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         //todo: why is retVar an option and why is it a string not an identifier?
         s match {
             case Return() =>
@@ -306,8 +306,8 @@ object CodeGenYul extends CodeGenerator {
                 val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
 
                 // translate each block and generate an extra assignment for the last statement
-                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
-                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable))
+                val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable, inMain))
+                val neg_yul: Seq[YulStatement] = neg.flatMap(s => translateStatement(s, retVar, contractName, checkedTable, inMain))
 
                 // put the pieces together into a switch statement, preceded by the evaluation of the scrutinee
                 decl_0exp(id_last) +:
@@ -348,7 +348,7 @@ object CodeGenYul extends CodeGenerator {
                 val s_yul: Seq[YulStatement] =
                     s.flatMap(s => {
                         val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable)
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable, inMain)
                         //todo: this also does not assign afterwards; likely the same bug as fixed in IfThenElse
                     })
 
@@ -451,7 +451,8 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable)
+                    // todo: this call to translateStatement is cute, but frankly the "inMain" argument does not particularly make sense here.
+                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable, true)
                     case Negate(e) =>
                         translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable)
                     case Dereference(_, _) =>
