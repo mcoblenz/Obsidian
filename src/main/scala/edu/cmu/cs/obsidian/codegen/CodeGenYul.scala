@@ -284,7 +284,6 @@ object CodeGenYul extends CodeGenerator {
       * @return
       */
     def translateStatement(s: Statement, retVar: Option[Identifier], contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
-        //todo: why is retVar an option?
         s match {
             case Return() =>
                 Seq(Leave())
