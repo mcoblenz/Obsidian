@@ -23,6 +23,10 @@ trait YulStatement extends YulAST
 // for each asm struct, create a case class
 case class TypedName(name: String, ntype: String) extends YulAST {
     override def toString: String = {
+        name
+/*
+ideally we'd want to do something like this:
+
         s"$name ${
             if (ntype.isEmpty) {
                 ""
@@ -30,6 +34,15 @@ case class TypedName(name: String, ntype: String) extends YulAST {
                 s" : $ntype"
             }
         }"
+
+but as of Sept2021, solc does not support that output even though it's in the def, e.g.
+
+Error: "string" is not a valid type (user defined types are not yet supported).
+   --> /sources/SetGetNoArgsNoConstructNoInit.yul:144:29:
+    |
+144 | function IntContainer___get(this  : string) -> _ret_2 {
+    |                             ^^^^^^^^^^^^^^
+*/
     }
 }
 
