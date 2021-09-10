@@ -35,7 +35,7 @@ object CodeGenYul extends CodeGenerator {
     }
 
     // todo this is getting redundant, find a better way
-    def nextRet(): String = { // todo: make this an indentifier not a string; that'll force a change to translateStatement
+    def nextRet(): String = { // todo: make this an identifier not a string; that'll force a change to translateStatement
         retCnt = retCnt + 1
         s"_ret_${retCnt.toString}" //todo: better naming convention?
     }
@@ -547,6 +547,7 @@ object CodeGenYul extends CodeGenerator {
 
                 // todo: this does not work with non-void functions that are called without binding
                 //  their results, ie "f()" if f returns an int
+                ids.map(id => decl_0exp(id)) ++
                 seqs.flatten ++ (width match {
                     case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
                     case 1 =>
@@ -565,7 +566,7 @@ object CodeGenYul extends CodeGenerator {
                 //  can call the appropriate translated transaction in the big Yul object.
 
                 // we get a variable storing the address of the instance from recursively translating
-                // the recipient. we also form a Parser indentifier with this, so that we can translate
+                // the recipient. we also form a Parser identifier with this, so that we can translate
                 // the invocation with a tailcall to translateExpr
                 val id_recipient: Identifier = nextTemp()
                 val this_address = edu.cmu.cs.obsidian.parser.ReferenceIdentifier(id_recipient.name)
