@@ -269,7 +269,7 @@ object CodeGenYul extends CodeGenerator {
                 retVar match {
                     case Some(retVarName) =>
                         val temp_id = nextTemp()
-                        val e_yul = translateExpr(temp_id, e, contractName, checkedTable)
+                        val e_yul = translateExpr(temp_id, e, contractName, checkedTable, inMain)
                         decl_0exp(temp_id) +:
                             e_yul :+
                             assign1(Identifier(retVarName), temp_id) :+
@@ -283,7 +283,7 @@ object CodeGenYul extends CodeGenerator {
                         // todo: this assumes that all identifiers are either fields or stack variables.
                         //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
-                        val e_yul = translateExpr(id, e, contractName, checkedTable)
+                        val e_yul = translateExpr(id, e, contractName, checkedTable, inMain)
                         decl_0exp(id) +:
                             e_yul :+
                             (if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
@@ -303,7 +303,7 @@ object CodeGenYul extends CodeGenerator {
                 val id_scrutinee: Identifier = nextTemp()
 
                 // translate the scrutinee
-                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable, inMain)
 
                 // translate each block and generate an extra assignment for the last statement
                 val pos_yul: Seq[YulStatement] = pos.flatMap(s => translateStatement(s, retVar, contractName, checkedTable, inMain))
@@ -320,16 +320,16 @@ object CodeGenYul extends CodeGenerator {
             case e: Expression =>
                 // todo: tighten up this logic, there's repeated code here
                 retVar match {
-                    case Some(value) => translateExpr(Identifier(value), e, contractName, checkedTable)
+                    case Some(value) => translateExpr(Identifier(value), e, contractName, checkedTable, inMain)
                     case None =>
                         val id = nextTemp()
-                        decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable)
+                        decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable, inMain)
                 }
             case VariableDecl(typ, varName) =>
                 Seq(decl_0exp_t(Identifier(varName), typ))
             case VariableDeclWithInit(typ, varName, e) =>
                 val id = nextTemp()
-                val e_yul = translateExpr(id, e, contractName, checkedTable)
+                val e_yul = translateExpr(id, e, contractName, checkedTable, inMain)
                 decl_0exp(id) +:
                     e_yul :+
                     decl_0exp_t_init(Identifier(varName), typ, id)
@@ -344,7 +344,7 @@ object CodeGenYul extends CodeGenerator {
                 Seq()
             case If(scrutinee, s) =>
                 val id_scrutinee: Identifier = nextTemp()
-                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable)
+                val scrutinee_yul: Seq[YulStatement] = translateExpr(id_scrutinee, scrutinee, contractName, checkedTable, inMain)
                 val s_yul: Seq[YulStatement] =
                     s.flatMap(s => {
                         val id_s: Identifier = nextTemp()
@@ -374,11 +374,11 @@ object CodeGenYul extends CodeGenerator {
     // helper function for a common calling pattern below. todo: there may be a slicker way to do
     //  this with https://docs.scala-lang.org/tour/mixin-class-composition.html in the future
     //  once all the cases are written and work
-    def call(s: String, retvar: Identifier, contractName: String, checkedTable: SymbolTable, es: Expression*): Seq[YulStatement] = {
+    def call(s: String, retvar: Identifier, contractName: String, checkedTable: SymbolTable, inMain: Boolean, es: Expression*): Seq[YulStatement] = {
         // for each expression, make a new temporary variable and translate the expression
         val es_trans: Seq[(Seq[YulStatement], Identifier)] = es.map(e => {
             val id = nextTemp()
-            (translateExpr(id, e, contractName, checkedTable), id)
+            (translateExpr(id, e, contractName, checkedTable, inMain), id)
         })
 
         // flatten the resultant sequences and do them first, then make the call to the function using the Ids
@@ -387,7 +387,7 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply(s, es_trans.map(x => x._2): _*))
     }
 
-    def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
+    def geq_leq(s: String, retvar: Identifier, e1: Expression, e2: Expression, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         // this doesn't fit the pattern of binary_call or a more general version that
         // takes  (Identifier, Identifier) => Expression, because what you want to do
         // is build another Obsidian Expression but with the Yul Identifiers for the
@@ -397,8 +397,8 @@ object CodeGenYul extends CodeGenerator {
         val e1id = nextTemp()
         val e2id = nextTemp()
         Seq(decl_0exp(e1id), decl_0exp(e2id)) ++
-            translateExpr(e1id, e1, contractName, checkedTable) ++
-            translateExpr(e2id, e2, contractName, checkedTable) :+
+            translateExpr(e1id, e1, contractName, checkedTable, inMain) ++
+            translateExpr(e2id, e2, contractName, checkedTable, inMain) :+
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
@@ -415,7 +415,7 @@ object CodeGenYul extends CodeGenerator {
         256
     }
 
-    def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
+    def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
                 e match {
@@ -452,9 +452,9 @@ object CodeGenYul extends CodeGenerator {
             case e: UnaryExpression =>
                 e match {
                     // todo: this call to translateStatement is cute, but frankly the "inMain" argument does not particularly make sense here.
-                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable, true)
+                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable, inMain)
                     case Negate(e) =>
-                        translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable)
+                        translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable, inMain)
                     case Dereference(_, _) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
@@ -464,22 +464,22 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: BinaryExpression =>
                 e match {
-                    case Conjunction(e1, e2) => call("and", retvar, contractName, checkedTable, e1, e2)
-                    case Disjunction(e1, e2) => call("or", retvar, contractName, checkedTable, e1, e2)
-                    case Add(e1, e2) => call("add", retvar, contractName, checkedTable, e1, e2)
+                    case Conjunction(e1, e2) => call("and", retvar, contractName, checkedTable, inMain, e1, e2)
+                    case Disjunction(e1, e2) => call("or", retvar, contractName, checkedTable, inMain, e1, e2)
+                    case Add(e1, e2) => call("add", retvar, contractName, checkedTable, inMain, e1, e2)
                     case StringConcat(e1, e2) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
-                    case Subtract(e1, e2) => call("sub", retvar, contractName, checkedTable, e1, e2)
-                    case Divide(e1, e2) => call("sdiv", retvar, contractName, checkedTable, e1, e2) // todo div is for unsigned; i believe we have signed ints?
-                    case Multiply(e1, e2) => call("mul", retvar, contractName, checkedTable, e1, e2)
-                    case Mod(e1, e2) => call("smod", retvar, contractName, checkedTable, e1, e2) // todo as with div
-                    case Equals(e1, e2) => call("eq", retvar, contractName, checkedTable, e1, e2)
-                    case GreaterThan(e1, e2) => call("sgt", retvar, contractName, checkedTable, e1, e2) // todo as with div
-                    case GreaterThanOrEquals(e1, e2) => geq_leq("sgt", retvar, e1, e2, contractName, checkedTable)
-                    case LessThan(e1, e2) => call("slt", retvar, contractName, checkedTable, e1, e2) //todo as with div
-                    case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable)
-                    case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable)
+                    case Subtract(e1, e2) => call("sub", retvar, contractName, checkedTable, inMain, e1, e2)
+                    case Divide(e1, e2) => call("sdiv", retvar, contractName, checkedTable, inMain, e1, e2) // todo div is for unsigned; i believe we have signed ints?
+                    case Multiply(e1, e2) => call("mul", retvar, contractName, checkedTable, inMain, e1, e2)
+                    case Mod(e1, e2) => call("smod", retvar, contractName, checkedTable, inMain, e1, e2) // todo as with div
+                    case Equals(e1, e2) => call("eq", retvar, contractName, checkedTable, inMain, e1, e2)
+                    case GreaterThan(e1, e2) => call("sgt", retvar, contractName, checkedTable, inMain, e1, e2) // todo as with div
+                    case GreaterThanOrEquals(e1, e2) => geq_leq("sgt", retvar, e1, e2, contractName, checkedTable, inMain)
+                    case LessThan(e1, e2) => call("slt", retvar, contractName, checkedTable, inMain, e1, e2) //todo as with div
+                    case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable, inMain)
+                    case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable, inMain)
                 }
             case LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
                 // look up the name of the function in the table, get its return type, and then compute
@@ -516,7 +516,7 @@ object CodeGenYul extends CodeGenerator {
                 val (seqs, ids) = {
                     args.map(p => {
                         val id: Identifier = nextTemp()
-                        (translateExpr(id, p, contractName, checkedTable), id)
+                        (translateExpr(id, p, contractName, checkedTable, inMain), id)
                     }).unzip
                 }
 
@@ -548,16 +548,13 @@ object CodeGenYul extends CodeGenerator {
                 val id_recipient: Identifier = nextTemp()
                 val this_address = edu.cmu.cs.obsidian.parser.ReferenceIdentifier(id_recipient.name)
 
-                val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable)
+                val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
                 ((decl_0exp(id_recipient) +: recipient_yul) ++
-                    translateExpr(retvar,
-                        LocalInvocation(transactionNameMapping(getContractName(recipient), name),
-                            genericParams,
-                            params,
-                            this_address +: args),
-                        contractName,
-                        checkedTable))
+                    translateExpr(retvar, LocalInvocation(transactionNameMapping(getContractName(recipient), name),
+                                                genericParams,
+                                                params,
+                                                this_address +: args), contractName, checkedTable, inMain))
 
             case Construction(contractType, args, isFFIInvocation) =>
                 // todo: currently we ignore the arguments to the constructor
