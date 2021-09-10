@@ -157,9 +157,9 @@ object CodeGenYul extends CodeGenerator {
       */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
-            case f: Field => translateField(f)
-            case t: Transaction => translateTransaction(t, contractName, checkedTable)
-            case s: State => translateState(s)
+            case f: Field => translateField(f) // todo
+            case t: Transaction => translateTransaction(t, contractName, checkedTable, inMain)
+            case s: State => translateState(s) // todo
             case c: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -201,6 +201,9 @@ object CodeGenYul extends CodeGenerator {
 
     def translateConstructor(constructor: Constructor, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
         assert(false) // todo: this is never getting called as far as i know, and i don't really think it should be so i want to know about it if it is
+
+
+        // this is basically dead code; it's never been run in any of the ganache tests because we don't have constructors.
         val new_name: String = "constructor_" + constructor.name
         val deployExpr = FunctionCall(
             Identifier(new_name), // TODO change how to find constructor function name after adding randomized suffix/prefix
@@ -214,8 +217,18 @@ object CodeGenYul extends CodeGenerator {
                 Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
 
-    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
+    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         var id: Option[String] = None
+
+        // if the transaction appears in main, it keeps its name, otherwise it gets prepended with the name of the contract in which it appears.
+        val name: String =
+            if (inMain) {
+                transaction.name
+            } else {
+                transactionNameMapping(contractName, transaction.name)
+            }
+
+        // translate the return type to the ABI names
         val ret: Seq[TypedName] = {
             transaction.retType match {
                 case Some(t) =>
@@ -225,11 +238,19 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        Seq(FunctionDefinition(
-            transaction.name, // TODO rename transaction name (by adding prefix/suffix)
-            transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
-            ret,
-            Block(transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))))) //todo iev temp vars: likely a hack to work around something wrong
+        // for transactions appearing in main, nothing changes; others get an explicit "this" argument added
+        val args: Seq[TypedName] =
+            if (inMain) {
+                Seq() // add nothing
+            } else {
+                Seq(TypedName("this","string")) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
+            } ++ transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1))
+
+        // form the body of the transaction by translating each statement found
+        val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))
+
+        // return the function definition formed from the above parts
+        Seq(FunctionDefinition(name, args, ret, Block(body)))
     }
 
     /**
