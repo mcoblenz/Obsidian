@@ -35,7 +35,7 @@ object CodeGenYul extends CodeGenerator {
     }
 
     // todo this is getting redundant, find a better way
-    def nextRet(): String = {
+    def nextRet(): String = { // todo: make this an indentifier not a string; that'll force a change to translateStatement
         retCnt = retCnt + 1
         s"_ret_${retCnt.toString}" //todo: better naming convention?
     }
