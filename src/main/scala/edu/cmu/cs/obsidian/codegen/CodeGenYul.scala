@@ -58,7 +58,7 @@ object CodeGenYul extends CodeGenerator {
             case None =>
                 Paths.get(mainName)
         }
-        
+
         // translate from obsidian AST to yul AST
         val translated_obj = translateProgram(ast, checkedTable)
 
@@ -107,6 +107,19 @@ object CodeGenYul extends CodeGenerator {
             data = mainContractYO.data) // todo this is always empty, we ignore data
     }
 
+    /**
+      * given a contract, produce the Yul object that contains its translation as the main object. this will not
+      * rename any of the transactions for this object, but will call transactions from other objects with the
+      * names that they will have in the flattened translation. e.g. `f()` remains `f()` but `ic.f()` becomes
+      * `IntContainer___f(this)` if ic is an IntContainer.
+      *
+      * todo: right now we do not actually have enough type information to do the above in a robust way, but we will
+      * add that soon
+      *
+      * @param contract the contract to be translated
+      * @param checkedTable the symbol table for that contract
+      * @return the yul
+      */
     def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
         var decls: Seq[YulStatement] = Seq()
 
@@ -115,7 +128,7 @@ object CodeGenYul extends CodeGenerator {
             decls = decls ++ translateDeclaration(d, contract.name, checkedTable, true)
         }
 
-        // create runtime object
+        // create runtime object from just the declarations and with the subobject name suffix
         val runtime_obj = YulObject(name = contract.name + "_deployed",
             code = Code(Block(decls)),
             runtimeSubobj = Seq(),
@@ -129,6 +142,15 @@ object CodeGenYul extends CodeGenerator {
             data = Seq())
     }
 
+    /**
+      * given a contract that is not the main one, produce a yul object that represents the part of its translation that's
+      * ready to be inserted into the translation of a main yul object. this will rename the transactions according to the
+      * contract name.
+      *
+      * @param c the contract to be translated
+      * @param checkedTable the symbol table of the contract
+      * @return the YulObject representing the translation. note that all the fields other than `code` will be the empty sequence.
+      */
     def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
         var translation: Seq[YulStatement] = Seq()
 
