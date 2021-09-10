@@ -50,6 +50,7 @@ object CodeGenYul extends CodeGenerator {
             throw new RuntimeException("No main contract found")
         }
         val mainName = findMainContractName(ast)
+
         // prepare finalOutputPath
         val finalOutputPath = options.outputPath match {
             case Some(p) =>
@@ -57,12 +58,12 @@ object CodeGenYul extends CodeGenerator {
             case None =>
                 Paths.get(mainName)
         }
+        
         // translate from obsidian AST to yul AST
         val translated_obj = translateProgram(ast, checkedTable)
-        // generate yul string from yul AST
+
+        // generate yul string from yul AST, write to the output file
         val s = translated_obj.yulString()
-        // write string to output file
-        // currently it's created in the Obsidian directory; this may need to be changed, based on desired destination
         Files.createDirectories(finalOutputPath)
         val writer = new FileWriter(new File(finalOutputPath.toString, translated_obj.name + ".yul"))
         writer.write(s)
@@ -243,7 +244,7 @@ object CodeGenYul extends CodeGenerator {
             if (inMain) {
                 Seq() // add nothing
             } else {
-                Seq(TypedName("this","string")) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
+                Seq(TypedName("this", "string")) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
             } ++ transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1))
 
         // form the body of the transaction by translating each statement found
@@ -552,9 +553,9 @@ object CodeGenYul extends CodeGenerator {
 
                 ((decl_0exp(id_recipient) +: recipient_yul) ++
                     translateExpr(retvar, LocalInvocation(transactionNameMapping(getContractName(recipient), name),
-                                                genericParams,
-                                                params,
-                                                this_address +: args), contractName, checkedTable, inMain))
+                        genericParams,
+                        params,
+                        this_address +: args), contractName, checkedTable, inMain))
 
             case Construction(contractType, args, isFFIInvocation) =>
                 // todo: currently we ignore the arguments to the constructor
