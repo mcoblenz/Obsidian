@@ -474,7 +474,6 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    // todo: this call to translateStatement is cute, but frankly the "inMain" argument does not particularly make sense here.
                     case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable, inMain)
                     case Negate(e) =>
                         translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable, inMain)
