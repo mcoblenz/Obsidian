@@ -31,13 +31,13 @@ object CodeGenYul extends CodeGenerator {
 
     def nextTemp(): Identifier = {
         tempCnt = tempCnt + 1
-        Identifier(name = s"_tmp_${tempCnt.toString}") //todo: better naming convention?
+        Identifier(name = s"_tmp_${tempCnt.toString}")
     }
 
     // todo this is getting redundant, find a better way
-    def nextRet(): String = { // todo: make this an identifier not a string; that'll force a change to translateStatement
+    def nextRet(): Identifier = {
         retCnt = retCnt + 1
-        s"_ret_${retCnt.toString}" //todo: better naming convention?
+        Identifier(s"_ret_${retCnt.toString}")
     }
 
 
@@ -241,7 +241,7 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
-        var id: Option[String] = None
+        var id: Option[Identifier] = None
 
         // if the transaction appears in main, it keeps its name, otherwise it gets prepended with the name of the contract in which it appears.
         val name: String =
@@ -256,7 +256,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get, obsTypeToYulTypeAndSize(t.toString)._1))
+                    Seq(TypedName(id.get.name, obsTypeToYulTypeAndSize(t.toString)._1))
                 case None => Seq()
             }
         }
@@ -283,8 +283,8 @@ object CodeGenYul extends CodeGenerator {
       * @param retVar the name of the variable to use for returning for the current scope, if there is one
       * @return
       */
-    def translateStatement(s: Statement, retVar: Option[String], contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
-        //todo: why is retVar an option and why is it a string not an identifier?
+    def translateStatement(s: Statement, retVar: Option[Identifier], contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
+        //todo: why is retVar an option?
         s match {
             case Return() =>
                 Seq(Leave())
@@ -295,7 +295,7 @@ object CodeGenYul extends CodeGenerator {
                         val e_yul = translateExpr(temp_id, e, contractName, checkedTable, inMain)
                         decl_0exp(temp_id) +:
                             e_yul :+
-                            assign1(Identifier(retVarName), temp_id) :+
+                            assign1(Identifier(retVarName.name), temp_id) :+
                             Leave()
                     case None => assert(assertion = false, "error: returning an expression from a transaction without a return type")
                         Seq()
@@ -343,7 +343,7 @@ object CodeGenYul extends CodeGenerator {
             case e: Expression =>
                 // todo: tighten up this logic, there's repeated code here
                 retVar match {
-                    case Some(value) => translateExpr(Identifier(value), e, contractName, checkedTable, inMain)
+                    case Some(value) => translateExpr(value, e, contractName, checkedTable, inMain)
                     case None =>
                         val id = nextTemp()
                         decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable, inMain)
@@ -371,7 +371,7 @@ object CodeGenYul extends CodeGenerator {
                 val s_yul: Seq[YulStatement] =
                     s.flatMap(s => {
                         val id_s: Identifier = nextTemp()
-                        decl_0exp(id_s) +: translateStatement(s, Some(id_s.name), contractName, checkedTable, inMain)
+                        decl_0exp(id_s) +: translateStatement(s, Some(id_s), contractName, checkedTable, inMain)
                         //todo: this also does not assign afterwards; likely the same bug as fixed in IfThenElse
                     })
 
@@ -474,7 +474,7 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e: UnaryExpression =>
                 e match {
-                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar.name), contractName, checkedTable, inMain)
+                    case LogicalNegation(e) => translateStatement(IfThenElse(e, Seq(FalseLiteral()), Seq(TrueLiteral())), Some(retvar), contractName, checkedTable, inMain)
                     case Negate(e) =>
                         translateExpr(retvar, Subtract(NumLiteral(0), e), contractName, checkedTable, inMain)
                     case Dereference(_, _) =>
