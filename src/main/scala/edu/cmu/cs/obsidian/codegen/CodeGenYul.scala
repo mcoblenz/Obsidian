@@ -519,8 +519,12 @@ object CodeGenYul extends CodeGenerator {
                             0
                         } else if (name == transactionNameMapping("IntContainer", "get")) {
                             1
+                        } else if (name == transactionNameMapping("IntContainer", "set1")) {
+                            0
+                        } else if (name == transactionNameMapping("IntContainer", "set2")) {
+                            0
                         } else {
-                            assert(false)
+                            assert(false, s"width of transaction named ${name}")
                         }
                 }
 
