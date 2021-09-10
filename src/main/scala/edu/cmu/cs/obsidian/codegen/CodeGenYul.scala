@@ -72,7 +72,7 @@ object CodeGenYul extends CodeGenerator {
 
     def translateProgram(program: Program, checkedTable: SymbolTable): YulObject = {
         // translate main contract, or fail if none is found or only a java contract is present
-        val main_contract_ast: YulObject =
+        val mainContractYO: YulObject =
             findMainContract(program) match {
                 case Some(p) => p match {
                     case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateMainContract(c, checkedTable)
@@ -91,7 +91,7 @@ object CodeGenYul extends CodeGenerator {
             c match {
                 case obsContract: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
-                        childContracts = childContracts // :+ translateContract(obsContract, checkedTable)
+                        childContracts = childContracts :+ translateNonMainContract(obsContract, checkedTable)
                     }
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
@@ -99,11 +99,11 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // todo: we do not process imports
-        YulObject(name = main_contract_ast.name,
-            code = main_contract_ast.code,
-            runtimeSubobj = main_contract_ast.runtimeSubobj,
-            childContracts = childContracts,
-            data = main_contract_ast.data) // todo this is always empty, we ignore data
+        YulObject(name = mainContractYO.name,
+            code = mainContractYO.code,
+            runtimeSubobj = mainContractYO.runtimeSubobj ++ childContracts,
+            childContracts = Seq(), // todo maybe delete this field entirely
+            data = mainContractYO.data) // todo this is always empty, we ignore data
     }
 
     def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
@@ -128,16 +128,20 @@ object CodeGenYul extends CodeGenerator {
             data = Seq())
     }
 
-
-    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable, mainContract: YulObject): YulObject = {
-        var statement_seq_runtime: Seq[YulStatement] = Seq()
+    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
+        var translation: Seq[YulStatement] = Seq()
 
         for (d <- c.declarations) {
-            val runtime_seq = translateDeclaration(d, c.name, checkedTable, false)
-            statement_seq_runtime = statement_seq_runtime ++ runtime_seq
+            val dTranslated = translateDeclaration(d, c.name, checkedTable, false)
+            translation = translation ++ dTranslated
         }
 
-        mainContract
+        YulObject(name = c.name,
+            code = Code(Block(translation)),
+            runtimeSubobj = Seq(),
+            childContracts = Seq(),
+            data = Seq()
+        )
     }
 
 
