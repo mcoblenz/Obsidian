@@ -676,7 +676,30 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             (resultType, contextAfterPrivateInvocation, isFFIInvocation, receiverPrime, foundTransaction.get.params, exprSequence)
         }
 
-         e match {
+        def updateType(e: Expression, typ: ObsidianType): Expression = {
+            e match {
+                case expression: AtomicExpression => expression match {
+                    // per https://docs.scala-lang.org/tour/case-classes.html i think this:
+                    //      e.copy(obstype = Some(typ))
+                    // should work in all these cases, but it does not! fascinating.
+                    case ReferenceIdentifier(name) => assert(false); e
+                    case NumLiteral(value) => assert(false); e
+                    case StringLiteral(value) => assert(false); e
+                    case TrueLiteral() => assert(false); e
+                    case FalseLiteral() => assert(false); e
+                    case This() => assert(false); e
+                    case Parent() => assert(false); e
+                } 
+                case expression: UnaryExpression => assert(false); e
+                case expression: BinaryExpression => assert(false); e
+                case LocalInvocation(name, genericParams, params, args) => assert(false); e
+                case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) => assert(false); e
+                case Construction(contractType, args, isFFIInvocation) => assert(false); e
+                case StateInitializer(stateName, fieldName) => assert(false); e
+            }
+        }
+
+        val (retType, retCtx, retExp) = e match {
              case ReferenceIdentifier(x) =>
                  (context get x, context.lookupCurrentFieldTypeInThis(x)) match {
                      case (Some(t), _) =>
@@ -974,8 +997,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                          }
                  }
 
+                 //assert(! e.obstype.isEmpty, s"infer and check failed to populate the type of ${e.toString}")
                  (fieldType, context, e)
          }
+
+        (retType, retCtx, updateType(retExp,retType))
     }
 
 
