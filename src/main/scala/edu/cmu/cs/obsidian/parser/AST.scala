@@ -10,19 +10,23 @@ trait HasLocation {
     var loc: Position = NoPosition
 
     def setLoc(t: Token): this.type = {
-        loc = t.pos; this
+        loc = t.pos;
+        this
     }
 
     def setLoc(other: HasLocation): this.type = {
-        loc = other.loc; this
+        loc = other.loc;
+        this
     }
 
     def setLoc(id: (String, Position)): this.type = {
-        loc = id._2; this
+        loc = id._2;
+        this
     }
 
     def setLoc(pos: Position): this.type = {
-        loc = pos; this
+        loc = pos;
+        this
     }
 }
 
@@ -36,7 +40,8 @@ sealed abstract class Statement() extends AST {
 /* All expressions are statements. We relegate the pruning of expressions
  * that don't have effects to a later analysis */
 sealed abstract class Expression() extends Statement {
-    val obstype : Option[ObsidianType]
+    val obstype: Option[ObsidianType]
+
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Expression
 }
 
@@ -85,12 +90,14 @@ sealed abstract class InvokableDeclaration() extends Declaration {
 // Expressions not containing other expressions
 sealed abstract class AtomicExpression extends Expression {
     val obstype: Option[ObsidianType] = None
+
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): AtomicExpression = this
 }
 
 sealed abstract class UnaryExpression(make: Expression => UnaryExpression,
                                       e: Expression) extends Expression {
     val obstype: Option[ObsidianType] = None
+
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): UnaryExpression =
         make(e.substitute(genericParams, actualParams)).setLoc(this)
 }
@@ -99,6 +106,7 @@ sealed abstract class BinaryExpression(make: (Expression, Expression) => BinaryE
                                        e1: Expression,
                                        e2: Expression) extends Expression {
     val obstype: Option[ObsidianType] = None
+
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): BinaryExpression =
         make(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
             .setLoc(this)
@@ -170,6 +178,7 @@ case class Dereference(e: Expression, f: String) extends UnaryExpression(Derefer
 case class LocalInvocation(name: String, genericParams: Seq[GenericType],
                            params: Seq[ObsidianType], args: Seq[Expression]) extends Expression {
     val obstype: Option[ObsidianType] = None
+
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LocalInvocation =
         LocalInvocation(name,
             genericParams,
@@ -183,6 +192,7 @@ case class LocalInvocation(name: String, genericParams: Seq[GenericType],
 case class Invocation(recipient: Expression, genericParams: Seq[GenericType], params: Seq[ObsidianType],
                       name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     val obstype: Option[ObsidianType] = None
+
     override def toString: String = s"$recipient.$name(${args.mkString(",")})"
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Invocation =
@@ -196,6 +206,7 @@ case class Invocation(recipient: Expression, genericParams: Seq[GenericType], pa
 
 case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
     val obstype: Option[ObsidianType] = None
+
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Construction =
         Construction(contractType.substitute(genericParams, actualParams),
             args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
@@ -206,6 +217,7 @@ case class Disown(e: Expression) extends UnaryExpression(Disown, e)
 
 case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression {
     val obstype: Option[ObsidianType] = None
+
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StateInitializer = this
 }
 
@@ -441,7 +453,7 @@ case class Ensures(expr: Expression) extends AST {
             .setLoc(this)
 }
 
-sealed abstract trait ContractModifier extends HasLocation
+sealed trait ContractModifier extends HasLocation
 
 case class IsAsset() extends ContractModifier
 
