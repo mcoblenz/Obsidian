@@ -10,22 +10,22 @@ trait HasLocation {
     var loc: Position = NoPosition
 
     def setLoc(t: Token): this.type = {
-        loc = t.pos;
+        loc = t.pos
         this
     }
 
     def setLoc(other: HasLocation): this.type = {
-        loc = other.loc;
+        loc = other.loc
         this
     }
 
     def setLoc(id: (String, Position)): this.type = {
-        loc = id._2;
+        loc = id._2
         this
     }
 
     def setLoc(pos: Position): this.type = {
-        loc = pos;
+        loc = pos
         this
     }
 }
