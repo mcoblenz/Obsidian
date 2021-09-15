@@ -141,8 +141,8 @@ case class FalseLiteral() extends AtomicExpression {
     override def toString: String = "false"
 }
 
-case class This(contractReferenceType: ContractReferenceType) extends AtomicExpression {
-    override val obstype: Option[ObsidianType] = Some(contractReferenceType) // todo is this right?
+case class This(typ: ObsidianType) extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = Some(typ) // todo is this right? should this be a contractReferenceType?
 
     override def toString: String = "this"
 }
