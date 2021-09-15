@@ -679,9 +679,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         def updateType(e: Expression, typ: ObsidianType): Expression = {
             e match {
                 case expression: AtomicExpression => expression match {
-                    // per https://docs.scala-lang.org/tour/case-classes.html i think this:
-                    //      e.copy(obstype = Some(typ))
-                    // should work in all these cases, but it does not! fascinating.
                     case ReferenceIdentifier(name) => assert(false); e
                     case NumLiteral(value) => assert(false); e
                     case StringLiteral(value) => assert(false); e
