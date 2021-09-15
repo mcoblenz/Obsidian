@@ -113,8 +113,8 @@ sealed abstract class BinaryExpression(make: (Expression, Expression) => BinaryE
 }
 
 /* Expressions */
-case class ReferenceIdentifier(name: String, typ: ObsidianType) extends AtomicExpression {
-    override val obstype: Option[ObsidianType] = Some(typ)
+case class ReferenceIdentifier(name: String, typ: Option[ObsidianType]) extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = typ
 
     override val toString: String = name
 }
@@ -141,8 +141,8 @@ case class FalseLiteral() extends AtomicExpression {
     override def toString: String = "false"
 }
 
-case class This(typ: ObsidianType) extends AtomicExpression {
-    override val obstype: Option[ObsidianType] = Some(typ) // todo is this right? should this be a contractReferenceType?
+case class This(typ: Option[ObsidianType]) extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = typ // todo is this right? should this be a contractReferenceType?
 
     override def toString: String = "this"
 }
@@ -223,8 +223,8 @@ case class Dereference(e: Expression, f: String) extends UnaryExpression(Derefer
 }
 
 case class LocalInvocation(name: String, genericParams: Seq[GenericType],
-                           params: Seq[ObsidianType], args: Seq[Expression], typ: ObsidianType) extends Expression {
-    override val obstype: Option[ObsidianType] = Some(typ)
+                           params: Seq[ObsidianType], args: Seq[Expression], typ: Option[ObsidianType]) extends Expression {
+    override val obstype: Option[ObsidianType] = typ
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LocalInvocation =
         LocalInvocation(name,
@@ -237,8 +237,8 @@ case class LocalInvocation(name: String, genericParams: Seq[GenericType],
 }
 
 case class Invocation(recipient: Expression, genericParams: Seq[GenericType], params: Seq[ObsidianType],
-                      name: String, args: Seq[Expression], isFFIInvocation: Boolean, typ: ObsidianType) extends Expression {
-    override val obstype: Option[ObsidianType] = Some(typ)
+                      name: String, args: Seq[Expression], isFFIInvocation: Boolean, typ: Option[ObsidianType]) extends Expression {
+    override val obstype: Option[ObsidianType] = typ
 
     override def toString: String = s"$recipient.$name(${args.mkString(",")})"
 
@@ -251,8 +251,8 @@ case class Invocation(recipient: Expression, genericParams: Seq[GenericType], pa
             .setLoc(this)
 }
 
-case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean, typ: ObsidianType) extends Expression {
-    override val obstype: Option[ObsidianType] = Some(typ)
+case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean, typ: Option[ObsidianType]) extends Expression {
+    override val obstype: Option[ObsidianType] = typ
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Construction =
         Construction(contractType.substitute(genericParams, actualParams),
@@ -262,8 +262,8 @@ case class Construction(contractType: ContractType, args: Seq[Expression], isFFI
 
 case class Disown(e: Expression) extends UnaryExpression(Disown, e) // todo there's something happening that i don't understand
 
-case class StateInitializer(stateName: Identifier, fieldName: Identifier, typ: ObsidianType) extends Expression {
-    override val obstype: Option[ObsidianType] = Some(typ)
+case class StateInitializer(stateName: Identifier, fieldName: Identifier, typ: Option[ObsidianType]) extends Expression {
+    override val obstype: Option[ObsidianType] = typ
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StateInitializer = this
 }
