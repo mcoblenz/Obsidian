@@ -113,85 +113,132 @@ sealed abstract class BinaryExpression(make: (Expression, Expression) => BinaryE
 }
 
 /* Expressions */
-case class ReferenceIdentifier(name: String) extends AtomicExpression {
+case class ReferenceIdentifier(name: String, typ: ObsidianType) extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = Some(typ)
+
     override val toString: String = name
 }
 
 case class NumLiteral(value: Int) extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = Some(IntType())
+
     override def toString: String = value.toString
 }
 
-case class StringLiteral(value: String) extends AtomicExpression
+case class StringLiteral(value: String) extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = Some(StringType())
+}
 
 case class TrueLiteral() extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+
     override def toString: String = "true"
 }
 
 case class FalseLiteral() extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+
     override def toString: String = "false"
 }
 
-case class This() extends AtomicExpression {
+case class This(contractReferenceType: ContractReferenceType) extends AtomicExpression {
+    override val obstype: Option[ObsidianType] = Some(contractReferenceType) // todo is this right?
+
     override def toString: String = "this"
 }
 
-case class Parent() extends AtomicExpression
+case class Parent() extends AtomicExpression //todo type of parent?
 
-case class Conjunction(e1: Expression, e2: Expression) extends BinaryExpression(Conjunction, e1, e2)
+case class Conjunction(e1: Expression, e2: Expression) extends BinaryExpression(Conjunction, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
-case class Disjunction(e1: Expression, e2: Expression) extends BinaryExpression(Disjunction, e1, e2)
+case class Disjunction(e1: Expression, e2: Expression) extends BinaryExpression(Disjunction, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
-case class LogicalNegation(e: Expression) extends UnaryExpression(LogicalNegation, e)
+case class LogicalNegation(e: Expression) extends UnaryExpression(LogicalNegation, e) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
-case class Add(e1: Expression, e2: Expression) extends BinaryExpression(Add, e1, e2)
 
-case class StringConcat(e1: Expression, e2: Expression) extends BinaryExpression(StringConcat, e1, e2)
+case class Add(e1: Expression, e2: Expression) extends BinaryExpression(Add, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(IntType())
+}
 
-case class Subtract(e1: Expression, e2: Expression) extends BinaryExpression(Subtract, e1, e2)
+case class StringConcat(e1: Expression, e2: Expression) extends BinaryExpression(StringConcat, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(StringType())
+}
 
-case class Divide(e1: Expression, e2: Expression) extends BinaryExpression(Divide, e1, e2)
+case class Subtract(e1: Expression, e2: Expression) extends BinaryExpression(Subtract, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(IntType())
+}
 
-case class Multiply(e1: Expression, e2: Expression) extends BinaryExpression(Multiply, e1, e2)
+case class Divide(e1: Expression, e2: Expression) extends BinaryExpression(Divide, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(IntType())
+}
 
-case class Mod(e1: Expression, e2: Expression) extends BinaryExpression(Mod, e1, e2)
+case class Multiply(e1: Expression, e2: Expression) extends BinaryExpression(Multiply, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(IntType())
+}
 
-case class Negate(e: Expression) extends UnaryExpression(Negate, e)
+case class Mod(e1: Expression, e2: Expression) extends BinaryExpression(Mod, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(IntType())
+}
 
-case class Equals(e1: Expression, e2: Expression) extends BinaryExpression(Equals, e1, e2)
+case class Negate(e: Expression) extends UnaryExpression(Negate, e) {
+    override val obstype: Option[ObsidianType] = Some(IntType())
+}
 
-case class GreaterThan(e1: Expression, e2: Expression) extends BinaryExpression(GreaterThan, e1, e2)
+case class Equals(e1: Expression, e2: Expression) extends BinaryExpression(Equals, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
-case class GreaterThanOrEquals(e1: Expression, e2: Expression) extends BinaryExpression(GreaterThanOrEquals, e1, e2)
+case class GreaterThan(e1: Expression, e2: Expression) extends BinaryExpression(GreaterThan, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
-case class LessThan(e1: Expression, e2: Expression) extends BinaryExpression(LessThan, e1, e2)
+case class GreaterThanOrEquals(e1: Expression, e2: Expression) extends BinaryExpression(GreaterThanOrEquals, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
-case class LessThanOrEquals(e1: Expression, e2: Expression) extends BinaryExpression(LessThanOrEquals, e1, e2)
+case class LessThan(e1: Expression, e2: Expression) extends BinaryExpression(LessThan, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
-case class NotEquals(e1: Expression, e2: Expression) extends BinaryExpression(NotEquals, e1, e2)
+case class LessThanOrEquals(e1: Expression, e2: Expression) extends BinaryExpression(LessThanOrEquals, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
+
+case class NotEquals(e1: Expression, e2: Expression) extends BinaryExpression(NotEquals, e1, e2) {
+    override val obstype: Option[ObsidianType] = Some(BoolType())
+}
 
 case class Dereference(e: Expression, f: String) extends UnaryExpression(Dereference(_, f), e) {
+    override val obstype: Option[ObsidianType] = e.obstype // todo
+
     override def toString: String = {
         s"$e.$f"
     }
 }
 
 case class LocalInvocation(name: String, genericParams: Seq[GenericType],
-                           params: Seq[ObsidianType], args: Seq[Expression]) extends Expression {
-    val obstype: Option[ObsidianType] = None
+                           params: Seq[ObsidianType], args: Seq[Expression], typ: ObsidianType) extends Expression {
+    override val obstype: Option[ObsidianType] = Some(typ)
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): LocalInvocation =
         LocalInvocation(name,
             genericParams,
             params.map(_.substitute(genericParams, actualParams)),
-            args.map(_.substitute(genericParams, actualParams)))
+            args.map(_.substitute(genericParams, actualParams)), typ)
             .setLoc(this)
 
     override def toString: String = s"$name(${args.mkString(",")})"
 }
 
 case class Invocation(recipient: Expression, genericParams: Seq[GenericType], params: Seq[ObsidianType],
-                      name: String, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
-    val obstype: Option[ObsidianType] = None
+                      name: String, args: Seq[Expression], isFFIInvocation: Boolean, typ: ObsidianType) extends Expression {
+    override val obstype: Option[ObsidianType] = Some(typ)
 
     override def toString: String = s"$recipient.$name(${args.mkString(",")})"
 
@@ -200,23 +247,23 @@ case class Invocation(recipient: Expression, genericParams: Seq[GenericType], pa
             genericParams,
             params.map(_.substitute(genericParams, actualParams)),
             name,
-            args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
+            args.map(_.substitute(genericParams, actualParams)), isFFIInvocation, typ)
             .setLoc(this)
 }
 
-case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean) extends Expression {
-    val obstype: Option[ObsidianType] = None
+case class Construction(contractType: ContractType, args: Seq[Expression], isFFIInvocation: Boolean, typ: ObsidianType) extends Expression {
+    override val obstype: Option[ObsidianType] = Some(typ)
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): Construction =
         Construction(contractType.substitute(genericParams, actualParams),
-            args.map(_.substitute(genericParams, actualParams)), isFFIInvocation)
+            args.map(_.substitute(genericParams, actualParams)), isFFIInvocation, typ)
             .setLoc(this)
 }
 
-case class Disown(e: Expression) extends UnaryExpression(Disown, e)
+case class Disown(e: Expression) extends UnaryExpression(Disown, e) // todo there's something happening that i don't understand
 
-case class StateInitializer(stateName: Identifier, fieldName: Identifier) extends Expression {
-    val obstype: Option[ObsidianType] = None
+case class StateInitializer(stateName: Identifier, fieldName: Identifier, typ: ObsidianType) extends Expression {
+    override val obstype: Option[ObsidianType] = Some(typ)
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): StateInitializer = this
 }
