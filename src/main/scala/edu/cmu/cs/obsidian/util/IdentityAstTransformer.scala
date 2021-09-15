@@ -148,7 +148,7 @@ class IdentityAstTransformer {
             case s: StringLiteral => (s, List())
             case t: TrueLiteral => (TrueLiteral().setLoc(t), List())
             case f: FalseLiteral => (FalseLiteral().setLoc(f), List())
-            case t: This => (This().setLoc(t), List())
+            case t: This => (This(None).setLoc(t), List()) // todo: no idea if this is right
             case p: Parent => (Parent().setLoc(p), List())
             case c: Conjunction =>
                 transformBinary(table, lexicallyInsideOf, context, c.e1, c.e2, params, Conjunction(_, _).setLoc(c))
