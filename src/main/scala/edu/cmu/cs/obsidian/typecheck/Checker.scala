@@ -1283,7 +1283,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
      * of identifiers on the path. If [e] isn't this form, returns None */
     private def extractPath(e: Expression): Option[Seq[String]] = {
         e match {
-            case ReferenceIdentifier(x,_) => Some(x :: Nil)
+            case ReferenceIdentifier(x, _) => Some(x :: Nil)
             case This(_) => Some("this" :: Nil)
             case Parent() => Some("this" :: "parent" :: Nil)
             case Dereference(ePrime, f) => extractPath(ePrime).map(_ ++ (f :: Nil))
@@ -1315,7 +1315,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val specOutputType = spec(i).typOut
 
                 val nameToUpdate = arg match {
-                    case ReferenceIdentifier(x,_) => Some(x)
+                    case ReferenceIdentifier(x, _) => Some(x)
                     case This(_) => Some("this")
                     case _ => None
                 }
@@ -1434,7 +1434,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                        declaredFinalType: NonPrimitiveType,
                                        context: Context): Context = {
         val nameToUpdate = arg match {
-            case ReferenceIdentifier(x,_) => Some(x)
+            case ReferenceIdentifier(x, _) => Some(x)
             case This(_) => Some("this")
             case _ =>
                 // If the argument isn't bound to a variable but owns an asset, and this call is not going to consume ownership, then error.
@@ -1647,7 +1647,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, consumeOwnership)
 
                 val thisSetToExclude = e match {
-                    case ReferenceIdentifier(xOther,_)
+                    case ReferenceIdentifier(xOther, _)
                         if retTypeOpt.isDefined && retTypeOpt.get.isOwned => Set(xOther, "this")
                     case _ => Set("this")
                 }
@@ -1772,7 +1772,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 if (updates.isDefined) {
                     var newUpdates = Seq.empty[(ReferenceIdentifier, Expression)]
 
-                    for ((ReferenceIdentifier(f,_), e) <- updates.get) {
+                    for ((ReferenceIdentifier(f, _), e) <- updates.get) {
                         // Check to make sure we're not going to lose an owned asset by overwriting it
                         val currentFieldType = contextPrime.lookupCurrentFieldTypeInThis(f).getOrElse(BottomType())
                         if (currentFieldType.isAssetReference(thisTable) != No() && currentFieldType.isOwned) {
@@ -1783,7 +1783,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val fieldAST = newStateTable.lookupField(f)
                         if (fieldAST.isDefined) {
                             val (t, contextPrime2, ePrime) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))
-                            newUpdates = newUpdates :+ (ReferenceIdentifier(f,Some(t)), ePrime)
+                            newUpdates = newUpdates :+ (ReferenceIdentifier(f, Some(t)), ePrime)
                             contextPrime = contextPrime2
                             checkIsSubtype(contextPrime.contractTable, s, t, fieldAST.get.typ)
                         }
@@ -1823,7 +1823,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 var newThisFieldTypes = contextPrime.thisFieldTypes.filter((fieldType: (String, ObsidianType)) => newFieldNames.contains(fieldType._1))
 
                 // Discard records for any this-field types that we're about to assign to.
-                for ((ReferenceIdentifier(f,_), e) <- updates.getOrElse(Seq())) {
+                for ((ReferenceIdentifier(f, _), e) <- updates.getOrElse(Seq())) {
                     newThisFieldTypes = newThisFieldTypes - f
                 }
                 // Discard records for any this-field types for which there were initializers (S::x = ...)
@@ -1853,12 +1853,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 (contextAfterTransition, Transition(newStateName, newUpdatesOption, context.thisType.permission).setLoc(s))
 
-            case Assignment(ReferenceIdentifier(x,obstyp), e: Expression) =>
+            case Assignment(ReferenceIdentifier(x, obstyp), e: Expression) =>
                 if (context.valVariables.contains(x)) {
                     logError(s, InvalidValAssignmentError())
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
-                (contextPrime, Assignment(ReferenceIdentifier(x,obstyp), ePrime).setLoc(s))
+                (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s))
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
                 assert(false, "the code below this case is certainly wrong and will need to be debugged on an example")
@@ -1991,7 +1991,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             val ident = e match {
                                 // If e is a variable, we might be able to put it in the context with the appropriate state.
                                 // If it's not a variable, we just check the state and move on (no context changes).
-                                case ReferenceIdentifier(x,_) => Some(x)
+                                case ReferenceIdentifier(x, _) => Some(x)
                                 case This(_) => Some("this")
                                 case _ => None
                             }
@@ -2174,7 +2174,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             val newContextThisType =
                                 newType // is this right?
                             contextPrime.updated("this", newContextThisType)
-                        case ReferenceIdentifier(x,_) =>
+                        case ReferenceIdentifier(x, _) =>
                             if (contextPrime.get(x).isDefined) {
                                 // We're switching on a local variable or formal parameter.
                                 contextPrime.updated(x, newType)
