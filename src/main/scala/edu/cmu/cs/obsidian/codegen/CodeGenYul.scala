@@ -234,7 +234,7 @@ object CodeGenYul extends CodeGenerator {
                 }
             case Assignment(assignTo, e) =>
                 assignTo match {
-                    case ReferenceIdentifier(x) =>
+                    case ReferenceIdentifier(x, obstype) =>
                         // todo: this assumes that all identifiers are either fields or stack variables.
                         //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
@@ -374,7 +374,7 @@ object CodeGenYul extends CodeGenerator {
         e match {
             case e: AtomicExpression =>
                 e match {
-                    case ReferenceIdentifier(x) =>
+                    case ReferenceIdentifier(x, obstype) =>
                         // todo: this assumes that all indentifiers are either fields or stack variables;
                         //  we store nothing in memory. this is also very likely not doing the right thing
                         //  with name shadowing
@@ -398,7 +398,7 @@ object CodeGenYul extends CodeGenerator {
                         Seq(assign1(retvar, boollit(true)))
                     case FalseLiteral() =>
                         Seq(assign1(retvar, boollit(false)))
-                    case This() =>
+                    case This(obstype) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case Parent() =>
@@ -436,7 +436,7 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable)
                 }
-            case e@LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
+            case e@LocalInvocation(name, genericParams, params, args, obstype) => // todo: why are the middle two args not used?
                 // look up the name of the function in the table, get its return type, and then compute
                 // how wide of a tuple that return type is. (currently this is always either 0 or 1)
                 val width = checkedTable.contractLookup(contractName).lookupTransaction(name) match {
@@ -480,7 +480,7 @@ object CodeGenYul extends CodeGenerator {
                     case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
                 })
 
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
+            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, obstype) =>
 
                 val id_recipient = nextTemp()
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable)
@@ -547,7 +547,7 @@ object CodeGenYul extends CodeGenerator {
                         // todo: there is no assignment to retvar at the end here; i'm not sure that's right.
                     )
 
-            case Construction(contractType, args, isFFIInvocation) =>
+            case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // todo: currently we ignore the arguments to the constructor
 
                 val max_addr = "0xffffffffffffffff"
@@ -580,7 +580,7 @@ object CodeGenYul extends CodeGenerator {
                     revertForwardIfZero(id_addr),
                     assign1(retvar, id_addr)
                 )
-            case StateInitializer(stateName, fieldName) =>
+            case StateInitializer(stateName, fieldName, obstype) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()
         }
