@@ -212,7 +212,7 @@ object Parser extends Parsers {
 
         val parseUpdate = {
             val oneUpdate = parseId ~! EqT() ~! parseExpr ^^ {
-                case f ~ _ ~ e => (ReferenceIdentifier(f._1).setLoc(f), e)
+                case f ~ _ ~ e => (ReferenceIdentifier(f._1, None).setLoc(f), e)
             }
             LParenT() ~ repsep(oneUpdate, CommaT()) ~ RParenT() ^^ {
                 case _ ~ updates ~ _ => updates
@@ -378,7 +378,7 @@ object Parser extends Parsers {
         def parseLocalInv = {
             parseId ~ parseTypeList ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
                 // genericParams will be filled in later by the typechecker
-                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, Nil, params, args).setLoc(name)
+                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, Nil, params, args, None).setLoc(name)
             }
         }
 
@@ -390,7 +390,7 @@ object Parser extends Parsers {
                 (e: Expression, inv: DotExpr) => inv match {
                     case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
                     // genericParams will be filled in later by the typechecker
-                    case Right((funcName, params, args)) => Invocation(e, Nil, params, funcName._1, args, false).setLoc(funcName)
+                    case Right((funcName, params, args)) => Invocation(e, Nil, params, funcName._1, args, false, None).setLoc(funcName)
                 }
             )
         }
@@ -409,10 +409,10 @@ object Parser extends Parsers {
             case _ ~ e ~ _ => e
         }
 
-        val parseVar = parseId ^^ { (id: Identifier) => ReferenceIdentifier(id._1).setLoc(id) }
+        val parseVar = parseId ^^ { (id: Identifier) => ReferenceIdentifier(id._1, None).setLoc(id) }
 
         val parseStateInitializer = parseId ~ ColonColonT() ~! parseId ^^ {
-            case stateName ~ _ ~ fieldName => StateInitializer(stateName, fieldName).setLoc(stateName)
+            case stateName ~ _ ~ fieldName => StateInitializer(stateName, fieldName, None).setLoc(stateName)
         }
 
         val parseNumLiteral = {
@@ -427,7 +427,7 @@ object Parser extends Parsers {
                         case None => Nil
                     }
 
-                    Construction(ContractType(name._1, typeParams), args, false).setLoc(_new)
+                    Construction(ContractType(name._1, typeParams), args, false, None).setLoc(_new)
             }
         }
 
@@ -437,7 +437,7 @@ object Parser extends Parsers {
         val parseLiterals: Parser[Expression] =
             parseTrue | parseFalse | parseNumLiteral | parseStringLiteral
 
-        val parseThis = { ThisT() ^^ (t => This().setLoc(t))}
+        val parseThis = { ThisT() ^^ (t => This(None).setLoc(t))}
 
         val fail = failure("expression expected")
 
