@@ -873,12 +873,12 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 //todo i don't konw if passing `obstype` to This is correct at all
                 val (typ, con, _, _, newGenericParams, newArgs) = handleInvocation(context, name, This(obstype).setLoc(e), params, args)
                 //This may need correction.
-                (typ, con, LocalInvocation(name, newGenericParams, params, newArgs, typ).setLoc(e))
+                (typ, con, LocalInvocation(name, newGenericParams, params, newArgs, Some(typ)).setLoc(e))
 
             case Invocation(receiver: Expression, _, params, name, args: Seq[Expression], isFFIInvocation, obstype) =>
                 //todo should there be an assertion to check that obstype == typ? which one takes precedence?
                 val (typ, con, isFFIInv, newReceiver, newGenericParams, newArgs) = handleInvocation(context, name, receiver, params, args)
-                (typ, con, Invocation(newReceiver, newGenericParams, params, name, newArgs, isFFIInv, typ).setLoc(e))
+                (typ, con, Invocation(newReceiver, newGenericParams, params, name, newArgs, isFFIInv, Some(typ)).setLoc(e))
 
             case c@Construction(contractType, args: Seq[Expression], isFFIInvocation, obstyp) =>
                 val tableLookup = context.contractTable.lookupContract(contractType.contractName)
@@ -927,7 +927,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         (newExprSequence, outTyp, cntxt)
                 }
 
-                (simpleType, contextPrime, Construction(contractType, exprList, isFFIInv, simpleType))
+                (simpleType, contextPrime, Construction(contractType, exprList, isFFIInv, Some(simpleType)))
 
             case Disown(e) =>
                 // The expression "disown e" evaluates to an unowned value but also side-effects the context
@@ -1783,7 +1783,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val fieldAST = newStateTable.lookupField(f)
                         if (fieldAST.isDefined) {
                             val (t, contextPrime2, ePrime) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))
-                            newUpdates = newUpdates :+ (ReferenceIdentifier(f,t), ePrime)
+                            newUpdates = newUpdates :+ (ReferenceIdentifier(f,Some(t)), ePrime)
                             contextPrime = contextPrime2
                             checkIsSubtype(contextPrime.contractTable, s, t, fieldAST.get.typ)
                         }
@@ -1862,7 +1862,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
                 assert(false, "the code below this case is certainly wrong and will need to be debugged on an example")
-                if (eDeref != This(eDeref.obstype.get)) { //todo: this is totally wrong again, i seem not to know how to get the type for `this`
+                if (eDeref != This(None)) { //todo: this is totally wrong again, i seem not to know how to get the type for `this`
                     logError(s, InvalidNonThisFieldAssignment())
                     (context, s)
                 }
@@ -1896,7 +1896,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
                 else {
                     (contextPrime.updatedWithTransitionInitialization(stateName._1, fieldIdentifier._1, s),
-                        Assignment(StateInitializer(stateName, fieldIdentifier, t), ePrime))
+                        Assignment(StateInitializer(stateName, fieldIdentifier, Some(t)), ePrime))
                     // todo: again i don't know which one to prefer or what to do if they're disequal
                 }
 
@@ -2696,7 +2696,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
 
         val expectedThisType: NonPrimitiveType = constr.resultType
-        val thisAST = This(StringType()).setLoc(constr.loc) // Make a fake "this" AST so we generate the right error message.
+        val thisAST = This(None).setLoc(constr.loc) // Make a fake "this" AST so we generate the right error message.
         // todo: this is fake, i know even less about what to put there!
         checkIsSubtype(table, thisAST, outputContext("this"), expectedThisType, true)
 
