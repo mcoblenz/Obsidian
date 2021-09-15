@@ -2867,13 +2867,13 @@ class CodeGen (val target: Target, table: SymbolTable) {
         val recurse = (e: Expression) => translateExpr(e, translationContext, localContext)
 
         e match {
-            case ReferenceIdentifier(x) => dereferenceVariable(x, translationContext, localContext)
+            case ReferenceIdentifier(x,_) => dereferenceVariable(x, translationContext, localContext)
             case NumLiteral(n) => model.directClass("java.math.BigInteger").
                                     staticInvoke("valueOf").arg(JExpr.lit(n))
             case StringLiteral(s) => JExpr.lit(s)
             case TrueLiteral() => JExpr.TRUE
             case FalseLiteral() => JExpr.FALSE
-            case This() => JExpr._this()
+            case This(_) => JExpr._this()
             case Conjunction(e1, e2) => recurse(e1).cand(recurse(e2))
             case Disjunction(e1, e2) => recurse(e1).cor(recurse(e2))
             case LogicalNegation(e1) => recurse(e1).not()
@@ -2897,7 +2897,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 recurse(e1).invoke("equals").arg(recurse(e2)).not()
             case Dereference(e1, f) => recurse(e1).ref(f) /* TODO : do we ever need this? */
 
-            case LocalInvocation(name, genericParams, params, args) =>
+            case LocalInvocation(name, genericParams, params, args,_) =>
                 if (name == "sqrt" && args.length == 1) {
                     val arg0 = recurse(args.head)
                     val doubleResult = model.ref("java.lang.Math").staticInvoke("sqrt").arg(arg0.invoke("doubleValue"))
@@ -2912,15 +2912,15 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     narrowWith(invocation, params)
                 }
             /* TODO : this shouldn't be an extra case */
-            case Invocation(This(), genericParams, params, name, args, isFFIInvocation) =>
+            case Invocation(This(_), genericParams, params, name, args, isFFIInvocation,_) =>
                 val invocation = addArgs(translationContext.invokeTransaction(name), args, genericParams, params, translationContext, localContext, isFFIInvocation)
                 narrowWith(invocation, params)
 
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
+            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation,_) =>
                 val invocation = addArgs(JExpr.invoke(recurse(recipient), name), args, genericParams, params, translationContext, localContext, isFFIInvocation)
                 narrowWith(invocation, params)
 
-            case Construction(contractType, args, isFFIInvocation) =>
+            case Construction(contractType, args, isFFIInvocation,_) =>
                 val contractRefType = ContractReferenceType(contractType, Owned(), NotRemoteReferenceType())
                 val resolvedType = resolveType(contractRefType, table)
 
@@ -2934,7 +2934,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
 
             case Parent() => assert(false, "Parents should not exist in code generation"); JExpr._null()
             case Disown(e) => recurse(e)
-            case StateInitializer(stateName, fieldName) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
+            case StateInitializer(stateName, fieldName,_) => JExpr.ref(stateInitializationVariableName(stateName._1, fieldName._1))
         }
     }
 
@@ -3317,11 +3317,11 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 }
 
                 translationContext.pendingFieldAssignments = immutable.Set.empty
-            case Assignment(ReferenceIdentifier(x), e) =>
+            case Assignment(ReferenceIdentifier(x,_), e) =>
                 assignVariable(x, translateExpr(e, translationContext,localContext),
                     body, translationContext, localContext, false)
             /* it's bad that this is a special case */
-            case Assignment(Dereference(This(), field), e) => {
+            case Assignment(Dereference(This(_), field), e) => {
                 /* we don't check the local context and just assume it's a field */
                 val newValue = translateExpr(e, translationContext,localContext)
                 translationContext.assignVariable(field, newValue, body, false)
@@ -3335,7 +3335,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 // TODO: do we ever need this in the general case if all contracts are encapsulated?
                 assert(false, "TODO")
             }
-            case Assignment(StateInitializer(stateName, fieldName), e) => {
+            case Assignment(StateInitializer(stateName, fieldName,_), e) => {
                 val stateContextOption = translationContext.states.get(stateName._1)
                 assert(stateContextOption.isDefined)
                 val stateContext = stateContextOption.get
@@ -3402,7 +3402,7 @@ class CodeGen (val target: Target, table: SymbolTable) {
                 val jIf = body._if(stateCond(state, jEx, ePerm))
 
                 val shouldStateLock = e match {
-                    case ReferenceIdentifier(x) => true
+                    case ReferenceIdentifier(_,_) => true
                     case _ => false
                 }
 
@@ -3422,19 +3422,19 @@ class CodeGen (val target: Target, table: SymbolTable) {
                     translateBody(jIf._else(), s2, translationContext, localContext)
                 }
 
-            case LocalInvocation(methName, genericParams, params, args) =>
+            case LocalInvocation(methName, genericParams, params, args,_) =>
                 val invocation = addArgs(translationContext.invokeTransaction(methName),
                         args, genericParams, params, translationContext, localContext, isFFIInvocation = false)
 
                 body.add(narrowWith(invocation, params))
             /* TODO : it's bad that this is a special case */
-            case Invocation(This(), genericParams, params, methName, args, isFFIInvocation) =>
+            case Invocation(This(_), genericParams, params, methName, args, isFFIInvocation,_) =>
                 val invocation = addArgs(translationContext.invokeTransaction(methName),
                         args, genericParams, params, translationContext, localContext, isFFIInvocation)
 
                 body.add(narrowWith(invocation, params))
 
-            case Invocation(e, genericParams, params, methName, args, isFFIInvocation) =>
+            case Invocation(e, genericParams, params, methName, args, isFFIInvocation,_) =>
                 val invocation = addArgs(translateExpr(e, translationContext, localContext).invoke(methName),
                         args, genericParams, params, translationContext, localContext, isFFIInvocation)
                 body.add(narrowWith(invocation, params))
