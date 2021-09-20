@@ -215,7 +215,7 @@ case class NotEquals(e1: Expression, e2: Expression) extends BinaryExpression(No
 }
 
 case class Dereference(e: Expression, f: String) extends UnaryExpression(Dereference(_, f), e) {
-    override val obstype: Option[ObsidianType] = e.obstype // todo
+    override val obstype: Option[ObsidianType] = e.obstype
 
     override def toString: String = {
         s"$e.$f"
