@@ -573,7 +573,7 @@ object CodeGenYul extends CodeGenerator {
                 // the recipient. we also form a Parser identifier with this, so that we can translate
                 // the invocation with a tailcall to translateExpr
                 val id_recipient: Identifier = nextTemp()
-                val this_address = edu.cmu.cs.obsidian.parser.ReferenceIdentifier(id_recipient.name)
+                val this_address = edu.cmu.cs.obsidian.parser.ReferenceIdentifier(id_recipient.name, obstype) //todo test this
 
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
@@ -581,7 +581,7 @@ object CodeGenYul extends CodeGenerator {
                     translateExpr(retvar, LocalInvocation(transactionNameMapping(getContractName(recipient), name),
                         genericParams,
                         params,
-                        this_address +: args), contractName, checkedTable, inMain))
+                        this_address +: args, obstype), contractName, checkedTable, inMain)) // todo test this, too
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // todo: currently we ignore the arguments to the constructor
