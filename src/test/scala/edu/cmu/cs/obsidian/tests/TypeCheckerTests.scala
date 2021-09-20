@@ -194,7 +194,7 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def equalityTest(): Unit = {
         runTest("resources/tests/type_checker_tests/Equality.obs",
-            (DifferentTypeError(ReferenceIdentifier("a"), IntType(), ReferenceIdentifier("b"), StringType()), 12)
+            (DifferentTypeError(ReferenceIdentifier("a", Some(IntType())), IntType(), ReferenceIdentifier("b", Some(StringType())), StringType()), 12)
                 ::
                 (DifferentTypeError(
                     TrueLiteral(),
@@ -322,13 +322,13 @@ class TypeCheckerTests extends JUnitSuite {
 
     @Test def sideEffectTest(): Unit = {
         runTest("resources/tests/type_checker_tests/NoSideEffects.obs",
-            (NoEffectsError(ReferenceIdentifier("x")), 8)
+            (NoEffectsError(ReferenceIdentifier("x", Some(IntType()))), 8)
                 ::
                 (NoEffectsError(
                     Add(NumLiteral(1), NumLiteral(3))), 10)
                 ::
                 (NoEffectsError(
-                    LessThan(NumLiteral(1), ReferenceIdentifier("x"))), 12)
+                    LessThan(NumLiteral(1), ReferenceIdentifier("x", Some(IntType())))), 12)
                 ::
                 (NoEffectsError(
                     Disjunction(TrueLiteral(), FalseLiteral())), 14)
@@ -475,7 +475,7 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType())),
                     56)
                 ::
-                (DisownUnowningExpressionError(ReferenceIdentifier("m")), 49)
+                (DisownUnowningExpressionError(ReferenceIdentifier("m", Some(IntType()))), 49)
                 ::
                 (UnusedOwnershipError("m"), 72)
                 ::
@@ -590,10 +590,10 @@ class TypeCheckerTests extends JUnitSuite {
     @Test def staticAssertsTest(): Unit = {
         runTest("resources/tests/type_checker_tests/StaticAsserts.obs",
             (StaticAssertInvalidState("C", "S3"), 6)
-                ::
-                (StaticAssertFailed(This(), States(Set("S2")), StateType(ContractType("C", Nil), Set("S1", "S2"), NotRemoteReferenceType())), 17)
-                ::
-                (StaticAssertFailed(ReferenceIdentifier("ow"), Unowned(), ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType())), 24)
+                :: // todo This(None) is suspect
+                (StaticAssertFailed(This(None), States(Set("S2")), StateType(ContractType("C", Nil), Set("S1", "S2"), NotRemoteReferenceType())), 17)
+                :: // todo i don't know what to put here either
+                (StaticAssertFailed(ReferenceIdentifier("ow", None), Unowned(), ContractReferenceType(ContractType("C", Nil), Owned(), NotRemoteReferenceType())), 24)
                 ::
                 Nil
         )
@@ -686,10 +686,10 @@ class TypeCheckerTests extends JUnitSuite {
             (StateCheckOnPrimitiveError(), 45) ::
               (StateCheckRedundant(), 56) ::
               (StaticAssertFailed(
-                ReferenceIdentifier("s"), Owned(),
+                ReferenceIdentifier("s", None), Owned(), // todo
                 StateType(ContractType("LightSwitch", Nil), "On", NotRemoteReferenceType())), 62) ::
               (StateCheckRedundant(), 67) ::
-                (StaticAssertFailed(ReferenceIdentifier("next"), States(Set("S1")),
+                (StaticAssertFailed(ReferenceIdentifier("next", None), States(Set("S1")),// todo
                     ContractReferenceType(ContractType("TestFieldShared", Nil), Shared(), NotRemoteReferenceType())), 88) ::
               Nil)
 
@@ -909,8 +909,8 @@ class TypeCheckerTests extends JUnitSuite {
             (ReceiverTypeIncompatibleError("t5",
                 ContractReferenceType(ContractType("PermissionPassing", Nil), Unowned(), NotRemoteReferenceType()),
                 ContractReferenceType(ContractType("PermissionPassing", Nil), Owned(), NotRemoteReferenceType())), 47) ::
-                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 58) ::
-                (LostOwnershipErrorDueToSharing(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil)), 65) ::
+                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil, None)), 58) :: // todo this may need to be an encoding of the type of returnOwnedAsset
+                (LostOwnershipErrorDueToSharing(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil, None)), 65) :: // todo ditto
                 Nil)
     }
 
@@ -922,8 +922,8 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), true), 25) ::
                 (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
                     ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()), true), 29) ::
-                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x2")), 41) ::
-                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x7")), 63) ::
+                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x2", Some(IntType()))), 41) ::
+                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x7", Some(IntType()))), 63) ::
                 (ReceiverTypeIncompatibleError("t1",
                     ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
                     ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 81) ::
