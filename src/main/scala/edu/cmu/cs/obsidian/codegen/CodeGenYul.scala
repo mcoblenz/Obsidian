@@ -301,7 +301,7 @@ object CodeGenYul extends CodeGenerator {
                 }
             case Assignment(assignTo, e) =>
                 assignTo match {
-                    case ReferenceIdentifier(x) =>
+                    case ReferenceIdentifier(x, obstype) =>
                         // todo: this assumes that all identifiers are either fields or stack variables.
                         //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
@@ -441,7 +441,7 @@ object CodeGenYul extends CodeGenerator {
         e match {
             case e: AtomicExpression =>
                 e match {
-                    case ReferenceIdentifier(x) =>
+                    case ReferenceIdentifier(x, obstype) =>
                         // todo: this assumes that all indentifiers are either fields or stack variables;
                         //  we store nothing in memory. this is also very likely not doing the right thing
                         //  with name shadowing
@@ -464,7 +464,7 @@ object CodeGenYul extends CodeGenerator {
                         Seq(assign1(retvar, boollit(true)))
                     case FalseLiteral() =>
                         Seq(assign1(retvar, boollit(false)))
-                    case This() =>
+                    case This(obstype) =>
                         assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                         Seq()
                     case Parent() =>
@@ -502,7 +502,7 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable, inMain)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable, inMain)
                 }
-            case LocalInvocation(name, genericParams, params, args) => // todo: why are the middle two args not used?
+            case e@LocalInvocation(name, genericParams, params, args, obstype) => // todo: why are the middle two args not used?
                 // look up the name of the function in the table, get its return type, and then compute
                 // how wide of a tuple that return type is. (currently this is always either 0 or 1).
                 //
@@ -559,10 +559,11 @@ object CodeGenYul extends CodeGenerator {
                     case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
                 })
 
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation) =>
+            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, obstype) =>
                 // we translate invocations by first translating the recipient expression. this
                 // returns a variable containing a memory address for the implicit `this` argument
                 // added to the translation of the transactions into the flat Yul object
+
 
                 // todo: this ultimately needs to be type-directed. to translate an invocation,
                 //  we need to know the type of the recipient expression being invoked so that we
@@ -582,7 +583,7 @@ object CodeGenYul extends CodeGenerator {
                         params,
                         this_address +: args), contractName, checkedTable, inMain))
 
-            case Construction(contractType, args, isFFIInvocation) =>
+            case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // todo: currently we ignore the arguments to the constructor
                 assert(args.isEmpty, "contracts that take arguments are not yet supported")
 
@@ -594,7 +595,7 @@ object CodeGenYul extends CodeGenerator {
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)
                 )
-            case StateInitializer(stateName, fieldName) =>
+            case StateInitializer(stateName, fieldName, obstype) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()
         }

@@ -114,10 +114,10 @@ class IdentityAstTransformer {
     }
 
     def transformField(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            f: Field): (Field, Seq[ErrorRecord]) = {
-        val thisType =  ContractReferenceType(lexicallyInsideOf.contractType, Owned(), NotRemoteReferenceType())
+                          table: SymbolTable,
+                          lexicallyInsideOf: DeclarationTable,
+                          f: Field): (Field, Seq[ErrorRecord]) = {
+        val thisType = ContractReferenceType(lexicallyInsideOf.contractType, Owned(), NotRemoteReferenceType())
 
         val context = startContext(lexicallyInsideOf, List.empty, thisType) // Permission of this is irrelevant when transforming fields
         val (newType, errors) = transformType(table, lexicallyInsideOf, context, f.typ, f.loc, Nil)
@@ -148,14 +148,14 @@ class IdentityAstTransformer {
             case s: StringLiteral => (s, List())
             case t: TrueLiteral => (TrueLiteral().setLoc(t), List())
             case f: FalseLiteral => (FalseLiteral().setLoc(f), List())
-            case t: This => (This().setLoc(t), List())
+            case t: This => (This(t.obstype).setLoc(t), List())
             case p: Parent => (Parent().setLoc(p), List())
             case c: Conjunction =>
                 transformBinary(table, lexicallyInsideOf, context, c.e1, c.e2, params, Conjunction(_, _).setLoc(c))
             case d: Disjunction =>
                 transformBinary(table, lexicallyInsideOf, context, d.e1, d.e2, params, Disjunction(_, _).setLoc(d))
             case n: LogicalNegation =>
-               transformUnary(table, lexicallyInsideOf, context, n.e, params, LogicalNegation(_).setLoc(n))
+                transformUnary(table, lexicallyInsideOf, context, n.e, params, LogicalNegation(_).setLoc(n))
             case a: Add =>
                 transformBinary(table, lexicallyInsideOf, context, a.e1, a.e2, params, Add(_, _).setLoc(a))
             case a: StringConcat =>
@@ -199,8 +199,8 @@ class IdentityAstTransformer {
                     i.args.map(transformExpression(table, lexicallyInsideOf, context, _, params)).unzip
                 (i.copy(recipient = newRecipient, args = newArgs, params = newParams).setLoc(i),
                     recipientErrors ++
-                    errors.flatten.toList ++
-                    argErrors.flatten.toList)
+                        errors.flatten.toList ++
+                        argErrors.flatten.toList)
 
             case c: Construction =>
                 val (newParams, errors) =
@@ -227,11 +227,11 @@ class IdentityAstTransformer {
     }
 
     def transformArgs(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            args: Seq[VariableDeclWithSpec],
-            thisType: ObsidianType,
-            params: Seq[GenericType]): (Seq[VariableDeclWithSpec], Seq[ErrorRecord]) = {
+                         table: SymbolTable,
+                         lexicallyInsideOf: DeclarationTable,
+                         args: Seq[VariableDeclWithSpec],
+                         thisType: ObsidianType,
+                         params: Seq[GenericType]): (Seq[VariableDeclWithSpec], Seq[ErrorRecord]) = {
         var errors = List.empty[ErrorRecord]
         var newArgs: Seq[VariableDeclWithSpec] = Nil
         val context = startContext(lexicallyInsideOf, args, thisType)
@@ -260,15 +260,15 @@ class IdentityAstTransformer {
     }
 
     def transformTransaction(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            t: Transaction): (Transaction, Seq[ErrorRecord]) = {
+                                table: SymbolTable,
+                                lexicallyInsideOf: DeclarationTable,
+                                t: Transaction): (Transaction, Seq[ErrorRecord]) = {
         val context = startContext(lexicallyInsideOf, t.args, t.thisType)
 
         // TODO GENERIC: Maybe there's a better way. We need to ensure we return a nonprimitivetype,
         //  but we also need to transform thisType to handle generic parameters properly
         val (newThisType, thisTypeErrors) =
-            requireNonPrimitive(t.thisType, lexicallyInsideOf, t.loc, transformType(table, lexicallyInsideOf, context, t.thisType, t.loc, t.params))
+        requireNonPrimitive(t.thisType, lexicallyInsideOf, t.loc, transformType(table, lexicallyInsideOf, context, t.thisType, t.loc, t.params))
         val (newThisFinalType, thisFinalTypeErrors) =
             requireNonPrimitive(t.thisFinalType, lexicallyInsideOf, t.loc, transformType(table, lexicallyInsideOf, context, t.thisFinalType, t.loc, t.params))
 
@@ -285,7 +285,7 @@ class IdentityAstTransformer {
                 val (transformedType, errs) = transformType(table, lexicallyInsideOf, context, retType, t.loc, t.params)
                 (Some(transformedType), errs)
         }
-        val (newTransactionBody, _, bodyErrors) =  transformBody(table, lexicallyInsideOf, context, t.body, t.params)
+        val (newTransactionBody, _, bodyErrors) = transformBody(table, lexicallyInsideOf, context, t.body, t.params)
         val newTransaction =
             t.copy(retType = newRetType,
                 thisType = newThisType,
@@ -295,13 +295,13 @@ class IdentityAstTransformer {
                 body = newTransactionBody).setLoc(t)
         (newTransaction,
             thisTypeErrors ++ thisFinalTypeErrors ++ retTypeErrors ++
-            argErrors ++ allEnsureErrors.flatten.toList ++ bodyErrors)
+                argErrors ++ allEnsureErrors.flatten.toList ++ bodyErrors)
     }
 
     def transformConstructor(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            c: Constructor): (Constructor, Seq[ErrorRecord]) = {
+                                table: SymbolTable,
+                                lexicallyInsideOf: DeclarationTable,
+                                c: Constructor): (Constructor, Seq[ErrorRecord]) = {
 
         val (newResultType, resTypeErrors) =
             requireNonPrimitive(c.resultType, lexicallyInsideOf, c.loc,
@@ -319,11 +319,11 @@ class IdentityAstTransformer {
     }
 
     def transformBody(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            inScope: Context,
-            b: Seq[Statement],
-            params: Seq[GenericType]): (Seq[Statement], Context, Seq[ErrorRecord]) = {
+                         table: SymbolTable,
+                         lexicallyInsideOf: DeclarationTable,
+                         inScope: Context,
+                         b: Seq[Statement],
+                         params: Seq[GenericType]): (Seq[Statement], Context, Seq[ErrorRecord]) = {
         b match {
             case Seq() => (Seq(), inScope, Seq())
             case s +: rest =>
@@ -334,11 +334,11 @@ class IdentityAstTransformer {
     }
 
     def transformStatement(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            context: Context,
-            s: Statement,
-            params: Seq[GenericType]): (Statement, Context, Seq[ErrorRecord]) = {
+                              table: SymbolTable,
+                              lexicallyInsideOf: DeclarationTable,
+                              context: Context,
+                              s: Statement,
+                              params: Seq[GenericType]): (Statement, Context, Seq[ErrorRecord]) = {
         s match {
             case oldDecl@VariableDecl(typ, varName) =>
                 val (newTyp, errors) = transformType(table, lexicallyInsideOf, context, typ, s.loc, params)
@@ -433,16 +433,16 @@ class IdentityAstTransformer {
     }
 
     def transformTypeState(table: SymbolTable, lexicallyInsideOf: DeclarationTable, typeState: TypeState,
-                       pos: Position, params: Seq[GenericType]): (TypeState, List[ErrorRecord]) =
+                           pos: Position, params: Seq[GenericType]): (TypeState, List[ErrorRecord]) =
         (typeState, List())
 
     def transformType(
-            table: SymbolTable,
-            lexicallyInsideOf: DeclarationTable,
-            context: Context,
-            t: ObsidianType,
-            pos: Position,
-            params: Seq[GenericType]): (ObsidianType, List[ErrorRecord]) = {
+                         table: SymbolTable,
+                         lexicallyInsideOf: DeclarationTable,
+                         context: Context,
+                         t: ObsidianType,
+                         pos: Position,
+                         params: Seq[GenericType]): (ObsidianType, List[ErrorRecord]) = {
         (t, List.empty[ErrorRecord])
     }
 }
