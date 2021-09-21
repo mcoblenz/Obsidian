@@ -207,10 +207,6 @@ object Util {
         1
     }
 
-    def functionRename(name: String): String = {
-        name //todo some sort of alpha variation here combined with consulting a mapping; consult the ABI
-    }
-
     def keccak256(s: String): String = {
         val digestK: Keccak.Digest256 = new Keccak.Digest256()
         s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0, 4))}"
