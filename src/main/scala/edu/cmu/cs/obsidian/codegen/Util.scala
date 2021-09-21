@@ -204,6 +204,8 @@ object Util {
       * @return the width of the type
       */
     def obsTypeToWidth(t: ObsidianType): Int = {
+        // this only gets called in one place, which is the translation of local invocations.
+        // it should either be 1 or 0, indicating if the return type is void (0) or not (1)
         1
     }
 
@@ -265,7 +267,7 @@ object Util {
       * @param e the expression of interest
       * @return the name of the contract for the expression, if there is one; raises an error otherwise
       */
-    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = {
+    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = { //todo should this return an option? what's the invariant exactly?
         e.obstype match {
             case Some(value) => value match {
                 case _: PrimitiveType => assert(false, s"primitive types do not have contract names"); ""

@@ -504,28 +504,11 @@ object CodeGenYul extends CodeGenerator {
                 }
             case e@LocalInvocation(name, genericParams, params, args, obstype) => // todo: why are the middle two args not used?
                 // look up the name of the function in the table, get its return type, and then compute
-                // how wide of a tuple that return type is. (currently this is always either 0 or 1).
-                //
-                // todo: this is a hack. when we add type arguments to the translation, we'll be able to do this correctly.
-                val width = checkedTable.contractLookup(contractName).lookupTransaction(name) match {
-                    case Some(trans) =>
-                        trans.retType match {
-                            case Some(typ) => obsTypeToWidth(typ)
-                            case None => 0
-                        }
-                    case None =>
-                        // this is an absolute kludge just to get a proof of concept working for a specific test case
-                        if (name == transactionNameMapping("IntContainer", "set")) {
-                            0
-                        } else if (name == transactionNameMapping("IntContainer", "get")) {
-                            1
-                        } else if (name == transactionNameMapping("IntContainer", "set1")) {
-                            0
-                        } else if (name == transactionNameMapping("IntContainer", "set2")) {
-                            0
-                        } else {
-                            assert(false, s"width of transaction named ${name}")
-                        }
+                // how wide of a tuple that return type is. right now that's either 1 (if the
+                // transaction returns) or 0 (because it's void)
+                val width = obstype match {
+                    case Some(t) => obsTypeToWidth(t)
+                    case None => assert(false, s"width failed on transaction named ${name} from expression ${e.toString}")
                 }
 
                 // todo: some of this logic may be repeated in the dispatch table
