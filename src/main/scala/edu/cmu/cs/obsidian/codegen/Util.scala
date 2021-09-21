@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
+import edu.cmu.cs.obsidian.typecheck.{BoolType, BottomType, ContractReferenceType, GenericType, Int256Type, IntType, InterfaceContractType, NonPrimitiveType, ObsidianType, PrimitiveType, StateType, StringType, UnitType}
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
 
@@ -207,6 +207,12 @@ object Util {
         1
     }
 
+    /**
+      * return the top 4 bytes of the keccak256 hash of a string
+      *
+      * @param s the string to hash
+      * @return the top 4 bytes of the keccak256 of the input string
+      */
     def keccak256(s: String): String = {
         val digestK: Keccak.Digest256 = new Keccak.Digest256()
         s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0, 4))}"
@@ -259,7 +265,21 @@ object Util {
       * @param e the expression of interest
       * @return the name of the contract for the expression, if there is one; raises an error otherwise
       */
-    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = "IntContainer"
+    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = {
+        e.obstype match {
+            case Some(value) => value match {
+                case _: PrimitiveType => assert(false, s"primitive types do not have contract names"); ""
+                case tau: NonPrimitiveType => tau match {
+                    case ContractReferenceType(contractType, _, _) => contractType.contractName
+                    case StateType(contractType, _, _) =>  contractType.contractName
+                    case InterfaceContractType(_, _) => assert(false, "unimplemented"); ""
+                    case GenericType(_, _) => assert(false, "unimplemented"); ""
+                }
+                case BottomType() =>assert(false, s"the bottom type does not have a contract name"); ""
+            }
+            case None => assert(false, s"expression without a type annotation: ${e.toString}"); ""
+        }
+    }
 
     /**
       * given a contract name and a transaction name, produce the name of the contract in the flat
