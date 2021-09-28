@@ -87,7 +87,8 @@ object CodeGenYul extends CodeGenerator {
         var childContracts: Seq[YulObject] = Seq()
         // todo: this collection always contains a contract that looks like
         //   ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,)
-        //   and i do not know why
+        //   and i do not know why. it appears because of the code in IdentityAstTransfomer.scala,
+        //   transformProgram, roughly line 20.
         for (c <- program.contracts) {
             c match {
                 case obsContract: ObsidianContractImpl =>
