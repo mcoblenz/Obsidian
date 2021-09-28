@@ -1858,6 +1858,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     logError(s, InvalidValAssignmentError())
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
+                //(contextPrime, Assignment(ReferenceIdentifier(x, ePrime.obstype), ePrime).setLoc(s)) // todo iev
                 (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s))
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
