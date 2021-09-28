@@ -253,6 +253,12 @@ object Main {
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val (typecheckingErrors, checkedTable) = checker.checkProgram()
 
+            // todo: after the above call, transformedTable.contractLookup.size = 3 on a program with two contracts
+            //  because a contract called Contract with nothing in it gets added. I think this is an error; it doesn't
+            //  appear in the program text and we have to special case to ignore it later in Yul generation. I don't
+            //  know what role it might play in other parts of the compiler. but this is where it first appears,
+            //  and therefore near where to remove it.
+            
             val allSortedErrors = (duplicateErrors ++ importErrors ++ transformErrors ++ typecheckingErrors).sorted
 
             if (!allSortedErrors.isEmpty) {
