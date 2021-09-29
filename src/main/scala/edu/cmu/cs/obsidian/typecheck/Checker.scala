@@ -1,5 +1,6 @@
 package edu.cmu.cs.obsidian.typecheck
 
+import edu.cmu.cs.obsidian.ParserUtil
 import edu.cmu.cs.obsidian.parser._
 
 import scala.collection.immutable.TreeMap
@@ -1859,6 +1860,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
                 //(contextPrime, Assignment(ReferenceIdentifier(x, ePrime.obstype), ePrime).setLoc(s)) // todo iev
+                assert(ParserUtil.expressionWithTypeProperty(ePrime, (y: Option[ObsidianType]) => !y.isEmpty))
                 (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s))
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
