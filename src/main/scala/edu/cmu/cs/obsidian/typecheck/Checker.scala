@@ -871,7 +871,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
             case LocalInvocation(name, _, params, args: Seq[Expression], obstype) =>
                 //todo should there be an assertion to check that obstype == typ? which one takes precedence?
-                //todo i don't konw if passing `obstype` to This is correct at all
+                //todo i don't know if passing `obstype` to This is correct at all
                 val (typ, con, _, _, newGenericParams, newArgs) = handleInvocation(context, name, This(obstype).setLoc(e), params, args)
                 //This may need correction.
                 (typ, con, LocalInvocation(name, newGenericParams, params, newArgs, Some(typ)).setLoc(e))

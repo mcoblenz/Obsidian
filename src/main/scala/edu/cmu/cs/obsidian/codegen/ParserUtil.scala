@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian
 
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
 import edu.cmu.cs.obsidian.parser._
+import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
 package object ParserUtil {
     /**
@@ -58,4 +58,56 @@ package object ParserUtil {
         }
     }
 
+    def statementWithExpTypeProperty(s: Statement, prop: Option[ObsidianType] => Boolean): Boolean = {
+        s match {
+            case e: Expression => expressionWithTypeProperty(e, prop)
+            case VariableDecl(typ, varName) => true
+            case VariableDeclWithInit(typ, varName, e) => expressionWithTypeProperty(e, prop)
+            case VariableDeclWithSpec(typIn, typOut, varName) => true
+            case Return() => true
+            case ReturnExpr(e) => expressionWithTypeProperty(e, prop)
+            case Transition(newStateName, updates, thisPermission) => updates match {
+                case Some(updates) => updates.forall(u => expressionWithTypeProperty(u._2, prop))
+                case None => true
+            }
+            case Assignment(assignTo, e) => expressionWithTypeProperty(assignTo, prop) && expressionWithTypeProperty(e, prop)
+            case Revert(maybeExpr) => maybeExpr match {
+                case Some(e) => expressionWithTypeProperty(e, prop)
+                case None => true
+            }
+            case If(eCond, s) => expressionWithTypeProperty(eCond, prop) && s.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case IfThenElse(eCond, s1, s2) => expressionWithTypeProperty(eCond, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case IfInState(e, ePerm, typeState, s1, s2) => expressionWithTypeProperty(e, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case TryCatch(s1, s2) => s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case Switch(e, cases) => expressionWithTypeProperty(e, prop) && cases.forall((sc: SwitchCase) => sc.body.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)))
+            case StaticAssert(e, typeState) => expressionWithTypeProperty(e, prop)
+        }
+    }
+
+    def declarationWithExpTypeProperty(d: Declaration, prop: Option[ObsidianType] => Boolean): Boolean = {
+        d match {
+            case declaration: InvokableDeclaration => declaration match {
+                case Constructor(name, args, resultType, body) => body.forall((s: Statement) => statementWithExpTypeProperty(s, prop))
+                case Transaction(name, params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes) =>
+                    body.forall((s: Statement) => statementWithExpTypeProperty(s, prop)) && ensures.forall((e: Ensures) => expressionWithTypeProperty(e.expr, prop))
+            }
+            case TypeDecl(name, typ) => true
+            case Field(isConst, typ, name, availableIn) => true
+            case State(name, fields, isAsset) => true // can fields have expressions in them? i don't think so
+            case contract: Contract => contractWithExpTypeProperty(contract, prop)
+        }
+    }
+
+
+    def contractWithExpTypeProperty(c: Contract, prop: Option[ObsidianType] => Boolean): Boolean = {
+        c match {
+            case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
+                declarations.forall((d: Declaration) => declarationWithExpTypeProperty(d, prop))
+            case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) => assert(false, "we don't support these yet"); true
+        }
+    }
+
+    def symbolTableWithExpTypeProperty(st: SymbolTable, prop: Option[ObsidianType] => Boolean): Boolean = {
+        st.ast.contracts.forall((c: Contract) => contractWithExpTypeProperty(c, prop))
+    }
 }
