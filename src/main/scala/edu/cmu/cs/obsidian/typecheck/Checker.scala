@@ -1864,13 +1864,11 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     logError(s, InvalidValAssignmentError())
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
-                //(contextPrime, Assignment(ReferenceIdentifier(x, ePrime.obstype), ePrime).setLoc(s)) // todo iev
                 assert(ParserUtil.expressionWithTypeProperty(ePrime, (y: Option[ObsidianType]) => !y.isEmpty))
                 (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s))
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
-                assert(false, "the code below this case is certainly wrong and will need to be debugged on an example")
-                if (eDeref != This(None)) { //todo: this is totally wrong again, i seem not to know how to get the type for `this`
+                if (eDeref != This(None)) { //todo: this is totally wrong again, i seem not to know how to get the type for `this`. maybe this needs to be a match not an if so i can check if it's This(_)?
                     logError(s, InvalidNonThisFieldAssignment())
                     (context, s)
                 }
