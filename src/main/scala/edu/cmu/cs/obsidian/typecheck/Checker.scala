@@ -727,7 +727,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     else {
                         context
                     }
-                (thisType, newContext, e)
+                (thisType, newContext, ParserUtil.updateExprType(e,thisType))
             case Parent() =>
                 assert(false, "TODO: re-add support for parents")
                 /*
@@ -846,14 +846,15 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case Some(t) =>
                                 val newType = t.residualType(ownershipConsumptionMode)
                                 if (newType != t) {
-                                    (t, context.updatedThisFieldType(fieldName, newType), e)
+                                    (t, context.updatedThisFieldType(fieldName, newType), ParserUtil.updateExprType(e,t))
                                 }
                                 else {
-                                    (t, context, e)
+                                    (t, context, ParserUtil.updateExprType(e,t))
                                 }
                             case None =>
                                 logError(e, FieldUndefinedError(context.thisType, fieldName))
-                                (BottomType(), context, e)
+                                val t = BottomType()
+                                (t, context, ParserUtil.updateExprType(e,t))
                         }
 
                     case _ =>
@@ -868,7 +869,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                     }
                                     (ePrime, c)
                             }
-                        (BottomType(), newContext, newExpr)
+                        val t = BottomType()
+                        (t, newContext, ParserUtil.updateExprType(newExpr,t))
                 }
 
             case LocalInvocation(name, _, params, args: Seq[Expression], obstype) =>
@@ -895,7 +897,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 if (tableLookup.isEmpty) {
                     logError(e, ContractUndefinedError(contractType.contractName))
-                    return (BottomType(), context, e)
+                    val t = BottomType()
+                    return (t, context, ParserUtil.updateExprType(e,t))
                 }
 
                 if (tableLookup.get.contract.isInterface) {
@@ -957,7 +960,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         }
                     case _ => contextPrime
                 }
-                (newTyp, finalContext, ePrime)
+                (newTyp, finalContext, ParserUtil.updateExprType(ePrime, newTyp))
             case StateInitializer(stateName, fieldName, obstype) =>
                 // A state initializer expression has its field's type.
                 if (!context.transitionFieldsDefinitelyInitialized.exists(
@@ -979,7 +982,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 //assert(! e.obstype.isEmpty, s"infer and check failed to populate the type of ${e.toString}")
-                (fieldType, context, e)
+                (fieldType, context, ParserUtil.updateExprType(e, fieldType))
         }
     }
 
