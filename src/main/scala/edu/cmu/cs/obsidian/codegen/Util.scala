@@ -207,7 +207,17 @@ object Util {
     def obsTypeToWidth(t: ObsidianType): Int = {
         // this only gets called in one place, which is the translation of local invocations.
         // it should either be 1 or 0, indicating if the return type is void (0) or not (1)
-        1
+        t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => 1
+                case BoolType() => 1
+                case StringType() => 1
+                case Int256Type() => 1
+                case UnitType() => 0
+            }
+            case primitiveType: NonPrimitiveType => assert(false, "width not implemented for nonprimitive types!"); -1
+            case BottomType() => assert(false, "width not implemented for the bottom type!"); -1
+        }
     }
 
     /**
