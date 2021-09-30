@@ -110,4 +110,35 @@ package object ParserUtil {
     def symbolTableWithExpTypeProperty(st: SymbolTable, prop: Option[ObsidianType] => Boolean): Boolean = {
         st.ast.contracts.forall((c: Contract) => contractWithExpTypeProperty(c, prop))
     }
+
+    /**
+      * given an expression e and a type t, compute the expression that is the same except that the obstype annotation
+      * at the top level of the AST has been replaced with Some(t). this isn't an instance of the Scala generated .copy()
+      * function because of the exact inheritance structure of Expressions.
+      *
+      * note that this does not recurr into e, we just change the top level annotation if there is one.
+      *
+      * @param e       the expression to update
+      * @param newType the new e
+      * @return the updated expression
+      */
+    def updateExprType(e: Expression, newType: ObsidianType): Expression = {
+        e match {
+            case expression: AtomicExpression => expression match {
+                case ReferenceIdentifier(name, _) => ReferenceIdentifier(name, Some(newType))
+                case NumLiteral(_) => e
+                case StringLiteral(_) => e
+                case TrueLiteral() => e
+                case FalseLiteral() => e
+                case This(_) => This(Some(newType))
+                case Parent() => e
+            }
+            case expression: UnaryExpression => expression // none of the unary expressions have constructors that take the obstype as an argument
+            case expression: BinaryExpression => expression // ditto
+            case LocalInvocation(name, genericParams, params, args, _) => LocalInvocation(name, genericParams, params, args, Some(newType))
+            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, _) => Invocation(recipient, genericParams, params, name, args, isFFIInvocation, Some(newType))
+            case Construction(contractType, args, isFFIInvocation, _) => Construction(contractType, args, isFFIInvocation, Some(newType))
+            case StateInitializer(stateName, fieldName, _) => StateInitializer(stateName, fieldName, Some(newType))
+        }
+    }
 }

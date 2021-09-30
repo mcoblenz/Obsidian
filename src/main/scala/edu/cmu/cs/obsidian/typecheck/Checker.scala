@@ -686,29 +686,31 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         // But consuming in a context that expects sharing results in Shared.
                         val newType = t.residualType(ownershipConsumptionMode)
                         if (newType != t) {
-                            (t, context.updated(x, newType), e)
+                            (t, context.updated(x, newType), ParserUtil.updateExprType(e, t))
                         }
                         else {
-                            (t, context, e)
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                     case (_, Some(t)) =>
                         val newType = t.residualType(ownershipConsumptionMode)
                         if (newType != t) {
-                            (t, context.updatedThisFieldType(x, newType), e)
+                            (t, context.updatedThisFieldType(x, newType), ParserUtil.updateExprType(e, t))
                         }
                         else {
-                            (t, context, e)
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                     case (None, None) =>
                         val tableLookup = context.contractTable.lookupContract(x)
                         if (tableLookup.isDefined) {
                             val contractTable = tableLookup.get
                             val nonPrimitiveType = ContractReferenceType(contractTable.contractType, Shared(), NotRemoteReferenceType())
-                            (InterfaceContractType(contractTable.name, nonPrimitiveType), context, e)
+                            val t = InterfaceContractType(contractTable.name, nonPrimitiveType)
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                         else {
                             logError(e, VariableUndefinedError(x, context.thisType.toString))
-                            (BottomType(), context, e)
+                            val t = BottomType()
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                 }
 

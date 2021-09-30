@@ -3,7 +3,6 @@ package edu.cmu.cs.obsidian
 import java.io.{File, FileInputStream}
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.Scanner
-
 import org.apache.commons.io.FileUtils
 
 import scala.collection.mutable.HashSet
@@ -252,6 +251,8 @@ object Main {
 
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val (typecheckingErrors, checkedTable) = checker.checkProgram()
+
+            //assert(ParserUtil.symbolTableWithExpTypeProperty(checkedTable, (y: Option[Any]) => !y.isEmpty))
 
             val allSortedErrors = (duplicateErrors ++ importErrors ++ transformErrors ++ typecheckingErrors).sorted
 
