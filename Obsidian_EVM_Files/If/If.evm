@@ -1,0 +1,230 @@
+
+======= /sources/If.yul (EVM) =======
+
+Pretty printed source:
+object "If" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("If_deployed")
+            codecopy(0, dataoffset("If_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "If_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0xb02c4b23 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        return(128, _1)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 1)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b607880610020600039806000f350fe60806040526004361015156072576000803560e01c63b02c4b238114602c5763dffeadd08114604c57606f565b34156035578182fd5b81600319360112156044578182fd5b816080f3606f565b34156055578182fd5b81600319360112156064578182fd5b600160805260206080f35b50505b60006000fd
+
+Text representation:
+    /* "/sources/If.yul":54:57   */
+  0x80
+    /* "/sources/If.yul":50:52   */
+  0x40
+    /* "/sources/If.yul":43:58   */
+  mstore
+    /* "/sources/If.yul":79:90   */
+  callvalue
+    /* "/sources/If.yul":76:78   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/If.yul":102:103   */
+  0x00
+  0x00
+    /* "/sources/If.yul":92:104   */
+  revert
+    /* "/sources/If.yul":76:78   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/If.yul":180:203   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/If.yul":150:151   */
+  0x00
+    /* "/sources/If.yul":141:204   */
+  codecopy
+    /* "/sources/If.yul":223:246   */
+  dup1
+    /* "/sources/If.yul":150:151   */
+  0x00
+    /* "/sources/If.yul":213:247   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/If.yul":332:335   */
+      0x80
+        /* "/sources/If.yul":328:330   */
+      0x40
+        /* "/sources/If.yul":321:336   */
+      mstore
+        /* "/sources/If.yul":405:406   */
+      0x04
+        /* "/sources/If.yul":389:403   */
+      calldatasize
+        /* "/sources/If.yul":386:407   */
+      lt
+        /* "/sources/If.yul":379:408   */
+      iszero
+        /* "/sources/If.yul":376:378   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/If.yul":490:491   */
+      0x00
+      dup1
+        /* "/sources/If.yul":477:492   */
+      calldataload
+        /* "/sources/If.yul":472:475   */
+      0xe0
+        /* "/sources/If.yul":468:493   */
+      shr
+        /* "/sources/If.yul":535:545   */
+      0xb02c4b23
+        /* "/sources/If.yul":530:746   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/If.yul":752:762   */
+      0xdffeadd0
+        /* "/sources/If.yul":747:989   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/If.yul":514:989   */
+      jump(tag_2)
+        /* "/sources/If.yul":530:746   */
+    tag_3:
+        /* "/sources/If.yul":550:561   */
+      callvalue
+        /* "/sources/If.yul":547:549   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/If.yul":490:491   */
+      dup2
+      dup3
+        /* "/sources/If.yul":563:575   */
+      revert
+        /* "/sources/If.yul":547:549   */
+    tag_5:
+        /* "/sources/If.yul":490:491   */
+      dup2
+        /* "/sources/If.yul":1184:1207   */
+      not(0x03)
+        /* "/sources/If.yul":389:403   */
+      calldatasize
+        /* "/sources/If.yul":1184:1207   */
+      add
+        /* "/sources/If.yul":1180:1211   */
+      slt
+        /* "/sources/If.yul":1177:1179   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/If.yul":490:491   */
+      dup2
+      dup3
+        /* "/sources/If.yul":1214:1226   */
+      revert
+        /* "/sources/If.yul":1177:1179   */
+    tag_6:
+        /* "/sources/If.yul":490:491   */
+      dup2
+        /* "/sources/If.yul":332:335   */
+      0x80
+        /* "/sources/If.yul":710:745   */
+      return
+        /* "/sources/If.yul":530:746   */
+      jump(tag_2)
+        /* "/sources/If.yul":747:989   */
+    tag_4:
+        /* "/sources/If.yul":767:778   */
+      callvalue
+        /* "/sources/If.yul":764:766   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/If.yul":490:491   */
+      dup2
+      dup3
+        /* "/sources/If.yul":780:792   */
+      revert
+        /* "/sources/If.yul":764:766   */
+    tag_7:
+        /* "/sources/If.yul":490:491   */
+      dup2
+        /* "/sources/If.yul":1184:1207   */
+      not(0x03)
+        /* "/sources/If.yul":389:403   */
+      calldatasize
+        /* "/sources/If.yul":1184:1207   */
+      add
+        /* "/sources/If.yul":1180:1211   */
+      slt
+        /* "/sources/If.yul":1177:1179   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/If.yul":490:491   */
+      dup2
+      dup3
+        /* "/sources/If.yul":1214:1226   */
+      revert
+        /* "/sources/If.yul":1177:1179   */
+    tag_8:
+        /* "/sources/If.yul":3158:3159   */
+      0x01
+        /* "/sources/If.yul":332:335   */
+      0x80
+        /* "/sources/If.yul":2607:2644   */
+      mstore
+        /* "/sources/If.yul":1459:1461   */
+      0x20
+        /* "/sources/If.yul":332:335   */
+      0x80
+        /* "/sources/If.yul":953:988   */
+      return
+        /* "/sources/If.yul":514:989   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/If.yul":376:378   */
+    tag_1:
+        /* "/sources/If.yul":1070:1071   */
+      0x00
+      0x00
+        /* "/sources/If.yul":1060:1072   */
+      revert
+}
+

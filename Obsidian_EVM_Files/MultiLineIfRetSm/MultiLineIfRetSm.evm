@@ -1,0 +1,278 @@
+
+======= /sources/MultiLineIfRetSm.yul (EVM) =======
+
+Pretty printed source:
+object "MultiLineIfRetSm" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("MultiLineIfRetSm_deployed")
+            codecopy(0, dataoffset("MultiLineIfRetSm_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "MultiLineIfRetSm_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0x3c6bb436 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 24)
+                        return(128, 32)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        let memPos := mload(64)
+                        return(memPos, sub(abi_encode_tuple(memPos), memPos))
+                    }
+                }
+                revert(0, 0)
+            }
+            function abi_encode_tuple(headStart) -> tail
+            {
+                tail := add(headStart, 32)
+                mstore(headStart, 24)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b609980610020600039806000f350fe6080604052600436101515607d576000803560e01c633c6bb4368114602c5763dffeadd08114605257607a565b34156035578182fd5b81600319360112156044578182fd5b601860805260206080f3607a565b3415605b578182fd5b8160031936011215606a578182fd5b604051806075826086565b0381f3505b50505b60006000fd6098565b6000602082019050601882525b919050565b
+
+Text representation:
+    /* "/sources/MultiLineIfRetSm.yul":68:71   */
+  0x80
+    /* "/sources/MultiLineIfRetSm.yul":64:66   */
+  0x40
+    /* "/sources/MultiLineIfRetSm.yul":57:72   */
+  mstore
+    /* "/sources/MultiLineIfRetSm.yul":93:104   */
+  callvalue
+    /* "/sources/MultiLineIfRetSm.yul":90:92   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/MultiLineIfRetSm.yul":116:117   */
+  0x00
+  0x00
+    /* "/sources/MultiLineIfRetSm.yul":106:118   */
+  revert
+    /* "/sources/MultiLineIfRetSm.yul":90:92   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/MultiLineIfRetSm.yul":208:245   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/MultiLineIfRetSm.yul":164:165   */
+  0x00
+    /* "/sources/MultiLineIfRetSm.yul":155:246   */
+  codecopy
+    /* "/sources/MultiLineIfRetSm.yul":265:302   */
+  dup1
+    /* "/sources/MultiLineIfRetSm.yul":164:165   */
+  0x00
+    /* "/sources/MultiLineIfRetSm.yul":255:303   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/MultiLineIfRetSm.yul":402:405   */
+      0x80
+        /* "/sources/MultiLineIfRetSm.yul":398:400   */
+      0x40
+        /* "/sources/MultiLineIfRetSm.yul":391:406   */
+      mstore
+        /* "/sources/MultiLineIfRetSm.yul":475:476   */
+      0x04
+        /* "/sources/MultiLineIfRetSm.yul":459:473   */
+      calldatasize
+        /* "/sources/MultiLineIfRetSm.yul":456:477   */
+      lt
+        /* "/sources/MultiLineIfRetSm.yul":449:478   */
+      iszero
+        /* "/sources/MultiLineIfRetSm.yul":446:448   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/MultiLineIfRetSm.yul":560:561   */
+      0x00
+      dup1
+        /* "/sources/MultiLineIfRetSm.yul":547:562   */
+      calldataload
+        /* "/sources/MultiLineIfRetSm.yul":542:545   */
+      0xe0
+        /* "/sources/MultiLineIfRetSm.yul":538:563   */
+      shr
+        /* "/sources/MultiLineIfRetSm.yul":605:615   */
+      0x3c6bb436
+        /* "/sources/MultiLineIfRetSm.yul":600:841   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/MultiLineIfRetSm.yul":847:857   */
+      0xdffeadd0
+        /* "/sources/MultiLineIfRetSm.yul":842:1084   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/MultiLineIfRetSm.yul":584:1084   */
+      jump(tag_2)
+        /* "/sources/MultiLineIfRetSm.yul":600:841   */
+    tag_3:
+        /* "/sources/MultiLineIfRetSm.yul":620:631   */
+      callvalue
+        /* "/sources/MultiLineIfRetSm.yul":617:619   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/MultiLineIfRetSm.yul":560:561   */
+      dup2
+      dup3
+        /* "/sources/MultiLineIfRetSm.yul":633:645   */
+      revert
+        /* "/sources/MultiLineIfRetSm.yul":617:619   */
+    tag_5:
+        /* "/sources/MultiLineIfRetSm.yul":560:561   */
+      dup2
+        /* "/sources/MultiLineIfRetSm.yul":1279:1302   */
+      not(0x03)
+        /* "/sources/MultiLineIfRetSm.yul":459:473   */
+      calldatasize
+        /* "/sources/MultiLineIfRetSm.yul":1279:1302   */
+      add
+        /* "/sources/MultiLineIfRetSm.yul":1275:1306   */
+      slt
+        /* "/sources/MultiLineIfRetSm.yul":1272:1274   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/MultiLineIfRetSm.yul":560:561   */
+      dup2
+      dup3
+        /* "/sources/MultiLineIfRetSm.yul":1309:1321   */
+      revert
+        /* "/sources/MultiLineIfRetSm.yul":1272:1274   */
+    tag_6:
+        /* "/sources/MultiLineIfRetSm.yul":3299:3320   */
+      0x18
+        /* "/sources/MultiLineIfRetSm.yul":402:405   */
+      0x80
+        /* "/sources/MultiLineIfRetSm.yul":2601:2638   */
+      mstore
+        /* "/sources/MultiLineIfRetSm.yul":1453:1455   */
+      0x20
+        /* "/sources/MultiLineIfRetSm.yul":402:405   */
+      0x80
+        /* "/sources/MultiLineIfRetSm.yul":805:840   */
+      return
+        /* "/sources/MultiLineIfRetSm.yul":600:841   */
+      jump(tag_2)
+        /* "/sources/MultiLineIfRetSm.yul":842:1084   */
+    tag_4:
+        /* "/sources/MultiLineIfRetSm.yul":862:873   */
+      callvalue
+        /* "/sources/MultiLineIfRetSm.yul":859:861   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/MultiLineIfRetSm.yul":560:561   */
+      dup2
+      dup3
+        /* "/sources/MultiLineIfRetSm.yul":875:887   */
+      revert
+        /* "/sources/MultiLineIfRetSm.yul":859:861   */
+    tag_7:
+        /* "/sources/MultiLineIfRetSm.yul":560:561   */
+      dup2
+        /* "/sources/MultiLineIfRetSm.yul":1279:1302   */
+      not(0x03)
+        /* "/sources/MultiLineIfRetSm.yul":459:473   */
+      calldatasize
+        /* "/sources/MultiLineIfRetSm.yul":1279:1302   */
+      add
+        /* "/sources/MultiLineIfRetSm.yul":1275:1306   */
+      slt
+        /* "/sources/MultiLineIfRetSm.yul":1272:1274   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/MultiLineIfRetSm.yul":560:561   */
+      dup2
+      dup3
+        /* "/sources/MultiLineIfRetSm.yul":1309:1321   */
+      revert
+        /* "/sources/MultiLineIfRetSm.yul":1272:1274   */
+    tag_8:
+        /* "/sources/MultiLineIfRetSm.yul":398:400   */
+      0x40
+        /* "/sources/MultiLineIfRetSm.yul":1787:1796   */
+      mload
+        /* "/sources/MultiLineIfRetSm.yul":1075:1081   */
+      dup1
+        /* "/sources/MultiLineIfRetSm.yul":998:1047   */
+      tag_9
+        /* "/sources/MultiLineIfRetSm.yul":1029:1035   */
+      dup3
+        /* "/sources/MultiLineIfRetSm.yul":998:1047   */
+      tag_10
+      jump	// in
+    tag_9:
+        /* "/sources/MultiLineIfRetSm.yul":1063:1082   */
+      sub
+        /* "/sources/MultiLineIfRetSm.yul":1055:1061   */
+      dup2
+        /* "/sources/MultiLineIfRetSm.yul":1048:1083   */
+      return
+      pop
+        /* "/sources/MultiLineIfRetSm.yul":584:1084   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/MultiLineIfRetSm.yul":446:448   */
+    tag_1:
+        /* "/sources/MultiLineIfRetSm.yul":1165:1166   */
+      0x00
+      0x00
+        /* "/sources/MultiLineIfRetSm.yul":1155:1167   */
+      revert
+        /* "/sources/MultiLineIfRetSm.yul":1352:1537   */
+      jump(tag_11)
+    tag_10:
+        /* "/sources/MultiLineIfRetSm.yul":1415:1419   */
+      0x00
+        /* "/sources/MultiLineIfRetSm.yul":1453:1455   */
+      0x20
+        /* "/sources/MultiLineIfRetSm.yul":1442:1451   */
+      dup3
+        /* "/sources/MultiLineIfRetSm.yul":1438:1456   */
+      add
+        /* "/sources/MultiLineIfRetSm.yul":1430:1456   */
+      swap1
+      pop
+        /* "/sources/MultiLineIfRetSm.yul":3299:3320   */
+      0x18
+        /* "/sources/MultiLineIfRetSm.yul":2608:2611   */
+      dup3
+        /* "/sources/MultiLineIfRetSm.yul":2601:2638   */
+      mstore
+        /* "/sources/MultiLineIfRetSm.yul":1420:1537   */
+    tag_12:
+      swap2
+      swap1
+      pop
+      jump	// out
+    tag_11:
+}
+

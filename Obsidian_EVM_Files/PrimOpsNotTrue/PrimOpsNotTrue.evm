@@ -1,0 +1,170 @@
+
+======= /sources/PrimOpsNotTrue.yul (EVM) =======
+
+Pretty printed source:
+object "PrimOpsNotTrue" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("PrimOpsNotTrue_deployed")
+            codecopy(0, dataoffset("PrimOpsNotTrue_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "PrimOpsNotTrue_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    if eq(0x543b7e12, shr(224, calldataload(_1)))
+                    {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, false)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+60806040523415600f5760006000fd5b604980601e600039806000f350fe60806040526004361015156043576000803560e01c63543b7e12141560415734156027578081fd5b80600319360112156036578081fd5b600060805260206080f35b505b60006000fd
+
+Text representation:
+    /* "/sources/PrimOpsNotTrue.yul":66:69   */
+  0x80
+    /* "/sources/PrimOpsNotTrue.yul":62:64   */
+  0x40
+    /* "/sources/PrimOpsNotTrue.yul":55:70   */
+  mstore
+    /* "/sources/PrimOpsNotTrue.yul":91:102   */
+  callvalue
+    /* "/sources/PrimOpsNotTrue.yul":88:90   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/PrimOpsNotTrue.yul":114:115   */
+  0x00
+  0x00
+    /* "/sources/PrimOpsNotTrue.yul":104:116   */
+  revert
+    /* "/sources/PrimOpsNotTrue.yul":88:90   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/PrimOpsNotTrue.yul":204:239   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/PrimOpsNotTrue.yul":162:163   */
+  0x00
+    /* "/sources/PrimOpsNotTrue.yul":153:240   */
+  codecopy
+    /* "/sources/PrimOpsNotTrue.yul":259:294   */
+  dup1
+    /* "/sources/PrimOpsNotTrue.yul":162:163   */
+  0x00
+    /* "/sources/PrimOpsNotTrue.yul":249:295   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/PrimOpsNotTrue.yul":392:395   */
+      0x80
+        /* "/sources/PrimOpsNotTrue.yul":388:390   */
+      0x40
+        /* "/sources/PrimOpsNotTrue.yul":381:396   */
+      mstore
+        /* "/sources/PrimOpsNotTrue.yul":465:466   */
+      0x04
+        /* "/sources/PrimOpsNotTrue.yul":449:463   */
+      calldatasize
+        /* "/sources/PrimOpsNotTrue.yul":446:467   */
+      lt
+        /* "/sources/PrimOpsNotTrue.yul":439:468   */
+      iszero
+        /* "/sources/PrimOpsNotTrue.yul":436:438   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/PrimOpsNotTrue.yul":550:551   */
+      0x00
+      dup1
+        /* "/sources/PrimOpsNotTrue.yul":537:552   */
+      calldataload
+        /* "/sources/PrimOpsNotTrue.yul":532:535   */
+      0xe0
+        /* "/sources/PrimOpsNotTrue.yul":528:553   */
+      shr
+        /* "/sources/PrimOpsNotTrue.yul":595:605   */
+      0x543b7e12
+        /* "/sources/PrimOpsNotTrue.yul":581:589   */
+      eq
+        /* "/sources/PrimOpsNotTrue.yul":574:842   */
+      iszero
+      tag_2
+      jumpi
+        /* "/sources/PrimOpsNotTrue.yul":610:621   */
+      callvalue
+        /* "/sources/PrimOpsNotTrue.yul":607:609   */
+      iszero
+      tag_3
+      jumpi
+        /* "/sources/PrimOpsNotTrue.yul":550:551   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsNotTrue.yul":623:635   */
+      revert
+        /* "/sources/PrimOpsNotTrue.yul":607:609   */
+    tag_3:
+        /* "/sources/PrimOpsNotTrue.yul":550:551   */
+      dup1
+        /* "/sources/PrimOpsNotTrue.yul":1037:1060   */
+      not(0x03)
+        /* "/sources/PrimOpsNotTrue.yul":449:463   */
+      calldatasize
+        /* "/sources/PrimOpsNotTrue.yul":1037:1060   */
+      add
+        /* "/sources/PrimOpsNotTrue.yul":1033:1064   */
+      slt
+        /* "/sources/PrimOpsNotTrue.yul":1030:1032   */
+      iszero
+      tag_4
+      jumpi
+        /* "/sources/PrimOpsNotTrue.yul":550:551   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsNotTrue.yul":1067:1079   */
+      revert
+        /* "/sources/PrimOpsNotTrue.yul":1030:1032   */
+    tag_4:
+        /* "/sources/PrimOpsNotTrue.yul":2710:2715   */
+      0x00
+        /* "/sources/PrimOpsNotTrue.yul":392:395   */
+      0x80
+        /* "/sources/PrimOpsNotTrue.yul":2359:2396   */
+      mstore
+        /* "/sources/PrimOpsNotTrue.yul":1211:1213   */
+      0x20
+        /* "/sources/PrimOpsNotTrue.yul":392:395   */
+      0x80
+        /* "/sources/PrimOpsNotTrue.yul":806:841   */
+      return
+        /* "/sources/PrimOpsNotTrue.yul":574:842   */
+    tag_2:
+      pop
+        /* "/sources/PrimOpsNotTrue.yul":436:438   */
+    tag_1:
+        /* "/sources/PrimOpsNotTrue.yul":923:924   */
+      0x00
+      0x00
+        /* "/sources/PrimOpsNotTrue.yul":913:925   */
+      revert
+}
+

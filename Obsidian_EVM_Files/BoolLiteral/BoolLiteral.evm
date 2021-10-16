@@ -1,0 +1,230 @@
+
+======= /sources/BoolLiteral.yul (EVM) =======
+
+Pretty printed source:
+object "BoolLiteral" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("BoolLiteral_deployed")
+            codecopy(0, dataoffset("BoolLiteral_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "BoolLiteral_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0xd605d42a {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        return(128, _1)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, false)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b607880610020600039806000f350fe60806040526004361015156072576000803560e01c63d605d42a8114602c5763dffeadd08114604c57606f565b34156035578182fd5b81600319360112156044578182fd5b816080f3606f565b34156055578182fd5b81600319360112156064578182fd5b600060805260206080f35b50505b60006000fd
+
+Text representation:
+    /* "/sources/BoolLiteral.yul":63:66   */
+  0x80
+    /* "/sources/BoolLiteral.yul":59:61   */
+  0x40
+    /* "/sources/BoolLiteral.yul":52:67   */
+  mstore
+    /* "/sources/BoolLiteral.yul":88:99   */
+  callvalue
+    /* "/sources/BoolLiteral.yul":85:87   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/BoolLiteral.yul":111:112   */
+  0x00
+  0x00
+    /* "/sources/BoolLiteral.yul":101:113   */
+  revert
+    /* "/sources/BoolLiteral.yul":85:87   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/BoolLiteral.yul":198:230   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/BoolLiteral.yul":159:160   */
+  0x00
+    /* "/sources/BoolLiteral.yul":150:231   */
+  codecopy
+    /* "/sources/BoolLiteral.yul":250:282   */
+  dup1
+    /* "/sources/BoolLiteral.yul":159:160   */
+  0x00
+    /* "/sources/BoolLiteral.yul":240:283   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/BoolLiteral.yul":377:380   */
+      0x80
+        /* "/sources/BoolLiteral.yul":373:375   */
+      0x40
+        /* "/sources/BoolLiteral.yul":366:381   */
+      mstore
+        /* "/sources/BoolLiteral.yul":450:451   */
+      0x04
+        /* "/sources/BoolLiteral.yul":434:448   */
+      calldatasize
+        /* "/sources/BoolLiteral.yul":431:452   */
+      lt
+        /* "/sources/BoolLiteral.yul":424:453   */
+      iszero
+        /* "/sources/BoolLiteral.yul":421:423   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/BoolLiteral.yul":535:536   */
+      0x00
+      dup1
+        /* "/sources/BoolLiteral.yul":522:537   */
+      calldataload
+        /* "/sources/BoolLiteral.yul":517:520   */
+      0xe0
+        /* "/sources/BoolLiteral.yul":513:538   */
+      shr
+        /* "/sources/BoolLiteral.yul":580:590   */
+      0xd605d42a
+        /* "/sources/BoolLiteral.yul":575:796   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/BoolLiteral.yul":802:812   */
+      0xdffeadd0
+        /* "/sources/BoolLiteral.yul":797:1039   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/BoolLiteral.yul":559:1039   */
+      jump(tag_2)
+        /* "/sources/BoolLiteral.yul":575:796   */
+    tag_3:
+        /* "/sources/BoolLiteral.yul":595:606   */
+      callvalue
+        /* "/sources/BoolLiteral.yul":592:594   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/BoolLiteral.yul":535:536   */
+      dup2
+      dup3
+        /* "/sources/BoolLiteral.yul":608:620   */
+      revert
+        /* "/sources/BoolLiteral.yul":592:594   */
+    tag_5:
+        /* "/sources/BoolLiteral.yul":535:536   */
+      dup2
+        /* "/sources/BoolLiteral.yul":1234:1257   */
+      not(0x03)
+        /* "/sources/BoolLiteral.yul":434:448   */
+      calldatasize
+        /* "/sources/BoolLiteral.yul":1234:1257   */
+      add
+        /* "/sources/BoolLiteral.yul":1230:1261   */
+      slt
+        /* "/sources/BoolLiteral.yul":1227:1229   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/BoolLiteral.yul":535:536   */
+      dup2
+      dup3
+        /* "/sources/BoolLiteral.yul":1264:1276   */
+      revert
+        /* "/sources/BoolLiteral.yul":1227:1229   */
+    tag_6:
+        /* "/sources/BoolLiteral.yul":535:536   */
+      dup2
+        /* "/sources/BoolLiteral.yul":377:380   */
+      0x80
+        /* "/sources/BoolLiteral.yul":760:795   */
+      return
+        /* "/sources/BoolLiteral.yul":575:796   */
+      jump(tag_2)
+        /* "/sources/BoolLiteral.yul":797:1039   */
+    tag_4:
+        /* "/sources/BoolLiteral.yul":817:828   */
+      callvalue
+        /* "/sources/BoolLiteral.yul":814:816   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/BoolLiteral.yul":535:536   */
+      dup2
+      dup3
+        /* "/sources/BoolLiteral.yul":830:842   */
+      revert
+        /* "/sources/BoolLiteral.yul":814:816   */
+    tag_7:
+        /* "/sources/BoolLiteral.yul":535:536   */
+      dup2
+        /* "/sources/BoolLiteral.yul":1234:1257   */
+      not(0x03)
+        /* "/sources/BoolLiteral.yul":434:448   */
+      calldatasize
+        /* "/sources/BoolLiteral.yul":1234:1257   */
+      add
+        /* "/sources/BoolLiteral.yul":1230:1261   */
+      slt
+        /* "/sources/BoolLiteral.yul":1227:1229   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/BoolLiteral.yul":535:536   */
+      dup2
+      dup3
+        /* "/sources/BoolLiteral.yul":1264:1276   */
+      revert
+        /* "/sources/BoolLiteral.yul":1227:1229   */
+    tag_8:
+        /* "/sources/BoolLiteral.yul":3097:3102   */
+      0x00
+        /* "/sources/BoolLiteral.yul":377:380   */
+      0x80
+        /* "/sources/BoolLiteral.yul":2657:2694   */
+      mstore
+        /* "/sources/BoolLiteral.yul":1509:1511   */
+      0x20
+        /* "/sources/BoolLiteral.yul":377:380   */
+      0x80
+        /* "/sources/BoolLiteral.yul":1003:1038   */
+      return
+        /* "/sources/BoolLiteral.yul":559:1039   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/BoolLiteral.yul":421:423   */
+    tag_1:
+        /* "/sources/BoolLiteral.yul":1120:1121   */
+      0x00
+      0x00
+        /* "/sources/BoolLiteral.yul":1110:1122   */
+      revert
+}
+

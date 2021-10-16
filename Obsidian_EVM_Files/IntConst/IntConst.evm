@@ -1,0 +1,230 @@
+
+======= /sources/IntConst.yul (EVM) =======
+
+Pretty printed source:
+object "IntConst" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("IntConst_deployed")
+            codecopy(0, dataoffset("IntConst_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "IntConst_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0xc788266f {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        return(128, _1)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 12)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b607880610020600039806000f350fe60806040526004361015156072576000803560e01c63c788266f8114602c5763dffeadd08114604c57606f565b34156035578182fd5b81600319360112156044578182fd5b816080f3606f565b34156055578182fd5b81600319360112156064578182fd5b600c60805260206080f35b50505b60006000fd
+
+Text representation:
+    /* "/sources/IntConst.yul":60:63   */
+  0x80
+    /* "/sources/IntConst.yul":56:58   */
+  0x40
+    /* "/sources/IntConst.yul":49:64   */
+  mstore
+    /* "/sources/IntConst.yul":85:96   */
+  callvalue
+    /* "/sources/IntConst.yul":82:84   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/IntConst.yul":108:109   */
+  0x00
+  0x00
+    /* "/sources/IntConst.yul":98:110   */
+  revert
+    /* "/sources/IntConst.yul":82:84   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/IntConst.yul":192:221   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/IntConst.yul":156:157   */
+  0x00
+    /* "/sources/IntConst.yul":147:222   */
+  codecopy
+    /* "/sources/IntConst.yul":241:270   */
+  dup1
+    /* "/sources/IntConst.yul":156:157   */
+  0x00
+    /* "/sources/IntConst.yul":231:271   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/IntConst.yul":362:365   */
+      0x80
+        /* "/sources/IntConst.yul":358:360   */
+      0x40
+        /* "/sources/IntConst.yul":351:366   */
+      mstore
+        /* "/sources/IntConst.yul":435:436   */
+      0x04
+        /* "/sources/IntConst.yul":419:433   */
+      calldatasize
+        /* "/sources/IntConst.yul":416:437   */
+      lt
+        /* "/sources/IntConst.yul":409:438   */
+      iszero
+        /* "/sources/IntConst.yul":406:408   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/IntConst.yul":520:521   */
+      0x00
+      dup1
+        /* "/sources/IntConst.yul":507:522   */
+      calldataload
+        /* "/sources/IntConst.yul":502:505   */
+      0xe0
+        /* "/sources/IntConst.yul":498:523   */
+      shr
+        /* "/sources/IntConst.yul":565:575   */
+      0xc788266f
+        /* "/sources/IntConst.yul":560:778   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/IntConst.yul":784:794   */
+      0xdffeadd0
+        /* "/sources/IntConst.yul":779:1021   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/IntConst.yul":544:1021   */
+      jump(tag_2)
+        /* "/sources/IntConst.yul":560:778   */
+    tag_3:
+        /* "/sources/IntConst.yul":580:591   */
+      callvalue
+        /* "/sources/IntConst.yul":577:579   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/IntConst.yul":520:521   */
+      dup2
+      dup3
+        /* "/sources/IntConst.yul":593:605   */
+      revert
+        /* "/sources/IntConst.yul":577:579   */
+    tag_5:
+        /* "/sources/IntConst.yul":520:521   */
+      dup2
+        /* "/sources/IntConst.yul":1216:1239   */
+      not(0x03)
+        /* "/sources/IntConst.yul":419:433   */
+      calldatasize
+        /* "/sources/IntConst.yul":1216:1239   */
+      add
+        /* "/sources/IntConst.yul":1212:1243   */
+      slt
+        /* "/sources/IntConst.yul":1209:1211   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/IntConst.yul":520:521   */
+      dup2
+      dup3
+        /* "/sources/IntConst.yul":1246:1258   */
+      revert
+        /* "/sources/IntConst.yul":1209:1211   */
+    tag_6:
+        /* "/sources/IntConst.yul":520:521   */
+      dup2
+        /* "/sources/IntConst.yul":362:365   */
+      0x80
+        /* "/sources/IntConst.yul":742:777   */
+      return
+        /* "/sources/IntConst.yul":560:778   */
+      jump(tag_2)
+        /* "/sources/IntConst.yul":779:1021   */
+    tag_4:
+        /* "/sources/IntConst.yul":799:810   */
+      callvalue
+        /* "/sources/IntConst.yul":796:798   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/IntConst.yul":520:521   */
+      dup2
+      dup3
+        /* "/sources/IntConst.yul":812:824   */
+      revert
+        /* "/sources/IntConst.yul":796:798   */
+    tag_7:
+        /* "/sources/IntConst.yul":520:521   */
+      dup2
+        /* "/sources/IntConst.yul":1216:1239   */
+      not(0x03)
+        /* "/sources/IntConst.yul":419:433   */
+      calldatasize
+        /* "/sources/IntConst.yul":1216:1239   */
+      add
+        /* "/sources/IntConst.yul":1212:1243   */
+      slt
+        /* "/sources/IntConst.yul":1209:1211   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/IntConst.yul":520:521   */
+      dup2
+      dup3
+        /* "/sources/IntConst.yul":1246:1258   */
+      revert
+        /* "/sources/IntConst.yul":1209:1211   */
+    tag_8:
+        /* "/sources/IntConst.yul":3025:3027   */
+      0x0c
+        /* "/sources/IntConst.yul":362:365   */
+      0x80
+        /* "/sources/IntConst.yul":2639:2676   */
+      mstore
+        /* "/sources/IntConst.yul":1491:1493   */
+      0x20
+        /* "/sources/IntConst.yul":362:365   */
+      0x80
+        /* "/sources/IntConst.yul":985:1020   */
+      return
+        /* "/sources/IntConst.yul":544:1021   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/IntConst.yul":406:408   */
+    tag_1:
+        /* "/sources/IntConst.yul":1102:1103   */
+      0x00
+      0x00
+        /* "/sources/IntConst.yul":1092:1104   */
+      revert
+}
+

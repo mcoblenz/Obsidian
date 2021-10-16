@@ -1,0 +1,243 @@
+
+======= /sources/SimpleCall.yul (EVM) =======
+
+Pretty printed source:
+object "SimpleCall" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("SimpleCall_deployed")
+            codecopy(0, dataoffset("SimpleCall_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "SimpleCall_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0x3c6bb436 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 4)
+                        return(128, 32)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        let memPos := mload(64)
+                        mstore(memPos, 4)
+                        return(memPos, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b608080610020600039806000f350fe6080604052600436101515607a576000803560e01c633c6bb4368114602c5763dffeadd081146052576077565b34156035578182fd5b81600319360112156044578182fd5b600460805260206080f36077565b3415605b578182fd5b8160031936011215606a578182fd5b60405160048152602081f3505b50505b60006000fd
+
+Text representation:
+    /* "/sources/SimpleCall.yul":62:65   */
+  0x80
+    /* "/sources/SimpleCall.yul":58:60   */
+  0x40
+    /* "/sources/SimpleCall.yul":51:66   */
+  mstore
+    /* "/sources/SimpleCall.yul":87:98   */
+  callvalue
+    /* "/sources/SimpleCall.yul":84:86   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/SimpleCall.yul":110:111   */
+  0x00
+  0x00
+    /* "/sources/SimpleCall.yul":100:112   */
+  revert
+    /* "/sources/SimpleCall.yul":84:86   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/SimpleCall.yul":196:227   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/SimpleCall.yul":158:159   */
+  0x00
+    /* "/sources/SimpleCall.yul":149:228   */
+  codecopy
+    /* "/sources/SimpleCall.yul":247:278   */
+  dup1
+    /* "/sources/SimpleCall.yul":158:159   */
+  0x00
+    /* "/sources/SimpleCall.yul":237:279   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/SimpleCall.yul":372:375   */
+      0x80
+        /* "/sources/SimpleCall.yul":368:370   */
+      0x40
+        /* "/sources/SimpleCall.yul":361:376   */
+      mstore
+        /* "/sources/SimpleCall.yul":445:446   */
+      0x04
+        /* "/sources/SimpleCall.yul":429:443   */
+      calldatasize
+        /* "/sources/SimpleCall.yul":426:447   */
+      lt
+        /* "/sources/SimpleCall.yul":419:448   */
+      iszero
+        /* "/sources/SimpleCall.yul":416:418   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/SimpleCall.yul":530:531   */
+      0x00
+      dup1
+        /* "/sources/SimpleCall.yul":517:532   */
+      calldataload
+        /* "/sources/SimpleCall.yul":512:515   */
+      0xe0
+        /* "/sources/SimpleCall.yul":508:533   */
+      shr
+        /* "/sources/SimpleCall.yul":575:585   */
+      0x3c6bb436
+        /* "/sources/SimpleCall.yul":570:811   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/SimpleCall.yul":817:827   */
+      0xdffeadd0
+        /* "/sources/SimpleCall.yul":812:1054   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/SimpleCall.yul":554:1054   */
+      jump(tag_2)
+        /* "/sources/SimpleCall.yul":570:811   */
+    tag_3:
+        /* "/sources/SimpleCall.yul":590:601   */
+      callvalue
+        /* "/sources/SimpleCall.yul":587:589   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/SimpleCall.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/SimpleCall.yul":603:615   */
+      revert
+        /* "/sources/SimpleCall.yul":587:589   */
+    tag_5:
+        /* "/sources/SimpleCall.yul":530:531   */
+      dup2
+        /* "/sources/SimpleCall.yul":1249:1272   */
+      not(0x03)
+        /* "/sources/SimpleCall.yul":429:443   */
+      calldatasize
+        /* "/sources/SimpleCall.yul":1249:1272   */
+      add
+        /* "/sources/SimpleCall.yul":1245:1276   */
+      slt
+        /* "/sources/SimpleCall.yul":1242:1244   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/SimpleCall.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/SimpleCall.yul":1279:1291   */
+      revert
+        /* "/sources/SimpleCall.yul":1242:1244   */
+    tag_6:
+        /* "/sources/SimpleCall.yul":445:446   */
+      0x04
+        /* "/sources/SimpleCall.yul":372:375   */
+      0x80
+        /* "/sources/SimpleCall.yul":2571:2608   */
+      mstore
+        /* "/sources/SimpleCall.yul":1423:1425   */
+      0x20
+        /* "/sources/SimpleCall.yul":372:375   */
+      0x80
+        /* "/sources/SimpleCall.yul":775:810   */
+      return
+        /* "/sources/SimpleCall.yul":570:811   */
+      jump(tag_2)
+        /* "/sources/SimpleCall.yul":812:1054   */
+    tag_4:
+        /* "/sources/SimpleCall.yul":832:843   */
+      callvalue
+        /* "/sources/SimpleCall.yul":829:831   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/SimpleCall.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/SimpleCall.yul":845:857   */
+      revert
+        /* "/sources/SimpleCall.yul":829:831   */
+    tag_7:
+        /* "/sources/SimpleCall.yul":530:531   */
+      dup2
+        /* "/sources/SimpleCall.yul":1249:1272   */
+      not(0x03)
+        /* "/sources/SimpleCall.yul":429:443   */
+      calldatasize
+        /* "/sources/SimpleCall.yul":1249:1272   */
+      add
+        /* "/sources/SimpleCall.yul":1245:1276   */
+      slt
+        /* "/sources/SimpleCall.yul":1242:1244   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/SimpleCall.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/SimpleCall.yul":1279:1291   */
+      revert
+        /* "/sources/SimpleCall.yul":1242:1244   */
+    tag_8:
+        /* "/sources/SimpleCall.yul":368:370   */
+      0x40
+        /* "/sources/SimpleCall.yul":1757:1766   */
+      mload
+        /* "/sources/SimpleCall.yul":445:446   */
+      0x04
+        /* "/sources/SimpleCall.yul":2578:2581   */
+      dup2
+        /* "/sources/SimpleCall.yul":2571:2608   */
+      mstore
+        /* "/sources/SimpleCall.yul":1423:1425   */
+      0x20
+        /* "/sources/SimpleCall.yul":1025:1031   */
+      dup2
+        /* "/sources/SimpleCall.yul":1018:1053   */
+      return
+      pop
+        /* "/sources/SimpleCall.yul":554:1054   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/SimpleCall.yul":416:418   */
+    tag_1:
+        /* "/sources/SimpleCall.yul":1135:1136   */
+      0x00
+      0x00
+        /* "/sources/SimpleCall.yul":1125:1137   */
+      revert
+}
+

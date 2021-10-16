@@ -1,0 +1,170 @@
+
+======= /sources/PrimOpsSubPos.yul (EVM) =======
+
+Pretty printed source:
+object "PrimOpsSubPos" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("PrimOpsSubPos_deployed")
+            codecopy(0, dataoffset("PrimOpsSubPos_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "PrimOpsSubPos_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    if eq(0xe0e7ce86, shr(224, calldataload(_1)))
+                    {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 15)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+60806040523415600f5760006000fd5b604980601e600039806000f350fe60806040526004361015156043576000803560e01c63e0e7ce86141560415734156027578081fd5b80600319360112156036578081fd5b600f60805260206080f35b505b60006000fd
+
+Text representation:
+    /* "/sources/PrimOpsSubPos.yul":65:68   */
+  0x80
+    /* "/sources/PrimOpsSubPos.yul":61:63   */
+  0x40
+    /* "/sources/PrimOpsSubPos.yul":54:69   */
+  mstore
+    /* "/sources/PrimOpsSubPos.yul":90:101   */
+  callvalue
+    /* "/sources/PrimOpsSubPos.yul":87:89   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/PrimOpsSubPos.yul":113:114   */
+  0x00
+  0x00
+    /* "/sources/PrimOpsSubPos.yul":103:115   */
+  revert
+    /* "/sources/PrimOpsSubPos.yul":87:89   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/PrimOpsSubPos.yul":202:236   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/PrimOpsSubPos.yul":161:162   */
+  0x00
+    /* "/sources/PrimOpsSubPos.yul":152:237   */
+  codecopy
+    /* "/sources/PrimOpsSubPos.yul":256:290   */
+  dup1
+    /* "/sources/PrimOpsSubPos.yul":161:162   */
+  0x00
+    /* "/sources/PrimOpsSubPos.yul":246:291   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/PrimOpsSubPos.yul":387:390   */
+      0x80
+        /* "/sources/PrimOpsSubPos.yul":383:385   */
+      0x40
+        /* "/sources/PrimOpsSubPos.yul":376:391   */
+      mstore
+        /* "/sources/PrimOpsSubPos.yul":460:461   */
+      0x04
+        /* "/sources/PrimOpsSubPos.yul":444:458   */
+      calldatasize
+        /* "/sources/PrimOpsSubPos.yul":441:462   */
+      lt
+        /* "/sources/PrimOpsSubPos.yul":434:463   */
+      iszero
+        /* "/sources/PrimOpsSubPos.yul":431:433   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/PrimOpsSubPos.yul":545:546   */
+      0x00
+      dup1
+        /* "/sources/PrimOpsSubPos.yul":532:547   */
+      calldataload
+        /* "/sources/PrimOpsSubPos.yul":527:530   */
+      0xe0
+        /* "/sources/PrimOpsSubPos.yul":523:548   */
+      shr
+        /* "/sources/PrimOpsSubPos.yul":590:600   */
+      0xe0e7ce86
+        /* "/sources/PrimOpsSubPos.yul":576:584   */
+      eq
+        /* "/sources/PrimOpsSubPos.yul":569:836   */
+      iszero
+      tag_2
+      jumpi
+        /* "/sources/PrimOpsSubPos.yul":605:616   */
+      callvalue
+        /* "/sources/PrimOpsSubPos.yul":602:604   */
+      iszero
+      tag_3
+      jumpi
+        /* "/sources/PrimOpsSubPos.yul":545:546   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsSubPos.yul":618:630   */
+      revert
+        /* "/sources/PrimOpsSubPos.yul":602:604   */
+    tag_3:
+        /* "/sources/PrimOpsSubPos.yul":545:546   */
+      dup1
+        /* "/sources/PrimOpsSubPos.yul":1031:1054   */
+      not(0x03)
+        /* "/sources/PrimOpsSubPos.yul":444:458   */
+      calldatasize
+        /* "/sources/PrimOpsSubPos.yul":1031:1054   */
+      add
+        /* "/sources/PrimOpsSubPos.yul":1027:1058   */
+      slt
+        /* "/sources/PrimOpsSubPos.yul":1024:1026   */
+      iszero
+      tag_4
+      jumpi
+        /* "/sources/PrimOpsSubPos.yul":545:546   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsSubPos.yul":1061:1073   */
+      revert
+        /* "/sources/PrimOpsSubPos.yul":1024:1026   */
+    tag_4:
+        /* "/sources/PrimOpsSubPos.yul":2696:2715   */
+      0x0f
+        /* "/sources/PrimOpsSubPos.yul":387:390   */
+      0x80
+        /* "/sources/PrimOpsSubPos.yul":2353:2390   */
+      mstore
+        /* "/sources/PrimOpsSubPos.yul":1205:1207   */
+      0x20
+        /* "/sources/PrimOpsSubPos.yul":387:390   */
+      0x80
+        /* "/sources/PrimOpsSubPos.yul":800:835   */
+      return
+        /* "/sources/PrimOpsSubPos.yul":569:836   */
+    tag_2:
+      pop
+        /* "/sources/PrimOpsSubPos.yul":431:433   */
+    tag_1:
+        /* "/sources/PrimOpsSubPos.yul":917:918   */
+      0x00
+      0x00
+        /* "/sources/PrimOpsSubPos.yul":907:919   */
+      revert
+}
+

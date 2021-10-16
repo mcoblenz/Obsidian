@@ -1,0 +1,278 @@
+
+======= /sources/CombinedBasicsRet.yul (EVM) =======
+
+Pretty printed source:
+object "CombinedBasicsRet" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("CombinedBasicsRet_deployed")
+            codecopy(0, dataoffset("CombinedBasicsRet_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "CombinedBasicsRet_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0x3c6bb436 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 24)
+                        return(128, 32)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        let memPos := mload(64)
+                        return(memPos, sub(abi_encode_tuple(memPos), memPos))
+                    }
+                }
+                revert(0, 0)
+            }
+            function abi_encode_tuple(headStart) -> tail
+            {
+                tail := add(headStart, 32)
+                mstore(headStart, 24)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b609980610020600039806000f350fe6080604052600436101515607d576000803560e01c633c6bb4368114602c5763dffeadd08114605257607a565b34156035578182fd5b81600319360112156044578182fd5b601860805260206080f3607a565b3415605b578182fd5b8160031936011215606a578182fd5b604051806075826086565b0381f3505b50505b60006000fd6098565b6000602082019050601882525b919050565b
+
+Text representation:
+    /* "/sources/CombinedBasicsRet.yul":69:72   */
+  0x80
+    /* "/sources/CombinedBasicsRet.yul":65:67   */
+  0x40
+    /* "/sources/CombinedBasicsRet.yul":58:73   */
+  mstore
+    /* "/sources/CombinedBasicsRet.yul":94:105   */
+  callvalue
+    /* "/sources/CombinedBasicsRet.yul":91:93   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/CombinedBasicsRet.yul":117:118   */
+  0x00
+  0x00
+    /* "/sources/CombinedBasicsRet.yul":107:119   */
+  revert
+    /* "/sources/CombinedBasicsRet.yul":91:93   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/CombinedBasicsRet.yul":210:248   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/CombinedBasicsRet.yul":165:166   */
+  0x00
+    /* "/sources/CombinedBasicsRet.yul":156:249   */
+  codecopy
+    /* "/sources/CombinedBasicsRet.yul":268:306   */
+  dup1
+    /* "/sources/CombinedBasicsRet.yul":165:166   */
+  0x00
+    /* "/sources/CombinedBasicsRet.yul":258:307   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/CombinedBasicsRet.yul":407:410   */
+      0x80
+        /* "/sources/CombinedBasicsRet.yul":403:405   */
+      0x40
+        /* "/sources/CombinedBasicsRet.yul":396:411   */
+      mstore
+        /* "/sources/CombinedBasicsRet.yul":480:481   */
+      0x04
+        /* "/sources/CombinedBasicsRet.yul":464:478   */
+      calldatasize
+        /* "/sources/CombinedBasicsRet.yul":461:482   */
+      lt
+        /* "/sources/CombinedBasicsRet.yul":454:483   */
+      iszero
+        /* "/sources/CombinedBasicsRet.yul":451:453   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/CombinedBasicsRet.yul":565:566   */
+      0x00
+      dup1
+        /* "/sources/CombinedBasicsRet.yul":552:567   */
+      calldataload
+        /* "/sources/CombinedBasicsRet.yul":547:550   */
+      0xe0
+        /* "/sources/CombinedBasicsRet.yul":543:568   */
+      shr
+        /* "/sources/CombinedBasicsRet.yul":610:620   */
+      0x3c6bb436
+        /* "/sources/CombinedBasicsRet.yul":605:846   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/CombinedBasicsRet.yul":852:862   */
+      0xdffeadd0
+        /* "/sources/CombinedBasicsRet.yul":847:1089   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/CombinedBasicsRet.yul":589:1089   */
+      jump(tag_2)
+        /* "/sources/CombinedBasicsRet.yul":605:846   */
+    tag_3:
+        /* "/sources/CombinedBasicsRet.yul":625:636   */
+      callvalue
+        /* "/sources/CombinedBasicsRet.yul":622:624   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/CombinedBasicsRet.yul":565:566   */
+      dup2
+      dup3
+        /* "/sources/CombinedBasicsRet.yul":638:650   */
+      revert
+        /* "/sources/CombinedBasicsRet.yul":622:624   */
+    tag_5:
+        /* "/sources/CombinedBasicsRet.yul":565:566   */
+      dup2
+        /* "/sources/CombinedBasicsRet.yul":1284:1307   */
+      not(0x03)
+        /* "/sources/CombinedBasicsRet.yul":464:478   */
+      calldatasize
+        /* "/sources/CombinedBasicsRet.yul":1284:1307   */
+      add
+        /* "/sources/CombinedBasicsRet.yul":1280:1311   */
+      slt
+        /* "/sources/CombinedBasicsRet.yul":1277:1279   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/CombinedBasicsRet.yul":565:566   */
+      dup2
+      dup3
+        /* "/sources/CombinedBasicsRet.yul":1314:1326   */
+      revert
+        /* "/sources/CombinedBasicsRet.yul":1277:1279   */
+    tag_6:
+        /* "/sources/CombinedBasicsRet.yul":3202:3221   */
+      0x18
+        /* "/sources/CombinedBasicsRet.yul":407:410   */
+      0x80
+        /* "/sources/CombinedBasicsRet.yul":2606:2643   */
+      mstore
+        /* "/sources/CombinedBasicsRet.yul":1458:1460   */
+      0x20
+        /* "/sources/CombinedBasicsRet.yul":407:410   */
+      0x80
+        /* "/sources/CombinedBasicsRet.yul":810:845   */
+      return
+        /* "/sources/CombinedBasicsRet.yul":605:846   */
+      jump(tag_2)
+        /* "/sources/CombinedBasicsRet.yul":847:1089   */
+    tag_4:
+        /* "/sources/CombinedBasicsRet.yul":867:878   */
+      callvalue
+        /* "/sources/CombinedBasicsRet.yul":864:866   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/CombinedBasicsRet.yul":565:566   */
+      dup2
+      dup3
+        /* "/sources/CombinedBasicsRet.yul":880:892   */
+      revert
+        /* "/sources/CombinedBasicsRet.yul":864:866   */
+    tag_7:
+        /* "/sources/CombinedBasicsRet.yul":565:566   */
+      dup2
+        /* "/sources/CombinedBasicsRet.yul":1284:1307   */
+      not(0x03)
+        /* "/sources/CombinedBasicsRet.yul":464:478   */
+      calldatasize
+        /* "/sources/CombinedBasicsRet.yul":1284:1307   */
+      add
+        /* "/sources/CombinedBasicsRet.yul":1280:1311   */
+      slt
+        /* "/sources/CombinedBasicsRet.yul":1277:1279   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/CombinedBasicsRet.yul":565:566   */
+      dup2
+      dup3
+        /* "/sources/CombinedBasicsRet.yul":1314:1326   */
+      revert
+        /* "/sources/CombinedBasicsRet.yul":1277:1279   */
+    tag_8:
+        /* "/sources/CombinedBasicsRet.yul":403:405   */
+      0x40
+        /* "/sources/CombinedBasicsRet.yul":1792:1801   */
+      mload
+        /* "/sources/CombinedBasicsRet.yul":1080:1086   */
+      dup1
+        /* "/sources/CombinedBasicsRet.yul":1003:1052   */
+      tag_9
+        /* "/sources/CombinedBasicsRet.yul":1034:1040   */
+      dup3
+        /* "/sources/CombinedBasicsRet.yul":1003:1052   */
+      tag_10
+      jump	// in
+    tag_9:
+        /* "/sources/CombinedBasicsRet.yul":1068:1087   */
+      sub
+        /* "/sources/CombinedBasicsRet.yul":1060:1066   */
+      dup2
+        /* "/sources/CombinedBasicsRet.yul":1053:1088   */
+      return
+      pop
+        /* "/sources/CombinedBasicsRet.yul":589:1089   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/CombinedBasicsRet.yul":451:453   */
+    tag_1:
+        /* "/sources/CombinedBasicsRet.yul":1170:1171   */
+      0x00
+      0x00
+        /* "/sources/CombinedBasicsRet.yul":1160:1172   */
+      revert
+        /* "/sources/CombinedBasicsRet.yul":1357:1542   */
+      jump(tag_11)
+    tag_10:
+        /* "/sources/CombinedBasicsRet.yul":1420:1424   */
+      0x00
+        /* "/sources/CombinedBasicsRet.yul":1458:1460   */
+      0x20
+        /* "/sources/CombinedBasicsRet.yul":1447:1456   */
+      dup3
+        /* "/sources/CombinedBasicsRet.yul":1443:1461   */
+      add
+        /* "/sources/CombinedBasicsRet.yul":1435:1461   */
+      swap1
+      pop
+        /* "/sources/CombinedBasicsRet.yul":3202:3221   */
+      0x18
+        /* "/sources/CombinedBasicsRet.yul":2613:2616   */
+      dup3
+        /* "/sources/CombinedBasicsRet.yul":2606:2643   */
+      mstore
+        /* "/sources/CombinedBasicsRet.yul":1425:1542   */
+    tag_12:
+      swap2
+      swap1
+      pop
+      jump	// out
+    tag_11:
+}
+

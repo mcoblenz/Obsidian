@@ -1,0 +1,170 @@
+
+======= /sources/PrimOpsAdd.yul (EVM) =======
+
+Pretty printed source:
+object "PrimOpsAdd" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("PrimOpsAdd_deployed")
+            codecopy(0, dataoffset("PrimOpsAdd_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "PrimOpsAdd_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    if eq(0xdd471941, shr(224, calldataload(_1)))
+                    {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 13)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+60806040523415600f5760006000fd5b604980601e600039806000f350fe60806040526004361015156043576000803560e01c63dd471941141560415734156027578081fd5b80600319360112156036578081fd5b600d60805260206080f35b505b60006000fd
+
+Text representation:
+    /* "/sources/PrimOpsAdd.yul":62:65   */
+  0x80
+    /* "/sources/PrimOpsAdd.yul":58:60   */
+  0x40
+    /* "/sources/PrimOpsAdd.yul":51:66   */
+  mstore
+    /* "/sources/PrimOpsAdd.yul":87:98   */
+  callvalue
+    /* "/sources/PrimOpsAdd.yul":84:86   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/PrimOpsAdd.yul":110:111   */
+  0x00
+  0x00
+    /* "/sources/PrimOpsAdd.yul":100:112   */
+  revert
+    /* "/sources/PrimOpsAdd.yul":84:86   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/PrimOpsAdd.yul":196:227   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/PrimOpsAdd.yul":158:159   */
+  0x00
+    /* "/sources/PrimOpsAdd.yul":149:228   */
+  codecopy
+    /* "/sources/PrimOpsAdd.yul":247:278   */
+  dup1
+    /* "/sources/PrimOpsAdd.yul":158:159   */
+  0x00
+    /* "/sources/PrimOpsAdd.yul":237:279   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/PrimOpsAdd.yul":372:375   */
+      0x80
+        /* "/sources/PrimOpsAdd.yul":368:370   */
+      0x40
+        /* "/sources/PrimOpsAdd.yul":361:376   */
+      mstore
+        /* "/sources/PrimOpsAdd.yul":445:446   */
+      0x04
+        /* "/sources/PrimOpsAdd.yul":429:443   */
+      calldatasize
+        /* "/sources/PrimOpsAdd.yul":426:447   */
+      lt
+        /* "/sources/PrimOpsAdd.yul":419:448   */
+      iszero
+        /* "/sources/PrimOpsAdd.yul":416:418   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/PrimOpsAdd.yul":530:531   */
+      0x00
+      dup1
+        /* "/sources/PrimOpsAdd.yul":517:532   */
+      calldataload
+        /* "/sources/PrimOpsAdd.yul":512:515   */
+      0xe0
+        /* "/sources/PrimOpsAdd.yul":508:533   */
+      shr
+        /* "/sources/PrimOpsAdd.yul":575:585   */
+      0xdd471941
+        /* "/sources/PrimOpsAdd.yul":561:569   */
+      eq
+        /* "/sources/PrimOpsAdd.yul":554:818   */
+      iszero
+      tag_2
+      jumpi
+        /* "/sources/PrimOpsAdd.yul":590:601   */
+      callvalue
+        /* "/sources/PrimOpsAdd.yul":587:589   */
+      iszero
+      tag_3
+      jumpi
+        /* "/sources/PrimOpsAdd.yul":530:531   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsAdd.yul":603:615   */
+      revert
+        /* "/sources/PrimOpsAdd.yul":587:589   */
+    tag_3:
+        /* "/sources/PrimOpsAdd.yul":530:531   */
+      dup1
+        /* "/sources/PrimOpsAdd.yul":1013:1036   */
+      not(0x03)
+        /* "/sources/PrimOpsAdd.yul":429:443   */
+      calldatasize
+        /* "/sources/PrimOpsAdd.yul":1013:1036   */
+      add
+        /* "/sources/PrimOpsAdd.yul":1009:1040   */
+      slt
+        /* "/sources/PrimOpsAdd.yul":1006:1008   */
+      iszero
+      tag_4
+      jumpi
+        /* "/sources/PrimOpsAdd.yul":530:531   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsAdd.yul":1043:1055   */
+      revert
+        /* "/sources/PrimOpsAdd.yul":1006:1008   */
+    tag_4:
+        /* "/sources/PrimOpsAdd.yul":2674:2693   */
+      0x0d
+        /* "/sources/PrimOpsAdd.yul":372:375   */
+      0x80
+        /* "/sources/PrimOpsAdd.yul":2335:2372   */
+      mstore
+        /* "/sources/PrimOpsAdd.yul":1187:1189   */
+      0x20
+        /* "/sources/PrimOpsAdd.yul":372:375   */
+      0x80
+        /* "/sources/PrimOpsAdd.yul":782:817   */
+      return
+        /* "/sources/PrimOpsAdd.yul":554:818   */
+    tag_2:
+      pop
+        /* "/sources/PrimOpsAdd.yul":416:418   */
+    tag_1:
+        /* "/sources/PrimOpsAdd.yul":899:900   */
+      0x00
+      0x00
+        /* "/sources/PrimOpsAdd.yul":889:901   */
+      revert
+}
+

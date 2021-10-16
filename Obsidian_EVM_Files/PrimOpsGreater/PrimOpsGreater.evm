@@ -1,0 +1,170 @@
+
+======= /sources/PrimOpsGreater.yul (EVM) =======
+
+Pretty printed source:
+object "PrimOpsGreater" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("PrimOpsGreater_deployed")
+            codecopy(0, dataoffset("PrimOpsGreater_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "PrimOpsGreater_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    if eq(0x1ddf44a4, shr(224, calldataload(_1)))
+                    {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, _1)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+60806040523415600f5760006000fd5b604880601e600039806000f350fe60806040526004361015156042576000803560e01c631ddf44a4141560405734156027578081fd5b80600319360112156036578081fd5b8060805260206080f35b505b60006000fd
+
+Text representation:
+    /* "/sources/PrimOpsGreater.yul":66:69   */
+  0x80
+    /* "/sources/PrimOpsGreater.yul":62:64   */
+  0x40
+    /* "/sources/PrimOpsGreater.yul":55:70   */
+  mstore
+    /* "/sources/PrimOpsGreater.yul":91:102   */
+  callvalue
+    /* "/sources/PrimOpsGreater.yul":88:90   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/PrimOpsGreater.yul":114:115   */
+  0x00
+  0x00
+    /* "/sources/PrimOpsGreater.yul":104:116   */
+  revert
+    /* "/sources/PrimOpsGreater.yul":88:90   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/PrimOpsGreater.yul":204:239   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/PrimOpsGreater.yul":162:163   */
+  0x00
+    /* "/sources/PrimOpsGreater.yul":153:240   */
+  codecopy
+    /* "/sources/PrimOpsGreater.yul":259:294   */
+  dup1
+    /* "/sources/PrimOpsGreater.yul":162:163   */
+  0x00
+    /* "/sources/PrimOpsGreater.yul":249:295   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/PrimOpsGreater.yul":392:395   */
+      0x80
+        /* "/sources/PrimOpsGreater.yul":388:390   */
+      0x40
+        /* "/sources/PrimOpsGreater.yul":381:396   */
+      mstore
+        /* "/sources/PrimOpsGreater.yul":465:466   */
+      0x04
+        /* "/sources/PrimOpsGreater.yul":449:463   */
+      calldatasize
+        /* "/sources/PrimOpsGreater.yul":446:467   */
+      lt
+        /* "/sources/PrimOpsGreater.yul":439:468   */
+      iszero
+        /* "/sources/PrimOpsGreater.yul":436:438   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/PrimOpsGreater.yul":550:551   */
+      0x00
+      dup1
+        /* "/sources/PrimOpsGreater.yul":537:552   */
+      calldataload
+        /* "/sources/PrimOpsGreater.yul":532:535   */
+      0xe0
+        /* "/sources/PrimOpsGreater.yul":528:553   */
+      shr
+        /* "/sources/PrimOpsGreater.yul":595:605   */
+      0x1ddf44a4
+        /* "/sources/PrimOpsGreater.yul":581:589   */
+      eq
+        /* "/sources/PrimOpsGreater.yul":574:842   */
+      iszero
+      tag_2
+      jumpi
+        /* "/sources/PrimOpsGreater.yul":610:621   */
+      callvalue
+        /* "/sources/PrimOpsGreater.yul":607:609   */
+      iszero
+      tag_3
+      jumpi
+        /* "/sources/PrimOpsGreater.yul":550:551   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsGreater.yul":623:635   */
+      revert
+        /* "/sources/PrimOpsGreater.yul":607:609   */
+    tag_3:
+        /* "/sources/PrimOpsGreater.yul":550:551   */
+      dup1
+        /* "/sources/PrimOpsGreater.yul":1037:1060   */
+      not(0x03)
+        /* "/sources/PrimOpsGreater.yul":449:463   */
+      calldatasize
+        /* "/sources/PrimOpsGreater.yul":1037:1060   */
+      add
+        /* "/sources/PrimOpsGreater.yul":1033:1064   */
+      slt
+        /* "/sources/PrimOpsGreater.yul":1030:1032   */
+      iszero
+      tag_4
+      jumpi
+        /* "/sources/PrimOpsGreater.yul":550:551   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsGreater.yul":1067:1079   */
+      revert
+        /* "/sources/PrimOpsGreater.yul":1030:1032   */
+    tag_4:
+        /* "/sources/PrimOpsGreater.yul":550:551   */
+      dup1
+        /* "/sources/PrimOpsGreater.yul":392:395   */
+      0x80
+        /* "/sources/PrimOpsGreater.yul":2359:2396   */
+      mstore
+        /* "/sources/PrimOpsGreater.yul":1211:1213   */
+      0x20
+        /* "/sources/PrimOpsGreater.yul":392:395   */
+      0x80
+        /* "/sources/PrimOpsGreater.yul":806:841   */
+      return
+        /* "/sources/PrimOpsGreater.yul":574:842   */
+    tag_2:
+      pop
+        /* "/sources/PrimOpsGreater.yul":436:438   */
+    tag_1:
+        /* "/sources/PrimOpsGreater.yul":923:924   */
+      0x00
+      0x00
+        /* "/sources/PrimOpsGreater.yul":913:925   */
+      revert
+}
+

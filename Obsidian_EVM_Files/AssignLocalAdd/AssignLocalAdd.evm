@@ -1,0 +1,230 @@
+
+======= /sources/AssignLocalAdd.yul (EVM) =======
+
+Pretty printed source:
+object "AssignLocalAdd" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("AssignLocalAdd_deployed")
+            codecopy(0, dataoffset("AssignLocalAdd_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "AssignLocalAdd_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0xddbbec23 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        return(128, _1)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 17)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b607880610020600039806000f350fe60806040526004361015156072576000803560e01c63ddbbec238114602c5763dffeadd08114604c57606f565b34156035578182fd5b81600319360112156044578182fd5b816080f3606f565b34156055578182fd5b81600319360112156064578182fd5b601160805260206080f35b50505b60006000fd
+
+Text representation:
+    /* "/sources/AssignLocalAdd.yul":66:69   */
+  0x80
+    /* "/sources/AssignLocalAdd.yul":62:64   */
+  0x40
+    /* "/sources/AssignLocalAdd.yul":55:70   */
+  mstore
+    /* "/sources/AssignLocalAdd.yul":91:102   */
+  callvalue
+    /* "/sources/AssignLocalAdd.yul":88:90   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/AssignLocalAdd.yul":114:115   */
+  0x00
+  0x00
+    /* "/sources/AssignLocalAdd.yul":104:116   */
+  revert
+    /* "/sources/AssignLocalAdd.yul":88:90   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/AssignLocalAdd.yul":204:239   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/AssignLocalAdd.yul":162:163   */
+  0x00
+    /* "/sources/AssignLocalAdd.yul":153:240   */
+  codecopy
+    /* "/sources/AssignLocalAdd.yul":259:294   */
+  dup1
+    /* "/sources/AssignLocalAdd.yul":162:163   */
+  0x00
+    /* "/sources/AssignLocalAdd.yul":249:295   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/AssignLocalAdd.yul":392:395   */
+      0x80
+        /* "/sources/AssignLocalAdd.yul":388:390   */
+      0x40
+        /* "/sources/AssignLocalAdd.yul":381:396   */
+      mstore
+        /* "/sources/AssignLocalAdd.yul":465:466   */
+      0x04
+        /* "/sources/AssignLocalAdd.yul":449:463   */
+      calldatasize
+        /* "/sources/AssignLocalAdd.yul":446:467   */
+      lt
+        /* "/sources/AssignLocalAdd.yul":439:468   */
+      iszero
+        /* "/sources/AssignLocalAdd.yul":436:438   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      0x00
+      dup1
+        /* "/sources/AssignLocalAdd.yul":537:552   */
+      calldataload
+        /* "/sources/AssignLocalAdd.yul":532:535   */
+      0xe0
+        /* "/sources/AssignLocalAdd.yul":528:553   */
+      shr
+        /* "/sources/AssignLocalAdd.yul":595:605   */
+      0xddbbec23
+        /* "/sources/AssignLocalAdd.yul":590:814   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/AssignLocalAdd.yul":820:830   */
+      0xdffeadd0
+        /* "/sources/AssignLocalAdd.yul":815:1057   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/AssignLocalAdd.yul":574:1057   */
+      jump(tag_2)
+        /* "/sources/AssignLocalAdd.yul":590:814   */
+    tag_3:
+        /* "/sources/AssignLocalAdd.yul":610:621   */
+      callvalue
+        /* "/sources/AssignLocalAdd.yul":607:609   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      dup2
+      dup3
+        /* "/sources/AssignLocalAdd.yul":623:635   */
+      revert
+        /* "/sources/AssignLocalAdd.yul":607:609   */
+    tag_5:
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      dup2
+        /* "/sources/AssignLocalAdd.yul":1252:1275   */
+      not(0x03)
+        /* "/sources/AssignLocalAdd.yul":449:463   */
+      calldatasize
+        /* "/sources/AssignLocalAdd.yul":1252:1275   */
+      add
+        /* "/sources/AssignLocalAdd.yul":1248:1279   */
+      slt
+        /* "/sources/AssignLocalAdd.yul":1245:1247   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      dup2
+      dup3
+        /* "/sources/AssignLocalAdd.yul":1282:1294   */
+      revert
+        /* "/sources/AssignLocalAdd.yul":1245:1247   */
+    tag_6:
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      dup2
+        /* "/sources/AssignLocalAdd.yul":392:395   */
+      0x80
+        /* "/sources/AssignLocalAdd.yul":778:813   */
+      return
+        /* "/sources/AssignLocalAdd.yul":590:814   */
+      jump(tag_2)
+        /* "/sources/AssignLocalAdd.yul":815:1057   */
+    tag_4:
+        /* "/sources/AssignLocalAdd.yul":835:846   */
+      callvalue
+        /* "/sources/AssignLocalAdd.yul":832:834   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      dup2
+      dup3
+        /* "/sources/AssignLocalAdd.yul":848:860   */
+      revert
+        /* "/sources/AssignLocalAdd.yul":832:834   */
+    tag_7:
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      dup2
+        /* "/sources/AssignLocalAdd.yul":1252:1275   */
+      not(0x03)
+        /* "/sources/AssignLocalAdd.yul":449:463   */
+      calldatasize
+        /* "/sources/AssignLocalAdd.yul":1252:1275   */
+      add
+        /* "/sources/AssignLocalAdd.yul":1248:1279   */
+      slt
+        /* "/sources/AssignLocalAdd.yul":1245:1247   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/AssignLocalAdd.yul":550:551   */
+      dup2
+      dup3
+        /* "/sources/AssignLocalAdd.yul":1282:1294   */
+      revert
+        /* "/sources/AssignLocalAdd.yul":1245:1247   */
+    tag_8:
+        /* "/sources/AssignLocalAdd.yul":3256:3275   */
+      0x11
+        /* "/sources/AssignLocalAdd.yul":392:395   */
+      0x80
+        /* "/sources/AssignLocalAdd.yul":2675:2712   */
+      mstore
+        /* "/sources/AssignLocalAdd.yul":1527:1529   */
+      0x20
+        /* "/sources/AssignLocalAdd.yul":392:395   */
+      0x80
+        /* "/sources/AssignLocalAdd.yul":1021:1056   */
+      return
+        /* "/sources/AssignLocalAdd.yul":574:1057   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/AssignLocalAdd.yul":436:438   */
+    tag_1:
+        /* "/sources/AssignLocalAdd.yul":1138:1139   */
+      0x00
+      0x00
+        /* "/sources/AssignLocalAdd.yul":1128:1140   */
+      revert
+}
+

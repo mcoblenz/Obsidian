@@ -1,0 +1,174 @@
+
+======= /sources/PrimOpsAnd.yul (EVM) =======
+
+Pretty printed source:
+object "PrimOpsAnd" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("PrimOpsAnd_deployed")
+            codecopy(0, dataoffset("PrimOpsAnd_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "PrimOpsAnd_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    if eq(0x72dad008, shr(224, calldataload(_1)))
+                    {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, and(true, false))
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+60806040523415600f5760006000fd5b604c80601e600039806000f350fe60806040526004361015156046576000803560e01c6372dad008141560445734156027578081fd5b80600319360112156036578081fd5b600060011660805260206080f35b505b60006000fd
+
+Text representation:
+    /* "/sources/PrimOpsAnd.yul":62:65   */
+  0x80
+    /* "/sources/PrimOpsAnd.yul":58:60   */
+  0x40
+    /* "/sources/PrimOpsAnd.yul":51:66   */
+  mstore
+    /* "/sources/PrimOpsAnd.yul":87:98   */
+  callvalue
+    /* "/sources/PrimOpsAnd.yul":84:86   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/PrimOpsAnd.yul":110:111   */
+  0x00
+  0x00
+    /* "/sources/PrimOpsAnd.yul":100:112   */
+  revert
+    /* "/sources/PrimOpsAnd.yul":84:86   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/PrimOpsAnd.yul":196:227   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/PrimOpsAnd.yul":158:159   */
+  0x00
+    /* "/sources/PrimOpsAnd.yul":149:228   */
+  codecopy
+    /* "/sources/PrimOpsAnd.yul":247:278   */
+  dup1
+    /* "/sources/PrimOpsAnd.yul":158:159   */
+  0x00
+    /* "/sources/PrimOpsAnd.yul":237:279   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/PrimOpsAnd.yul":372:375   */
+      0x80
+        /* "/sources/PrimOpsAnd.yul":368:370   */
+      0x40
+        /* "/sources/PrimOpsAnd.yul":361:376   */
+      mstore
+        /* "/sources/PrimOpsAnd.yul":445:446   */
+      0x04
+        /* "/sources/PrimOpsAnd.yul":429:443   */
+      calldatasize
+        /* "/sources/PrimOpsAnd.yul":426:447   */
+      lt
+        /* "/sources/PrimOpsAnd.yul":419:448   */
+      iszero
+        /* "/sources/PrimOpsAnd.yul":416:418   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/PrimOpsAnd.yul":530:531   */
+      0x00
+      dup1
+        /* "/sources/PrimOpsAnd.yul":517:532   */
+      calldataload
+        /* "/sources/PrimOpsAnd.yul":512:515   */
+      0xe0
+        /* "/sources/PrimOpsAnd.yul":508:533   */
+      shr
+        /* "/sources/PrimOpsAnd.yul":575:585   */
+      0x72dad008
+        /* "/sources/PrimOpsAnd.yul":561:569   */
+      eq
+        /* "/sources/PrimOpsAnd.yul":554:818   */
+      iszero
+      tag_2
+      jumpi
+        /* "/sources/PrimOpsAnd.yul":590:601   */
+      callvalue
+        /* "/sources/PrimOpsAnd.yul":587:589   */
+      iszero
+      tag_3
+      jumpi
+        /* "/sources/PrimOpsAnd.yul":530:531   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsAnd.yul":603:615   */
+      revert
+        /* "/sources/PrimOpsAnd.yul":587:589   */
+    tag_3:
+        /* "/sources/PrimOpsAnd.yul":530:531   */
+      dup1
+        /* "/sources/PrimOpsAnd.yul":1013:1036   */
+      not(0x03)
+        /* "/sources/PrimOpsAnd.yul":429:443   */
+      calldatasize
+        /* "/sources/PrimOpsAnd.yul":1013:1036   */
+      add
+        /* "/sources/PrimOpsAnd.yul":1009:1040   */
+      slt
+        /* "/sources/PrimOpsAnd.yul":1006:1008   */
+      iszero
+      tag_4
+      jumpi
+        /* "/sources/PrimOpsAnd.yul":530:531   */
+      dup1
+      dup2
+        /* "/sources/PrimOpsAnd.yul":1043:1055   */
+      revert
+        /* "/sources/PrimOpsAnd.yul":1006:1008   */
+    tag_4:
+        /* "/sources/PrimOpsAnd.yul":2657:2662   */
+      0x00
+        /* "/sources/PrimOpsAnd.yul":2634:2638   */
+      0x01
+        /* "/sources/PrimOpsAnd.yul":2681:2700   */
+      and
+        /* "/sources/PrimOpsAnd.yul":372:375   */
+      0x80
+        /* "/sources/PrimOpsAnd.yul":2335:2372   */
+      mstore
+        /* "/sources/PrimOpsAnd.yul":1187:1189   */
+      0x20
+        /* "/sources/PrimOpsAnd.yul":372:375   */
+      0x80
+        /* "/sources/PrimOpsAnd.yul":782:817   */
+      return
+        /* "/sources/PrimOpsAnd.yul":554:818   */
+    tag_2:
+      pop
+        /* "/sources/PrimOpsAnd.yul":416:418   */
+    tag_1:
+        /* "/sources/PrimOpsAnd.yul":899:900   */
+      0x00
+      0x00
+        /* "/sources/PrimOpsAnd.yul":889:901   */
+      revert
+}
+

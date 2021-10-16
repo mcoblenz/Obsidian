@@ -1,0 +1,230 @@
+
+======= /sources/IfThenElse.yul (EVM) =======
+
+Pretty printed source:
+object "IfThenElse" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("IfThenElse_deployed")
+            codecopy(0, dataoffset("IfThenElse_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "IfThenElse_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0x674cd1ac {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        return(128, _1)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        if slt(add(calldatasize(), not(3)), _1) { revert(_1, _1) }
+                        mstore(128, 90)
+                        return(128, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b607880610020600039806000f350fe60806040526004361015156072576000803560e01c63674cd1ac8114602c5763dffeadd08114604c57606f565b34156035578182fd5b81600319360112156044578182fd5b816080f3606f565b34156055578182fd5b81600319360112156064578182fd5b605a60805260206080f35b50505b60006000fd
+
+Text representation:
+    /* "/sources/IfThenElse.yul":62:65   */
+  0x80
+    /* "/sources/IfThenElse.yul":58:60   */
+  0x40
+    /* "/sources/IfThenElse.yul":51:66   */
+  mstore
+    /* "/sources/IfThenElse.yul":87:98   */
+  callvalue
+    /* "/sources/IfThenElse.yul":84:86   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/IfThenElse.yul":110:111   */
+  0x00
+  0x00
+    /* "/sources/IfThenElse.yul":100:112   */
+  revert
+    /* "/sources/IfThenElse.yul":84:86   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/IfThenElse.yul":196:227   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/IfThenElse.yul":158:159   */
+  0x00
+    /* "/sources/IfThenElse.yul":149:228   */
+  codecopy
+    /* "/sources/IfThenElse.yul":247:278   */
+  dup1
+    /* "/sources/IfThenElse.yul":158:159   */
+  0x00
+    /* "/sources/IfThenElse.yul":237:279   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/IfThenElse.yul":372:375   */
+      0x80
+        /* "/sources/IfThenElse.yul":368:370   */
+      0x40
+        /* "/sources/IfThenElse.yul":361:376   */
+      mstore
+        /* "/sources/IfThenElse.yul":445:446   */
+      0x04
+        /* "/sources/IfThenElse.yul":429:443   */
+      calldatasize
+        /* "/sources/IfThenElse.yul":426:447   */
+      lt
+        /* "/sources/IfThenElse.yul":419:448   */
+      iszero
+        /* "/sources/IfThenElse.yul":416:418   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/IfThenElse.yul":530:531   */
+      0x00
+      dup1
+        /* "/sources/IfThenElse.yul":517:532   */
+      calldataload
+        /* "/sources/IfThenElse.yul":512:515   */
+      0xe0
+        /* "/sources/IfThenElse.yul":508:533   */
+      shr
+        /* "/sources/IfThenElse.yul":575:585   */
+      0x674cd1ac
+        /* "/sources/IfThenElse.yul":570:790   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/IfThenElse.yul":796:806   */
+      0xdffeadd0
+        /* "/sources/IfThenElse.yul":791:1033   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/IfThenElse.yul":554:1033   */
+      jump(tag_2)
+        /* "/sources/IfThenElse.yul":570:790   */
+    tag_3:
+        /* "/sources/IfThenElse.yul":590:601   */
+      callvalue
+        /* "/sources/IfThenElse.yul":587:589   */
+      iszero
+      tag_5
+      jumpi
+        /* "/sources/IfThenElse.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/IfThenElse.yul":603:615   */
+      revert
+        /* "/sources/IfThenElse.yul":587:589   */
+    tag_5:
+        /* "/sources/IfThenElse.yul":530:531   */
+      dup2
+        /* "/sources/IfThenElse.yul":1228:1251   */
+      not(0x03)
+        /* "/sources/IfThenElse.yul":429:443   */
+      calldatasize
+        /* "/sources/IfThenElse.yul":1228:1251   */
+      add
+        /* "/sources/IfThenElse.yul":1224:1255   */
+      slt
+        /* "/sources/IfThenElse.yul":1221:1223   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/IfThenElse.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/IfThenElse.yul":1258:1270   */
+      revert
+        /* "/sources/IfThenElse.yul":1221:1223   */
+    tag_6:
+        /* "/sources/IfThenElse.yul":530:531   */
+      dup2
+        /* "/sources/IfThenElse.yul":372:375   */
+      0x80
+        /* "/sources/IfThenElse.yul":754:789   */
+      return
+        /* "/sources/IfThenElse.yul":570:790   */
+      jump(tag_2)
+        /* "/sources/IfThenElse.yul":791:1033   */
+    tag_4:
+        /* "/sources/IfThenElse.yul":811:822   */
+      callvalue
+        /* "/sources/IfThenElse.yul":808:810   */
+      iszero
+      tag_7
+      jumpi
+        /* "/sources/IfThenElse.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/IfThenElse.yul":824:836   */
+      revert
+        /* "/sources/IfThenElse.yul":808:810   */
+    tag_7:
+        /* "/sources/IfThenElse.yul":530:531   */
+      dup2
+        /* "/sources/IfThenElse.yul":1228:1251   */
+      not(0x03)
+        /* "/sources/IfThenElse.yul":429:443   */
+      calldatasize
+        /* "/sources/IfThenElse.yul":1228:1251   */
+      add
+        /* "/sources/IfThenElse.yul":1224:1255   */
+      slt
+        /* "/sources/IfThenElse.yul":1221:1223   */
+      iszero
+      tag_8
+      jumpi
+        /* "/sources/IfThenElse.yul":530:531   */
+      dup2
+      dup3
+        /* "/sources/IfThenElse.yul":1258:1270   */
+      revert
+        /* "/sources/IfThenElse.yul":1221:1223   */
+    tag_8:
+        /* "/sources/IfThenElse.yul":3349:3351   */
+      0x5a
+        /* "/sources/IfThenElse.yul":372:375   */
+      0x80
+        /* "/sources/IfThenElse.yul":2651:2688   */
+      mstore
+        /* "/sources/IfThenElse.yul":1503:1505   */
+      0x20
+        /* "/sources/IfThenElse.yul":372:375   */
+      0x80
+        /* "/sources/IfThenElse.yul":997:1032   */
+      return
+        /* "/sources/IfThenElse.yul":554:1033   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/IfThenElse.yul":416:418   */
+    tag_1:
+        /* "/sources/IfThenElse.yul":1114:1115   */
+      0x00
+      0x00
+        /* "/sources/IfThenElse.yul":1104:1116   */
+      revert
+}
+

@@ -1,0 +1,295 @@
+
+======= /sources/Return.yul (EVM) =======
+
+Pretty printed source:
+object "Return" {
+    code {
+        {
+            mstore(64, 128)
+            if callvalue() { revert(0, 0) }
+            let _1 := datasize("Return_deployed")
+            codecopy(0, dataoffset("Return_deployed"), _1)
+            return(0, _1)
+        }
+    }
+    object "Return_deployed" {
+        code {
+            {
+                mstore(64, 128)
+                if iszero(lt(calldatasize(), 4))
+                {
+                    let _1 := 0
+                    switch shr(224, calldataload(_1))
+                    case 0x26121ff0 {
+                        if callvalue() { revert(_1, _1) }
+                        abi_decode_tuple(calldatasize())
+                        mstore(128, 8)
+                        return(128, 32)
+                    }
+                    case 0xe2179b8e {
+                        if callvalue() { revert(_1, _1) }
+                        abi_decode_tuple(calldatasize())
+                        return(mload(64), _1)
+                    }
+                    case 0xdffeadd0 {
+                        if callvalue() { revert(_1, _1) }
+                        abi_decode_tuple(calldatasize())
+                        let memPos := mload(64)
+                        mstore(memPos, 8)
+                        return(memPos, 32)
+                    }
+                }
+                revert(0, 0)
+            }
+            function abi_decode_tuple(dataEnd)
+            {
+                if slt(add(dataEnd, not(3)), 0) { revert(0, 0) }
+            }
+        }
+    }
+}
+
+
+Binary representation:
+608060405234156100105760006000fd5b60ad80610020600039806000f350fe6080604052600436101515608d576000803560e01c6326121ff0811460365763e2179b8e811460545763dffeadd08114606d57608a565b3415603f578182fd5b6046366096565b600860805260206080f3608a565b3415605d578182fd5b6064366096565b81604051f3608a565b34156076578182fd5b607d366096565b60405160088152602081f3505b50505b60006000fd60ac565b60006003198201121560a85760006000fd5b505b565b
+
+Text representation:
+    /* "/sources/Return.yul":58:61   */
+  0x80
+    /* "/sources/Return.yul":54:56   */
+  0x40
+    /* "/sources/Return.yul":47:62   */
+  mstore
+    /* "/sources/Return.yul":83:94   */
+  callvalue
+    /* "/sources/Return.yul":80:82   */
+  iszero
+  tag_1
+  jumpi
+    /* "/sources/Return.yul":106:107   */
+  0x00
+  0x00
+    /* "/sources/Return.yul":96:108   */
+  revert
+    /* "/sources/Return.yul":80:82   */
+tag_1:
+  dataSize(sub_0)
+    /* "/sources/Return.yul":188:215   */
+  dup1
+  dataOffset(sub_0)
+    /* "/sources/Return.yul":154:155   */
+  0x00
+    /* "/sources/Return.yul":145:216   */
+  codecopy
+    /* "/sources/Return.yul":235:262   */
+  dup1
+    /* "/sources/Return.yul":154:155   */
+  0x00
+    /* "/sources/Return.yul":225:263   */
+  return
+  pop
+stop
+
+sub_0: assembly {
+        /* "/sources/Return.yul":352:355   */
+      0x80
+        /* "/sources/Return.yul":348:350   */
+      0x40
+        /* "/sources/Return.yul":341:356   */
+      mstore
+        /* "/sources/Return.yul":425:426   */
+      0x04
+        /* "/sources/Return.yul":409:423   */
+      calldatasize
+        /* "/sources/Return.yul":406:427   */
+      lt
+        /* "/sources/Return.yul":399:428   */
+      iszero
+        /* "/sources/Return.yul":396:398   */
+      iszero
+      tag_1
+      jumpi
+        /* "/sources/Return.yul":510:511   */
+      0x00
+      dup1
+        /* "/sources/Return.yul":497:512   */
+      calldataload
+        /* "/sources/Return.yul":492:495   */
+      0xe0
+        /* "/sources/Return.yul":488:513   */
+      shr
+        /* "/sources/Return.yul":555:565   */
+      0x26121ff0
+        /* "/sources/Return.yul":550:789   */
+      dup2
+      eq
+      tag_3
+      jumpi
+        /* "/sources/Return.yul":795:805   */
+      0xe2179b8e
+        /* "/sources/Return.yul":790:1001   */
+      dup2
+      eq
+      tag_4
+      jumpi
+        /* "/sources/Return.yul":1007:1017   */
+      0xdffeadd0
+        /* "/sources/Return.yul":1002:1244   */
+      dup2
+      eq
+      tag_5
+      jumpi
+        /* "/sources/Return.yul":534:1244   */
+      jump(tag_2)
+        /* "/sources/Return.yul":550:789   */
+    tag_3:
+        /* "/sources/Return.yul":570:581   */
+      callvalue
+        /* "/sources/Return.yul":567:569   */
+      iszero
+      tag_6
+      jumpi
+        /* "/sources/Return.yul":510:511   */
+      dup2
+      dup3
+        /* "/sources/Return.yul":583:595   */
+      revert
+        /* "/sources/Return.yul":567:569   */
+    tag_6:
+        /* "/sources/Return.yul":597:632   */
+      tag_7
+        /* "/sources/Return.yul":409:423   */
+      calldatasize
+        /* "/sources/Return.yul":597:632   */
+      tag_8
+      jump	// in
+    tag_7:
+        /* "/sources/Return.yul":3192:3211   */
+      0x08
+        /* "/sources/Return.yul":352:355   */
+      0x80
+        /* "/sources/Return.yul":2862:2899   */
+      mstore
+        /* "/sources/Return.yul":768:787   */
+      0x20
+        /* "/sources/Return.yul":352:355   */
+      0x80
+        /* "/sources/Return.yul":753:788   */
+      return
+        /* "/sources/Return.yul":550:789   */
+      jump(tag_2)
+        /* "/sources/Return.yul":790:1001   */
+    tag_4:
+        /* "/sources/Return.yul":810:821   */
+      callvalue
+        /* "/sources/Return.yul":807:809   */
+      iszero
+      tag_9
+      jumpi
+        /* "/sources/Return.yul":510:511   */
+      dup2
+      dup3
+        /* "/sources/Return.yul":823:835   */
+      revert
+        /* "/sources/Return.yul":807:809   */
+    tag_9:
+        /* "/sources/Return.yul":837:872   */
+      tag_10
+        /* "/sources/Return.yul":409:423   */
+      calldatasize
+        /* "/sources/Return.yul":837:872   */
+      tag_8
+      jump	// in
+    tag_10:
+        /* "/sources/Return.yul":510:511   */
+      dup2
+        /* "/sources/Return.yul":348:350   */
+      0x40
+        /* "/sources/Return.yul":2048:2057   */
+      mload
+        /* "/sources/Return.yul":965:1000   */
+      return
+        /* "/sources/Return.yul":790:1001   */
+      jump(tag_2)
+        /* "/sources/Return.yul":1002:1244   */
+    tag_5:
+        /* "/sources/Return.yul":1022:1033   */
+      callvalue
+        /* "/sources/Return.yul":1019:1021   */
+      iszero
+      tag_11
+      jumpi
+        /* "/sources/Return.yul":510:511   */
+      dup2
+      dup3
+        /* "/sources/Return.yul":1035:1047   */
+      revert
+        /* "/sources/Return.yul":1019:1021   */
+    tag_11:
+        /* "/sources/Return.yul":1049:1084   */
+      tag_12
+        /* "/sources/Return.yul":409:423   */
+      calldatasize
+        /* "/sources/Return.yul":1049:1084   */
+      tag_8
+      jump	// in
+    tag_12:
+        /* "/sources/Return.yul":348:350   */
+      0x40
+        /* "/sources/Return.yul":2048:2057   */
+      mload
+        /* "/sources/Return.yul":3192:3211   */
+      0x08
+        /* "/sources/Return.yul":2869:2872   */
+      dup2
+        /* "/sources/Return.yul":2862:2899   */
+      mstore
+        /* "/sources/Return.yul":1613:1615   */
+      0x20
+        /* "/sources/Return.yul":1215:1221   */
+      dup2
+        /* "/sources/Return.yul":1208:1243   */
+      return
+      pop
+        /* "/sources/Return.yul":534:1244   */
+    tag_2:
+      pop
+      pop
+        /* "/sources/Return.yul":396:398   */
+    tag_1:
+        /* "/sources/Return.yul":1325:1326   */
+      0x00
+      0x00
+        /* "/sources/Return.yul":1315:1327   */
+      revert
+        /* "/sources/Return.yul":1366:1497   */
+      jump(tag_13)
+    tag_8:
+        /* "/sources/Return.yul":1464:1465   */
+      0x00
+        /* "/sources/Return.yul":1439:1462   */
+      not(0x03)
+        /* "/sources/Return.yul":1443:1450   */
+      dup3
+        /* "/sources/Return.yul":1439:1462   */
+      add
+        /* "/sources/Return.yul":1435:1466   */
+      slt
+        /* "/sources/Return.yul":1432:1434   */
+      iszero
+      tag_15
+      jumpi
+        /* "/sources/Return.yul":1464:1465   */
+      0x00
+      0x00
+        /* "/sources/Return.yul":1469:1481   */
+      revert
+        /* "/sources/Return.yul":1432:1434   */
+    tag_15:
+        /* "/sources/Return.yul":1414:1497   */
+      pop
+    tag_14:
+      jump	// out
+    tag_13:
+}
+
