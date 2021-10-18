@@ -1864,7 +1864,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     logError(s, InvalidValAssignmentError())
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
-                assert(ParserUtil.expressionWithTypeProperty(ePrime, (y: Option[ObsidianType]) => !y.isEmpty))
+                assert(ParserUtil.expressionHasTypeProperty(ePrime, (y: Option[ObsidianType]) => !y.isEmpty))
                 (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s))
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>

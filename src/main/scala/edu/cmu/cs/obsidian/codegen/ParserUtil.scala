@@ -17,7 +17,7 @@ package object ParserUtil {
       * @param prop the property of interest
       * @return true if every type annotation in the expression has the property; false otherwise
       */
-    def expressionWithTypeProperty(e: edu.cmu.cs.obsidian.parser.Expression, prop: Option[ObsidianType] => Boolean): Boolean = {
+    def expressionHasTypeProperty(e: edu.cmu.cs.obsidian.parser.Expression, prop: Option[ObsidianType] => Boolean): Boolean = {
         e match {
             case expression: AtomicExpression => expression match {
                 case ReferenceIdentifier(name, typ) => prop(typ)
@@ -29,58 +29,58 @@ package object ParserUtil {
                 case Parent() => true
             }
             case expression: UnaryExpression => expression match {
-                case LogicalNegation(e) => expressionWithTypeProperty(e, prop)
-                case Negate(e) => expressionWithTypeProperty(e, prop)
-                case Dereference(e, _) => expressionWithTypeProperty(e, prop)
-                case Disown(e) => expressionWithTypeProperty(e, prop)
+                case LogicalNegation(e) => expressionHasTypeProperty(e, prop)
+                case Negate(e) => expressionHasTypeProperty(e, prop)
+                case Dereference(e, _) => expressionHasTypeProperty(e, prop)
+                case Disown(e) => expressionHasTypeProperty(e, prop)
             }
             case expression: BinaryExpression => prop(expression.obstype) &&
                 (expression match {
-                    case Conjunction(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case Disjunction(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case Add(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case StringConcat(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case Subtract(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case Divide(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case Multiply(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case Mod(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case parser.Equals(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case GreaterThan(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case GreaterThanOrEquals(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case LessThan(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case LessThanOrEquals(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
-                    case NotEquals(e1, e2) => expressionWithTypeProperty(e1, prop) && expressionWithTypeProperty(e2, prop)
+                    case Conjunction(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case Disjunction(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case Add(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case StringConcat(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case Subtract(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case Divide(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case Multiply(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case Mod(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case parser.Equals(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case GreaterThan(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case GreaterThanOrEquals(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case LessThan(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case LessThanOrEquals(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
+                    case NotEquals(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
                 })
-            case LocalInvocation(name, genericParams, params, args, typ) => prop(typ) && args.forall(ePrime => expressionWithTypeProperty(ePrime, prop))
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, typ) => expressionWithTypeProperty(recipient, prop) && prop(typ) && args.forall(ePrime => expressionWithTypeProperty(ePrime, prop))
-            case Construction(contractType, args, isFFIInvocation, typ) => prop(typ) && args.forall(ePrime => expressionWithTypeProperty(ePrime, prop))
+            case LocalInvocation(name, genericParams, params, args, typ) => prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
+            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, typ) => expressionHasTypeProperty(recipient, prop) && prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
+            case Construction(contractType, args, isFFIInvocation, typ) => prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
             case StateInitializer(stateName, fieldName, typ) => prop(typ)
         }
     }
 
     def statementWithExpTypeProperty(s: Statement, prop: Option[ObsidianType] => Boolean): Boolean = {
         s match {
-            case e: Expression => expressionWithTypeProperty(e, prop)
+            case e: Expression => expressionHasTypeProperty(e, prop)
             case VariableDecl(typ, varName) => true
-            case VariableDeclWithInit(typ, varName, e) => expressionWithTypeProperty(e, prop)
+            case VariableDeclWithInit(typ, varName, e) => expressionHasTypeProperty(e, prop)
             case VariableDeclWithSpec(typIn, typOut, varName) => true
             case Return() => true
-            case ReturnExpr(e) => expressionWithTypeProperty(e, prop)
+            case ReturnExpr(e) => expressionHasTypeProperty(e, prop)
             case Transition(newStateName, updates, thisPermission) => updates match {
-                case Some(updates) => updates.forall(u => expressionWithTypeProperty(u._2, prop))
+                case Some(updates) => updates.forall(u => expressionHasTypeProperty(u._2, prop))
                 case None => true
             }
-            case Assignment(assignTo, e) => expressionWithTypeProperty(assignTo, prop) && expressionWithTypeProperty(e, prop)
+            case Assignment(assignTo, e) => expressionHasTypeProperty(assignTo, prop) && expressionHasTypeProperty(e, prop)
             case Revert(maybeExpr) => maybeExpr match {
-                case Some(e) => expressionWithTypeProperty(e, prop)
+                case Some(e) => expressionHasTypeProperty(e, prop)
                 case None => true
             }
-            case If(eCond, s) => expressionWithTypeProperty(eCond, prop) && s.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
-            case IfThenElse(eCond, s1, s2) => expressionWithTypeProperty(eCond, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
-            case IfInState(e, ePerm, typeState, s1, s2) => expressionWithTypeProperty(e, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case If(eCond, s) => expressionHasTypeProperty(eCond, prop) && s.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case IfThenElse(eCond, s1, s2) => expressionHasTypeProperty(eCond, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case IfInState(e, ePerm, typeState, s1, s2) => expressionHasTypeProperty(e, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
             case TryCatch(s1, s2) => s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
-            case Switch(e, cases) => expressionWithTypeProperty(e, prop) && cases.forall((sc: SwitchCase) => sc.body.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)))
-            case StaticAssert(e, typeState) => expressionWithTypeProperty(e, prop)
+            case Switch(e, cases) => expressionHasTypeProperty(e, prop) && cases.forall((sc: SwitchCase) => sc.body.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)))
+            case StaticAssert(e, typeState) => expressionHasTypeProperty(e, prop)
         }
     }
 
@@ -89,7 +89,7 @@ package object ParserUtil {
             case declaration: InvokableDeclaration => declaration match {
                 case Constructor(name, args, resultType, body) => body.forall((s: Statement) => statementWithExpTypeProperty(s, prop))
                 case Transaction(name, params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes) =>
-                    body.forall((s: Statement) => statementWithExpTypeProperty(s, prop)) && ensures.forall((e: Ensures) => expressionWithTypeProperty(e.expr, prop))
+                    body.forall((s: Statement) => statementWithExpTypeProperty(s, prop)) && ensures.forall((e: Ensures) => expressionHasTypeProperty(e.expr, prop))
             }
             case TypeDecl(name, typ) => true
             case Field(isConst, typ, name, availableIn) => true

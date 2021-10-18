@@ -251,9 +251,7 @@ object Main {
 
             val checker = new Checker(transformedTable, options.typeCheckerDebug)
             val (typecheckingErrors, checkedTable) = checker.checkProgram()
-
-            //assert(ParserUtil.symbolTableWithExpTypeProperty(checkedTable, (y: Option[Any]) => !y.isEmpty))
-
+            
             val allSortedErrors = (duplicateErrors ++ importErrors ++ transformErrors ++ typecheckingErrors).sorted
 
             if (!allSortedErrors.isEmpty) {

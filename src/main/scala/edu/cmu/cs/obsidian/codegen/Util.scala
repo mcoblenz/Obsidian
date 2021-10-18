@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.typecheck.{BoolType, BottomType, ContractReferenceType, GenericType, Int256Type, IntType, InterfaceContractType, NonPrimitiveType, ObsidianType, PrimitiveType, StateType, StringType, UnitType}
+import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
 
