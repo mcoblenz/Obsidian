@@ -17,6 +17,10 @@ class IdentityAstTransformer {
 
     def transformProgram(table: SymbolTable): (SymbolTable, Seq[ErrorRecord]) = {
         var errorRecords = List.empty[ErrorRecord]
+
+        // todo: this line is exactly where the empty contract "Contract" comes from. if i change
+        //   it to start with an empty list instead of adding a contract always, many tests fail.
+        //   i don't really understand why. this is probably correct but i want to know more about it.
         var contracts = List[Contract](ContractType.topContractImpl)
         assert(table.ast.imports.isEmpty, "Imports should be empty after processing.")
 

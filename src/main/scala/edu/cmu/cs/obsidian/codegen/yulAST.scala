@@ -274,7 +274,7 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
 
             //todo: second argument to the application is highly speculative; check once you have more complex functions
             // the actual call to f, and a possible declaration of the temporary variables if there are any returns
-            val call_to_f: Expression = apply(functionRename(f.name), f.parameters.map(p => Identifier(p.name)): _*)
+            val call_to_f: Expression = apply(f.name, f.parameters.map(p => Identifier(p.name)): _*)
             val call_f_and_maybe_assign: YulStatement =
                 if (f.returnVariables.nonEmpty) {
                     codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))

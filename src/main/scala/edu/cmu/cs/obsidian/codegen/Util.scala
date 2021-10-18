@@ -1,7 +1,8 @@
 package edu.cmu.cs.obsidian.codegen
 
+
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
+import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
 
@@ -204,13 +205,27 @@ object Util {
       * @return the width of the type
       */
     def obsTypeToWidth(t: ObsidianType): Int = {
-        1
+        // this only gets called in one place, which is the translation of local invocations.
+        // it should either be 1 or 0, indicating if the return type is void (0) or not (1)
+        t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => 1
+                case BoolType() => 1
+                case StringType() => 1
+                case Int256Type() => 1
+                case UnitType() => 0
+            }
+            case primitiveType: NonPrimitiveType => assert(false, "width not implemented for nonprimitive types!"); -1
+            case BottomType() => assert(false, "width not implemented for the bottom type!"); -1
+        }
     }
 
-    def functionRename(name: String): String = {
-        name //todo some sort of alpha variation here combined with consulting a mapping; consult the ABI
-    }
-
+    /**
+      * return the top 4 bytes of the keccak256 hash of a string
+      *
+      * @param s the string to hash
+      * @return the top 4 bytes of the keccak256 of the input string
+      */
     def keccak256(s: String): String = {
         val digestK: Keccak.Digest256 = new Keccak.Digest256()
         s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0, 4))}"
@@ -263,7 +278,21 @@ object Util {
       * @param e the expression of interest
       * @return the name of the contract for the expression, if there is one; raises an error otherwise
       */
-    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = "IntContainer"
+    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = { //todo should this return an option? what's the invariant exactly?
+        e.obstype match {
+            case Some(value) => value match {
+                case _: PrimitiveType => assert(false, s"primitive types do not have contract names"); ""
+                case tau: NonPrimitiveType => tau match {
+                    case ContractReferenceType(contractType, _, _) => contractType.contractName
+                    case StateType(contractType, _, _) => contractType.contractName
+                    case InterfaceContractType(_, _) => assert(false, "unimplemented"); ""
+                    case GenericType(_, _) => assert(false, "unimplemented"); ""
+                }
+                case BottomType() => assert(false, s"the bottom type does not have a contract name"); ""
+            }
+            case None => assert(false, s"expression without a type annotation: ${e.toString}"); ""
+        }
+    }
 
     /**
       * given a contract name and a transaction name, produce the name of the contract in the flat
@@ -278,14 +307,15 @@ object Util {
 
     /**
       * if a and b do not contain "___", then
-      *    transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
+      * transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
+      *
       *
       * @param s
       * @return
       */
     def transactionNameUnmapping(s: String): Option[(String, String)] = {
         val halves: Array[String] = s.split("___")
-        if(halves.length != 2) {
+        if (halves.length != 2) {
             None
         } else {
             Some(halves(0), halves(1))
