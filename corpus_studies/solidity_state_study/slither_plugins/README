@@ -1,0 +1,2 @@
+To use these plugins with slither, first follow the instructions at https://github.com/crytic/slither/wiki/Developer-installation to set up the slither development environment. 
+Then, create a symlink in <path-to-slither>/slither/slither/detectors to this directory and update all_detectors.py to include the detector names. 
