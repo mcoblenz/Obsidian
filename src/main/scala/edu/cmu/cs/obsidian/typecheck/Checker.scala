@@ -1789,7 +1789,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val fieldAST = newStateTable.lookupField(f)
                         if (fieldAST.isDefined) {
                             val (t, contextPrime2, ePrime) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))
-                            newUpdates = newUpdates :+ (ReferenceIdentifier(f, Some(t)), ePrime)
+                            newUpdates = newUpdates :+ (ReferenceIdentifier(f, Some(t)), ePrime) // todo iev: does ePrime here need its obstype field updated?
                             contextPrime = contextPrime2
                             checkIsSubtype(contextPrime.contractTable, s, t, fieldAST.get.typ)
                         }
@@ -1865,7 +1865,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
                 assert(ParserUtil.expressionHasTypeProperty(ePrime, (y: Option[ObsidianType]) => !y.isEmpty))
-                (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s))
+                (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s)) //todo iev should eprime be updated here?
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
                 if (eDeref != This(None)) { //todo: this is totally wrong again, i seem not to know how to get the type for `this`. maybe this needs to be a match not an if so i can check if it's This(_)?

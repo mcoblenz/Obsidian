@@ -36,6 +36,12 @@ class TypeCheckerTests extends JUnitSuite {
         val checker = new Checker(globalTable)
         val errs = (checker.checkProgram()._1 ++ transformErrors).sorted
 
+        if(errs.length > 0) {
+            println("--------------")
+            println(s"ERRORS in ${file}: ${errs.toString}")
+            println("--------------")
+        }
+
         val remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
         for (ErrorRecord(err, loc, _) <- errs) {
             val pred = (expected: (Error, LineNumber)) => {
@@ -321,6 +327,7 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def sideEffectTest(): Unit = {
+        println("here")
         runTest("resources/tests/type_checker_tests/NoSideEffects.obs",
             (NoEffectsError(ReferenceIdentifier("x", Some(IntType()))), 8)
                 ::
