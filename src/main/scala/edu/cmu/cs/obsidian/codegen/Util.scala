@@ -260,14 +260,40 @@ object Util {
     }
 
     /**
+      * traverse an obsidian type to compute the number of bytes needed to store it in memory.
+      *
+      * @param t the obsidian type of interest
+      * @return the number of bytes of memory to allocate to store a value of t
+      */
+    def sizeOfObsType(t : ObsidianType): Int = {
+        t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => 32
+                case BoolType() => 1
+                case StringType() => assert(false, "size of string constants is unimplemented"); -1
+                case Int256Type() => 256
+                case UnitType() => 1
+            }
+            case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
+                // todo: what is a remote reference type, exactly? i don't use it now so i don't make room for it, but one day.
+                case ContractReferenceType(contractType, _, remoteReferenceType) => sizeOfContractType(contractType)
+                case StateType(contractType, stateNames, remoteReferenceType) => sizeOfContractType(contractType)
+                case InterfaceContractType(name, simpleType) => sizeOfObsType(simpleType)
+                case GenericType(gVar, bound) => 0 //todo: is this right? there's nothing more there, anyway
+            }
+            case BottomType() => 1 //todo maybe zero?
+        }
+    }
+
+    /**
       * given a contract type, compute the number of bytes needed to store it in memory in the yul
-      * object. WARNING: right now this is a stub, it just returns 32 always.
+      * object.
       *
       * @param ct the contract of interest
       * @return the number of bytes needed to store the fields of the contract
       */
     def sizeOfContractType(ct: edu.cmu.cs.obsidian.typecheck.ContractType): Int = {
-        32
+        ct.typeArgs.map(sizeOfObsType).sum
     }
 
     /**
