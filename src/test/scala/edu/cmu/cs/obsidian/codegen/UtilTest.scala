@@ -58,19 +58,6 @@ class UtilTest extends JUnitSuite {
             contractSizes.equals(expected))
     }
 
-    @Test def sizeOfOneInt(): Unit = {
-        //val simple : ContractType = new ContractType("Simple", Seq(IntType()))
-        val con: Contract = new Contract("Simple", "")
-        val sym: SymbolTable = new SymbolTable(Program(Seq(), Seq()))
-        val simple: ContractTable = new ContractTable(con, sym, None)
-        assertTrue(Util.sizeOfContract(simple) == 32)
-    }
-    //
-    //    @Test def sizeOfTwoInts() : Unit = {
-    //        val simple : ContractType = new ContractType("Simple", Seq(IntType(),IntType()))
-    //        assertTrue(Util.sizeOfContractType(simple) == 64)
-    //    }
-
     @Test def sizeOfSetGetNoArgsNoConstructNoInit(): Unit = {
         runTest("resources/tests/GanacheTests/SetGetNoArgsNoConstructNoInit.obs",
             Map("SetGetNoArgsNoConstructNoInit" -> 0, "IntContainer" -> 32))
