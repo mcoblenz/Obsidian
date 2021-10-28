@@ -4,10 +4,9 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck._
 import org.scalatestplus.junit.JUnitSuite
 import org.junit.Test
-import org.junit.Assert.{assertTrue, fail}
+import org.junit.Assert.assertTrue
 
 import java.io.FileInputStream
-import scala.collection.mutable.ArrayBuffer
 
 class UtilTest extends JUnitSuite {
 
@@ -38,16 +37,19 @@ class UtilTest extends JUnitSuite {
             fail(s"Type checking errors: ${errs.toString}")
         }
 
-        // todo this is just for debugging; remove it when it works.
-        for(c <- globalTable.ast.contracts){
-            println(s"contract: ${c.toString}\nbound:${c.bound.toString()}")
+        // stash the symbol table that we get from the type checker so that we don't have to rerun
+        // checkProgram every time below
+        val symbols = checker.checkProgram()._2
+
+        // given a contract, return its name paired with the size of its type
+        def contractPair (c : Contract) : (String, Int) = {
+            (c.name, Util.sizeOfContractType(symbols.contractLookup(c.name).contractType))
         }
 
-        // todo this is wrong; the contract type stored in bound is to do with subtyping, it's not the type of the contract.
-        //   that information must be in the Checker some where, but perhaps is not emitted in the same way that expression ASTs
-        //   were not adorned with their typed until I changed it.
-        val contractSizes: Map[String, Int] = Map.from(globalTable.ast.contracts.map(c => (c.name, Util.sizeOfContractType(c.bound))))
+        // iterate over the contracts in the symboltable's AST and compute all the sizes
+        val contractSizes: Map[String, Int] = Map.from(symbols.ast.contracts.map(contractPair))
 
+        // the test passes if the map of expected sizes agrees with the computed one.
         assertTrue(s"The size of the contracts in ${file} did not match the expected sizes: ${contractSizes.toString} vs ${expected.toString}",
             contractSizes.equals(expected))
     }

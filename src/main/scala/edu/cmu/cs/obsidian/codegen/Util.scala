@@ -268,7 +268,7 @@ object Util {
     def sizeOfObsType(t : ObsidianType): Int = {
         t match {
             case primitiveType: PrimitiveType => primitiveType match {
-                case IntType() => 32
+                case IntType() => println("found an int!"); 32
                 case BoolType() => 1
                 case StringType() => assert(false, "size of string constants is unimplemented"); -1
                 case Int256Type() => 256
@@ -293,6 +293,7 @@ object Util {
       * @return the number of bytes needed to store the fields of the contract
       */
     def sizeOfContractType(ct: edu.cmu.cs.obsidian.typecheck.ContractType): Int = {
+        println(s"${ct.toString} has ${ct.typeArgs.toString}")
         ct.typeArgs.map(sizeOfObsType).sum
     }
 
