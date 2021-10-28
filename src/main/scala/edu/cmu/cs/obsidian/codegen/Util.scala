@@ -266,7 +266,7 @@ object Util {
       * @param t the obsidian type of interest
       * @return the number of bytes of memory to allocate to store a value of t
       */
-    def sizeOfObsType(t : ObsidianType): Int = {
+    def sizeOfObsType(t: ObsidianType): Int = {
         val pointer_size = 32
 
         t match {
