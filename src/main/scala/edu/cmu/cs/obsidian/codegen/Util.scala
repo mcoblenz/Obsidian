@@ -277,12 +277,12 @@ object Util {
             }
             case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
                 // todo: what is a remote reference type, exactly? i don't use it now so i don't make room for it, but one day.
-                case ContractReferenceType(contractType, _, remoteReferenceType) => sizeOfContractType(contractType)
-                case StateType(contractType, stateNames, remoteReferenceType) => sizeOfContractType(contractType)
+                case ContractReferenceType(contractType, permission, remoteReferenceType) => -1
+                case StateType(contractType, stateNames, remoteReferenceType) => -1
                 case InterfaceContractType(name, simpleType) => sizeOfObsType(simpleType)
                 case GenericType(gVar, bound) => 0 //todo: is this right? there's nothing more there, anyway
             }
-            case BottomType() => 1 //todo maybe zero?
+            case BottomType() => 0
         }
     }
 
@@ -293,7 +293,7 @@ object Util {
       * @param ct the contract of interest
       * @return the number of bytes needed to store the fields of the contract
       */
-    def sizeOfContractType(ct: ContractTable): Int = {
+    def sizeOfContract(ct: ContractTable): Int = {
         ct.allFields.map((f) => sizeOfObsType(f.typ)).sum
     }
 

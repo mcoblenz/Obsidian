@@ -4,7 +4,7 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck._
 import org.scalatestplus.junit.JUnitSuite
 import org.junit.Test
-import org.junit.Assert.assertTrue
+import org.junit.Assert.{assertTrue,fail}
 
 import java.io.FileInputStream
 
@@ -43,8 +43,11 @@ class UtilTest extends JUnitSuite {
 
         // given a contract, return its name paired with the size of its type
         def contractPair (c : Contract) : (String, Int) = {
-            ("xxx",0)
-            //(c.name, Util.sizeOfContractType(symbols.contractLookup(c.name).contractType))
+            val ct =  symbols.contract(c.name)
+            ct match {
+                case Some(value) => (c.name, Util.sizeOfContract(value))
+                case None => assertTrue("the typechecker produced a symbol table missing contracts",false);("",-1)
+            }
         }
 
         // iterate over the contracts in the symboltable's AST and compute all the sizes

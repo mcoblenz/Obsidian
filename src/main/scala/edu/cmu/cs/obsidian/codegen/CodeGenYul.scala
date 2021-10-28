@@ -576,7 +576,7 @@ object CodeGenYul extends CodeGenerator {
                 val id_memaddr = nextTemp()
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
-                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractType(ct.get)))),
+                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContract(ct.get)))),
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)
