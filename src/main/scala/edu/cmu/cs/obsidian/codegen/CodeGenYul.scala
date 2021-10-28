@@ -571,10 +571,12 @@ object CodeGenYul extends CodeGenerator {
                 // todo: currently we ignore the arguments to the constructor
                 assert(args.isEmpty, "contracts that take arguments are not yet supported")
 
+                val ct: Option[ContractTable] = checkedTable.contract(contractType.contractName)
+
                 val id_memaddr = nextTemp()
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
-                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractType(contractType)))),
+                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContract(ct.get)))),
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)
