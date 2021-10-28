@@ -2,6 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 
 import edu.cmu.cs.obsidian.codegen
+import edu.cmu.cs.obsidian.parser.ContractTable
 import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
@@ -260,14 +261,45 @@ object Util {
     }
 
     /**
+      * traverse an obsidian type to compute the number of bytes needed to store it in memory.
+      *
+      * @param t the obsidian type of interest
+      * @return the number of bytes of memory to allocate to store a value of t
+      */
+    def sizeOfObsType(t: ObsidianType): Int = {
+        val pointer_size = 32
+
+        t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => 32
+                case BoolType() => 0
+                case StringType() => assert(false, "size of string constants is unimplemented"); -1
+                case Int256Type() => 256
+                case UnitType() => 0
+            }
+            case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
+                case ContractReferenceType(contractType, permission, remoteReferenceType) => pointer_size
+                case StateType(contractType, stateNames, remoteReferenceType) =>
+                    // one day, this should probably be ceil(log_2 (length of stateNames()))) bits
+                    assert(false, "size of states is unimplemented"); -1
+                case InterfaceContractType(name, simpleType) => pointer_size
+                case GenericType(gVar, bound) =>
+                    // todo: this may need to change; think about it more later
+                    pointer_size
+            }
+            case BottomType() => 0
+        }
+    }
+
+    /**
       * given a contract type, compute the number of bytes needed to store it in memory in the yul
-      * object. WARNING: right now this is a stub, it just returns 32 always.
+      * object.
       *
       * @param ct the contract of interest
       * @return the number of bytes needed to store the fields of the contract
       */
-    def sizeOfContractType(ct: edu.cmu.cs.obsidian.typecheck.ContractType): Int = {
-        32
+    def sizeOfContract(ct: ContractTable): Int = {
+        ct.allFields.map(f => sizeOfObsType(f.typ)).sum
     }
 
     /**
