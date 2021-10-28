@@ -2,6 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 
 import edu.cmu.cs.obsidian.codegen
+import edu.cmu.cs.obsidian.parser.ContractTable
 import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
@@ -292,9 +293,8 @@ object Util {
       * @param ct the contract of interest
       * @return the number of bytes needed to store the fields of the contract
       */
-    def sizeOfContractType(ct: edu.cmu.cs.obsidian.typecheck.ContractType): Int = {
-        println(s"${ct.toString} has ${ct.typeArgs.toString}")
-        ct.typeArgs.map(sizeOfObsType).sum
+    def sizeOfContractType(ct: ContractTable): Int = {
+        ct.allFields.map((f) => sizeOfObsType(f.typ)).sum
     }
 
     /**
