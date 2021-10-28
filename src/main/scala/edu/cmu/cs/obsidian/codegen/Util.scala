@@ -267,20 +267,25 @@ object Util {
       * @return the number of bytes of memory to allocate to store a value of t
       */
     def sizeOfObsType(t : ObsidianType): Int = {
+        val pointer_size = 32
+
         t match {
             case primitiveType: PrimitiveType => primitiveType match {
-                case IntType() => println("found an int!"); 32
-                case BoolType() => 1
+                case IntType() => 32
+                case BoolType() => 0
                 case StringType() => assert(false, "size of string constants is unimplemented"); -1
                 case Int256Type() => 256
-                case UnitType() => 1
+                case UnitType() => 0
             }
             case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
-                // todo: what is a remote reference type, exactly? i don't use it now so i don't make room for it, but one day.
-                case ContractReferenceType(contractType, permission, remoteReferenceType) => -1
-                case StateType(contractType, stateNames, remoteReferenceType) => -1
-                case InterfaceContractType(name, simpleType) => sizeOfObsType(simpleType)
-                case GenericType(gVar, bound) => 0 //todo: is this right? there's nothing more there, anyway
+                case ContractReferenceType(contractType, permission, remoteReferenceType) => pointer_size
+                case StateType(contractType, stateNames, remoteReferenceType) =>
+                    // one day, this should probably be ceil(log_2 (length of stateNames()))) bits
+                    assert(false, "size of states is unimplemented"); -1
+                case InterfaceContractType(name, simpleType) => pointer_size
+                case GenericType(gVar, bound) =>
+                    // todo: this may need to change; think about it more later
+                    pointer_size
             }
             case BottomType() => 0
         }
@@ -294,7 +299,7 @@ object Util {
       * @return the number of bytes needed to store the fields of the contract
       */
     def sizeOfContract(ct: ContractTable): Int = {
-        ct.allFields.map((f) => sizeOfObsType(f.typ)).sum
+        ct.allFields.map(f => sizeOfObsType(f.typ)).sum
     }
 
     /**
