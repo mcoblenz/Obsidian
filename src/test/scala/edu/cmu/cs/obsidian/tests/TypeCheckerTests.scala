@@ -36,11 +36,11 @@ class TypeCheckerTests extends JUnitSuite {
         val checker = new Checker(globalTable)
         val errs = (checker.checkProgram()._1 ++ transformErrors).sorted
 
-        if(errs.length > 0) {
-            println("--------------")
-            println(s"ERRORS in ${file}: ${errs.toString}")
-            println("--------------")
-        }
+//        if(errs.length > 0) {
+//            println("--------------")
+//            println(s"ERRORS in ${file}: ${errs.toString}")
+//            println("--------------")
+//        }
 
         val remaining = new ArrayBuffer[(Error, LineNumber)]() ++ expectedErrors
         for (ErrorRecord(err, loc, _) <- errs) {
