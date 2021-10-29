@@ -916,6 +916,7 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def allPermissions(): Unit = {
+        val allpermowned: ContractReferenceType = ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())
         runTest("resources/tests/type_checker_tests/AllPermissions.obs",
             (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
                 ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), true), 19) ::
@@ -923,8 +924,8 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType()), true), 25) ::
                 (SubtypingError(ContractReferenceType(ContractType("AllPermissions", Nil), Unowned(), NotRemoteReferenceType()),
                     ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()), true), 29) ::
-                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x2", Some(IntType()))), 41) ::
-                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x7", Some(IntType()))), 63) ::
+                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x2", Some(allpermowned))), 41) ::
+                (LostOwnershipErrorDueToSharing(ReferenceIdentifier("x7", Some(allpermowned))), 63) ::
                 (ReceiverTypeIncompatibleError("t1",
                     ContractReferenceType(ContractType("AllPermissions", Nil), Shared(), NotRemoteReferenceType()),
                     ContractReferenceType(ContractType("AllPermissions", Nil), Owned(), NotRemoteReferenceType())), 81) ::

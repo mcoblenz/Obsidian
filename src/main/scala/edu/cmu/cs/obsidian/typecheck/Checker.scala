@@ -666,7 +666,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
-                        updateArgTypeInContext(receiver, receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
+                        updateArgTypeInContext(ParserUtil.updateExprType(receiver,receiverType), receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
                     case _ => contextAfterArgs
                 }
 
