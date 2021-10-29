@@ -89,14 +89,14 @@ sealed abstract class InvokableDeclaration() extends Declaration {
 
 // Expressions not containing other expressions
 sealed abstract class AtomicExpression extends Expression {
-    val obstype: Option[ObsidianType] = None
+    override val obstype: Option[ObsidianType] = None
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): AtomicExpression = this
 }
 
 sealed abstract class UnaryExpression(make: Expression => UnaryExpression,
                                       e: Expression) extends Expression {
-    val obstype: Option[ObsidianType] = None
+    override val obstype: Option[ObsidianType] = None
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): UnaryExpression =
         make(e.substitute(genericParams, actualParams)).setLoc(this)
@@ -105,7 +105,7 @@ sealed abstract class UnaryExpression(make: Expression => UnaryExpression,
 sealed abstract class BinaryExpression(make: (Expression, Expression) => BinaryExpression,
                                        e1: Expression,
                                        e2: Expression) extends Expression {
-    val obstype: Option[ObsidianType] = None
+    override val obstype: Option[ObsidianType] = None
 
     override def substitute(genericParams: Seq[GenericType], actualParams: Seq[ObsidianType]): BinaryExpression =
         make(e1.substitute(genericParams, actualParams), e2.substitute(genericParams, actualParams))
@@ -113,9 +113,7 @@ sealed abstract class BinaryExpression(make: (Expression, Expression) => BinaryE
 }
 
 /* Expressions */
-case class ReferenceIdentifier(name: String, typ: Option[ObsidianType]) extends AtomicExpression {
-    override val obstype: Option[ObsidianType] = typ
-
+case class ReferenceIdentifier(name: String, override val obstype: Option[ObsidianType]) extends AtomicExpression {
     override val toString: String = name
 }
 

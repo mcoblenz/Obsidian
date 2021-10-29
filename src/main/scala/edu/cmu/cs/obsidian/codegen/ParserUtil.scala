@@ -125,7 +125,7 @@ package object ParserUtil {
     def updateExprType(e: Expression, newType: ObsidianType): Expression = {
         e match {
             case expression: AtomicExpression => expression match {
-                case ReferenceIdentifier(name, _) => ReferenceIdentifier(name, Some(newType))
+                case r@ReferenceIdentifier(name, _) => r.copy(obstype = Some(newType))
                 case NumLiteral(_) => e
                 case StringLiteral(_) => e
                 case TrueLiteral() => e
