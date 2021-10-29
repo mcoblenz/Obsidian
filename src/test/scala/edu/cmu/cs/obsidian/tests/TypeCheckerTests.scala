@@ -905,12 +905,13 @@ class TypeCheckerTests extends JUnitSuite {
     }
 
     @Test def permissionPassing(): Unit = {
+        val ppowned: ContractReferenceType = ContractReferenceType(ContractType("PermissionPassing", Nil), Owned(), NotRemoteReferenceType())
         runTest("resources/tests/type_checker_tests/PermissionPassing.obs",
             (ReceiverTypeIncompatibleError("t5",
                 ContractReferenceType(ContractType("PermissionPassing", Nil), Unowned(), NotRemoteReferenceType()),
-                ContractReferenceType(ContractType("PermissionPassing", Nil), Owned(), NotRemoteReferenceType())), 47) ::
-                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil, None)), 58) :: // todo this may need to be an encoding of the type of returnOwnedAsset
-                (LostOwnershipErrorDueToSharing(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil, None)), 65) :: // todo ditto
+                ppowned), 47) ::
+                (UnusedExpressionArgumentOwnershipError(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil, Some(ppowned))), 58) ::
+                (LostOwnershipErrorDueToSharing(LocalInvocation("returnOwnedAsset", Nil, Nil, Nil, Some(ppowned))), 65) ::
                 Nil)
     }
 
