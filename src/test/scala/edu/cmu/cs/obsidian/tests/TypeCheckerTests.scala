@@ -475,7 +475,13 @@ class TypeCheckerTests extends JUnitSuite {
                     ContractReferenceType(ContractType("Money", Nil), Owned(), NotRemoteReferenceType())),
                     56)
                 ::
-                (DisownUnowningExpressionError(ReferenceIdentifier("m", Some(IntType()))), 49)
+                //(DisownUnowningExpressionError(ReferenceIdentifier("m", Some(IntType()))), 49)
+                    (DisownUnowningExpressionError(ReferenceIdentifier("m",
+                            Some(
+                                ContractReferenceType(ContractType("Money", Nil), Unowned(), NotRemoteReferenceType())
+                            ))
+                    ),
+                        49)
                 ::
                 (UnusedOwnershipError("m"), 72)
                 ::
