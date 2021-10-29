@@ -811,7 +811,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     (BoolType(), c2, Equals(e1Prime, e2Prime).setLoc(e))
                 } else {
                     if (!t1.isBottom && !t2.isBottom) {
-                        logError(e, DifferentTypeError(e1, t1, e2, t2))
+                        logError(e, DifferentTypeError(e1Prime, t1, e2Prime, t2))
                     }
                     (BottomType(), c2, Equals(e1Prime, e2Prime).setLoc(e))
                 }
@@ -834,7 +834,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     (BoolType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e))
                 } else {
                     if (!t1.isBottom && !t2.isBottom) {
-                        logError(e, DifferentTypeError(e1, t1, e2, t2))
+                        logError(e, DifferentTypeError(e1Prime, t1, e2Prime, t2))
                     }
                     (BottomType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e))
                 }
@@ -852,9 +852,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                     (t, context, ParserUtil.updateExprType(e,t))
                                 }
                             case None =>
-                                logError(e, FieldUndefinedError(context.thisType, fieldName))
                                 val t = BottomType()
-                                (t, context, ParserUtil.updateExprType(e,t))
+                                val eprime = ParserUtil.updateExprType(e,t)
+                                logError(eprime, FieldUndefinedError(context.thisType, fieldName))
+                                (t, context, eprime)
                         }
 
                     case _ =>
@@ -940,7 +941,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // so that e is no longer owned (if it is a variable).
                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ownershipConsumptionMode)
                 if (!typ.isOwned) {
-                    logError(e, DisownUnowningExpressionError(e))
+                    logError(ePrime, DisownUnowningExpressionError(ePrime))
                 }
 
                 val newTyp = typ match {
@@ -2229,10 +2230,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case e: Expression =>
                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesShared())
                 if (typ.isOwned) {
-                    logError(s, UnusedExpressionOwnershipError(e))
+                    logError(ePrime, UnusedExpressionOwnershipError(ePrime))
                 }
                 if (!(s.isInstanceOf[LocalInvocation] || s.isInstanceOf[Invocation])) {
-                    logError(s, NoEffectsError(s))
+                    logError(ePrime, NoEffectsError(ePrime))
                 }
                 (contextPrime, ePrime)
             case StaticAssert(e, allowedStatesOrPermissions) =>
