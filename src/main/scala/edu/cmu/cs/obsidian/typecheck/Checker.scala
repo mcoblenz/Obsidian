@@ -818,7 +818,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val (typ, con, e1Prime, e2Prime) = assertOperationType(e1, e2, IntType())
                 (typ, con, Mod(e1Prime, e2Prime).setLoc(e))
             case Negate(e: Expression) =>
-                assertTypeEquality(e, IntType(), context)
+                val (typ, con, eprime) = assertTypeEquality(e, IntType(), context)
+                (typ, con, Negate(eprime).setLoc(e))
             case Equals(e1: Expression, e2: Expression) =>
                 val (t1, c1, e1Prime) = inferAndCheckExpr(decl, context, e1, NoOwnershipConsumption())
                 val (t2, c2, e2Prime) = inferAndCheckExpr(decl, c1, e2, NoOwnershipConsumption())
