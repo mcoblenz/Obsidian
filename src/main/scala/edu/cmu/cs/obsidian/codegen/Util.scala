@@ -1,7 +1,9 @@
 package edu.cmu.cs.obsidian.codegen
 
+
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
+import edu.cmu.cs.obsidian.parser.ContractTable
+import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
 
@@ -61,7 +63,16 @@ object Util {
       * @param s the scala string
       * @return the corresponding Yul string literal
       */
-    def stringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
+    def stringlit(s: String): Literal = Literal(LiteralKind.string, quote(s), "string")
+
+    /**
+      * shorthand for inserting strings into the Yul directly, without quotations to make them a
+      * string literal
+      *
+      * @param s the scala string
+      * @return the corresponding Yul string literal
+      */
+    def rawstringlit(s: String): Literal = Literal(LiteralKind.string, s, "string")
 
     /**
       * shorthand for building Yul function applications
@@ -195,13 +206,27 @@ object Util {
       * @return the width of the type
       */
     def obsTypeToWidth(t: ObsidianType): Int = {
-        1
+        // this only gets called in one place, which is the translation of local invocations.
+        // it should either be 1 or 0, indicating if the return type is void (0) or not (1)
+        t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => 1
+                case BoolType() => 1
+                case StringType() => 1
+                case Int256Type() => 1
+                case UnitType() => 0
+            }
+            case primitiveType: NonPrimitiveType => assert(false, "width not implemented for nonprimitive types!"); -1
+            case BottomType() => assert(false, "width not implemented for the bottom type!"); -1
+        }
     }
 
-    def functionRename(name: String): String = {
-        name //todo some sort of alpha variation here combined with consulting a mapping; consult the ABI
-    }
-
+    /**
+      * return the top 4 bytes of the keccak256 hash of a string
+      *
+      * @param s the string to hash
+      * @return the top 4 bytes of the keccak256 of the input string
+      */
     def keccak256(s: String): String = {
         val digestK: Keccak.Digest256 = new Keccak.Digest256()
         s"0x${Hex.toHexString(digestK.digest(s.getBytes).slice(0, 4))}"
@@ -233,5 +258,99 @@ object Util {
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
         hashOfFunctionName(f.name, f.parameters.map(p => obsTypeToYulTypeAndSize(p.ntype)._1))
+    }
+
+    /**
+      * traverse an obsidian type to compute the number of bytes needed to store it in memory.
+      *
+      * @param t the obsidian type of interest
+      * @return the number of bytes of memory to allocate to store a value of t
+      */
+    def sizeOfObsType(t: ObsidianType): Int = {
+        val pointer_size = 32
+
+        t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => 32
+                case BoolType() => 0
+                case StringType() => assert(false, "size of string constants is unimplemented"); -1
+                case Int256Type() => 256
+                case UnitType() => 0
+            }
+            case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
+                case ContractReferenceType(contractType, permission, remoteReferenceType) => pointer_size
+                case StateType(contractType, stateNames, remoteReferenceType) =>
+                    // one day, this should probably be ceil(log_2 (length of stateNames()))) bits
+                    assert(false, "size of states is unimplemented"); -1
+                case InterfaceContractType(name, simpleType) => pointer_size
+                case GenericType(gVar, bound) =>
+                    // todo: this may need to change; think about it more later
+                    pointer_size
+            }
+            case BottomType() => 0
+        }
+    }
+
+    /**
+      * given a contract type, compute the number of bytes needed to store it in memory in the yul
+      * object.
+      *
+      * @param ct the contract of interest
+      * @return the number of bytes needed to store the fields of the contract
+      */
+    def sizeOfContract(ct: ContractTable): Int = {
+        ct.allFields.map(f => sizeOfObsType(f.typ)).sum
+    }
+
+    /**
+      * given an expression, produce the name of the contract that it associates with.
+      * WARNING: this is a stub! actually implementing this means reworking the translation to yul
+      * to carry around type information for the expression being elaborated.
+      *
+      * @param e the expression of interest
+      * @return the name of the contract for the expression, if there is one; raises an error otherwise
+      */
+    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = { //todo should this return an option? what's the invariant exactly?
+        e.obstype match {
+            case Some(value) => value match {
+                case _: PrimitiveType => assert(false, s"primitive types do not have contract names"); ""
+                case tau: NonPrimitiveType => tau match {
+                    case ContractReferenceType(contractType, _, _) => contractType.contractName
+                    case StateType(contractType, _, _) => contractType.contractName
+                    case InterfaceContractType(_, _) => assert(false, "unimplemented"); ""
+                    case GenericType(_, _) => assert(false, "unimplemented"); ""
+                }
+                case BottomType() => assert(false, s"the bottom type does not have a contract name"); ""
+            }
+            case None => assert(false, s"expression without a type annotation: ${e.toString}"); ""
+        }
+    }
+
+    /**
+      * given a contract name and a transaction name, produce the name of the contract in the flat
+      * yul object that corresponds to it
+      *
+      * @param contractName    the name of the contract
+      * @param transactionName the name of the transaction
+      * @return the name of the Yul transaction for that contract
+      */
+    def transactionNameMapping(contractName: String, transactionName: String): String =
+        s"${contractName}___${transactionName}"
+
+    /**
+      * if a and b do not contain "___", then
+      * transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
+      *
+      *
+      * @param s
+      * @return
+      */
+    def transactionNameUnmapping(s: String): Option[(String, String)] = {
+        val halves: Array[String] = s.split("___")
+        if (halves.length != 2) {
+            None
+        } else {
+            Some(halves(0), halves(1))
+        }
     }
 }

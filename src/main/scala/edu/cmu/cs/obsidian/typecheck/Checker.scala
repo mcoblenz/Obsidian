@@ -1,5 +1,6 @@
 package edu.cmu.cs.obsidian.typecheck
 
+import edu.cmu.cs.obsidian.ParserUtil
 import edu.cmu.cs.obsidian.parser._
 
 import scala.collection.immutable.TreeMap
@@ -548,6 +549,21 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    /**
+      * TODO: document the invariants of this function. at several call sites, we assume that the
+      *   annotation in the expression returned matches the type returned (and therefore to not call
+      *   ParserUtil.updateExprType to enforce that). That invariant is held in some of the returns
+      *   below, but not all of them. It should be all of them, and that should be documented here.
+      *   It's possible that changing the code to enforce that may break test cases, but unlikely.
+      *   The typechecker tests we have now do not have perfect coverage; I believe many of them
+      *   would fail because of the lack of this invariant if it was larger.
+      *
+      * @param decl
+      * @param context
+      * @param e
+      * @param ownershipConsumptionMode
+      * @return
+      */
     private def inferAndCheckExpr(decl: InvokableDeclaration,
                                   context: Context,
                                   e: Expression,
@@ -665,7 +681,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
-                        updateArgTypeInContext(receiver, receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
+                        updateArgTypeInContext(ParserUtil.updateExprType(receiver, receiverType), receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
                     case _ => contextAfterArgs
                 }
 
@@ -685,29 +701,31 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         // But consuming in a context that expects sharing results in Shared.
                         val newType = t.residualType(ownershipConsumptionMode)
                         if (newType != t) {
-                            (t, context.updated(x, newType), e)
+                            (t, context.updated(x, newType), ParserUtil.updateExprType(e, t))
                         }
                         else {
-                            (t, context, e)
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                     case (_, Some(t)) =>
                         val newType = t.residualType(ownershipConsumptionMode)
                         if (newType != t) {
-                            (t, context.updatedThisFieldType(x, newType), e)
+                            (t, context.updatedThisFieldType(x, newType), ParserUtil.updateExprType(e, t))
                         }
                         else {
-                            (t, context, e)
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                     case (None, None) =>
                         val tableLookup = context.contractTable.lookupContract(x)
                         if (tableLookup.isDefined) {
                             val contractTable = tableLookup.get
                             val nonPrimitiveType = ContractReferenceType(contractTable.contractType, Shared(), NotRemoteReferenceType())
-                            (InterfaceContractType(contractTable.name, nonPrimitiveType), context, e)
+                            val t = InterfaceContractType(contractTable.name, nonPrimitiveType)
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                         else {
                             logError(e, VariableUndefinedError(x, context.thisType.toString))
-                            (BottomType(), context, e)
+                            val t = BottomType()
+                            (t, context, ParserUtil.updateExprType(e, t))
                         }
                 }
 
@@ -724,7 +742,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     else {
                         context
                     }
-                (thisType, newContext, e)
+                (thisType, newContext, ParserUtil.updateExprType(e, thisType))
             case Parent() =>
                 assert(false, "TODO: re-add support for parents")
                 /*
@@ -808,7 +826,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     (BoolType(), c2, Equals(e1Prime, e2Prime).setLoc(e))
                 } else {
                     if (!t1.isBottom && !t2.isBottom) {
-                        logError(e, DifferentTypeError(e1, t1, e2, t2))
+                        logError(e, DifferentTypeError(e1Prime, t1, e2Prime, t2))
                     }
                     (BottomType(), c2, Equals(e1Prime, e2Prime).setLoc(e))
                 }
@@ -831,7 +849,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     (BoolType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e))
                 } else {
                     if (!t1.isBottom && !t2.isBottom) {
-                        logError(e, DifferentTypeError(e1, t1, e2, t2))
+                        logError(e, DifferentTypeError(e1Prime, t1, e2Prime, t2))
                     }
                     (BottomType(), c2, NotEquals(e1Prime, e2Prime).setLoc(e))
                 }
@@ -843,14 +861,16 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case Some(t) =>
                                 val newType = t.residualType(ownershipConsumptionMode)
                                 if (newType != t) {
-                                    (t, context.updatedThisFieldType(fieldName, newType), e)
+                                    (t, context.updatedThisFieldType(fieldName, newType), ParserUtil.updateExprType(e, t))
                                 }
                                 else {
-                                    (t, context, e)
+                                    (t, context, ParserUtil.updateExprType(e, t))
                                 }
                             case None =>
-                                logError(e, FieldUndefinedError(context.thisType, fieldName))
-                                (BottomType(), context, e)
+                                val t = BottomType()
+                                val eprime = ParserUtil.updateExprType(e, t)
+                                logError(eprime, FieldUndefinedError(context.thisType, fieldName))
+                                (t, context, eprime)
                         }
 
                     case _ =>
@@ -865,12 +885,13 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                     }
                                     (ePrime, c)
                             }
-                        (BottomType(), newContext, newExpr)
+                        val t = BottomType()
+                        (t, newContext, ParserUtil.updateExprType(newExpr, t))
                 }
 
             case LocalInvocation(name, _, params, args: Seq[Expression], obstype) =>
                 //todo should there be an assertion to check that obstype == typ? which one takes precedence?
-                //todo i don't konw if passing `obstype` to This is correct at all
+                //todo i don't know if passing `obstype` to This is correct at all
                 val (typ, con, _, _, newGenericParams, newArgs) = handleInvocation(context, name, This(obstype).setLoc(e), params, args)
                 //This may need correction.
                 (typ, con, LocalInvocation(name, newGenericParams, params, newArgs, Some(typ)).setLoc(e))
@@ -892,7 +913,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                 if (tableLookup.isEmpty) {
                     logError(e, ContractUndefinedError(contractType.contractName))
-                    return (BottomType(), context, e)
+                    val t = BottomType()
+                    return (t, context, ParserUtil.updateExprType(e, t))
                 }
 
                 if (tableLookup.get.contract.isInterface) {
@@ -934,7 +956,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // so that e is no longer owned (if it is a variable).
                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ownershipConsumptionMode)
                 if (!typ.isOwned) {
-                    logError(e, DisownUnowningExpressionError(e))
+                    logError(ePrime, DisownUnowningExpressionError(ePrime))
                 }
 
                 val newTyp = typ match {
@@ -954,7 +976,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         }
                     case _ => contextPrime
                 }
-                (newTyp, finalContext, ePrime)
+                (newTyp, finalContext, ParserUtil.updateExprType(ePrime, newTyp))
             case StateInitializer(stateName, fieldName, obstype) =>
                 // A state initializer expression has its field's type.
                 if (!context.transitionFieldsDefinitelyInitialized.exists(
@@ -976,7 +998,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 }
 
                 //assert(! e.obstype.isEmpty, s"infer and check failed to populate the type of ${e.toString}")
-                (fieldType, context, e)
+                (fieldType, context, ParserUtil.updateExprType(e, fieldType))
         }
     }
 
@@ -1858,11 +1880,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     logError(s, InvalidValAssignmentError())
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
-                (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s))
+                (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s)) //todo iev should eprime be updated here?
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
-                assert(false, "the code below this case is certainly wrong and will need to be debugged on an example")
-                if (eDeref != This(None)) { //todo: this is totally wrong again, i seem not to know how to get the type for `this`
+                if (eDeref != This(None)) { //todo: this is totally wrong again, i seem not to know how to get the type for `this`. maybe this needs to be a match not an if so i can check if it's This(_)?
                     logError(s, InvalidNonThisFieldAssignment())
                     (context, s)
                 }
@@ -2223,10 +2244,10 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             case e: Expression =>
                 val (typ, contextPrime, ePrime) = inferAndCheckExpr(decl, context, e, ConsumingOwnedGivesShared())
                 if (typ.isOwned) {
-                    logError(s, UnusedExpressionOwnershipError(e))
+                    logError(ePrime, UnusedExpressionOwnershipError(ePrime))
                 }
                 if (!(s.isInstanceOf[LocalInvocation] || s.isInstanceOf[Invocation])) {
-                    logError(s, NoEffectsError(s))
+                    logError(ePrime, NoEffectsError(ePrime))
                 }
                 (contextPrime, ePrime)
             case StaticAssert(e, allowedStatesOrPermissions) =>

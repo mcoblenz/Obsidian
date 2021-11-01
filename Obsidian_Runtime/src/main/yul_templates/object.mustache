@@ -37,6 +37,7 @@ object "{{creationObject}}" {
             if iszero(lt(calldatasize(), 4)) {
                 {{#dispatch}}
                     {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
+                    let this := address()
                     let selector := shr(224, calldataload(0))
                     {{dispatchCase}}
                 {{/dispatch}}
@@ -63,14 +64,14 @@ object "{{creationObject}}" {
             }
 
             function allocate_unbounded() -> memPtr {
-                memPtr := mload(64)
+                memPtr := mload(0x40)
             }
 
             function finalize_allocation(memPtr, size) {
                 let newFreePtr := add(memPtr, round_up_to_mul_of_32(size))
                 // protect against overflow
                 if or(gt(newFreePtr, 0xffffffffffffffff), lt(newFreePtr, memPtr)) {  panic_error_0x41() }
-                mstore(64, newFreePtr)
+                mstore(0x40, newFreePtr)
             }
 
             function panic_error_0x41() {

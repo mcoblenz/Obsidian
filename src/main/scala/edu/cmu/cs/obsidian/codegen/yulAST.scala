@@ -23,6 +23,10 @@ trait YulStatement extends YulAST
 // for each asm struct, create a case class
 case class TypedName(name: String, ntype: String) extends YulAST {
     override def toString: String = {
+        name
+/*
+ideally we'd want to do something like this:
+
         s"$name ${
             if (ntype.isEmpty) {
                 ""
@@ -30,6 +34,15 @@ case class TypedName(name: String, ntype: String) extends YulAST {
                 s" : $ntype"
             }
         }"
+
+but as of Sept2021, solc does not support that output even though it's in the def, e.g.
+
+Error: "string" is not a valid type (user defined types are not yet supported).
+   --> /sources/SetGetNoArgsNoConstructNoInit.yul:144:29:
+    |
+144 | function IntContainer___get(this  : string) -> _ret_2 {
+    |                             ^^^^^^^^^^^^^^
+*/
     }
 }
 
@@ -261,7 +274,7 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
 
             //todo: second argument to the application is highly speculative; check once you have more complex functions
             // the actual call to f, and a possible declaration of the temporary variables if there are any returns
-            val call_to_f: Expression = apply(functionRename(f.name), f.parameters.map(p => Identifier(p.name)): _*)
+            val call_to_f: Expression = apply(f.name, f.parameters.map(p => Identifier(p.name)): _*)
             val call_f_and_maybe_assign: YulStatement =
                 if (f.returnVariables.nonEmpty) {
                     codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))
@@ -337,9 +350,9 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
 
         def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
 
-        val datasize: Expression = apply("datasize", stringlit(runtimeObjectName))
+        val datasize: Expression = apply("datasize", rawstringlit(runtimeObjectName))
 
-        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", stringlit(runtimeObjectName)), datasize)
+        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(runtimeObjectName)), datasize)
 
         def defaultReturn(): Expression = apply("return", intlit(0), datasize)
 
