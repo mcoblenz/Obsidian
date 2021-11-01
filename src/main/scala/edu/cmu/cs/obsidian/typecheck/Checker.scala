@@ -549,6 +549,21 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+    /**
+      * TODO: document the invariants of this function. at several call sites, we assume that the
+      *   annotation in the expression returned matches the type returned (and therefore to not call
+      *   ParserUtil.updateExprType to enforce that). That invariant is held in some of the returns
+      *   below, but not all of them. It should be all of them, and that should be documented here.
+      *   It's possible that changing the code to enforce that may break test cases, but unlikely.
+      *   The typechecker tests we have now do not have perfect coverage; I believe many of them
+      *   would fail because of the lack of this invariant if it was larger.
+      *
+      * @param decl
+      * @param context
+      * @param e
+      * @param ownershipConsumptionMode
+      * @return
+      */
     private def inferAndCheckExpr(decl: InvokableDeclaration,
                                   context: Context,
                                   e: Expression,
@@ -1790,7 +1805,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                         val fieldAST = newStateTable.lookupField(f)
                         if (fieldAST.isDefined) {
                             val (t, contextPrime2, ePrime) = inferAndCheckExpr(decl, contextPrime, e, consumptionModeForType(fieldAST.get.typ))
-                            newUpdates = newUpdates :+ (ReferenceIdentifier(f, Some(t)), ePrime) // todo iev: does ePrime here need its obstype field updated?
+                            newUpdates = newUpdates :+ (ReferenceIdentifier(f, Some(t)), ePrime)
                             contextPrime = contextPrime2
                             checkIsSubtype(contextPrime.contractTable, s, t, fieldAST.get.typ)
                         }
@@ -1865,7 +1880,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     logError(s, InvalidValAssignmentError())
                 }
                 val (contextPrime, statementPrime, ePrime) = checkAssignment(x, e, context, false)
-                assert(ParserUtil.expressionHasTypeProperty(ePrime, (y: Option[ObsidianType]) => !y.isEmpty))
                 (contextPrime, Assignment(ReferenceIdentifier(x, obstyp), ePrime).setLoc(s)) //todo iev should eprime be updated here?
 
             case Assignment(Dereference(eDeref, f), e: Expression) =>
