@@ -666,7 +666,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
             val contextPrime =
                 correctInvokable match {
                     case t: Transaction =>
-                        updateArgTypeInContext(ParserUtil.updateExprType(receiver,receiverType), receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
+                        updateArgTypeInContext(ParserUtil.updateExprType(receiver, receiverType), receiverType, t.thisType, t.thisFinalType, contextAfterArgs)
                     case _ => contextAfterArgs
                 }
 
@@ -727,7 +727,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     else {
                         context
                     }
-                (thisType, newContext, ParserUtil.updateExprType(e,thisType))
+                (thisType, newContext, ParserUtil.updateExprType(e, thisType))
             case Parent() =>
                 assert(false, "TODO: re-add support for parents")
                 /*
@@ -846,14 +846,14 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                             case Some(t) =>
                                 val newType = t.residualType(ownershipConsumptionMode)
                                 if (newType != t) {
-                                    (t, context.updatedThisFieldType(fieldName, newType), ParserUtil.updateExprType(e,t))
+                                    (t, context.updatedThisFieldType(fieldName, newType), ParserUtil.updateExprType(e, t))
                                 }
                                 else {
-                                    (t, context, ParserUtil.updateExprType(e,t))
+                                    (t, context, ParserUtil.updateExprType(e, t))
                                 }
                             case None =>
                                 val t = BottomType()
-                                val eprime = ParserUtil.updateExprType(e,t)
+                                val eprime = ParserUtil.updateExprType(e, t)
                                 logError(eprime, FieldUndefinedError(context.thisType, fieldName))
                                 (t, context, eprime)
                         }
@@ -871,7 +871,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                     (ePrime, c)
                             }
                         val t = BottomType()
-                        (t, newContext, ParserUtil.updateExprType(newExpr,t))
+                        (t, newContext, ParserUtil.updateExprType(newExpr, t))
                 }
 
             case LocalInvocation(name, _, params, args: Seq[Expression], obstype) =>
@@ -899,7 +899,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 if (tableLookup.isEmpty) {
                     logError(e, ContractUndefinedError(contractType.contractName))
                     val t = BottomType()
-                    return (t, context, ParserUtil.updateExprType(e,t))
+                    return (t, context, ParserUtil.updateExprType(e, t))
                 }
 
                 if (tableLookup.get.contract.isInterface) {
