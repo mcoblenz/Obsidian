@@ -4,7 +4,7 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck._
 import org.scalatestplus.junit.JUnitSuite
 import org.junit.Test
-import org.junit.Assert.{assertTrue, fail}
+import org.junit.Assert.assertTrue
 
 import java.io.FileInputStream
 
