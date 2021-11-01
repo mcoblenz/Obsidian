@@ -125,20 +125,20 @@ package object ParserUtil {
     def updateExprType(e: Expression, newType: ObsidianType): Expression = {
         e match {
             case expression: AtomicExpression => expression match {
-                case ReferenceIdentifier(name, _) => ReferenceIdentifier(name, Some(newType))
+                case r@ReferenceIdentifier(name, _) => r.copy(obstype = Some(newType)).setLoc(r)
                 case NumLiteral(_) => e
                 case StringLiteral(_) => e
                 case TrueLiteral() => e
                 case FalseLiteral() => e
-                case This(_) => This(Some(newType))
+                case r@This(_) => r.copy(obstype = Some(newType)).setLoc(r)
                 case Parent() => e
             }
             case expression: UnaryExpression => expression // none of the unary expressions have constructors that take the obstype as an argument
             case expression: BinaryExpression => expression // ditto
-            case LocalInvocation(name, genericParams, params, args, _) => LocalInvocation(name, genericParams, params, args, Some(newType))
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, _) => Invocation(recipient, genericParams, params, name, args, isFFIInvocation, Some(newType))
-            case Construction(contractType, args, isFFIInvocation, _) => Construction(contractType, args, isFFIInvocation, Some(newType))
-            case StateInitializer(stateName, fieldName, _) => StateInitializer(stateName, fieldName, Some(newType))
+            case r@LocalInvocation(name, genericParams, params, args, _) => r.copy(obstype = Some(newType)).setLoc(r)
+            case r@Invocation(recipient, genericParams, params, name, args, isFFIInvocation, _) => r.copy(obstype = Some(newType)).setLoc(r)
+            case r@Construction(contractType, args, isFFIInvocation, _) => r.copy(obstype = Some(newType)).setLoc(r)
+            case r@StateInitializer(stateName, fieldName, _) => r.copy(obstype = Some(newType)).setLoc(r)
         }
     }
 }
