@@ -76,7 +76,7 @@ class UtilTest extends JUnitSuite {
 
     @Test def sizeOfSetGetTwoInts(): Unit = {
         runSizeTest("resources/tests/GanacheTests/SG.obs",
-            Map("SG" -> 0, "IntContainer" -> 64))
+            Map("SG" -> 0, "IntContainer" -> 4*32))
     }
 
     @Test def offsetOfXSetGetTwoInts(): Unit = {
@@ -85,5 +85,13 @@ class UtilTest extends JUnitSuite {
 
     @Test def offsetOfYSetGetTwoInts(): Unit = {
         runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "y", 32)
+    }
+
+    @Test def offsetOfZSetGetTwoInts(): Unit = {
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "z", 64)
+    }
+
+    @Test def offsetOfFSetGetTwoInts(): Unit = {
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "f", 96)
     }
 }

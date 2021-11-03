@@ -1,6 +1,8 @@
 contract IntContainer{
     int x;
     int y;
+    int z;
+    int f;
 
     transaction set() {
         x = 5;
