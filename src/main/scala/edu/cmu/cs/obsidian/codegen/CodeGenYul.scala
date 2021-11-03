@@ -311,7 +311,7 @@ object CodeGenYul extends CodeGenerator {
                             e_yul :+
                             (if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
                                 //todo: compute offsets
-                                ExpressionStatement(apply("sstore", hexlit(keccak256(contractName + x)), id))
+                                ExpressionStatement(apply("sstore", hexlit(keccak256(contractName + x)), id)) //here
                             } else {
                                 assign1(Identifier(x), id)
                             })
@@ -452,7 +452,7 @@ object CodeGenYul extends CodeGenerator {
                         if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
                             //todo: compute offsets
-                            Seq(decl_1exp(store_id, apply("sload", hexlit(keccak256(contractName + x)))),
+                            Seq(decl_1exp(store_id, apply("sload", hexlit(keccak256(contractName + x)))), //here
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))

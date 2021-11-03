@@ -6,10 +6,13 @@ contract IntContainer{
 
     transaction set() {
         x = 5;
+	y = 10;
+	z = 4;
+	f = 9;
     }
 
     transaction get() returns int{
-        return x;
+        return x*y*z*f; // 1800
     }
 }
 
