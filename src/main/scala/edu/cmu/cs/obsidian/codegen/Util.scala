@@ -302,6 +302,20 @@ object Util {
         ct.allFields.toList.map(f => sizeOfObsType(f.typ)).sum
     }
 
+    /** given a contract table and a field name, compute the number of bytes offset from the
+      * beginning of that contract's area in memory to find the field.
+      *
+      * @param ct the contract table
+      * @param name the field to look for
+      * @return number of bytes offset
+      */
+    def offsetOfField(ct: ContractTable, name: String): Int = {
+        ct.allFields.toList
+            .takeWhile(f => f.name != name) // drop the suffix including and after the target
+            .map(f => sizeOfObsType(f.typ)) // compute the sizes of everything before the target
+            .sum // add up those sizes to get the offset
+    }
+
     /**
       * given an expression, produce the name of the contract that it associates with.
       * WARNING: this is a stub! actually implementing this means reworking the translation to yul
