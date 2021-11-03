@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.parser.ContractTable
+import edu.cmu.cs.obsidian.parser.{Contract, ContractTable, Field, InvokableDeclaration, State, TypeDecl}
 import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
@@ -291,6 +291,20 @@ object Util {
         }
     }
 
+    /** given a contract table, produce a sequence of its fields. note that there are simpler ways
+      * to do this, e.g. ct.allFields, but they produce unordered collections. this is not suitable
+      * for layout in memory, where we want the order to be predictable.
+      *
+      * @param ct the contract table of interest
+      * @return the fields present in the contract table.
+      */
+    def fieldsOfContract(ct: ContractTable): Seq[Field] = {
+        ct.contract.declarations.filter(decl => decl match {
+            case Field(_, _, _, _) => true
+            case _ => false
+        }).map(decl => decl.asInstanceOf[Field])
+    }
+
     /**
       * given a contract type, compute the number of bytes needed to store it in memory in the yul
       * object.
@@ -299,7 +313,7 @@ object Util {
       * @return the number of bytes needed to store the fields of the contract
       */
     def sizeOfContract(ct: ContractTable): Int = {
-        ct.allFields.toList.map(f => sizeOfObsType(f.typ)).sum
+        fieldsOfContract(ct).map(f => sizeOfObsType(f.typ)).sum
     }
 
     /** given a contract table and a field name, compute the number of bytes offset from the
@@ -310,7 +324,7 @@ object Util {
       * @return number of bytes offset
       */
     def offsetOfField(ct: ContractTable, name: String): Int = {
-        ct.allFields.toList
+        fieldsOfContract(ct)
             .takeWhile(f => f.name != name) // drop the suffix including and after the target
             .map(f => sizeOfObsType(f.typ)) // compute the sizes of everything before the target
             .sum // add up those sizes to get the offset
