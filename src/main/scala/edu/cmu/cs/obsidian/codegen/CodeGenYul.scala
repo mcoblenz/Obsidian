@@ -575,7 +575,7 @@ object CodeGenYul extends CodeGenerator {
                 //   if that amount can't be computed.
                 val size: Int = checkedTable.contract(contractType.contractName) match {
                     case Some(value) => sizeOfContract(value)
-                    case None => assert(false, s"contract table didn't contain contract name: ${contractType.contractName}")
+                    case None => assert(false, s"contract table didn't contain contract name: ${contractType.contractName}"); -1
                 }
 
                 val id_memaddr = nextTemp()

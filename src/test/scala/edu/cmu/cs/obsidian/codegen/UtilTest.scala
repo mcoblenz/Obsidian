@@ -62,4 +62,9 @@ class UtilTest extends JUnitSuite {
         runTest("resources/tests/GanacheTests/SetGetNoArgsNoConstructNoInit.obs",
             Map("SetGetNoArgsNoConstructNoInit" -> 0, "IntContainer" -> 32))
     }
+
+    @Test def sizeOfSetGetTwoInts(): Unit = {
+        runTest("resources/tests/GanacheTests/SG.obs",
+            Map("SG" -> 0, "IntContainer" -> 64))
+    }
 }
