@@ -307,11 +307,12 @@ object CodeGenYul extends CodeGenerator {
                         //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable, inMain)
+                        val ct = checkedTable.contractLookup(contractName)
                         decl_0exp(id) +:
                             e_yul :+
-                            (if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
-                                //todo: compute offsets
-                                ExpressionStatement(apply("sstore", hexlit(keccak256(contractName + x)), id)) //here
+                            (if (ct.allFields.exists(f => f.name.equals(x))) {
+                                //todo working here
+                                ExpressionStatement(apply("mstore", Util.fieldFromThis(ct,x), id))
                             } else {
                                 assign1(Identifier(x), id)
                             })
@@ -449,10 +450,11 @@ object CodeGenYul extends CodeGenerator {
 
                         // todo: this also assumes that everything is a u256 and does no type-directed
                         //  cleaning in the way that solc does
-                        if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                        val ct = checkedTable.contractLookup(contractName)
+                        if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
-                            //todo: compute offsets
-                            Seq(decl_1exp(store_id, apply("sload", hexlit(keccak256(contractName + x)))), //here
+                            //todo working here
+                            Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct,x))),
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))

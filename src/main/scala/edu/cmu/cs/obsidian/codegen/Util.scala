@@ -381,4 +381,8 @@ object Util {
             Some(halves(0), halves(1))
         }
     }
+
+    def fieldFromThis(ct : ContractTable, x: String): Expression = {
+        apply("add", Identifier("this"), intlit(Util.offsetOfField(ct,x)))
+    }
 }
