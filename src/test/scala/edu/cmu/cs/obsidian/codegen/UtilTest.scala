@@ -62,9 +62,8 @@ class UtilTest extends JUnitSuite {
     }
 
     private def runOffsetTest(file: String, contractName: String, fieldName: String, expectedOffset: Int): Unit = {
-        val symbols = pullSymbolTable(file)
-        symbols.contract(contractName) match {
-            case Some(value) => assertTrue("offset did not match expected offset", Util.offsetOfField(value, fieldName) == expectedOffset)
+        pullSymbolTable(file).contract(contractName) match {
+            case Some(ct) => assertTrue("offset did not match expected offset", Util.offsetOfField(ct, fieldName) == expectedOffset)
             case None => assertTrue("type checker produced a symbol table missing a contract", false)
         }
     }
