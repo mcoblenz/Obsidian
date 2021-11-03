@@ -117,7 +117,7 @@ object CodeGenYul extends CodeGenerator {
       * todo: right now we do not actually have enough type information to do the above in a robust way, but we will
       * add that soon
       *
-      * @param contract the contract to be translated
+      * @param contract     the contract to be translated
       * @param checkedTable the symbol table for that contract
       * @return the yul
       */
@@ -148,7 +148,7 @@ object CodeGenYul extends CodeGenerator {
       * ready to be inserted into the translation of a main yul object. this will rename the transactions according to the
       * contract name.
       *
-      * @param c the contract to be translated
+      * @param c            the contract to be translated
       * @param checkedTable the symbol table of the contract
       * @return the YulObject representing the translation. note that all the fields other than `code` will be the empty sequence.
       */
@@ -535,7 +535,7 @@ object CodeGenYul extends CodeGenerator {
                 // todo: this does not work with non-void functions that are called without binding
                 //  their results, ie "f()" if f returns an int
                 ids.map(id => decl_0exp(id)) ++
-                seqs.flatten ++ (width match {
+                    seqs.flatten ++ (width match {
                     case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
                     case 1 =>
                         val id: Identifier = nextTemp()
@@ -571,12 +571,18 @@ object CodeGenYul extends CodeGenerator {
                 // todo: currently we ignore the arguments to the constructor
                 assert(args.isEmpty, "contracts that take arguments are not yet supported")
 
-                val ct: Option[ContractTable] = checkedTable.contract(contractType.contractName)
+                // compute the amount of space we need to store something of this type, or assert
+                //   if that amount can't be computed.
+                val size: Int = checkedTable.contract(contractType.contractName) match {
+                    case Some(value) => sizeOfContract(value)
+                    case None => assert(false, s"contract table didn't contain contract name: ${contractType.contractName}")
+                }
 
                 val id_memaddr = nextTemp()
+
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
-                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContract(ct.get)))),
+                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(size))),
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)

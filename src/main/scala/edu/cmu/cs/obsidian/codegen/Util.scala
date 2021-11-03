@@ -299,7 +299,7 @@ object Util {
       * @return the number of bytes needed to store the fields of the contract
       */
     def sizeOfContract(ct: ContractTable): Int = {
-        ct.allFields.map(f => sizeOfObsType(f.typ)).sum
+        ct.allFields.toList.map(f => sizeOfObsType(f.typ)).sum
     }
 
     /**
