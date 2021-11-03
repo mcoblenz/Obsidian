@@ -10,7 +10,7 @@ import java.io.FileInputStream
 
 class UtilTest extends JUnitSuite {
 
-    private def pullSymbolTable(file: String): SymbolTable ={
+    private def pullSymbolTable(file: String): SymbolTable = {
         var prog: Program = null
         try {
             prog = Parser.parseFileAtPath(file, new FileInputStream(file), printTokens = false)
@@ -64,7 +64,7 @@ class UtilTest extends JUnitSuite {
     private def runOffsetTest(file: String, contractName: String, fieldName: String, expectedOffset: Int): Unit = {
         val symbols = pullSymbolTable(file)
         symbols.contract(contractName) match {
-            case Some(value) => assertTrue("offset did not match expected offset", Util.offsetOfField(value,fieldName) == expectedOffset)
+            case Some(value) => assertTrue("offset did not match expected offset", Util.offsetOfField(value, fieldName) == expectedOffset)
             case None => assertTrue("type checker produced a symbol table missing a contract", false)
         }
     }
@@ -80,10 +80,10 @@ class UtilTest extends JUnitSuite {
     }
 
     @Test def offsetOfXSetGetTwoInts(): Unit = {
-        runOffsetTest("resources/tests/GanacheTests/SG.obs","IntContainer","x",0)
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "x", 0)
     }
 
     @Test def offsetOfYSetGetTwoInts(): Unit = {
-        runOffsetTest("resources/tests/GanacheTests/SG.obs","IntContainer","y",32)
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "y", 32)
     }
 }
