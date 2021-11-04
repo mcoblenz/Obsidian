@@ -1,7 +1,7 @@
 contract IntContainer{
     int x;
 
-    IntContainer@Owned() {
+    IntContainer() {
         x = 0;
     }
 
