@@ -236,7 +236,7 @@ object CodeGenYul extends CodeGenerator {
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
+                constructor.args.map(v => TypedName(v.varName, baseTypeToYulName(v.typIn))),
                 Seq(), //todo/iev: why is this always empty?
                 Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, inMain = true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
@@ -257,7 +257,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get.name, obsTypeToYulTypeAndSize(t.toString)._1))
+                    Seq(TypedName(id.get.name, baseTypeToYulName(t)))
                 case None => Seq()
             }
         }
@@ -268,7 +268,7 @@ object CodeGenYul extends CodeGenerator {
                 Seq() // add nothing
             } else {
                 Seq(TypedName("this", "string")) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
-            } ++ transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1))
+            } ++ transaction.args.map(v => TypedName(v.varName, baseTypeToYulName(v.typIn)))
 
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))

@@ -136,7 +136,7 @@ object Util {
       * @return the expression declaring the variable
       */
     def decl_0exp_t(id: Identifier, t: ObsidianType): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(obsTypeToYulTypeAndSize(t.baseTypeName)._1))), None)
+        VariableDeclaration(Seq((id, Some(baseTypeToYulName(t)))), None)
 
     /**
       * shorthand for building the yul expression that declares one variable with a type and no
@@ -148,7 +148,7 @@ object Util {
       * @return the expression declaring the variable
       */
     def decl_0exp_t_init(id: Identifier, t: ObsidianType, e: Expression): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(obsTypeToYulTypeAndSize(t.baseTypeName)._1))), Some(e))
+        VariableDeclaration(Seq((id, Some(baseTypeToYulName(t)))), Some(e))
 
     /**
       * shorthand for building the yul expression that declares a sequence (non-empty) of identifiers
@@ -173,29 +173,25 @@ object Util {
       */
     def decl_1exp(id: Identifier, e: Expression): VariableDeclaration = decl_nexp(Seq(id), e)
 
-    /**
-      * given the string name of an obsidian type, provide the name of the Yul type that it maps to
-      * paired with the number of bytes needed to store a value of that type in Yul.
+    /** if a given obsidian type is a base type that matches directly to a Yul base type,
+      * produce the string that names the Yul type. assert otherwise.
       *
-      * @param ntype the name of the obsidian type
-      * @return a pair of the name of the corresponding Yul type and the size of its values
+      * @param typ the obsidian type in question
+      * @return the matching yul type name, if the argument is indeed a base type.
       */
-    def obsTypeToYulTypeAndSize(ntype: String): (String, Int) = {
-        // todo: this covers the primitive types from ObsidianType.scala but is hard to maintain because
-        // it's basically hard coded, and doesn't traverse the structure of more complicated types.
-        //
-        // see https://docs.soliditylang.org/en/latest/abi-spec.html#types
-        ntype match {
-            case "bool" => ("bool", 1)
-            case "int" => ("u256", 32)
-            case "string" => ("string", -1) // todo this -1 is a place holder
-            case "Int256" => ("int256", 32)
-            case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ("", -1)
-            // fall through here and return the type unmodified; it'll be a structure that is defined by the file in question
-            case ntype => (ntype, -1) // todo need to compute the size of richer types, too.
+    def baseTypeToYulName(typ: ObsidianType): String = {
+        typ match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => "u256"
+                case BoolType() => "bool"
+                case StringType() => "string"
+                case Int256Type() => "int256"
+                case UnitType() => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ""
+            }
+            case _: NonPrimitiveType => assert(assertion = false, s"${typ.toString} is not primitive"); ""
+            case BottomType() => assert(assertion = false, "unimplemented: bottom type not encoded in Yul"); ""
         }
     }
-
 
     /**
       * returns the width of an obsidian type. right now this is always 1 because obsidian
@@ -257,7 +253,23 @@ object Util {
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-        hashOfFunctionName(f.name, f.parameters.map(p => obsTypeToYulTypeAndSize(p.ntype)._1))
+        // this small function is here because the parameters of a function definition are typed
+        // names, which (weirdly?) only contain the string representation of the obsidian type
+        // not the full thing.
+        //
+        // todo: refactor typed names to contain the whole type, then remove this function.
+        def hack(st: String): ObsidianType = {
+            st match {
+                case "bool" => BoolType()
+                case "int" => IntType()
+                case "string" => StringType()
+                case "Int256" => Int256Type()
+                case "unit" => UnitType()
+                case _ => assert(false); UnitType()
+            }
+        }
+
+        hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(hack(p.ntype))))
     }
 
     /**
