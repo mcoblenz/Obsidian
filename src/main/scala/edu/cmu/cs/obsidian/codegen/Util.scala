@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.parser.{Contract, ContractTable, Field, InvokableDeclaration, State, TypeDecl}
+import edu.cmu.cs.obsidian.parser.{ContractTable, Field}
 import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
@@ -86,7 +86,7 @@ object Util {
     /**
       * helper function for a common subexpression that checks if a condition holds and calls revert if so
       *
-      * @param id the expresion to check for being zero
+      * @param cond the expression to check for being zero
       * @return the yul if-statement doing the check
       */
     def revertIf(cond: Expression): YulStatement =
@@ -102,14 +102,14 @@ object Util {
     /**
       * helper function for a common subexpression that checks if something is zero and calls revert forward if so
       *
-      * @param id the expresion to check for being zero
+      * @param id the expression to check for being zero
       * @return the yul if-statement doing the check
       */
     def revertForwardIfZero(id: Expression): YulStatement =
         edu.cmu.cs.obsidian.codegen.If(apply("iszero", id), Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
 
     /**
-      * shorthand for bulding yul assignment statements, here assigning one expression to just one
+      * shorthand for building yul assignment statements, here assigning one expression to just one
       * identifier
       *
       * @param id the identifier to be assigned
@@ -216,8 +216,8 @@ object Util {
                 case Int256Type() => 1
                 case UnitType() => 0
             }
-            case primitiveType: NonPrimitiveType => assert(false, "width not implemented for nonprimitive types!"); -1
-            case BottomType() => assert(false, "width not implemented for the bottom type!"); -1
+            case _: NonPrimitiveType => assert(assertion = false, "width not implemented for non-primitive types!"); -1
+            case BottomType() => assert(assertion = false, "width not implemented for the bottom type!"); -1
         }
     }
 
@@ -273,17 +273,17 @@ object Util {
             case primitiveType: PrimitiveType => primitiveType match {
                 case IntType() => 32
                 case BoolType() => 0
-                case StringType() => assert(false, "size of string constants is unimplemented"); -1
+                case StringType() => assert(assertion = false, "size of string constants is unimplemented"); -1
                 case Int256Type() => 256
                 case UnitType() => 0
             }
             case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
-                case ContractReferenceType(contractType, permission, remoteReferenceType) => pointer_size
-                case StateType(contractType, stateNames, remoteReferenceType) =>
+                case ContractReferenceType(_, _, _) => pointer_size
+                case StateType(_, _, _) =>
                     // one day, this should probably be ceil(log_2 (length of stateNames()))) bits
-                    assert(false, "size of states is unimplemented"); -1
-                case InterfaceContractType(name, simpleType) => pointer_size
-                case GenericType(gVar, bound) =>
+                    assert(assertion = false, "size of states is unimplemented"); -1
+                case InterfaceContractType(_, _) => pointer_size
+                case GenericType(_, _) =>
                     // todo: this may need to change; think about it more later
                     pointer_size
             }
@@ -319,7 +319,7 @@ object Util {
     /** given a contract table and a field name, compute the number of bytes offset from the
       * beginning of that contract's area in memory to find the field.
       *
-      * @param ct the contract table
+      * @param ct   the contract table
       * @param name the field to look for
       * @return number of bytes offset
       */
@@ -341,16 +341,16 @@ object Util {
     def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = { //todo should this return an option? what's the invariant exactly?
         e.obstype match {
             case Some(value) => value match {
-                case _: PrimitiveType => assert(false, s"primitive types do not have contract names"); ""
+                case _: PrimitiveType => assert(assertion = false, s"primitive types do not have contract names"); ""
                 case tau: NonPrimitiveType => tau match {
                     case ContractReferenceType(contractType, _, _) => contractType.contractName
                     case StateType(contractType, _, _) => contractType.contractName
-                    case InterfaceContractType(_, _) => assert(false, "unimplemented"); ""
-                    case GenericType(_, _) => assert(false, "unimplemented"); ""
+                    case InterfaceContractType(_, _) => assert(assertion = false, "unimplemented"); ""
+                    case GenericType(_, _) => assert(assertion = false, "unimplemented"); ""
                 }
-                case BottomType() => assert(false, s"the bottom type does not have a contract name"); ""
+                case BottomType() => assert(assertion = false, s"the bottom type does not have a contract name"); ""
             }
-            case None => assert(false, s"expression without a type annotation: ${e.toString}"); ""
+            case None => assert(assertion = false, s"expression without a type annotation: ${e.toString}"); ""
         }
     }
 
@@ -363,15 +363,14 @@ object Util {
       * @return the name of the Yul transaction for that contract
       */
     def transactionNameMapping(contractName: String, transactionName: String): String =
-        s"${contractName}___${transactionName}"
+        s"${contractName}___$transactionName"
 
     /**
-      * if a and b do not contain "___", then
+      * if a and b do not contain three underscores in a row, then
       * transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
       *
-      *
-      * @param s
-      * @return
+      * @param s the string to break
+      * @return the two halves of the string
       */
     def transactionNameUnmapping(s: String): Option[(String, String)] = {
         val halves: Array[String] = s.split("___")
@@ -382,7 +381,7 @@ object Util {
         }
     }
 
-    def fieldFromThis(ct : ContractTable, x: String): Expression = {
-        apply("add", Identifier("this"), intlit(Util.offsetOfField(ct,x)))
+    def fieldFromThis(ct: ContractTable, x: String): Expression = {
+        apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
     }
 }
