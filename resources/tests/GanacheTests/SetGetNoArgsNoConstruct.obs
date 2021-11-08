@@ -6,7 +6,7 @@ contract IntContainer{
     }
 
     transaction set2() {
-            x = 10;
+        x = 10;
     }
 
     transaction get() returns int{
@@ -18,7 +18,7 @@ main contract SetGetNoArgsNoConstruct{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
         ic.set1();
-            ic.set2();
+        ic.set2();
         return (ic.get());
     }
 }

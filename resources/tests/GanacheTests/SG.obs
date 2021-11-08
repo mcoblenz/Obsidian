@@ -5,14 +5,14 @@ contract IntContainer{
     int f;
 
     transaction set() {
-	x = -1;
-	f = -1;
-	z = -1;
-	y = -1;
+        x = -1;
+        f = -1;
+        z = -1;
+        y = -1;
         x = 5;
-	y = 10;
-	z = 4;
-	f = 9;
+        y = 10;
+        z = 4;
+        f = 9;
     }
 
     transaction get() returns int{
