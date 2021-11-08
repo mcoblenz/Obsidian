@@ -188,7 +188,7 @@ object Util {
                 case Int256Type() => "int256"
                 case UnitType() => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ""
             }
-            case _: NonPrimitiveType => assert(assertion = false, s"${typ.toString} is not primitive"); ""
+            case t: NonPrimitiveType => t.contractName 
             case BottomType() => assert(assertion = false, "unimplemented: bottom type not encoded in Yul"); ""
         }
     }
