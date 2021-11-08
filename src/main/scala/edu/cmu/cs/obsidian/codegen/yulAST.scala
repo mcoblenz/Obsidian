@@ -55,10 +55,6 @@ case class Case(value: Literal, body: Block) extends YulAST {
 
 case class Literal(kind: LiteralKind.LiteralKind, value: String, vtype: String) extends Expression {
     override def toString: String = {
-        /* todo/iev: i'm not positive if these assertions are the best idea, but they might be
-           a nice seatbelt. the constants i'm checking against may be wrong or incomplete right now,
-           this needs to be tested. add more complex assertions?
-        */
         val msg: String = "internal error: literal with inconsistent type string"
         kind match {
             case LiteralKind.number => assert(vtype == "int", msg)

@@ -188,7 +188,7 @@ object Util {
                 case Int256Type() => "int256"
                 case UnitType() => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ""
             }
-            case t: NonPrimitiveType => t.contractName 
+            case t: NonPrimitiveType => t.contractName
             case BottomType() => assert(assertion = false, "unimplemented: bottom type not encoded in Yul"); ""
         }
     }
@@ -276,7 +276,7 @@ object Util {
             case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
                 case ContractReferenceType(_, _, _) => pointer_size
                 case StateType(_, _, _) =>
-                    // one day, this should probably be ceil(log_2 (length of stateNames()))) bits
+                    // todo: one day, this should probably be ceil(log_2 (length of stateNames()))) bits
                     assert(assertion = false, "size of states is unimplemented"); -1
                 case InterfaceContractType(_, _) => pointer_size
                 case GenericType(_, _) =>
@@ -334,7 +334,7 @@ object Util {
       * @param e the expression of interest
       * @return the name of the contract for the expression, if there is one; raises an error otherwise
       */
-    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = { //todo should this return an option? what's the invariant exactly?
+    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = {
         e.obstype match {
             case Some(value) => value match {
                 case _: PrimitiveType => assert(assertion = false, s"primitive types do not have contract names"); ""
@@ -377,6 +377,13 @@ object Util {
         }
     }
 
+    /** given a contract table and a name of a field, produce the expression that computes
+      * the address of that field offset into the contract
+      *
+      * @param ct the contract table
+      * @param x the field name
+      * @return the expression computing the offset
+      */
     def fieldFromThis(ct: ContractTable, x: String): Expression = {
         apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
     }

@@ -115,9 +115,6 @@ object CodeGenYul extends CodeGenerator {
       * names that they will have in the flattened translation. e.g. `f()` remains `f()` but `ic.f()` becomes
       * `IntContainer___f(this)` if ic is an IntContainer.
       *
-      * todo: right now we do not actually have enough type information to do the above in a robust way, but we will
-      * add that soon
-      *
       * @param contract     the contract to be translated
       * @param checkedTable the symbol table for that contract
       * @return the yul
@@ -194,11 +191,6 @@ object CodeGenYul extends CodeGenerator {
             case _: Constructor =>
                 assert(assertion = false, "constructors not supported in Yul translation")
                 Seq()
-            // todo: previously this returned a pair of sequences, and this was the only clause
-            //   in which the left element was not empty. the left sequence would go in the code
-            //   part of the output object rather than the runtime, but that's not where we
-            //   want constructors to go.
-            // (translateConstructor(c, contractName, checkedTable), Seq())
             case _: TypeDecl =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -312,7 +304,6 @@ object CodeGenYul extends CodeGenerator {
                         decl_0exp(id) +:
                             e_yul :+
                             (if (ct.allFields.exists(f => f.name.equals(x))) {
-                                //todo working here
                                 ExpressionStatement(apply("mstore", Util.fieldFromThis(ct, x), id))
                             } else {
                                 assign1(Identifier(x), id)
@@ -427,19 +418,6 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
-
-    /**
-      * Given the type of a contract and a table, compute the size that we need to allocate for it in memory.
-      * TODO: as a simplifying assumption, for now this always returns 256.
-      *
-      * @param t      the contract type of interest
-      * @param symTab the symbol table to look in
-      * @return the size of memory needed for the contract
-      */
-    def contractSize(t: ContractType, symTab: SymbolTable): Int = {
-        256
-    }
-
     def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -454,7 +432,6 @@ object CodeGenYul extends CodeGenerator {
                         val ct = checkedTable.contractLookup(contractName)
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
-                            //todo working here
                             Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))),
                                 assign1(retvar, store_id))
                         } else {
@@ -506,7 +483,7 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable, inMain)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable, inMain)
                 }
-            case e@LocalInvocation(name, genericParams, params, args, obstype) => // todo: why are the middle two args not used?
+            case e@LocalInvocation(name, genericParams, params, args, obstype) =>
                 // look up the name of the function in the table, get its return type, and then compute
                 // how wide of a tuple that return type is. right now that's either 1 (if the
                 // transaction returns) or 0 (because it's void)
@@ -550,11 +527,6 @@ object CodeGenYul extends CodeGenerator {
                 // we translate invocations by first translating the recipient expression. this
                 // returns a variable containing a memory address for the implicit `this` argument
                 // added to the translation of the transactions into the flat Yul object
-
-
-                // todo: this ultimately needs to be type-directed. to translate an invocation,
-                //  we need to know the type of the recipient expression being invoked so that we
-                //  can call the appropriate translated transaction in the big Yul object.
 
                 // we get a variable storing the address of the instance from recursively translating
                 // the recipient. we also form a Parser identifier with this, so that we can translate
