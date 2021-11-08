@@ -126,7 +126,7 @@ object CodeGenYul extends CodeGenerator {
 
         // translate declarations
         for (d <- contract.declarations) {
-            decls = decls ++ translateDeclaration(d, contract.name, checkedTable, true)
+            decls = decls ++ translateDeclaration(d, contract.name, checkedTable, inMain = true)
         }
 
         // create runtime object from just the declarations and with the subobject name suffix
@@ -156,7 +156,7 @@ object CodeGenYul extends CodeGenerator {
         var translation: Seq[YulStatement] = Seq()
 
         for (d <- c.declarations) {
-            val dTranslated = translateDeclaration(d, c.name, checkedTable, false)
+            val dTranslated = translateDeclaration(d, c.name, checkedTable, inMain = false)
             translation = translation ++ dTranslated
         }
 
@@ -238,7 +238,7 @@ object CodeGenYul extends CodeGenerator {
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
                 constructor.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
                 Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
+                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, inMain = true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
 
     def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
@@ -511,7 +511,7 @@ object CodeGenYul extends CodeGenerator {
                 // transaction returns) or 0 (because it's void)
                 val width = obstype match {
                     case Some(t) => obsTypeToWidth(t)
-                    case None => assert(false, s"width failed on transaction named ${name} from expression ${e.toString}")
+                    case None => assert(assertion = false, s"width failed on transaction named $name from expression ${e.toString}")
                 }
 
                 // todo: some of this logic may be repeated in the dispatch table
@@ -563,11 +563,11 @@ object CodeGenYul extends CodeGenerator {
 
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
-                ((decl_0exp(id_recipient) +: recipient_yul) ++
+                (decl_0exp(id_recipient) +: recipient_yul) ++
                     translateExpr(retvar, LocalInvocation(transactionNameMapping(getContractName(recipient), name),
                         genericParams,
                         params,
-                        this_address +: args, obstype), contractName, checkedTable, inMain)) // todo test this, too
+                        this_address +: args, obstype), contractName, checkedTable, inMain) // todo test this, too
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // todo: currently we ignore the arguments to the constructor
@@ -577,7 +577,7 @@ object CodeGenYul extends CodeGenerator {
                 //   if that amount can't be computed.
                 val size: Int = checkedTable.contract(contractType.contractName) match {
                     case Some(value) => sizeOfContract(value)
-                    case None => assert(false, s"contract table didn't contain contract name: ${contractType.contractName}"); -1
+                    case None => assert(assertion = false, s"contract table didn't contain contract name: ${contractType.contractName}"); -1
                 }
 
                 val id_memaddr = nextTemp()
