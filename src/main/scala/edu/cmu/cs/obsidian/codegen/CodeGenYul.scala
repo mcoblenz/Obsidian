@@ -1,6 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.typecheck.StringType
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -236,7 +237,7 @@ object CodeGenYul extends CodeGenerator {
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, baseTypeToYulName(v.typIn))),
+                constructor.args.map(v => TypedName(v.varName, v.typIn)),
                 Seq(), //todo/iev: why is this always empty?
                 Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, inMain = true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
@@ -257,7 +258,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get.name, baseTypeToYulName(t)))
+                    Seq(TypedName(id.get.name, t))
                 case None => Seq()
             }
         }
@@ -267,8 +268,8 @@ object CodeGenYul extends CodeGenerator {
             if (inMain) {
                 Seq() // add nothing
             } else {
-                Seq(TypedName("this", "string")) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
-            } ++ transaction.args.map(v => TypedName(v.varName, baseTypeToYulName(v.typIn)))
+                Seq(TypedName("this", StringType())) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
+            } ++ transaction.args.map(v => TypedName(v.varName, v.typIn))
 
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))

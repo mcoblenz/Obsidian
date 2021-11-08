@@ -253,23 +253,7 @@ object Util {
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-        // this small function is here because the parameters of a function definition are typed
-        // names, which (weirdly?) only contain the string representation of the obsidian type
-        // not the full thing.
-        //
-        // todo: refactor typed names to contain the whole type, then remove this function.
-        def hack(st: String): ObsidianType = {
-            st match {
-                case "bool" => BoolType()
-                case "int" => IntType()
-                case "string" => StringType()
-                case "Int256" => Int256Type()
-                case "unit" => UnitType()
-                case _ => assert(false); UnitType()
-            }
-        }
-
-        hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(hack(p.ntype))))
+        hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(p.typ)))
     }
 
     /**
