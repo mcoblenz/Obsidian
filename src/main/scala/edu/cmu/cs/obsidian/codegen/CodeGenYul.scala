@@ -12,15 +12,7 @@ import edu.cmu.cs.obsidian.codegen.Util._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
-import scala.collection.immutable.Map
-
 object CodeGenYul extends CodeGenerator {
-
-    var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
-    var stateIdx: Int = -1 // whether or not there is a state
-    var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
-    var stateEnumCounter: Int = 0 // counter indicating the next value to assign since we don't know the total num of states
-
 
     // we generate new temporary variables with a little bit of global state; i am making the
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
@@ -179,9 +171,9 @@ object CodeGenYul extends CodeGenerator {
       */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
-            case f: Field => translateField(f) // todo
+            case f: Field => Seq() // fields are translated as they are encountered
             case t: Transaction => translateTransaction(t, contractName, checkedTable, inMain)
-            case s: State => translateState(s) // todo
+            case s: State => Seq() // this is unimplemented
             case c: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -195,43 +187,6 @@ object CodeGenYul extends CodeGenerator {
                 assert(assertion = false, "TODO")
                 Seq()
         }
-    }
-
-    def translateField(f: Field): Seq[YulStatement] = {
-        // Reserve a slot in the storage by assigning a index in the symbol table
-        // since field declaration has not yet be assigned, there is no need to do sstore
-        tempTableIdx += 1
-        Seq() // TODO: do we really mean to always return the empty sequence?
-    }
-
-    def translateState(s: State): Seq[YulStatement] = {
-        if (stateIdx == -1) {
-            stateIdx = tempTableIdx
-            tempTableIdx += 1
-        }
-        // add state name to enum value mapping
-        stateEnumMapping += s.name -> stateEnumCounter
-        stateEnumCounter += 1
-
-        Seq() // TODO: do we really mean to always return the empty sequence?
-    }
-
-    def translateConstructor(constructor: Constructor, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
-        assert(false) // todo: this is never getting called as far as i know, and i don't really think it should be so i want to know about it if it is
-
-
-        // this is basically dead code; it's never been run in any of the ganache tests because we don't have constructors.
-        val new_name: String = "constructor_" + constructor.name
-        val deployExpr = FunctionCall(
-            Identifier(new_name), // TODO change how to find constructor function name after adding randomized suffix/prefix
-            Seq()) // TODO constructor params not implemented
-
-        Seq(ExpressionStatement(deployExpr),
-            FunctionDefinition(
-                new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, v.typIn)),
-                Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, inMain = true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
 
     def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
