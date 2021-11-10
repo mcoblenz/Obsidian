@@ -111,7 +111,7 @@ do
 
   # grep through the format output by solc in yul producing mode for the binary representation
   TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
-  BOT=$(wc -l "$NAME".evm | cut -f2 -w)
+  BOT=$(wc -l "$NAME".evm | awk '{print $1}' )
   TOP=$((TOP+1)) # drop the line with the name
   EVM_BIN=$(sed -n $TOP','$BOT'p' "$NAME".evm)
   echo "binary representation is: $EVM_BIN"
