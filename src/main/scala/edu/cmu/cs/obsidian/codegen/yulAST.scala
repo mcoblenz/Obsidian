@@ -3,6 +3,7 @@ package edu.cmu.cs.obsidian.codegen
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
+import edu.cmu.cs.obsidian.typecheck.{IntType, ObsidianType}
 
 import java.io.{FileReader, StringWriter}
 
@@ -21,7 +22,7 @@ trait Expression extends YulAST
 trait YulStatement extends YulAST
 
 // for each asm struct, create a case class
-case class TypedName(name: String, ntype: String) extends YulAST {
+case class TypedName(name: String, typ: ObsidianType) extends YulAST {
     override def toString: String = {
         name
 /*
@@ -54,10 +55,6 @@ case class Case(value: Literal, body: Block) extends YulAST {
 
 case class Literal(kind: LiteralKind.LiteralKind, value: String, vtype: String) extends Expression {
     override def toString: String = {
-        /* todo/iev: i'm not positive if these assertions are the best idea, but they might be
-           a nice seatbelt. the constants i'm checking against may be wrong or incomplete right now,
-           this needs to be tested. add more complex assertions?
-        */
         val msg: String = "internal error: literal with inconsistent type string"
         kind match {
             case LiteralKind.number => assert(vtype == "int", msg)
@@ -393,8 +390,8 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
 
             val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
             FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
-                TypedName("headStart", "") +: var_indices.map(i => TypedName("value" + i.toString, "")),
-                Seq(TypedName("tail", "")), Block(bod))
+                TypedName("headStart", IntType()) +: var_indices.map(i => TypedName("value" + i.toString, IntType())),
+                Seq(TypedName("tail", IntType())), Block(bod))
         }
 
         def abiEncodeTupleFuncs(): YulStatement = Block(abiEncodesNeeded.map(write_abi_encode).toSeq)

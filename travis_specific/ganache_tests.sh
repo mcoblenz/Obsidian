@@ -33,7 +33,7 @@ else
   tests=(resources/tests/GanacheTests/*.json)
 fi
 
-missing_json=$(diff --changed-group-format='%<%>' --unchanged-group-format='' <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
+missing_json=$(bin/skipped_tests.sh)
 if [ "$missing_json" ]
 then
   echo "******** warning: some tests are defined but do not have json files and will not be run:"
@@ -102,7 +102,7 @@ do
 
   # generate the evm from yul, failing if not
   echo "running solc to produce evm bytecode"
-  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
+  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
   then
       echo "$NAME test failed: solc cannot compile yul code"
       failed+=("$test [solc]")
@@ -111,9 +111,8 @@ do
 
   # grep through the format output by solc in yul producing mode for the binary representation
   TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
-  BOT=$(grep -n "Text representation" "$NAME".evm | cut -f1 -d:)
+  BOT=$(wc -l "$NAME".evm | awk '{print $1}' )
   TOP=$((TOP+1)) # drop the line with the name
-  BOT=$((BOT-1)) # drop the empty line after the binary
   EVM_BIN=$(sed -n $TOP','$BOT'p' "$NAME".evm)
   echo "binary representation is: $EVM_BIN"
 
