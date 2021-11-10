@@ -24,7 +24,7 @@ contract IntContainer{
 // this differs from the test in SG.obs in that the main contract
 // not only has a field  but that field is at a non-primitive type
 main contract SetGetPointer {
-    IntContainer ic;
+    IntContainer@Owned ic;
 
     transaction main() returns int{
         ic = new IntContainer();
