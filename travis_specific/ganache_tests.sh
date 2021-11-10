@@ -102,7 +102,7 @@ do
 
   # generate the evm from yul, failing if not
   echo "running solc to produce evm bytecode"
-  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
+  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
   then
       echo "$NAME test failed: solc cannot compile yul code"
       failed+=("$test [solc]")
@@ -111,9 +111,8 @@ do
 
   # grep through the format output by solc in yul producing mode for the binary representation
   TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
-  BOT=$(grep -n "Text representation" "$NAME".evm | cut -f1 -d:)
+  BOT=$(wc -l "$NAME".evm | cut -f2 -w)
   TOP=$((TOP+1)) # drop the line with the name
-  BOT=$((BOT-1)) # drop the empty line after the binary
   EVM_BIN=$(sed -n $TOP','$BOT'p' "$NAME".evm)
   echo "binary representation is: $EVM_BIN"
 
