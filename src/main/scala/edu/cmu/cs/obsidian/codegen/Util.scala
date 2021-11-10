@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.parser.ContractTable
+import edu.cmu.cs.obsidian.parser.{ContractTable, Field}
 import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
@@ -86,7 +86,7 @@ object Util {
     /**
       * helper function for a common subexpression that checks if a condition holds and calls revert if so
       *
-      * @param id the expresion to check for being zero
+      * @param cond the expression to check for being zero
       * @return the yul if-statement doing the check
       */
     def revertIf(cond: Expression): YulStatement =
@@ -102,14 +102,14 @@ object Util {
     /**
       * helper function for a common subexpression that checks if something is zero and calls revert forward if so
       *
-      * @param id the expresion to check for being zero
+      * @param id the expression to check for being zero
       * @return the yul if-statement doing the check
       */
     def revertForwardIfZero(id: Expression): YulStatement =
         edu.cmu.cs.obsidian.codegen.If(apply("iszero", id), Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
 
     /**
-      * shorthand for bulding yul assignment statements, here assigning one expression to just one
+      * shorthand for building yul assignment statements, here assigning one expression to just one
       * identifier
       *
       * @param id the identifier to be assigned
@@ -136,7 +136,7 @@ object Util {
       * @return the expression declaring the variable
       */
     def decl_0exp_t(id: Identifier, t: ObsidianType): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(obsTypeToYulTypeAndSize(t.baseTypeName)._1))), None)
+        VariableDeclaration(Seq((id, Some(baseTypeToYulName(t)))), None)
 
     /**
       * shorthand for building the yul expression that declares one variable with a type and no
@@ -148,7 +148,7 @@ object Util {
       * @return the expression declaring the variable
       */
     def decl_0exp_t_init(id: Identifier, t: ObsidianType, e: Expression): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(obsTypeToYulTypeAndSize(t.baseTypeName)._1))), Some(e))
+        VariableDeclaration(Seq((id, Some(baseTypeToYulName(t)))), Some(e))
 
     /**
       * shorthand for building the yul expression that declares a sequence (non-empty) of identifiers
@@ -173,29 +173,25 @@ object Util {
       */
     def decl_1exp(id: Identifier, e: Expression): VariableDeclaration = decl_nexp(Seq(id), e)
 
-    /**
-      * given the string name of an obsidian type, provide the name of the Yul type that it maps to
-      * paired with the number of bytes needed to store a value of that type in Yul.
+    /** if a given obsidian type is a base type that matches directly to a Yul base type,
+      * produce the string that names the Yul type. assert otherwise.
       *
-      * @param ntype the name of the obsidian type
-      * @return a pair of the name of the corresponding Yul type and the size of its values
+      * @param typ the obsidian type in question
+      * @return the matching yul type name, if the argument is indeed a base type.
       */
-    def obsTypeToYulTypeAndSize(ntype: String): (String, Int) = {
-        // todo: this covers the primitive types from ObsidianType.scala but is hard to maintain because
-        // it's basically hard coded, and doesn't traverse the structure of more complicated types.
-        //
-        // see https://docs.soliditylang.org/en/latest/abi-spec.html#types
-        ntype match {
-            case "bool" => ("bool", 1)
-            case "int" => ("u256", 32)
-            case "string" => ("string", -1) // todo this -1 is a place holder
-            case "Int256" => ("int256", 32)
-            case "unit" => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ("", -1)
-            // fall through here and return the type unmodified; it'll be a structure that is defined by the file in question
-            case ntype => (ntype, -1) // todo need to compute the size of richer types, too.
+    def baseTypeToYulName(typ: ObsidianType): String = {
+        typ match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() => "u256"
+                case BoolType() => "bool"
+                case StringType() => "string"
+                case Int256Type() => "int256"
+                case UnitType() => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ""
+            }
+            case t: NonPrimitiveType => t.contractName
+            case BottomType() => assert(assertion = false, "unimplemented: bottom type not encoded in Yul"); ""
         }
     }
-
 
     /**
       * returns the width of an obsidian type. right now this is always 1 because obsidian
@@ -216,8 +212,8 @@ object Util {
                 case Int256Type() => 1
                 case UnitType() => 0
             }
-            case primitiveType: NonPrimitiveType => assert(false, "width not implemented for nonprimitive types!"); -1
-            case BottomType() => assert(false, "width not implemented for the bottom type!"); -1
+            case _: NonPrimitiveType => assert(assertion = false, "width not implemented for non-primitive types!"); -1
+            case BottomType() => assert(assertion = false, "width not implemented for the bottom type!"); -1
         }
     }
 
@@ -257,7 +253,7 @@ object Util {
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-        hashOfFunctionName(f.name, f.parameters.map(p => obsTypeToYulTypeAndSize(p.ntype)._1))
+        hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(p.typ)))
     }
 
     /**
@@ -273,22 +269,36 @@ object Util {
             case primitiveType: PrimitiveType => primitiveType match {
                 case IntType() => 32
                 case BoolType() => 0
-                case StringType() => assert(false, "size of string constants is unimplemented"); -1
+                case StringType() => assert(assertion = false, "size of string constants is unimplemented"); -1
                 case Int256Type() => 256
                 case UnitType() => 0
             }
             case nonPrimitiveType: NonPrimitiveType => nonPrimitiveType match {
-                case ContractReferenceType(contractType, permission, remoteReferenceType) => pointer_size
-                case StateType(contractType, stateNames, remoteReferenceType) =>
-                    // one day, this should probably be ceil(log_2 (length of stateNames()))) bits
-                    assert(false, "size of states is unimplemented"); -1
-                case InterfaceContractType(name, simpleType) => pointer_size
-                case GenericType(gVar, bound) =>
+                case ContractReferenceType(_, _, _) => pointer_size
+                case StateType(_, _, _) =>
+                    // todo: one day, this should probably be ceil(log_2 (length of stateNames()))) bits
+                    assert(assertion = false, "size of states is unimplemented"); -1
+                case InterfaceContractType(_, _) => pointer_size
+                case GenericType(_, _) =>
                     // todo: this may need to change; think about it more later
                     pointer_size
             }
             case BottomType() => 0
         }
+    }
+
+    /** given a contract table, produce a sequence of its fields. note that there are simpler ways
+      * to do this, e.g. ct.allFields, but they produce unordered collections. this is not suitable
+      * for layout in memory, where we want the order to be predictable.
+      *
+      * @param ct the contract table of interest
+      * @return the fields present in the contract table.
+      */
+    def fieldsOfContract(ct: ContractTable): Seq[Field] = {
+        ct.contract.declarations.filter(decl => decl match {
+            case Field(_, _, _, _) => true
+            case _ => false
+        }).map(decl => decl.asInstanceOf[Field])
     }
 
     /**
@@ -299,7 +309,21 @@ object Util {
       * @return the number of bytes needed to store the fields of the contract
       */
     def sizeOfContract(ct: ContractTable): Int = {
-        ct.allFields.map(f => sizeOfObsType(f.typ)).sum
+        fieldsOfContract(ct).map(f => sizeOfObsType(f.typ)).sum
+    }
+
+    /** given a contract table and a field name, compute the number of bytes offset from the
+      * beginning of that contract's area in memory to find the field.
+      *
+      * @param ct   the contract table
+      * @param name the field to look for
+      * @return number of bytes offset
+      */
+    def offsetOfField(ct: ContractTable, name: String): Int = {
+        fieldsOfContract(ct)
+            .takeWhile(f => f.name != name) // drop the suffix including and after the target
+            .map(f => sizeOfObsType(f.typ)) // compute the sizes of everything before the target
+            .sum // add up those sizes to get the offset
     }
 
     /**
@@ -310,19 +334,19 @@ object Util {
       * @param e the expression of interest
       * @return the name of the contract for the expression, if there is one; raises an error otherwise
       */
-    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = { //todo should this return an option? what's the invariant exactly?
+    def getContractName(e: edu.cmu.cs.obsidian.parser.Expression): String = {
         e.obstype match {
             case Some(value) => value match {
-                case _: PrimitiveType => assert(false, s"primitive types do not have contract names"); ""
+                case _: PrimitiveType => assert(assertion = false, s"primitive types do not have contract names"); ""
                 case tau: NonPrimitiveType => tau match {
                     case ContractReferenceType(contractType, _, _) => contractType.contractName
                     case StateType(contractType, _, _) => contractType.contractName
-                    case InterfaceContractType(_, _) => assert(false, "unimplemented"); ""
-                    case GenericType(_, _) => assert(false, "unimplemented"); ""
+                    case InterfaceContractType(_, _) => assert(assertion = false, "unimplemented"); ""
+                    case GenericType(_, _) => assert(assertion = false, "unimplemented"); ""
                 }
-                case BottomType() => assert(false, s"the bottom type does not have a contract name"); ""
+                case BottomType() => assert(assertion = false, s"the bottom type does not have a contract name"); ""
             }
-            case None => assert(false, s"expression without a type annotation: ${e.toString}"); ""
+            case None => assert(assertion = false, s"expression without a type annotation: ${e.toString}"); ""
         }
     }
 
@@ -335,15 +359,14 @@ object Util {
       * @return the name of the Yul transaction for that contract
       */
     def transactionNameMapping(contractName: String, transactionName: String): String =
-        s"${contractName}___${transactionName}"
+        s"${contractName}___$transactionName"
 
     /**
-      * if a and b do not contain "___", then
+      * if a and b do not contain three underscores in a row, then
       * transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
       *
-      *
-      * @param s
-      * @return
+      * @param s the string to break
+      * @return the two halves of the string
       */
     def transactionNameUnmapping(s: String): Option[(String, String)] = {
         val halves: Array[String] = s.split("___")
@@ -352,5 +375,16 @@ object Util {
         } else {
             Some(halves(0), halves(1))
         }
+    }
+
+    /** given a contract table and a name of a field, produce the expression that computes
+      * the address of that field offset into the contract
+      *
+      * @param ct the contract table
+      * @param x the field name
+      * @return the expression computing the offset
+      */
+    def fieldFromThis(ct: ContractTable, x: String): Expression = {
+        apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
     }
 }

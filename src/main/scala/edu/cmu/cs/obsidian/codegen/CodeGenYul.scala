@@ -1,6 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.typecheck.StringType
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -114,10 +115,7 @@ object CodeGenYul extends CodeGenerator {
       * names that they will have in the flattened translation. e.g. `f()` remains `f()` but `ic.f()` becomes
       * `IntContainer___f(this)` if ic is an IntContainer.
       *
-      * todo: right now we do not actually have enough type information to do the above in a robust way, but we will
-      * add that soon
-      *
-      * @param contract the contract to be translated
+      * @param contract     the contract to be translated
       * @param checkedTable the symbol table for that contract
       * @return the yul
       */
@@ -126,7 +124,7 @@ object CodeGenYul extends CodeGenerator {
 
         // translate declarations
         for (d <- contract.declarations) {
-            decls = decls ++ translateDeclaration(d, contract.name, checkedTable, true)
+            decls = decls ++ translateDeclaration(d, contract.name, checkedTable, inMain = true)
         }
 
         // create runtime object from just the declarations and with the subobject name suffix
@@ -148,7 +146,7 @@ object CodeGenYul extends CodeGenerator {
       * ready to be inserted into the translation of a main yul object. this will rename the transactions according to the
       * contract name.
       *
-      * @param c the contract to be translated
+      * @param c            the contract to be translated
       * @param checkedTable the symbol table of the contract
       * @return the YulObject representing the translation. note that all the fields other than `code` will be the empty sequence.
       */
@@ -156,7 +154,7 @@ object CodeGenYul extends CodeGenerator {
         var translation: Seq[YulStatement] = Seq()
 
         for (d <- c.declarations) {
-            val dTranslated = translateDeclaration(d, c.name, checkedTable, false)
+            val dTranslated = translateDeclaration(d, c.name, checkedTable, inMain = false)
             translation = translation ++ dTranslated
         }
 
@@ -193,11 +191,6 @@ object CodeGenYul extends CodeGenerator {
             case _: Constructor =>
                 assert(assertion = false, "constructors not supported in Yul translation")
                 Seq()
-            // todo: previously this returned a pair of sequences, and this was the only clause
-            //   in which the left element was not empty. the left sequence would go in the code
-            //   part of the output object rather than the runtime, but that's not where we
-            //   want constructors to go.
-            // (translateConstructor(c, contractName, checkedTable), Seq())
             case _: TypeDecl =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -236,9 +229,9 @@ object CodeGenYul extends CodeGenerator {
         Seq(ExpressionStatement(deployExpr),
             FunctionDefinition(
                 new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1)),
+                constructor.args.map(v => TypedName(v.varName, v.typIn)),
                 Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
+                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, inMain = true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
     }
 
     def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
@@ -257,7 +250,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get.name, obsTypeToYulTypeAndSize(t.toString)._1))
+                    Seq(TypedName(id.get.name, t))
                 case None => Seq()
             }
         }
@@ -267,8 +260,8 @@ object CodeGenYul extends CodeGenerator {
             if (inMain) {
                 Seq() // add nothing
             } else {
-                Seq(TypedName("this", "string")) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
-            } ++ transaction.args.map(v => TypedName(v.varName, obsTypeToYulTypeAndSize(v.typIn.toString)._1))
+                Seq(TypedName("this", StringType())) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
+            } ++ transaction.args.map(v => TypedName(v.varName, v.typIn))
 
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
@@ -307,11 +300,11 @@ object CodeGenYul extends CodeGenerator {
                         //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable, inMain)
+                        val ct = checkedTable.contractLookup(contractName)
                         decl_0exp(id) +:
                             e_yul :+
-                            (if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
-                                //todo: compute offsets
-                                ExpressionStatement(apply("sstore", hexlit(keccak256(contractName + x)), id))
+                            (if (ct.allFields.exists(f => f.name.equals(x))) {
+                                ExpressionStatement(apply("mstore", Util.fieldFromThis(ct, x), id))
                             } else {
                                 assign1(Identifier(x), id)
                             })
@@ -425,19 +418,6 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
-
-    /**
-      * Given the type of a contract and a table, compute the size that we need to allocate for it in memory.
-      * TODO: as a simplifying assumption, for now this always returns 256.
-      *
-      * @param t      the contract type of interest
-      * @param symTab the symbol table to look in
-      * @return the size of memory needed for the contract
-      */
-    def contractSize(t: ContractType, symTab: SymbolTable): Int = {
-        256
-    }
-
     def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -449,10 +429,10 @@ object CodeGenYul extends CodeGenerator {
 
                         // todo: this also assumes that everything is a u256 and does no type-directed
                         //  cleaning in the way that solc does
-                        if (checkedTable.contractLookup(contractName).allFields.exists(f => f.name.equals(x))) {
+                        val ct = checkedTable.contractLookup(contractName)
+                        if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
-                            //todo: compute offsets
-                            Seq(decl_1exp(store_id, apply("sload", hexlit(keccak256(contractName + x)))),
+                            Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))),
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
@@ -503,13 +483,13 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable, inMain)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable, inMain)
                 }
-            case e@LocalInvocation(name, genericParams, params, args, obstype) => // todo: why are the middle two args not used?
+            case e@LocalInvocation(name, genericParams, params, args, obstype) =>
                 // look up the name of the function in the table, get its return type, and then compute
                 // how wide of a tuple that return type is. right now that's either 1 (if the
                 // transaction returns) or 0 (because it's void)
                 val width = obstype match {
                     case Some(t) => obsTypeToWidth(t)
-                    case None => assert(false, s"width failed on transaction named ${name} from expression ${e.toString}")
+                    case None => assert(assertion = false, s"width failed on transaction named $name from expression ${e.toString}")
                 }
 
                 // todo: some of this logic may be repeated in the dispatch table
@@ -535,7 +515,7 @@ object CodeGenYul extends CodeGenerator {
                 // todo: this does not work with non-void functions that are called without binding
                 //  their results, ie "f()" if f returns an int
                 ids.map(id => decl_0exp(id)) ++
-                seqs.flatten ++ (width match {
+                    seqs.flatten ++ (width match {
                     case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
                     case 1 =>
                         val id: Identifier = nextTemp()
@@ -548,11 +528,6 @@ object CodeGenYul extends CodeGenerator {
                 // returns a variable containing a memory address for the implicit `this` argument
                 // added to the translation of the transactions into the flat Yul object
 
-
-                // todo: this ultimately needs to be type-directed. to translate an invocation,
-                //  we need to know the type of the recipient expression being invoked so that we
-                //  can call the appropriate translated transaction in the big Yul object.
-
                 // we get a variable storing the address of the instance from recursively translating
                 // the recipient. we also form a Parser identifier with this, so that we can translate
                 // the invocation with a tailcall to translateExpr
@@ -561,22 +536,28 @@ object CodeGenYul extends CodeGenerator {
 
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
-                ((decl_0exp(id_recipient) +: recipient_yul) ++
+                (decl_0exp(id_recipient) +: recipient_yul) ++
                     translateExpr(retvar, LocalInvocation(transactionNameMapping(getContractName(recipient), name),
                         genericParams,
                         params,
-                        this_address +: args, obstype), contractName, checkedTable, inMain)) // todo test this, too
+                        this_address +: args, obstype), contractName, checkedTable, inMain) // todo test this, too
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // todo: currently we ignore the arguments to the constructor
                 assert(args.isEmpty, "contracts that take arguments are not yet supported")
 
-                val ct: Option[ContractTable] = checkedTable.contract(contractType.contractName)
+                // compute the amount of space we need to store something of this type, or assert
+                //   if that amount can't be computed.
+                val size: Int = checkedTable.contract(contractType.contractName) match {
+                    case Some(value) => sizeOfContract(value)
+                    case None => assert(assertion = false, s"contract table didn't contain contract name: ${contractType.contractName}"); -1
+                }
 
                 val id_memaddr = nextTemp()
+
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
-                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContract(ct.get)))),
+                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(size))),
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)

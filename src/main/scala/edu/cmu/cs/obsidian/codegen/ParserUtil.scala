@@ -20,7 +20,7 @@ package object ParserUtil {
     def expressionHasTypeProperty(e: edu.cmu.cs.obsidian.parser.Expression, prop: Option[ObsidianType] => Boolean): Boolean = {
         e match {
             case expression: AtomicExpression => expression match {
-                case ReferenceIdentifier(name, typ) => prop(typ)
+                case ReferenceIdentifier(_, typ) => prop(typ)
                 case NumLiteral(_) => true
                 case parser.StringLiteral(_) => true
                 case TrueLiteral() => true
@@ -51,22 +51,22 @@ package object ParserUtil {
                     case LessThanOrEquals(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
                     case NotEquals(e1, e2) => expressionHasTypeProperty(e1, prop) && expressionHasTypeProperty(e2, prop)
                 })
-            case LocalInvocation(name, genericParams, params, args, typ) => prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, typ) => expressionHasTypeProperty(recipient, prop) && prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
-            case Construction(contractType, args, isFFIInvocation, typ) => prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
-            case StateInitializer(stateName, fieldName, typ) => prop(typ)
+            case LocalInvocation(_, _, _, args, typ) => prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
+            case Invocation(recipient, _, _, _, args, _, typ) => expressionHasTypeProperty(recipient, prop) && prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
+            case Construction(_, args, _, typ) => prop(typ) && args.forall(ePrime => expressionHasTypeProperty(ePrime, prop))
+            case StateInitializer(_, _, typ) => prop(typ)
         }
     }
 
     def statementWithExpTypeProperty(s: Statement, prop: Option[ObsidianType] => Boolean): Boolean = {
         s match {
             case e: Expression => expressionHasTypeProperty(e, prop)
-            case VariableDecl(typ, varName) => true
-            case VariableDeclWithInit(typ, varName, e) => expressionHasTypeProperty(e, prop)
-            case VariableDeclWithSpec(typIn, typOut, varName) => true
+            case VariableDecl(_, _) => true
+            case VariableDeclWithInit(_, _, e) => expressionHasTypeProperty(e, prop)
+            case VariableDeclWithSpec(_, _, _) => true
             case Return() => true
             case ReturnExpr(e) => expressionHasTypeProperty(e, prop)
-            case Transition(newStateName, updates, thisPermission) => updates match {
+            case Transition(_, updates, _) => updates match {
                 case Some(updates) => updates.forall(u => expressionHasTypeProperty(u._2, prop))
                 case None => true
             }
@@ -77,23 +77,23 @@ package object ParserUtil {
             }
             case If(eCond, s) => expressionHasTypeProperty(eCond, prop) && s.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
             case IfThenElse(eCond, s1, s2) => expressionHasTypeProperty(eCond, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
-            case IfInState(e, ePerm, typeState, s1, s2) => expressionHasTypeProperty(e, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
+            case IfInState(e, _, _, s1, s2) => expressionHasTypeProperty(e, prop) && s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
             case TryCatch(s1, s2) => s1.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)) && s2.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop))
             case Switch(e, cases) => expressionHasTypeProperty(e, prop) && cases.forall((sc: SwitchCase) => sc.body.forall((sPrime: Statement) => statementWithExpTypeProperty(sPrime, prop)))
-            case StaticAssert(e, typeState) => expressionHasTypeProperty(e, prop)
+            case StaticAssert(e, _) => expressionHasTypeProperty(e, prop)
         }
     }
 
     def declarationWithExpTypeProperty(d: Declaration, prop: Option[ObsidianType] => Boolean): Boolean = {
         d match {
             case declaration: InvokableDeclaration => declaration match {
-                case Constructor(name, args, resultType, body) => body.forall((s: Statement) => statementWithExpTypeProperty(s, prop))
-                case Transaction(name, params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes) =>
+                case Constructor(_, _, _, body) => body.forall((s: Statement) => statementWithExpTypeProperty(s, prop))
+                case Transaction(_, _, _, _, ensures, body, _, _, _, _, _, _) =>
                     body.forall((s: Statement) => statementWithExpTypeProperty(s, prop)) && ensures.forall((e: Ensures) => expressionHasTypeProperty(e.expr, prop))
             }
-            case TypeDecl(name, typ) => true
-            case Field(isConst, typ, name, availableIn) => true
-            case State(name, fields, isAsset) => true // can fields have expressions in them? i don't think so
+            case TypeDecl(_, _) => true
+            case Field(_, _, _, _) => true
+            case State(_, _, _) => true
             case contract: Contract => contractWithExpTypeProperty(contract, prop)
         }
     }
@@ -101,9 +101,9 @@ package object ParserUtil {
 
     def contractWithExpTypeProperty(c: Contract, prop: Option[ObsidianType] => Boolean): Boolean = {
         c match {
-            case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
+            case ObsidianContractImpl(_, _, _, _, declarations, _, _, _) =>
                 declarations.forall((d: Declaration) => declarationWithExpTypeProperty(d, prop))
-            case JavaFFIContractImpl(name, interface, javaPath, sp, declarations) => assert(false, "we don't support these yet"); true
+            case JavaFFIContractImpl(_, _, _, _, _) => assert(assertion = false, "we don't support these yet"); true
         }
     }
 
@@ -125,7 +125,7 @@ package object ParserUtil {
     def updateExprType(e: Expression, newType: ObsidianType): Expression = {
         e match {
             case expression: AtomicExpression => expression match {
-                case r@ReferenceIdentifier(name, _) => r.copy(obstype = Some(newType)).setLoc(r)
+                case r@ReferenceIdentifier(_, _) => r.copy(obstype = Some(newType)).setLoc(r)
                 case NumLiteral(_) => e
                 case StringLiteral(_) => e
                 case TrueLiteral() => e
@@ -135,10 +135,10 @@ package object ParserUtil {
             }
             case expression: UnaryExpression => expression // none of the unary expressions have constructors that take the obstype as an argument
             case expression: BinaryExpression => expression // ditto
-            case r@LocalInvocation(name, genericParams, params, args, _) => r.copy(obstype = Some(newType)).setLoc(r)
-            case r@Invocation(recipient, genericParams, params, name, args, isFFIInvocation, _) => r.copy(obstype = Some(newType)).setLoc(r)
-            case r@Construction(contractType, args, isFFIInvocation, _) => r.copy(obstype = Some(newType)).setLoc(r)
-            case r@StateInitializer(stateName, fieldName, _) => r.copy(obstype = Some(newType)).setLoc(r)
+            case r@LocalInvocation(_, _, _, _, _) => r.copy(obstype = Some(newType)).setLoc(r)
+            case r@Invocation(_, _, _, _, _, _, _) => r.copy(obstype = Some(newType)).setLoc(r)
+            case r@Construction(_, _, _, _) => r.copy(obstype = Some(newType)).setLoc(r)
+            case r@StateInitializer(_, _, _) => r.copy(obstype = Some(newType)).setLoc(r)
         }
     }
 }
