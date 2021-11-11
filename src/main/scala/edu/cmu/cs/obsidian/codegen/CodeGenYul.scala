@@ -117,6 +117,17 @@ object CodeGenYul extends CodeGenerator {
             runtimeSubobj = Seq(),
             data = Seq())
 
+        val sizeOfMain: Int = checkedTable.contract(contract.name) match {
+            case Some(ct) => Util.sizeOfContract(ct)
+            case None => assert(false, "no main contract in the symbol table"); -1
+        }
+
+        // if the main contract takes up space, we need to allocate some for it and make that
+        // available as this to any transaction in main.
+        if (sizeOfMain > 0){
+            // todo
+        }
+
         YulObject(name = contract.name,
             code = Code(Block(Seq())),
             runtimeSubobj = Seq(runtime_obj),
