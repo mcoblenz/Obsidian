@@ -167,10 +167,12 @@ object CodeGenYul extends CodeGenerator {
       */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
-            case f: Field => Seq() // fields are translated as they are encountered
+            case _: Field => Seq() // fields are translated as they are encountered
             case t: Transaction => translateTransaction(t, contractName, checkedTable, inMain)
-            case s: State => Seq() // this is unimplemented
-            case c: ObsidianContractImpl =>
+            case _: State =>
+                assert(assertion = false, "TODO")
+                Seq()
+            case _: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
                 Seq()
             case _: JavaFFIContractImpl =>
