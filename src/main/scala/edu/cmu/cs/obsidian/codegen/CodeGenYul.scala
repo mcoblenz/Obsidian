@@ -97,7 +97,6 @@ object CodeGenYul extends CodeGenerator {
         YulObject(name = mainContractYO.name,
             code = mainContractYO.code,
             runtimeSubobj = mainContractYO.runtimeSubobj ++ childContracts,
-            childContracts = Seq(), // todo maybe delete this field entirely
             data = mainContractYO.data) // todo this is always empty, we ignore data
     }
 
@@ -123,13 +122,11 @@ object CodeGenYul extends CodeGenerator {
         val runtime_obj = YulObject(name = contract.name + "_deployed",
             code = Code(Block(decls)),
             runtimeSubobj = Seq(),
-            childContracts = Seq(),
             data = Seq())
 
         YulObject(name = contract.name,
             code = Code(Block(Seq())),
             runtimeSubobj = Seq(runtime_obj),
-            childContracts = Seq(),
             data = Seq())
     }
 
@@ -153,7 +150,6 @@ object CodeGenYul extends CodeGenerator {
         YulObject(name = c.name,
             code = Code(Block(translation)),
             runtimeSubobj = Seq(),
-            childContracts = Seq(),
             data = Seq()
         )
     }
@@ -166,7 +162,7 @@ object CodeGenYul extends CodeGenerator {
       * @param declaration  the declaration to translate
       * @param contractName the name of the contract in which the declaration appears
       * @param checkedTable the symbol table for the contract in which the declaration appears
-      * @param inMain       whether or not the contract in which the declaration apepars is the main one
+      * @param inMain       whether or not the contract in which the declaration appears is the main one
       * @return the yul statements corresponding to the declaration
       */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
