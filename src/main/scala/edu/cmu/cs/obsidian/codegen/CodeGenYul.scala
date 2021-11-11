@@ -111,16 +111,9 @@ object CodeGenYul extends CodeGenerator {
       * @return the yul
       */
     def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var decls: Seq[YulStatement] = Seq()
-
-        // translate declarations
-        for (d <- contract.declarations) {
-            decls = decls ++ translateDeclaration(d, contract.name, checkedTable, inMain = true)
-        }
-
         // create runtime object from just the declarations and with the subobject name suffix
         val runtime_obj = YulObject(name = contract.name + "_deployed",
-            code = Code(Block(decls)),
+            code = Code(Block(contract.declarations.flatMap(d => translateDeclaration(d, contract.name, checkedTable, inMain = true)))),
             runtimeSubobj = Seq(),
             data = Seq())
 
@@ -140,15 +133,8 @@ object CodeGenYul extends CodeGenerator {
       * @return the YulObject representing the translation. note that all the fields other than `code` will be the empty sequence.
       */
     def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var translation: Seq[YulStatement] = Seq()
-
-        for (d <- c.declarations) {
-            val dTranslated = translateDeclaration(d, c.name, checkedTable, inMain = false)
-            translation = translation ++ dTranslated
-        }
-
         YulObject(name = c.name,
-            code = Code(Block(translation)),
+            code = Code(Block(c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false)))),
             runtimeSubobj = Seq(),
             data = Seq()
         )
