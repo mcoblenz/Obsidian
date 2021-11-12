@@ -312,23 +312,6 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], da
 
         def deployFunctions(): Array[Func] = deployFunctionArray
 
-        for (s <- obj.code.block.statements) {
-            s match {
-                case f: FunctionDefinition =>
-                    deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
-                case e: ExpressionStatement =>
-                    e.expression match {
-                        case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
-                        case _ =>
-                            assert(assertion = false, "TODO: objscope not implemented for expression statement " + e.toString)
-                            () // TODO unimplemented
-                    }
-                case _ =>
-                    assert(assertion = false, "TODO: objscope not implemented for statement " + s.toString)
-                    () // TODO unimplemented
-            }
-        }
-
         def runtimeFunctions(): Array[Func] = runtimeFunctionArray
 
         var abiEncodesNeeded: Set[Int] = Set()
