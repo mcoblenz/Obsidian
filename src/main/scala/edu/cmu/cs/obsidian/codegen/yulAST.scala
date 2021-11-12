@@ -399,5 +399,4 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], da
 
         class Call(val call: String) {}
     }
-
 }
