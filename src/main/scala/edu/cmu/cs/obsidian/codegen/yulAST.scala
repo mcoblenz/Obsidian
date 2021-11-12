@@ -208,7 +208,16 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], data: Seq[Data]) extends YulAST {
+/**
+  * @param name
+  * @param code
+  * @param runtimeSubobj
+  * @param data
+  * @param mainContractSize if the contract being represented is the main contract, this should be Some(the size it takes in memory), and None otherwise
+  */
+//case class YulObject(contractName: String, code: Code, runtimeSubobj: Seq[YulObject], data: Seq[Data], mainContractSize: Option[Int]) extends YulAST {
+
+case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], data: Seq[Data], mainContractSize: Option[Int]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -324,6 +333,8 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], da
 
         var abiEncodesNeeded: Set[Int] = Set()
 
+        val mainSize: Int = mainContractSize.getOrElse(0)
+
         // process the runtime object; todo this may only ever be a singleton
         for (sub <- obj.runtimeSubobj) {
             for (s <- sub.code.block.statements) {
@@ -331,8 +342,10 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], da
                     case f: FunctionDefinition =>
                         dispatch = true
                         runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                        // generate the dispatch table entry
-                        dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
+                        if (mainContractSize.nonEmpty) {
+                            // generate the dispatch table entry for things in main
+                            dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
+                        }
                         // note the number of return variables so that we generate the appropriate abi encode functions (without repetitions)
                         abiEncodesNeeded = abiEncodesNeeded + f.returnVariables.length
                     case x =>

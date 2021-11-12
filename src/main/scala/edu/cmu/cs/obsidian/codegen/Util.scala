@@ -387,4 +387,9 @@ object Util {
     def fieldFromThis(ct: ContractTable, x: String): Expression = {
         apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
     }
+
+    def addThisArgument(f : FunctionDefinition) : FunctionDefinition = {
+        FunctionDefinition(f.name, f.parameters, f.returnVariables, f.body)
+    }
+
 }

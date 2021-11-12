@@ -93,11 +93,17 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        val sizeOfMain: Int = checkedTable.contract(mainContractYO.name) match {
+            case Some(ct) => Util.sizeOfContract(ct)
+            case None => assert(false, "no main contract in the symbol table"); -1
+        }
+
         // todo: we do not process imports
         YulObject(name = mainContractYO.name,
             code = mainContractYO.code,
             runtimeSubobj = mainContractYO.runtimeSubobj ++ childContracts,
-            data = mainContractYO.data) // todo this is always empty, we ignore data
+            data = mainContractYO.data, // todo this is always empty, we ignore data
+            Some(sizeOfMain))
     }
 
     /**
@@ -115,23 +121,14 @@ object CodeGenYul extends CodeGenerator {
         val runtime_obj = YulObject(name = contract.name + "_deployed",
             code = Code(Block(contract.declarations.flatMap(d => translateDeclaration(d, contract.name, checkedTable, inMain = true)))),
             runtimeSubobj = Seq(),
-            data = Seq())
-
-        val sizeOfMain: Int = checkedTable.contract(contract.name) match {
-            case Some(ct) => Util.sizeOfContract(ct)
-            case None => assert(false, "no main contract in the symbol table"); -1
-        }
-
-        // if the main contract takes up space, we need to allocate some for it and make that
-        // available as this to any transaction in main.
-        if (sizeOfMain > 0){
-            // todo
-        }
+            data = Seq(),
+            None)
 
         YulObject(name = contract.name,
             code = Code(Block(Seq())),
             runtimeSubobj = Seq(runtime_obj),
-            data = Seq())
+            data = Seq(),
+            None)
     }
 
     /**
@@ -147,7 +144,8 @@ object CodeGenYul extends CodeGenerator {
         YulObject(name = c.name,
             code = Code(Block(c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false)))),
             runtimeSubobj = Seq(),
-            data = Seq()
+            data = Seq(),
+            None
         )
     }
 
@@ -206,12 +204,8 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // for transactions appearing in main, nothing changes; others get an explicit "this" argument added
-        val args: Seq[TypedName] =
-            if (inMain) {
-                Seq() // add nothing
-            } else {
-                Seq(TypedName("this", StringType())) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
-            } ++ transaction.args.map(v => TypedName(v.varName, v.typIn))
+        // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
+        val args: Seq[TypedName] = Seq(TypedName("this", StringType())) ++ transaction.args.map(v => TypedName(v.varName, v.typIn))
 
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
