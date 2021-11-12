@@ -58,54 +58,54 @@ object CodeGenYul extends CodeGenerator {
         // generate yul string from yul AST, write to the output file
         val s = translated_obj.yulString()
         Files.createDirectories(finalOutputPath)
-        val writer = new FileWriter(new File(finalOutputPath.toString, translated_obj.name + ".yul"))
+        val writer = new FileWriter(new File(finalOutputPath.toString, translated_obj.contractName + ".yul"))
         writer.write(s)
         writer.flush()
         true
     }
 
     def translateProgram(program: Program, checkedTable: SymbolTable): YulObject = {
+
         // translate main contract, or fail if none is found or only a java contract is present
-        val mainContractYO: YulObject =
+        val mainContract: ObsidianContractImpl =
             findMainContract(program) match {
                 case Some(p) => p match {
-                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateMainContract(c, checkedTable)
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => c
                     case JavaFFIContractImpl(_, _, _, _, _) =>
                         throw new RuntimeException("Java contract not supported in yul translation")
                 }
                 case None => throw new RuntimeException("No main contract found")
             }
 
-        // translate other contracts (if any) and add them to the childObjects
-        var childContracts: Seq[YulObject] = Seq()
-        // todo: this collection always contains a contract that looks like
-        //   ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,)
-        //   and i do not know why. it appears because of the code in IdentityAstTransfomer.scala,
-        //   transformProgram, roughly line 20.
-        for (c <- program.contracts) {
+        def translateNonMains(c : Contract): Seq[YulStatement] = {
             c match {
                 case obsContract: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
-                        childContracts = childContracts :+ translateNonMainContract(obsContract, checkedTable)
+                        translateNonMainContract(obsContract, checkedTable)
+                    } else {
+                        // skip the main and the self contracts
+                        Seq()
                     }
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
-        val sizeOfMain: Int = checkedTable.contract(mainContractYO.name) match {
+        val sizeOfMain: Int = checkedTable.contract(mainContract.name) match {
             case Some(ct) => Util.sizeOfContract(ct)
             case None => assert(false, "no main contract in the symbol table"); -1
         }
 
-        // todo: we do not process imports
-        YulObject(name = mainContractYO.name,
-            code = mainContractYO.code,
-            runtimeSubobj = mainContractYO.runtimeSubobj ++ childContracts,
-            data = mainContractYO.data, // todo this is always empty, we ignore data
-            Some(sizeOfMain))
+        // nb: we do not process imports
+        YulObject(contractName = mainContract.name,
+            data = Seq(), // NB we currently ignore data so this is empty
+            mainContractTransactions = translateMainContract(mainContract, checkedTable),
+            mainContractSize = sizeOfMain,
+            otherTransactions = program.contracts.flatMap(translateNonMains)
+            )
     }
 
+    // TODO update docs // remove these two when it works
     /**
       * given a contract, produce the Yul object that contains its translation as the main object. this will not
       * rename any of the transactions for this object, but will call transactions from other objects with the
@@ -116,21 +116,11 @@ object CodeGenYul extends CodeGenerator {
       * @param checkedTable the symbol table for that contract
       * @return the yul
       */
-    def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        // create runtime object from just the declarations and with the subobject name suffix
-        val runtime_obj = YulObject(name = contract.name + "_deployed",
-            code = Code(Block(contract.declarations.flatMap(d => translateDeclaration(d, contract.name, checkedTable, inMain = true)))),
-            runtimeSubobj = Seq(),
-            data = Seq(),
-            None)
-
-        YulObject(name = contract.name,
-            code = Code(Block(Seq())),
-            runtimeSubobj = Seq(runtime_obj),
-            data = Seq(),
-            None)
+    def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): Seq[YulStatement] = {
+        contract.declarations.flatMap(d => translateDeclaration(d, contract.name, checkedTable, inMain = true))
     }
 
+    // TODO update docs
     /**
       * given a contract that is not the main one, produce a yul object that represents the part of its translation that's
       * ready to be inserted into the translation of a main yul object. this will rename the transactions according to the
@@ -140,13 +130,8 @@ object CodeGenYul extends CodeGenerator {
       * @param checkedTable the symbol table of the contract
       * @return the YulObject representing the translation. note that all the fields other than `code` will be the empty sequence.
       */
-    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        YulObject(name = c.name,
-            code = Code(Block(c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false)))),
-            runtimeSubobj = Seq(),
-            data = Seq(),
-            None
-        )
+    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable): Seq[YulStatement] = {
+        c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
     }
 
 
@@ -182,7 +167,7 @@ object CodeGenYul extends CodeGenerator {
         }
     }
 
-    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
+    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[FunctionDefinition] = {
         var id: Option[Identifier] = None
 
         // if the transaction appears in main, it keeps its name, otherwise it gets prepended with the name of the contract in which it appears.
@@ -203,9 +188,7 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        // for transactions appearing in main, nothing changes; others get an explicit "this" argument added
-        // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
-        val args: Seq[TypedName] = Seq(TypedName("this", StringType())) ++ transaction.args.map(v => TypedName(v.varName, v.typIn))
+        val args: Seq[TypedName] = transaction.args.map(v => TypedName(v.varName, v.typIn))
 
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))

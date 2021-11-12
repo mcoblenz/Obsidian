@@ -253,7 +253,7 @@ object Util {
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-        hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(p.typ)))
+            hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(p.typ)))
     }
 
     /**
