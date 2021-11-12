@@ -208,6 +208,116 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
+case class YulObject2(contractName : String, data: Seq[Data], mainContractTransactions: Seq[FunctionDefinition], mainContractSize: Int, otherTransactions: Seq[FunctionDefinition]) extends YulAST{
+    def yulString(): String = {
+        val mf = new DefaultMustacheFactory()
+        val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
+        val scope = new ObjScope(this)
+        val raw: String = mustache.execute(new StringWriter(), scope).toString
+        // mustache butchers certain characters; this fixes that. there may be other characters that
+        // need to be added here
+        raw.replaceAll("&amp;", "&").
+            replaceAll("&gt;", ">").
+            replaceAll("&#10;", "\n").
+            replaceAll("&#61;", "=").
+            replaceAll("&quot;", "\"").
+            replaceAll("&#13;", "\r")
+    }
+
+    class ObjScope(obj: YulObject2) {
+        // the values here are defined, as much as possible, in the same order as the mustache file
+        val contractName: String = obj.contractName
+        val deployedName : String = obj.contractName + "_deployed"
+
+        val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
+        val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
+
+        // the free memory pointer points to 0x80 initially
+        var memoryInit: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
+
+        def callValueCheck(): YulStatement = callvaluecheck
+
+        val datasize: Expression = apply("datasize", rawstringlit(deployedName))
+
+        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(deployedName)), datasize)
+
+        def defaultReturn(): Expression = apply("return", intlit(0), datasize)
+
+        val mainSize: Int = mainContractSize
+
+        // together, these keep track of and create temporary variables for returns in the dispatch table
+        var deRetCnt = 0
+
+        def nextDeRet(): String = {
+            deRetCnt = deRetCnt + 1
+            s"_dd_ret_${deRetCnt.toString}" //todo: better naming convention?
+        }
+
+        /**
+          * compute the sequence of statements for the dispatch table for a function
+          *
+          * @param f the function to be added to dispatch
+          * @return the sequence to add to dispatch
+          */
+        def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
+            // temporary variables to store the return from calling the function
+            val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
+
+            //todo: second argument to the application is highly speculative; check once you have more complex functions
+            // the actual call to f, and a possible declaration of the temporary variables if there are any returns
+            val call_to_f: Expression = apply(f.name, f.parameters.map(p => Identifier(p.name)): _*)
+            val call_f_and_maybe_assign: YulStatement =
+                if (f.returnVariables.nonEmpty) {
+                    codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))
+                } else {
+                    ExpressionStatement(call_to_f)
+                }
+
+            val mp_id: Identifier = Identifier("memPos")
+
+            Seq(
+                //    if callvalue() { revert(0, 0) }
+                callvaluecheck,
+                // abi_decode_tuple_(4, calldatasize())
+                codegen.ExpressionStatement(apply("abi_decode_tuple", intlit(4), apply("calldatasize"))),
+                //    fun_retrieve_24()
+                call_f_and_maybe_assign,
+                //    let memPos := allocate_unbounded()
+                decl_1exp(mp_id, apply("allocate_unbounded")),
+                //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
+                //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
+                // nb: the code for these is written dynamically below so we can assume that they exist before they do
+                decl_1exp(Identifier("memEnd"), apply("abi_encode_tuple_to_fromStack" + temps.length.toString, mp_id +: temps: _*)),
+                //    return(memPos, sub(memEnd, memPos))
+                codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
+            )
+        }
+
+        val transactions: Seq[Func] = (mainContractTransactions ++ otherTransactions).map(t => new Func(t.toString))
+
+        // the dispatch table gets one entry for each transaction in the main contract. the transactions
+        // elaborations are added below, and those have a `this` argument added, which is supplied in the
+        // dispatch table from an allocated instance of the main contract at the top of memory. but the
+        // outside world does not see that, so the hashes in the dispatch array are the ones that
+        // result from the transaction definitions WITHOUT the `this` argument.
+        def dispatchTable(): codegen.Switch =
+            codegen.Switch(Identifier("selector"),
+                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(t)), Block(dispatchEntry(addThisArgument(t))))))
+
+        def abiEncodeTupleFuncs(): YulStatement = Block((mainContractTransactions ++ otherTransactions)
+                                                        .map(t => t.returnVariables.length)
+                                                        .toSet
+                                                        .map(write_abi_encode)
+                                                        .toSeq)
+
+        class Func(val code: String) {}
+
+        class Case(val hash: String) {}
+
+        class Call(val call: String) {}
+    }
+}
+
 /**
   * @param name
   * @param code
@@ -215,8 +325,6 @@ case class StringLiteral(content: String) extends YulAST
   * @param data
   * @param mainContractSize if the contract being represented is the main contract, this should be Some(the size it takes in memory), and None otherwise
   */
-//case class YulObject(contractName: String, code: Code, runtimeSubobj: Seq[YulObject], data: Seq[Data], mainContractSize: Option[Int]) extends YulAST {
-
 case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], data: Seq[Data], mainContractSize: Option[Int]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()

@@ -388,8 +388,53 @@ object Util {
         apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
     }
 
+    /** given a function, return the function with an added `this` argument
+      * @param f
+      * @return
+      */
     def addThisArgument(f : FunctionDefinition) : FunctionDefinition = {
-        FunctionDefinition(f.name, f.parameters, f.returnVariables, f.body)
+        // todo: string type is a temporary hack here
+        FunctionDefinition(f.name, Seq(TypedName("this", StringType())) ++ f.parameters, f.returnVariables, f.body)
     }
 
+    /**
+      * compute the abi tuple encode function for a given number of returns. for example, for 0,
+      * 1, and 2 returns:
+      *
+      * {{{
+      * function abi_encode_tuple__to__fromStack(headStart ) -> tail {
+      *    tail := add(headStart, 0)
+      * }
+      * }}}
+      *
+      * {{{
+      * function abi_encode_tuple_t_uint256__to_t_uint256__fromStack(headStart , value0) -> tail {
+      *    tail := add(headStart, 32)
+      *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
+      * }
+      * }}}
+      *
+      * {{{
+      * function abi_encode_tuple_t_uint256_t_uint256__to_t_uint256_t_uint256__fromStack(headStart , value0, value1) -> tail {
+      *    tail := add(headStart, 64)
+      *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
+      *    abi_encode_t_uint256_to_t_uint256_fromStack(value1,  add(headStart, 32))
+      * }
+      * }}}
+      *
+      * @param n the number of returns
+      * @return the function definition for output
+      */
+    def write_abi_encode(n: Int): FunctionDefinition = {
+        val var_indices: Seq[Int] = Seq.tabulate(n)(i => i)
+        val encode_lines: Seq[YulStatement] = var_indices.map(i =>
+            ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
+                Identifier("value" + i.toString),
+                apply("add", Identifier("headStart"), intlit((n - 1) * 32)))))
+
+        val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
+        FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
+            TypedName("headStart", IntType()) +: var_indices.map(i => TypedName("value" + i.toString, IntType())),
+            Seq(TypedName("tail", IntType())), Block(bod))
+    }
 }
