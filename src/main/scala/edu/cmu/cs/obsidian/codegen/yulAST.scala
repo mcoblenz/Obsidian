@@ -155,9 +155,13 @@ case class If(condition: Expression, body: Block) extends YulStatement {
 
 case class Switch(expression: Expression, cases: Seq[Case]) extends YulStatement {
     override def toString: String = {
-        s"switch ${expression.toString}" + "\n" +
-            (if (cases.isEmpty) brace("") else cases.map(c => c.toString).mkString("\n")) +
-            "\n"
+        if (cases.nonEmpty){
+            s"switch ${expression.toString}" + "\n" +
+                cases.map(c => c.toString).mkString("\n") +
+                "\n"
+        } else {
+            ""
+        }
     }
 }
 
