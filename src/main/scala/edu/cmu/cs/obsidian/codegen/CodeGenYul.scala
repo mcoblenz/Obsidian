@@ -143,14 +143,6 @@ object CodeGenYul extends CodeGenerator {
 
         var id: Option[Identifier] = None
 
-        // if the transaction appears in main, it keeps its name, otherwise it gets prepended with the name of the contract in which it appears.
-        val name: String =
-            if (inMain) {
-                transaction.name
-            } else {
-                transactionNameMapping(contractName, transaction.name)
-            }
-
         // translate the return type to the ABI names
         val ret: Seq[TypedName] = {
             transaction.retType match {
@@ -161,13 +153,14 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        val args: Seq[TypedName] = transaction.args.map(v => TypedName(v.varName, v.typIn))
-
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
 
         // return the function definition formed from the above parts
-        FunctionDefinition(name, args, ret, Block(body))
+        FunctionDefinition(name = if (inMain) { transaction.name } else { transactionNameMapping(contractName, transaction.name) },
+            parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
+            ret,
+            body = Block(body))
     }
 
     /**
