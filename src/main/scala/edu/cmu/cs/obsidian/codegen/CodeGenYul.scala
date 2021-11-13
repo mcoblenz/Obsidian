@@ -1,7 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.StringType
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -77,11 +76,12 @@ object CodeGenYul extends CodeGenerator {
                 case None => throw new RuntimeException("No main contract found")
             }
 
+        // todo document this
         def translateNonMains(c : Contract): Seq[YulStatement] = {
             c match {
-                case obsContract: ObsidianContractImpl =>
+                case _: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
-                        translateNonMainContract(obsContract, checkedTable)
+                        c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
                     } else {
                         // skip the main and the self contracts
                         Seq()
@@ -91,49 +91,20 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        // todo maybe inline this below with a .get? this really should never happen
         val sizeOfMain: Int = checkedTable.contract(mainContract.name) match {
             case Some(ct) => Util.sizeOfContract(ct)
-            case None => assert(false, "no main contract in the symbol table"); -1
+            case None => assert(assertion = false, "no main contract in the symbol table"); -1
         }
 
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
-            data = Seq(), // NB we currently ignore data so this is empty
-            mainContractTransactions = translateMainContract(mainContract, checkedTable),
+            data = Seq(), // nb: we currently ignore data so this is empty
+            mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfMain,
             otherTransactions = program.contracts.flatMap(translateNonMains)
             )
     }
-
-    // TODO update docs // remove these two when it works
-    /**
-      * given a contract, produce the Yul object that contains its translation as the main object. this will not
-      * rename any of the transactions for this object, but will call transactions from other objects with the
-      * names that they will have in the flattened translation. e.g. `f()` remains `f()` but `ic.f()` becomes
-      * `IntContainer___f(this)` if ic is an IntContainer.
-      *
-      * @param contract     the contract to be translated
-      * @param checkedTable the symbol table for that contract
-      * @return the yul
-      */
-    def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): Seq[YulStatement] = {
-        contract.declarations.flatMap(d => translateDeclaration(d, contract.name, checkedTable, inMain = true))
-    }
-
-    // TODO update docs
-    /**
-      * given a contract that is not the main one, produce a yul object that represents the part of its translation that's
-      * ready to be inserted into the translation of a main yul object. this will rename the transactions according to the
-      * contract name.
-      *
-      * @param c            the contract to be translated
-      * @param checkedTable the symbol table of the contract
-      * @return the YulObject representing the translation. note that all the fields other than `code` will be the empty sequence.
-      */
-    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable): Seq[YulStatement] = {
-        c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
-    }
-
 
     /**
       * compute the translation of a declaration into yul with respect to its context in the larger
@@ -168,6 +139,8 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[FunctionDefinition] = {
+        // todo: maybe add the this argument here after all? think through this again. it just can't get added twice is the thing
+
         var id: Option[Identifier] = None
 
         // if the transaction appears in main, it keeps its name, otherwise it gets prepended with the name of the contract in which it appears.

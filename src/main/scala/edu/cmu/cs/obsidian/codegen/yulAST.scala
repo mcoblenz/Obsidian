@@ -208,6 +208,7 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
+// todo document this class now
 case class YulObject(contractName : String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
@@ -297,10 +298,7 @@ case class YulObject(contractName : String,
             )
         }
 
-        // todo: this seems like a weird place for the this argument to finally get added, but maybe it's right?
-        //    at least for the transactions from the main contract we need to know their signatures without it so
-        //    that we can put the right thing in the dispatch table
-        def transactions(): YulStatement = Block((mainContractTransactions ++ otherTransactions).map(t => addThisArgument(t.asInstanceOf[FunctionDefinition])))
+        // todo: there are some instanceOf things here that always work but i am not in love with them. talk to MC about it
 
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
@@ -318,10 +316,9 @@ case class YulObject(contractName : String,
                                                         .map(write_abi_encode)
                                                         .toSeq)
 
-        class Func(val code: String) {}
-
-        class Case(val hash: String) {}
-
-        class Call(val call: String) {}
+        // todo: this seems like a weird place for the this argument to finally get added, but maybe it's right?
+        //    at least for the transactions from the main contract we need to know their signatures without it so
+        //    that we can put the right thing in the dispatch table
+        def transactions(): YulStatement = Block((mainContractTransactions ++ otherTransactions).map(t => addThisArgument(t.asInstanceOf[FunctionDefinition])))
     }
 }
