@@ -77,7 +77,7 @@ object CodeGenYul extends CodeGenerator {
             }
 
         // todo document this
-        def translateNonMains(c : Contract): Seq[YulStatement] = {
+        def translateNonMains(c: Contract): Seq[YulStatement] = {
             c match {
                 case _: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
@@ -103,7 +103,7 @@ object CodeGenYul extends CodeGenerator {
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfMain,
             otherTransactions = program.contracts.flatMap(translateNonMains)
-            )
+        )
     }
 
     /**
@@ -119,7 +119,7 @@ object CodeGenYul extends CodeGenerator {
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
             case _: Field => Seq() // fields are translated as they are encountered
-            case t: Transaction => translateTransaction(t, contractName, checkedTable, inMain)
+            case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, inMain))
             case _: State =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -138,8 +138,8 @@ object CodeGenYul extends CodeGenerator {
         }
     }
 
-    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[FunctionDefinition] = {
-        // todo: maybe add the this argument here after all? think through this again. it just can't get added twice is the thing
+    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): FunctionDefinition = {
+        // todo: maybe add the this argument here after all? think through this again. the problem is that it can't get added twice and the hashes that appear in the dispatch table have to hide it.
 
         var id: Option[Identifier] = None
 
@@ -167,7 +167,7 @@ object CodeGenYul extends CodeGenerator {
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
 
         // return the function definition formed from the above parts
-        Seq(FunctionDefinition(name, args, ret, Block(body)))
+        FunctionDefinition(name, args, ret, Block(body))
     }
 
     /**
@@ -416,10 +416,10 @@ object CodeGenYul extends CodeGenerator {
                 //  their results, ie "f()" if f returns an int
                 ids.map(id => decl_0exp(id)) ++
                     seqs.flatten ++ (width match {
-                    case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
+                    case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), Identifier("this") +: ids)))
                     case 1 =>
                         val id: Identifier = nextTemp()
-                        Seq(decl_1exp(id, FunctionCall(Identifier(name), ids)), assign1(retvar, id))
+                        Seq(decl_1exp(id, FunctionCall(Identifier(name), Identifier("this") +: ids)), assign1(retvar, id))
                     case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
                 })
 

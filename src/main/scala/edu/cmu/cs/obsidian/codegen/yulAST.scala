@@ -25,25 +25,25 @@ trait YulStatement extends YulAST
 case class TypedName(name: String, typ: ObsidianType) extends YulAST {
     override def toString: String = {
         name
-/*
-ideally we'd want to do something like this:
+        /*
+        ideally we'd want to do something like this:
 
-        s"$name ${
-            if (ntype.isEmpty) {
-                ""
-            } else {
-                s" : $ntype"
-            }
-        }"
+                s"$name ${
+                    if (ntype.isEmpty) {
+                        ""
+                    } else {
+                        s" : $ntype"
+                    }
+                }"
 
-but as of Sept2021, solc does not support that output even though it's in the def, e.g.
+        but as of Sept2021, solc does not support that output even though it's in the def, e.g.
 
-Error: "string" is not a valid type (user defined types are not yet supported).
-   --> /sources/SetGetNoArgsNoConstructNoInit.yul:144:29:
-    |
-144 | function IntContainer___get(this  : string) -> _ret_2 {
-    |                             ^^^^^^^^^^^^^^
-*/
+        Error: "string" is not a valid type (user defined types are not yet supported).
+           --> /sources/SetGetNoArgsNoConstructNoInit.yul:144:29:
+            |
+        144 | function IntContainer___get(this  : string) -> _ret_2 {
+            |                             ^^^^^^^^^^^^^^
+        */
     }
 }
 
@@ -209,11 +209,11 @@ case class HexLiteral(content: String) extends YulAST
 case class StringLiteral(content: String) extends YulAST
 
 // todo document this class now
-case class YulObject(contractName : String,
+case class YulObject(contractName: String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
-                     otherTransactions: Seq[YulStatement]) extends YulAST{
+                     otherTransactions: Seq[YulStatement]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -232,7 +232,7 @@ case class YulObject(contractName : String,
     class YulMustache(obj: YulObject) {
         // the values here are defined, as much as possible, in the same order as the mustache file
         val contractName: String = obj.contractName
-        val deployedName : String = obj.contractName + "_deployed"
+        val deployedName: String = obj.contractName + "_deployed"
 
         val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
         val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
@@ -308,13 +308,13 @@ case class YulObject(contractName : String,
         def dispatchTable(): codegen.Switch =
             codegen.Switch(Identifier("selector"),
                 mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(t.asInstanceOf[FunctionDefinition])),
-                                                                Block(dispatchEntry(addThisArgument(t.asInstanceOf[FunctionDefinition]))))))
+                    Block(dispatchEntry(addThisArgument(t.asInstanceOf[FunctionDefinition]))))))
 
         def abiEncodeTupleFuncs(): YulStatement = Block((mainContractTransactions ++ otherTransactions)
-                                                        .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
-                                                        .toSet
-                                                        .map(write_abi_encode)
-                                                        .toSeq)
+            .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
+            .toSet
+            .map(write_abi_encode)
+            .toSeq)
 
         // todo: this seems like a weird place for the this argument to finally get added, but maybe it's right?
         //    at least for the transactions from the main contract we need to know their signatures without it so
