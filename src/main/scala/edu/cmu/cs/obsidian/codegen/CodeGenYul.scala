@@ -92,17 +92,11 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        // todo maybe inline this below with a .get? this really should never happen
-        val sizeOfMain: Int = checkedTable.contract(mainContract.name) match {
-            case Some(ct) => Util.sizeOfContract(ct)
-            case None => assert(assertion = false, "no main contract in the symbol table"); -1
-        }
-
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
             data = Seq(), // nb: we currently ignore data so this is empty
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
-            mainContractSize = sizeOfMain,
+            mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
             otherTransactions = program.contracts.flatMap(translateNonMains)
         )
     }
@@ -121,6 +115,10 @@ object CodeGenYul extends CodeGenerator {
         declaration match {
             case _: Field => Seq() // fields are translated as they are encountered
             case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, inMain))
+
+            // nb there is a .asInstanceOf in the mustache glue code that only works if this really
+            // returns a sequence of FunctionDeclaration objects. that's OK for now because it's true,
+            // but as the cases below here get filled in that may not be true and we'll have to fix it.
             case _: State =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -140,8 +138,6 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): FunctionDefinition = {
-        // todo: maybe add the this argument here after all? think through this again. the problem is that it can't get added twice and the hashes that appear in the dispatch table have to hide it.
-
         var id: Option[Identifier] = None
 
         // translate the return type to the ABI names
@@ -455,18 +451,11 @@ object CodeGenYul extends CodeGenerator {
                 // todo: currently we ignore the arguments to the constructor
                 assert(args.isEmpty, "contracts that take arguments are not yet supported")
 
-                // compute the amount of space we need to store something of this type, or assert
-                //   if that amount can't be computed.
-                val size: Int = checkedTable.contract(contractType.contractName) match {
-                    case Some(value) => sizeOfContract(value)
-                    case None => assert(assertion = false, s"contract table didn't contain contract name: ${contractType.contractName}"); -1
-                }
-
                 val id_memaddr = nextTemp()
 
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
-                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(size))),
+                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)

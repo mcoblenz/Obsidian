@@ -2,7 +2,7 @@ package edu.cmu.cs.obsidian.codegen
 
 
 import edu.cmu.cs.obsidian.codegen
-import edu.cmu.cs.obsidian.parser.{ContractTable, Field}
+import edu.cmu.cs.obsidian.parser.{ContractTable, Field, SymbolTable}
 import edu.cmu.cs.obsidian.typecheck._
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.util.encoders.Hex
@@ -253,7 +253,7 @@ object Util {
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-            hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(p.typ)))
+        hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(p.typ)))
     }
 
     /**
@@ -302,7 +302,7 @@ object Util {
     }
 
     /**
-      * given a contract type, compute the number of bytes needed to store it in memory in the yul
+      * given a contract table, compute the number of bytes needed to store it in memory in the yul
       * object.
       *
       * @param ct the contract of interest
@@ -310,6 +310,20 @@ object Util {
       */
     def sizeOfContract(ct: ContractTable): Int = {
         fieldsOfContract(ct).map(f => sizeOfObsType(f.typ)).sum
+    }
+
+    /** given the name of a contract and a symbol table, either produce the size that contract uses
+      * when laid out in memory or assert if it's not present in the symbol table.
+      *
+      * @param contractName the contract to find the size of
+      * @param st           the symbol table to look in
+      * @return the size of the contract
+      */
+    def sizeOfContractST(contractName: String, st: SymbolTable): Int = {
+        st.contract(contractName) match {
+            case Some(ct) => Util.sizeOfContract(ct)
+            case None => assert(assertion = false, "symbol table missing a contract"); -1
+        }
     }
 
     /** given a contract table and a field name, compute the number of bytes offset from the
@@ -381,27 +395,32 @@ object Util {
       * the address of that field offset into the contract
       *
       * @param ct the contract table
-      * @param x the field name
+      * @param x  the field name
       * @return the expression computing the offset
       */
     def fieldFromThis(ct: ContractTable, x: String): Expression = {
         apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
     }
 
-    /** given a function, return the function with an added `this` argument
-      * @param f //todo
-      * @return
+    /** given a function definition, return a function definition that is the same but with an extra
+      * first argument named `this`.
+      *
+      * @param f the function definition to transform
+      * @return the transformed definition with an added first argument
       */
-    def addThisArgument(f : FunctionDefinition) : FunctionDefinition = {
+    def addThisArgument(f: FunctionDefinition): FunctionDefinition = {
         // todo: string type is a temporary hack here
         FunctionDefinition(f.name, Seq(TypedName("this", StringType())) ++ f.parameters, f.returnVariables, f.body)
     }
 
-    /** given a function, return the function without the added `this` argument
-      * @param f //todo
-      * @return
+    /** given a function definition where the first argument is a named `this`, return the definition
+      * without that argument but that is otherwise the same
+      *
+      * @param f the function definition to transform
+      * @return the transformed definition without the first argument
+      * @throws RuntimeException if the first argument of the function definition is not `this`
       */
-    def dropThisArgument(f : FunctionDefinition) : FunctionDefinition = {
+    def dropThisArgument(f: FunctionDefinition): FunctionDefinition = {
         f.parameters match {
             case TypedName("this", StringType()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body)
             case _ :: _ => throw new RuntimeException("dropping `this` argument from a sequence of args that doesn't start with `this`")

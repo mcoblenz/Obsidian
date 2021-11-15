@@ -155,7 +155,7 @@ case class If(condition: Expression, body: Block) extends YulStatement {
 
 case class Switch(expression: Expression, cases: Seq[Case]) extends YulStatement {
     override def toString: String = {
-        if (cases.nonEmpty){
+        if (cases.nonEmpty) {
             s"switch ${expression.toString}" + "\n" +
                 cases.map(c => c.toString).mkString("\n") +
                 "\n"
@@ -212,7 +212,15 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-// todo document this class now
+/** This class encapsulates how we write the Yul program resulting from the translation of an obsidian
+  * program out to a string that can be written to a file and compiled to EVM.
+  *
+  * @param contractName             the name of the contract to write to a file
+  * @param data                     the data of the contract -- CURRENTLY IGNORED
+  * @param mainContractTransactions the transactions that came from the main contract in obsidian
+  * @param mainContractSize         the number of bytes that the main contract needs when laid out in memory
+  * @param otherTransactions        the transactions that came from each of the other contracts in obsidian
+  */
 case class YulObject(contractName: String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
@@ -233,6 +241,11 @@ case class YulObject(contractName: String,
             replaceAll("&#13;", "\r")
     }
 
+    /** This class encapulsates the interaction between our representation of a Yul object and
+      * the mustache description given in `object.mustache`, and from there how it's written to a file.
+      *
+      * @param obj the object to present to mustache
+      */
     class YulMustache(obj: YulObject) {
         // the values here are defined, as much as possible, in the same order as the mustache file
         val contractName: String = obj.contractName
@@ -263,7 +276,7 @@ case class YulObject(contractName: String,
         }
 
         /**
-          * compute the sequence of statements for the dispatch table for a function
+          * compute the sequence of statements for the dispatch entry table for a function
           *
           * @param f the function to be added to dispatch
           * @return the sequence to add to dispatch
@@ -302,8 +315,6 @@ case class YulObject(contractName: String,
             )
         }
 
-        // todo: there are some instanceOf things here that always work but i am not in love with them. talk to MC about it
-
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
         // dispatch table from an allocated instance of the main contract at the top of memory. but the
@@ -314,15 +325,13 @@ case class YulObject(contractName: String,
                 mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
                     Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
 
+        // traverse the transactions and compute the abi functions we need to emit.
         def abiEncodeTupleFuncs(): YulStatement = Block((mainContractTransactions ++ otherTransactions)
             .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
             .toSet
             .map(write_abi_encode)
             .toSeq)
 
-        // todo: this seems like a weird place for the this argument to finally get added, but maybe it's right?
-        //    at least for the transactions from the main contract we need to know their signatures without it so
-        //    that we can put the right thing in the dispatch table
         def transactions(): YulStatement = Block(mainContractTransactions ++ otherTransactions)
     }
 }
