@@ -389,12 +389,24 @@ object Util {
     }
 
     /** given a function, return the function with an added `this` argument
-      * @param f
+      * @param f //todo
       * @return
       */
     def addThisArgument(f : FunctionDefinition) : FunctionDefinition = {
         // todo: string type is a temporary hack here
         FunctionDefinition(f.name, Seq(TypedName("this", StringType())) ++ f.parameters, f.returnVariables, f.body)
+    }
+
+    /** given a function, return the function without the added `this` argument
+      * @param f //todo
+      * @return
+      */
+    def dropThisArgument(f : FunctionDefinition) : FunctionDefinition = {
+        f.parameters match {
+            case TypedName("this", StringType()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body)
+            case _ :: _ => throw new RuntimeException("dropping `this` argument from a sequence of args that doesn't start with `this`")
+            case _ => throw new RuntimeException("dropping argument from empty list")
+        }
     }
 
     /**

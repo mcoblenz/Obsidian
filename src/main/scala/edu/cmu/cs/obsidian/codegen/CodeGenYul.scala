@@ -158,11 +158,13 @@ object CodeGenYul extends CodeGenerator {
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
 
-        // return the function definition formed from the above parts
-        FunctionDefinition(name = if (inMain) { transaction.name } else { transactionNameMapping(contractName, transaction.name) },
+        // return the function definition formed from the above parts, with an added special argument called `this` for the address
+        // of the allocated instance on which it should act
+        addThisArgument(
+            FunctionDefinition(name = if (inMain) { transaction.name } else { transactionNameMapping(contractName, transaction.name) },
             parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
             ret,
-            body = Block(body))
+            body = Block(body)))
     }
 
     /**

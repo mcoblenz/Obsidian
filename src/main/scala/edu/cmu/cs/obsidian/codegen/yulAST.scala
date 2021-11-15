@@ -311,8 +311,8 @@ case class YulObject(contractName: String,
         // result from the transaction definitions WITHOUT the `this` argument.
         def dispatchTable(): codegen.Switch =
             codegen.Switch(Identifier("selector"),
-                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(t.asInstanceOf[FunctionDefinition])),
-                    Block(dispatchEntry(addThisArgument(t.asInstanceOf[FunctionDefinition]))))))
+                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
+                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
 
         def abiEncodeTupleFuncs(): YulStatement = Block((mainContractTransactions ++ otherTransactions)
             .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
@@ -323,6 +323,6 @@ case class YulObject(contractName: String,
         // todo: this seems like a weird place for the this argument to finally get added, but maybe it's right?
         //    at least for the transactions from the main contract we need to know their signatures without it so
         //    that we can put the right thing in the dispatch table
-        def transactions(): YulStatement = Block((mainContractTransactions ++ otherTransactions).map(t => addThisArgument(t.asInstanceOf[FunctionDefinition])))
+        def transactions(): YulStatement = Block(mainContractTransactions ++ otherTransactions)
     }
 }
