@@ -153,6 +153,8 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        // todo: i think that i can remove the inMain argument form translateStatement and translateExpression
+
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
 
