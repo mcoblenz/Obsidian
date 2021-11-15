@@ -36,24 +36,22 @@ object CodeGenYul extends CodeGenerator {
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
-        // extract ast and find main contract
-        val ast = checkedTable.ast
-        val mainContractOption = findMainContract(ast)
-        if (mainContractOption.isEmpty) {
+
+        //  throw an exception if there is no main contract
+        if (findMainContract(checkedTable.ast).isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val mainName = findMainContractName(ast)
 
-        // prepare finalOutputPath
+        // figure out where to put the output depending on the compiler options
         val finalOutputPath = options.outputPath match {
             case Some(p) =>
-                Paths.get(p).resolve(mainName)
+                Paths.get(p).resolve(findMainContractName(checkedTable.ast))
             case None =>
-                Paths.get(mainName)
+                Paths.get(findMainContractName(checkedTable.ast))
         }
 
         // translate from obsidian AST to yul AST
-        val translated_obj = translateProgram(ast, checkedTable)
+        val translated_obj = translateProgram(checkedTable.ast, checkedTable)
 
         // generate yul string from yul AST, write to the output file
         val s = translated_obj.yulString()
@@ -77,7 +75,14 @@ object CodeGenYul extends CodeGenerator {
                 case None => throw new RuntimeException("No main contract found")
             }
 
-        // todo document this
+
+        /** given a contract, if it is not the main one and it is not the special contract `Contract`,
+          * translate all the declarations it contains into yul and produce that sequence. if it is
+          * one of the other two, we return nothing at all.
+          *
+          * @param c the contract to translate
+          * @return the sequence of yul statements for each declaration in the contract
+          */
         def translateNonMains(c: Contract): Seq[YulStatement] = {
             c match {
                 case _: ObsidianContractImpl =>
