@@ -1,6 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -315,6 +316,53 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
+    //todo document this; it's a helper to share some code repeated between the two Invocation cases
+    def translateInvocation(name : String,
+                            args: Seq[Expression],
+                            obstype: Option[ObsidianType], //the innards of an invocation
+                            thisID: Identifier, // where to look for `this`, which changes for local or general invocations
+                            retvar: Identifier, contractName: String, checkedTable: SymbolTable, inMain: Boolean // the recursive args for the rest of expansion
+                           ): Seq[YulStatement] ={
+        // look up the name of the function in the table, get its return type, and then compute
+        // how wide of a tuple that return type is. right now that's either 1 (if the
+        // transaction returns) or 0 (because it's void)
+        val width = obstype match {
+            case Some(t) => obsTypeToWidth(t)
+            case None => assert(assertion = false, s"width failed; missing type annotation")
+        }
+
+        // todo: some of this logic may be repeated in the dispatch table
+
+        // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
+        //  which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
+        //  to fix it, i need to refactor this object so that i pass around a vector of temporary variables
+        //  to assign returns to rather than just one (i think). this is OK for now, but technical debt that
+        //  we'll have to address if we ever add tuples to obsidian.
+
+        // for each argument expression, produce a new temp variable and translate it to a
+        // sequence of yul statements ending in an assignment to that variable.
+        val (seqs: Seq[Seq[YulStatement]], ids: Seq[Identifier]) = {
+            args.map(p => {
+                val id: Identifier = nextTemp()
+                (translateExpr(id, p, contractName, checkedTable, inMain), id)
+            }).unzip
+        }
+
+        // the result is the recursive translation and the expression either using the temp
+        // here or not.
+
+        // todo: this does not work with non-void functions that are called without binding
+        //  their results, ie "f()" if f returns an int
+        ids.map(id => decl_0exp(id)) ++
+            seqs.flatten ++ (width match {
+            case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), thisID +: ids)))
+            case 1 =>
+                val id: Identifier = nextTemp()
+                Seq(decl_1exp(id, FunctionCall(Identifier(name), thisID +: ids)), assign1(retvar, id))
+            case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
+        })
+    }
+
     def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -380,47 +428,10 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable, inMain)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable, inMain)
                 }
-            case e@LocalInvocation(name, genericParams, params, args, obstype) =>
-                // look up the name of the function in the table, get its return type, and then compute
-                // how wide of a tuple that return type is. right now that's either 1 (if the
-                // transaction returns) or 0 (because it's void)
-                val width = obstype match {
-                    case Some(t) => obsTypeToWidth(t)
-                    case None => assert(assertion = false, s"width failed on transaction named $name from expression ${e.toString}")
-                }
+            case e@LocalInvocation(name, _, _, args, obstype) =>
+                translateInvocation(name, args, obstype, Identifier("this"), retvar, contractName, checkedTable, inMain)
 
-                // todo: some of this logic may be repeated in the dispatch table
-
-                // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
-                //  which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
-                //  to fix it, i need to refactor this object so that i pass around a vector of temporary variables
-                //  to assign returns to rather than just one (i think). this is OK for now, but technical debt that
-                //  we'll have to address if we ever add tuples to obsidian.
-
-                // for each argument expression, produce a new temp variable and translate it to a
-                // sequence of yul statements ending in an assignment to that variable.
-                val (seqs, ids) = {
-                    args.map(p => {
-                        val id: Identifier = nextTemp()
-                        (translateExpr(id, p, contractName, checkedTable, inMain), id)
-                    }).unzip
-                }
-
-                // the result is the recursive translation and the expression either using the temp
-                // here or not.
-
-                // todo: this does not work with non-void functions that are called without binding
-                //  their results, ie "f()" if f returns an int
-                ids.map(id => decl_0exp(id)) ++
-                    seqs.flatten ++ (width match {
-                    case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), Identifier("this") +: ids)))
-                    case 1 =>
-                        val id: Identifier = nextTemp()
-                        Seq(decl_1exp(id, FunctionCall(Identifier(name), Identifier("this") +: ids)), assign1(retvar, id))
-                    case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
-                })
-
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, obstype) =>
+            case Invocation(recipient, _, _, name, args, _, obstype) =>
                 // we translate invocations by first translating the recipient expression. this
                 // returns a variable containing a memory address for the implicit `this` argument
                 // added to the translation of the transactions into the flat Yul object
@@ -429,15 +440,16 @@ object CodeGenYul extends CodeGenerator {
                 // the recipient. we also form a Parser identifier with this, so that we can translate
                 // the invocation with a tailcall to translateExpr
                 val id_recipient: Identifier = nextTemp()
-                val this_address = edu.cmu.cs.obsidian.parser.ReferenceIdentifier(id_recipient.name, obstype) //todo test this
-
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
-                    translateExpr(retvar, LocalInvocation(transactionNameMapping(getContractName(recipient), name),
-                        genericParams,
-                        params,
-                        this_address +: args, obstype), contractName, checkedTable, inMain) // todo test this, too
+                    // todo: this may be the cause of a bug in the future. this is how non-main functions get their names translated before calling, but i'm not sure that's right at all.
+                    translateInvocation(transactionNameMapping(getContractName(recipient), name),
+                        args,
+                        obstype,
+                        id_recipient,
+                        retvar, contractName, checkedTable, inMain
+                    )
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // todo: currently we ignore the arguments to the constructor
