@@ -3,7 +3,7 @@ package edu.cmu.cs.obsidian.codegen
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
-import edu.cmu.cs.obsidian.typecheck.{IntType, ObsidianType}
+import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
 import java.io.{FileReader, StringWriter}
 
@@ -25,25 +25,25 @@ trait YulStatement extends YulAST
 case class TypedName(name: String, typ: ObsidianType) extends YulAST {
     override def toString: String = {
         name
-/*
-ideally we'd want to do something like this:
+        /*
+        ideally we'd want to do something like this:
 
-        s"$name ${
-            if (ntype.isEmpty) {
-                ""
-            } else {
-                s" : $ntype"
-            }
-        }"
+                s"$name ${
+                    if (ntype.isEmpty) {
+                        ""
+                    } else {
+                        s" : $ntype"
+                    }
+                }"
 
-but as of Sept2021, solc does not support that output even though it's in the def, e.g.
+        but as of Sept2021, solc does not support that output even though it's in the def, e.g.
 
-Error: "string" is not a valid type (user defined types are not yet supported).
-   --> /sources/SetGetNoArgsNoConstructNoInit.yul:144:29:
-    |
-144 | function IntContainer___get(this  : string) -> _ret_2 {
-    |                             ^^^^^^^^^^^^^^
-*/
+        Error: "string" is not a valid type (user defined types are not yet supported).
+           --> /sources/SetGetNoArgsNoConstructNoInit.yul:144:29:
+            |
+        144 | function IntContainer___get(this  : string) -> _ret_2 {
+            |                             ^^^^^^^^^^^^^^
+        */
     }
 }
 
@@ -155,9 +155,13 @@ case class If(condition: Expression, body: Block) extends YulStatement {
 
 case class Switch(expression: Expression, cases: Seq[Case]) extends YulStatement {
     override def toString: String = {
-        s"switch ${expression.toString}" + "\n" +
-            (if (cases.isEmpty) brace("") else cases.map(c => c.toString).mkString("\n")) +
-            "\n"
+        if (cases.nonEmpty) {
+            s"switch ${expression.toString}" + "\n" +
+                cases.map(c => c.toString).mkString("\n") +
+                "\n"
+        } else {
+            ""
+        }
     }
 }
 
@@ -208,11 +212,24 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], childContracts: Seq[YulObject], data: Seq[Data]) extends YulAST {
+/** This class encapsulates how we write the Yul program resulting from the translation of an obsidian
+  * program out to a string that can be written to a file and compiled to EVM.
+  *
+  * @param contractName             the name of the contract to write to a file
+  * @param data                     the data of the contract -- CURRENTLY IGNORED
+  * @param mainContractTransactions the transactions that came from the main contract in obsidian
+  * @param mainContractSize         the number of bytes that the main contract needs when laid out in memory
+  * @param otherTransactions        the transactions that came from each of the other contracts in obsidian
+  */
+case class YulObject(contractName: String,
+                     data: Seq[Data],
+                     mainContractTransactions: Seq[YulStatement],
+                     mainContractSize: Int,
+                     otherTransactions: Seq[YulStatement]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
-        val scope = new ObjScope(this)
+        val scope = new YulMustache(this)
         val raw: String = mustache.execute(new StringWriter(), scope).toString
         // mustache butchers certain characters; this fixes that. there may be other characters that
         // need to be added here
@@ -224,32 +241,31 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
             replaceAll("&#13;", "\r")
     }
 
-    // ObjScope and FuncScope are designed to facilitate mustache templates, with the following rules
-    // - Each val is a tag in the template.
-    // - If you need to fill in a section with non-empty list, define a function (which takes no args)
-    //   named by the section tag, let it return an array of object, the object name does not matter,
-    //   but the it must contain a val named by the tag inside the section tag (the best way to understand
-    //   this is to track down an example)
-    class ObjScope(obj: YulObject) {
-
-        val mainContractName: String = obj.name
-        val creationObject: String = mainContractName
-        val runtimeObjectName: String = mainContractName + "_deployed"
-        var runtimeFunctionArray: Array[Func] = Array[Func]()
-        var deployFunctionArray: Array[Func] = Array[Func]()
-        var dispatch = false
-        var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
-        var deployCall: Array[Call] = Array[Call]()
+    /** This class encapulsates the interaction between our representation of a Yul object and
+      * the mustache description given in `object.mustache`, and from there how it's written to a file.
+      *
+      * @param obj the object to present to mustache
+      */
+    class YulMustache(obj: YulObject) {
+        // the values here are defined, as much as possible, in the same order as the mustache file
+        val contractName: String = obj.contractName
+        val deployedName: String = obj.contractName + "_deployed"
 
         val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
         val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
+
         // the free memory pointer points to 0x80 initially
-
-        var memoryInitRuntime: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
-
-        var memoryInit: Expression = memoryInitRuntime
+        var memoryInit: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
 
         def callValueCheck(): YulStatement = callvaluecheck
+
+        val datasize: Expression = apply("datasize", rawstringlit(deployedName))
+
+        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(deployedName)), datasize)
+
+        def defaultReturn(): Expression = apply("return", intlit(0), datasize)
+
+        val mainSize: Int = mainContractSize
 
         // together, these keep track of and create temporary variables for returns in the dispatch table
         var deRetCnt = 0
@@ -260,7 +276,7 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
         }
 
         /**
-          * compute the sequence of statements for the dispatch table for a function
+          * compute the sequence of statements for the dispatch entry table for a function
           *
           * @param f the function to be added to dispatch
           * @return the sequence to add to dispatch
@@ -299,108 +315,23 @@ case class YulObject(name: String, code: Code, runtimeSubobj: Seq[YulObject], ch
             )
         }
 
-        def deploy(): Array[Call] = deployCall
+        // the dispatch table gets one entry for each transaction in the main contract. the transactions
+        // elaborations are added below, and those have a `this` argument added, which is supplied in the
+        // dispatch table from an allocated instance of the main contract at the top of memory. but the
+        // outside world does not see that, so the hashes in the dispatch array are the ones that
+        // result from the transaction definitions WITHOUT the `this` argument.
+        def dispatchTable(): codegen.Switch =
+            codegen.Switch(Identifier("selector"),
+                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
+                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
 
-        def deployFunctions(): Array[Func] = deployFunctionArray
+        // traverse the transactions and compute the abi functions we need to emit.
+        def abiEncodeTupleFuncs(): YulStatement = Block((mainContractTransactions ++ otherTransactions)
+            .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
+            .toSet
+            .map(write_abi_encode)
+            .toSeq)
 
-        for (s <- obj.code.block.statements) {
-            s match {
-                case f: FunctionDefinition =>
-                    deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
-                case e: ExpressionStatement =>
-                    e.expression match {
-                        case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
-                        case _ =>
-                            assert(assertion = false, "TODO: objscope not implemented for expression statement " + e.toString)
-                            () // TODO unimplemented
-                    }
-                case _ =>
-                    assert(assertion = false, "TODO: objscope not implemented for statement " + s.toString)
-                    () // TODO unimplemented
-            }
-        }
-
-        def runtimeFunctions(): Array[Func] = runtimeFunctionArray
-
-        var abiEncodesNeeded: Set[Int] = Set()
-
-        // process the runtime object; todo this may only ever be a singleton
-        for (sub <- obj.runtimeSubobj) {
-            for (s <- sub.code.block.statements) {
-                s match {
-                    case f: FunctionDefinition =>
-                        dispatch = true
-                        runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                        // generate the dispatch table entry
-                        dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
-                        // note the number of return variables so that we generate the appropriate abi encode functions (without repetitions)
-                        abiEncodesNeeded = abiEncodesNeeded + f.returnVariables.length
-                    case x =>
-                        assert(assertion = false, s"subobject case for ${x.toString} unimplemented")
-                        ()
-                }
-            }
-        }
-
-        // recursively compute the strings for the child contracts
-        def childContracts: String = obj.childContracts.foldRight("") { (o, str) => o.yulString() + str }
-
-        def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
-
-        val datasize: Expression = apply("datasize", rawstringlit(runtimeObjectName))
-
-        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(runtimeObjectName)), datasize)
-
-        def defaultReturn(): Expression = apply("return", intlit(0), datasize)
-
-        /**
-          * compute the abi tuple encode function for a given number of returns. for example, for 0,
-          * 1, and 2 returns:
-          *
-          * {{{
-          * function abi_encode_tuple__to__fromStack(headStart ) -> tail {
-          *    tail := add(headStart, 0)
-          * }
-          * }}}
-          *
-          * {{{
-          * function abi_encode_tuple_t_uint256__to_t_uint256__fromStack(headStart , value0) -> tail {
-          *    tail := add(headStart, 32)
-          *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
-          * }
-          * }}}
-          *
-          * {{{
-          * function abi_encode_tuple_t_uint256_t_uint256__to_t_uint256_t_uint256__fromStack(headStart , value0, value1) -> tail {
-          *    tail := add(headStart, 64)
-          *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
-          *    abi_encode_t_uint256_to_t_uint256_fromStack(value1,  add(headStart, 32))
-          * }
-          * }}}
-          *
-          * @param n the number of returns
-          * @return the function definition for output
-          */
-        def write_abi_encode(n: Int): FunctionDefinition = {
-            val var_indices: Seq[Int] = Seq.tabulate(n)(i => i)
-            val encode_lines: Seq[YulStatement] = var_indices.map(i =>
-                ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
-                    Identifier("value" + i.toString),
-                    apply("add", Identifier("headStart"), intlit((n - 1) * 32)))))
-
-            val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
-            FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
-                TypedName("headStart", IntType()) +: var_indices.map(i => TypedName("value" + i.toString, IntType())),
-                Seq(TypedName("tail", IntType())), Block(bod))
-        }
-
-        def abiEncodeTupleFuncs(): YulStatement = Block(abiEncodesNeeded.map(write_abi_encode).toSeq)
-
-        class Func(val code: String) {}
-
-        class Case(val hash: String) {}
-
-        class Call(val call: String) {}
+        def transactions(): YulStatement = Block(mainContractTransactions ++ otherTransactions)
     }
-
 }
