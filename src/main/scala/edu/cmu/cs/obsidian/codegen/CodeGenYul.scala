@@ -317,12 +317,24 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
-    //todo document this; it's a helper to share some code repeated between the two Invocation cases
+    /** This encapsulates a general pattern of translation shared between both local and general
+      * invocations, as called below in the two relevant cases of translate expression.
+      *
+      * @param name the name of the thing being invoked
+      * @param args the arguments to the invokee
+      * @param obstype the type at the invocation site
+      * @param thisID where to look in memory for the relevant fields
+      * @param retvar the tempory variable to store the return
+      * @param contractName the overall name of the contract being translated
+      * @param checkedTable the checked tabled for the overall contract
+      * @param inMain whether or not this is being elborated in main
+      * @return the sequence of yul statements that are the translation of the invocation so described
+      */
     def translateInvocation(name : String,
                             args: Seq[Expression],
-                            obstype: Option[ObsidianType], //the innards of an invocation
-                            thisID: Identifier, // where to look for `this`, which changes for local or general invocations
-                            retvar: Identifier, contractName: String, checkedTable: SymbolTable, inMain: Boolean // the recursive args for the rest of expansion
+                            obstype: Option[ObsidianType],
+                            thisID: Identifier,
+                            retvar: Identifier, contractName: String, checkedTable: SymbolTable, inMain: Boolean
                            ): Seq[YulStatement] ={
         // look up the name of the function in the table, get its return type, and then compute
         // how wide of a tuple that return type is. right now that's either 1 (if the
