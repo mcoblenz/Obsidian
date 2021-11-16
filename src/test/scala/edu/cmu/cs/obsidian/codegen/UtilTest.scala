@@ -93,4 +93,9 @@ class UtilTest extends JUnitSuite {
     @Test def offsetOfFSetGetTwoInts(): Unit = {
         runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "f", 96)
     }
+
+    @Test def sizeOfIntContainerField(): Unit = {
+        runSizeTest("resources/tests/GanacheTests/SetGetPointer.obs",
+            Map("SetGetPointer" -> 32, "IntContainer" -> 4*32))
+    }
 }

@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.StringType
+import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -12,15 +12,7 @@ import edu.cmu.cs.obsidian.codegen.Util._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
-import scala.collection.immutable.Map
-
 object CodeGenYul extends CodeGenerator {
-
-    var tempTableIdx: Int = 0 // counter indicating the next available slot in the table
-    var stateIdx: Int = -1 // whether or not there is a state
-    var stateEnumMapping: Map[String, Int] = Map() // map from state name to an enum value
-    var stateEnumCounter: Int = 0 // counter indicating the next value to assign since we don't know the total num of states
-
 
     // we generate new temporary variables with a little bit of global state; i am making the
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
@@ -44,128 +36,75 @@ object CodeGenYul extends CodeGenerator {
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
-        // extract ast and find main contract
-        val ast = checkedTable.ast
-        val mainContractOption = findMainContract(ast)
-        if (mainContractOption.isEmpty) {
+
+        //  throw an exception if there is no main contract
+        if (findMainContract(checkedTable.ast).isEmpty) {
             throw new RuntimeException("No main contract found")
         }
-        val mainName = findMainContractName(ast)
 
-        // prepare finalOutputPath
+        // figure out where to put the output depending on the compiler options
         val finalOutputPath = options.outputPath match {
             case Some(p) =>
-                Paths.get(p).resolve(mainName)
+                Paths.get(p).resolve(findMainContractName(checkedTable.ast))
             case None =>
-                Paths.get(mainName)
+                Paths.get(findMainContractName(checkedTable.ast))
         }
 
         // translate from obsidian AST to yul AST
-        val translated_obj = translateProgram(ast, checkedTable)
+        val translated_obj = translateProgram(checkedTable.ast, checkedTable)
 
         // generate yul string from yul AST, write to the output file
         val s = translated_obj.yulString()
         Files.createDirectories(finalOutputPath)
-        val writer = new FileWriter(new File(finalOutputPath.toString, translated_obj.name + ".yul"))
+        val writer = new FileWriter(new File(finalOutputPath.toString, translated_obj.contractName + ".yul"))
         writer.write(s)
         writer.flush()
         true
     }
 
     def translateProgram(program: Program, checkedTable: SymbolTable): YulObject = {
+
         // translate main contract, or fail if none is found or only a java contract is present
-        val mainContractYO: YulObject =
+        val mainContract: ObsidianContractImpl =
             findMainContract(program) match {
                 case Some(p) => p match {
-                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => translateMainContract(c, checkedTable)
+                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => c
                     case JavaFFIContractImpl(_, _, _, _, _) =>
                         throw new RuntimeException("Java contract not supported in yul translation")
                 }
                 case None => throw new RuntimeException("No main contract found")
             }
 
-        // translate other contracts (if any) and add them to the childObjects
-        var childContracts: Seq[YulObject] = Seq()
-        // todo: this collection always contains a contract that looks like
-        //   ObsidianContractImpl(Set(),Contract,List(),Contract,List(),None,true,)
-        //   and i do not know why. it appears because of the code in IdentityAstTransfomer.scala,
-        //   transformProgram, roughly line 20.
-        for (c <- program.contracts) {
+
+        /** given a contract, if it is not the main one and it is not the special contract `Contract`,
+          * translate all the declarations it contains into yul and produce that sequence. if it is
+          * one of the other two, we return nothing at all.
+          *
+          * @param c the contract to translate
+          * @return the sequence of yul statements for each declaration in the contract
+          */
+        def translateNonMains(c: Contract): Seq[YulStatement] = {
             c match {
-                case obsContract: ObsidianContractImpl =>
+                case _: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
-                        childContracts = childContracts :+ translateNonMainContract(obsContract, checkedTable)
+                        c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
+                    } else {
+                        // skip the main and the self contracts
+                        Seq()
                     }
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
-        // todo: we do not process imports
-        YulObject(name = mainContractYO.name,
-            code = mainContractYO.code,
-            runtimeSubobj = mainContractYO.runtimeSubobj ++ childContracts,
-            childContracts = Seq(), // todo maybe delete this field entirely
-            data = mainContractYO.data) // todo this is always empty, we ignore data
-    }
-
-    /**
-      * given a contract, produce the Yul object that contains its translation as the main object. this will not
-      * rename any of the transactions for this object, but will call transactions from other objects with the
-      * names that they will have in the flattened translation. e.g. `f()` remains `f()` but `ic.f()` becomes
-      * `IntContainer___f(this)` if ic is an IntContainer.
-      *
-      * @param contract     the contract to be translated
-      * @param checkedTable the symbol table for that contract
-      * @return the yul
-      */
-    def translateMainContract(contract: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var decls: Seq[YulStatement] = Seq()
-
-        // translate declarations
-        for (d <- contract.declarations) {
-            decls = decls ++ translateDeclaration(d, contract.name, checkedTable, inMain = true)
-        }
-
-        // create runtime object from just the declarations and with the subobject name suffix
-        val runtime_obj = YulObject(name = contract.name + "_deployed",
-            code = Code(Block(decls)),
-            runtimeSubobj = Seq(),
-            childContracts = Seq(),
-            data = Seq())
-
-        YulObject(name = contract.name,
-            code = Code(Block(Seq())),
-            runtimeSubobj = Seq(runtime_obj),
-            childContracts = Seq(),
-            data = Seq())
-    }
-
-    /**
-      * given a contract that is not the main one, produce a yul object that represents the part of its translation that's
-      * ready to be inserted into the translation of a main yul object. this will rename the transactions according to the
-      * contract name.
-      *
-      * @param c            the contract to be translated
-      * @param checkedTable the symbol table of the contract
-      * @return the YulObject representing the translation. note that all the fields other than `code` will be the empty sequence.
-      */
-    def translateNonMainContract(c: ObsidianContractImpl, checkedTable: SymbolTable): YulObject = {
-        var translation: Seq[YulStatement] = Seq()
-
-        for (d <- c.declarations) {
-            val dTranslated = translateDeclaration(d, c.name, checkedTable, inMain = false)
-            translation = translation ++ dTranslated
-        }
-
-        YulObject(name = c.name,
-            code = Code(Block(translation)),
-            runtimeSubobj = Seq(),
-            childContracts = Seq(),
-            data = Seq()
+        // nb: we do not process imports
+        YulObject(contractName = mainContract.name,
+            data = Seq(), // nb: we currently ignore data so this is empty
+            mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
+            mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
+            otherTransactions = program.contracts.flatMap(translateNonMains)
         )
     }
-
 
     /**
       * compute the translation of a declaration into yul with respect to its context in the larger
@@ -174,15 +113,21 @@ object CodeGenYul extends CodeGenerator {
       * @param declaration  the declaration to translate
       * @param contractName the name of the contract in which the declaration appears
       * @param checkedTable the symbol table for the contract in which the declaration appears
-      * @param inMain       whether or not the contract in which the declaration apepars is the main one
+      * @param inMain       whether or not the contract in which the declaration appears is the main one
       * @return the yul statements corresponding to the declaration
       */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         declaration match {
-            case f: Field => translateField(f) // todo
-            case t: Transaction => translateTransaction(t, contractName, checkedTable, inMain)
-            case s: State => translateState(s) // todo
-            case c: ObsidianContractImpl =>
+            case _: Field => Seq() // fields are translated as they are encountered
+            case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, inMain))
+
+            // nb there is a .asInstanceOf in the mustache glue code that only works if this really
+            // returns a sequence of FunctionDeclaration objects. that's OK for now because it's true,
+            // but as the cases below here get filled in that may not be true and we'll have to fix it.
+            case _: State =>
+                assert(assertion = false, "TODO")
+                Seq()
+            case _: ObsidianContractImpl =>
                 assert(assertion = false, "TODO")
                 Seq()
             case _: JavaFFIContractImpl =>
@@ -197,53 +142,8 @@ object CodeGenYul extends CodeGenerator {
         }
     }
 
-    def translateField(f: Field): Seq[YulStatement] = {
-        // Reserve a slot in the storage by assigning a index in the symbol table
-        // since field declaration has not yet be assigned, there is no need to do sstore
-        tempTableIdx += 1
-        Seq() // TODO: do we really mean to always return the empty sequence?
-    }
-
-    def translateState(s: State): Seq[YulStatement] = {
-        if (stateIdx == -1) {
-            stateIdx = tempTableIdx
-            tempTableIdx += 1
-        }
-        // add state name to enum value mapping
-        stateEnumMapping += s.name -> stateEnumCounter
-        stateEnumCounter += 1
-
-        Seq() // TODO: do we really mean to always return the empty sequence?
-    }
-
-    def translateConstructor(constructor: Constructor, contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
-        assert(false) // todo: this is never getting called as far as i know, and i don't really think it should be so i want to know about it if it is
-
-
-        // this is basically dead code; it's never been run in any of the ganache tests because we don't have constructors.
-        val new_name: String = "constructor_" + constructor.name
-        val deployExpr = FunctionCall(
-            Identifier(new_name), // TODO change how to find constructor function name after adding randomized suffix/prefix
-            Seq()) // TODO constructor params not implemented
-
-        Seq(ExpressionStatement(deployExpr),
-            FunctionDefinition(
-                new_name, // TODO rename transaction name (by adding prefix/suffix) iev: this seems to be done already
-                constructor.args.map(v => TypedName(v.varName, v.typIn)),
-                Seq(), //todo/iev: why is this always empty?
-                Block(constructor.body.flatMap((s: Statement) => translateStatement(s, None, contractName, checkedTable, inMain = true))))) //todo iev flatmap may be a bug to hide something wrong; None means that constructors don't return. is that true?
-    }
-
-    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
+    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): FunctionDefinition = {
         var id: Option[Identifier] = None
-
-        // if the transaction appears in main, it keeps its name, otherwise it gets prepended with the name of the contract in which it appears.
-        val name: String =
-            if (inMain) {
-                transaction.name
-            } else {
-                transactionNameMapping(contractName, transaction.name)
-            }
 
         // translate the return type to the ABI names
         val ret: Seq[TypedName] = {
@@ -255,19 +155,18 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        // for transactions appearing in main, nothing changes; others get an explicit "this" argument added
-        val args: Seq[TypedName] =
-            if (inMain) {
-                Seq() // add nothing
-            } else {
-                Seq(TypedName("this", StringType())) // todo "this" is emphatically not a string but i'm not sure what the type of it ought to be; addr?
-            } ++ transaction.args.map(v => TypedName(v.varName, v.typIn))
+        // todo: i think that i can remove the inMain argument form translateStatement and translateExpression
 
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
 
-        // return the function definition formed from the above parts
-        Seq(FunctionDefinition(name, args, ret, Block(body)))
+        // return the function definition formed from the above parts, with an added special argument called `this` for the address
+        // of the allocated instance on which it should act
+        addThisArgument(
+            FunctionDefinition(name = if (inMain) { transaction.name } else { transactionNameMapping(contractName, transaction.name) },
+            parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
+            ret,
+            body = Block(body)))
     }
 
     /**
@@ -418,6 +317,65 @@ object CodeGenYul extends CodeGenerator {
             assign1(retvar, apply("or", apply(s, e1id, e2id), apply("eq", e1id, e2id)))
     }
 
+    /** This encapsulates a general pattern of translation shared between both local and general
+      * invocations, as called below in the two relevant cases of translate expression.
+      *
+      * @param name the name of the thing being invoked
+      * @param args the arguments to the invokee
+      * @param obstype the type at the invocation site
+      * @param thisID where to look in memory for the relevant fields
+      * @param retvar the tempory variable to store the return
+      * @param contractName the overall name of the contract being translated
+      * @param checkedTable the checked tabled for the overall contract
+      * @param inMain whether or not this is being elborated in main
+      * @return the sequence of yul statements that are the translation of the invocation so described
+      */
+    def translateInvocation(name : String,
+                            args: Seq[Expression],
+                            obstype: Option[ObsidianType],
+                            thisID: Identifier,
+                            retvar: Identifier, contractName: String, checkedTable: SymbolTable, inMain: Boolean
+                           ): Seq[YulStatement] ={
+        // look up the name of the function in the table, get its return type, and then compute
+        // how wide of a tuple that return type is. right now that's either 1 (if the
+        // transaction returns) or 0 (because it's void)
+        val width = obstype match {
+            case Some(t) => obsTypeToWidth(t)
+            case None => assert(assertion = false, s"width failed; missing type annotation")
+        }
+
+        // todo: some of this logic may be repeated in the dispatch table
+
+        // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
+        //  which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
+        //  to fix it, i need to refactor this object so that i pass around a vector of temporary variables
+        //  to assign returns to rather than just one (i think). this is OK for now, but technical debt that
+        //  we'll have to address if we ever add tuples to obsidian.
+
+        // for each argument expression, produce a new temp variable and translate it to a
+        // sequence of yul statements ending in an assignment to that variable.
+        val (seqs: Seq[Seq[YulStatement]], ids: Seq[Identifier]) = {
+            args.map(p => {
+                val id: Identifier = nextTemp()
+                (translateExpr(id, p, contractName, checkedTable, inMain), id)
+            }).unzip
+        }
+
+        // the result is the recursive translation and the expression either using the temp
+        // here or not.
+
+        // todo: this does not work with non-void functions that are called without binding
+        //  their results, ie "f()" if f returns an int
+        ids.map(id => decl_0exp(id)) ++
+            seqs.flatten ++ (width match {
+            case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), thisID +: ids)))
+            case 1 =>
+                val id: Identifier = nextTemp()
+                Seq(decl_1exp(id, FunctionCall(Identifier(name), thisID +: ids)), assign1(retvar, id))
+            case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
+        })
+    }
+
     def translateExpr(retvar: Identifier, e: Expression, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
         e match {
             case e: AtomicExpression =>
@@ -483,47 +441,10 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable, inMain)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable, inMain)
                 }
-            case e@LocalInvocation(name, genericParams, params, args, obstype) =>
-                // look up the name of the function in the table, get its return type, and then compute
-                // how wide of a tuple that return type is. right now that's either 1 (if the
-                // transaction returns) or 0 (because it's void)
-                val width = obstype match {
-                    case Some(t) => obsTypeToWidth(t)
-                    case None => assert(assertion = false, s"width failed on transaction named $name from expression ${e.toString}")
-                }
+            case e@LocalInvocation(name, _, _, args, obstype) =>
+                translateInvocation(name, args, obstype, Identifier("this"), retvar, contractName, checkedTable, inMain)
 
-                // todo: some of this logic may be repeated in the dispatch table
-
-                // todo: the code here is set up to mostly work in the world in which obsidian has tuples,
-                //  which it does not. i wrote it before i knew that. the assert below is one place that it breaks;
-                //  to fix it, i need to refactor this object so that i pass around a vector of temporary variables
-                //  to assign returns to rather than just one (i think). this is OK for now, but technical debt that
-                //  we'll have to address if we ever add tuples to obsidian.
-
-                // for each argument expression, produce a new temp variable and translate it to a
-                // sequence of yul statements ending in an assignment to that variable.
-                val (seqs, ids) = {
-                    args.map(p => {
-                        val id: Identifier = nextTemp()
-                        (translateExpr(id, p, contractName, checkedTable, inMain), id)
-                    }).unzip
-                }
-
-                // the result is the recursive translation and the expression either using the temp
-                // here or not.
-
-                // todo: this does not work with non-void functions that are called without binding
-                //  their results, ie "f()" if f returns an int
-                ids.map(id => decl_0exp(id)) ++
-                    seqs.flatten ++ (width match {
-                    case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), ids)))
-                    case 1 =>
-                        val id: Identifier = nextTemp()
-                        Seq(decl_1exp(id, FunctionCall(Identifier(name), ids)), assign1(retvar, id))
-                    case _ => assert(assertion = false, "obsidian currently does not support tuples; this shouldn't happen."); Seq()
-                })
-
-            case Invocation(recipient, genericParams, params, name, args, isFFIInvocation, obstype) =>
+            case Invocation(recipient, _, _, name, args, _, obstype) =>
                 // we translate invocations by first translating the recipient expression. this
                 // returns a variable containing a memory address for the implicit `this` argument
                 // added to the translation of the transactions into the flat Yul object
@@ -532,32 +453,26 @@ object CodeGenYul extends CodeGenerator {
                 // the recipient. we also form a Parser identifier with this, so that we can translate
                 // the invocation with a tailcall to translateExpr
                 val id_recipient: Identifier = nextTemp()
-                val this_address = edu.cmu.cs.obsidian.parser.ReferenceIdentifier(id_recipient.name, obstype) //todo test this
-
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
-                    translateExpr(retvar, LocalInvocation(transactionNameMapping(getContractName(recipient), name),
-                        genericParams,
-                        params,
-                        this_address +: args, obstype), contractName, checkedTable, inMain) // todo test this, too
+                    // todo: this may be the cause of a bug in the future. this is how non-main functions get their names translated before calling, but i'm not sure that's right at all.
+                    translateInvocation(transactionNameMapping(getContractName(recipient), name),
+                        args,
+                        obstype,
+                        id_recipient,
+                        retvar, contractName, checkedTable, inMain
+                    )
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // todo: currently we ignore the arguments to the constructor
                 assert(args.isEmpty, "contracts that take arguments are not yet supported")
 
-                // compute the amount of space we need to store something of this type, or assert
-                //   if that amount can't be computed.
-                val size: Int = checkedTable.contract(contractType.contractName) match {
-                    case Some(value) => sizeOfContract(value)
-                    case None => assert(assertion = false, s"contract table didn't contain contract name: ${contractType.contractName}"); -1
-                }
-
                 val id_memaddr = nextTemp()
 
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
-                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(size))),
+                    decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)

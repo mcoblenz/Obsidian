@@ -39,15 +39,8 @@ then
     exit 1
 fi
 
-echo "Yul that produced the binary:"
-TOP=$(echo "$output" | grep -n "Pretty printed source:" | cut -f1 -d:)
-BOT=$(echo "$output" | grep -n "Binary representation:" | cut -f1 -d:)
-TOP=$((TOP+1)) # drop the line with the name
-BOT=$((BOT-2)) # drop the empty line after the binary
-echo -ne "$output" | sed -n $TOP','$BOT'p' | bat -l javascript --style=plain -P
-
 TOP=$(echo "$output" | grep -n "Binary representation" | cut -f1 -d:)
-BOT=$(echo "$output" | grep -n "Text representation" | cut -f1 -d:)
+BOT=$(echo "$output" | wc -l | awk '{print $1}' )
 TOP=$((TOP+1)) # drop the line with the name
 BOT=$((BOT-1)) # drop the empty line after the binary
 EVM_BIN=$(echo "$output" | sed -n $TOP','$BOT'p' )

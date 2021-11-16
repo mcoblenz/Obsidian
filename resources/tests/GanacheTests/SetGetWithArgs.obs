@@ -9,7 +9,7 @@ contract IntContainer{
     }
 }
 
-main contract SetGet{
+main contract SetGetWithArgs{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
         ic.set(5);

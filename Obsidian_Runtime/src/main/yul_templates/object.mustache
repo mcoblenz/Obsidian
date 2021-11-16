@@ -5,42 +5,28 @@ ethereum/solidity/libsolidity/codegen/ir/IRGenerator.cpp
 Consulting example yul code is also helpful in understanding the template.
 https://solidity.readthedocs.io/en/latest/yul.html#specification-of-yul-object
 }}
-object "{{creationObject}}" {
+object "{{contractName}}" {
     code {
         {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
         {{memoryInit}}
         {{! protection against sending Ether }}
         {{callValueCheck}}
-        {{! not impletmented by the current stage, cited from IRGenerator.cpp (link in file comment above) }}
-        {{#notLibrary}}
-            {{#constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
-            {{implicitConstructor}}({{constructorParams}})
-        {{/notLibrary}}
-        {{! todo: write and call constructor }}
-        {{#deploy}}
-            {{call}}
-        {{/deploy}}
-        {{! functions related to constructor }}
-        {{#deployFunctions}}
-            {{code}}
-        {{/deployFunctions}}
         {{codeCopy}}
         {{defaultReturn}}
     }
-    object "{{runtimeObjectName}}" {
+    object "{{deployedName}}" {
         code {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
-            {{memoryInitRuntime}}
+            {{memoryInit}}
+
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
 
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
             if iszero(lt(calldatasize(), 4)) {
-                {{#dispatch}}
-                    {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
-                    let this := address()
-                    let selector := shr(224, calldataload(0))
-                    {{dispatchCase}}
-                {{/dispatch}}
+                {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
+                let this := allocate_memory({{mainSize}})
+                let selector := shr(224, calldataload(0))
+                {{dispatchTable}}
             }
             if iszero(calldatasize()) {  }
             revert(0, 0)
@@ -101,11 +87,7 @@ object "{{creationObject}}" {
                 cleaned := value
             }
 
-            {{#runtimeFunctions}}
-                {{code}}
-            {{/runtimeFunctions}}
+            {{transactions}}
         }
-
-        {{childContracts}}
     }
 }
