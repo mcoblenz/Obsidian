@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
+import edu.cmu.cs.obsidian.typecheck.{NonPrimitiveType, ObsidianType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -133,9 +133,30 @@ object CodeGenYul extends CodeGenerator {
             case _: JavaFFIContractImpl =>
                 assert(assertion = false, "Java contracts not supported in Yul translation")
                 Seq()
-            case _: Constructor =>
-                assert(assertion = false, "constructors not supported in Yul translation")
-                Seq()
+            case c: Constructor =>
+                // given an obsidian type, pull out the nonprimitive type or raise an exception
+                def nonprim(t: ObsidianType): NonPrimitiveType = {
+                    t match {
+                        case npt: NonPrimitiveType => npt
+                        case _ => throw new RuntimeException("needed a non-primitive type")
+                    }
+                }
+
+                //to support multiple constructors, constructors get the hash of their argument type sequence
+                // appended to their name
+                Seq(translateTransaction(
+                    Transaction(name = c.name + hashOfFunctionName(c.name, c.args.map(v => v.typIn.toString)), // : String,
+                        params = Seq(), // : Seq[GenericType], // todo this is likely wrong
+                        args = c.args, // : Seq[VariableDeclWithSpec],
+                        retType = c.retType, //: Option[ObsidianType],
+                        ensures = Seq(), // : Seq[Ensures], // todo this could be wrong
+                        body = c.body, // : Seq[Statement],
+                        isStatic = false, //: Boolean,
+                        isPrivate = false, //: Boolean,
+                        thisType = nonprim(c.thisType), // : NonPrimitiveType,
+                        thisFinalType = nonprim(c.thisFinalType) //: NonPrimitiveType,
+                    ),
+                    contractName, checkedTable, inMain))
             case _: TypeDecl =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -163,10 +184,14 @@ object CodeGenYul extends CodeGenerator {
         // return the function definition formed from the above parts, with an added special argument called `this` for the address
         // of the allocated instance on which it should act
         addThisArgument(
-            FunctionDefinition(name = if (inMain) { transaction.name } else { transactionNameMapping(contractName, transaction.name) },
-            parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
-            ret,
-            body = Block(body)))
+            FunctionDefinition(name = if (inMain) {
+                transaction.name
+            } else {
+                transactionNameMapping(contractName, transaction.name)
+            },
+                parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
+                ret,
+                body = Block(body)))
     }
 
     /**
@@ -320,22 +345,22 @@ object CodeGenYul extends CodeGenerator {
     /** This encapsulates a general pattern of translation shared between both local and general
       * invocations, as called below in the two relevant cases of translate expression.
       *
-      * @param name the name of the thing being invoked
-      * @param args the arguments to the invokee
-      * @param obstype the type at the invocation site
-      * @param thisID where to look in memory for the relevant fields
-      * @param retvar the tempory variable to store the return
+      * @param name         the name of the thing being invoked
+      * @param args         the arguments to the invokee
+      * @param obstype      the type at the invocation site
+      * @param thisID       where to look in memory for the relevant fields
+      * @param retvar       the tempory variable to store the return
       * @param contractName the overall name of the contract being translated
       * @param checkedTable the checked tabled for the overall contract
-      * @param inMain whether or not this is being elborated in main
+      * @param inMain       whether or not this is being elborated in main
       * @return the sequence of yul statements that are the translation of the invocation so described
       */
-    def translateInvocation(name : String,
+    def translateInvocation(name: String,
                             args: Seq[Expression],
                             obstype: Option[ObsidianType],
                             thisID: Identifier,
                             retvar: Identifier, contractName: String, checkedTable: SymbolTable, inMain: Boolean
-                           ): Seq[YulStatement] ={
+                           ): Seq[YulStatement] = {
         // look up the name of the function in the table, get its return type, and then compute
         // how wide of a tuple that return type is. right now that's either 1 (if the
         // transaction returns) or 0 (because it's void)
@@ -465,18 +490,20 @@ object CodeGenYul extends CodeGenerator {
                     )
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
-                // todo: currently we ignore the arguments to the constructor
-                assert(args.isEmpty, "contracts that take arguments are not yet supported")
-
                 val id_memaddr = nextTemp()
-
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
-                    assign1(retvar, id_memaddr)
-                )
+                    assign1(retvar, id_memaddr)) ++
+                    // translate the arguments and invoke the constructor as normal, with the hash appended to the name to call the right one
+                    translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, args.map(e => e.obstype.get.toString)),
+                        args = args,
+                        obstype = obstype,
+                        thisID = id_memaddr,
+                        retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
+
             case StateInitializer(stateName, fieldName, obstype) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()
