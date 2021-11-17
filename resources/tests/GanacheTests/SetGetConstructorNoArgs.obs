@@ -1,12 +1,12 @@
 contract IntContainer{
     int x;
 
-    IntContainer() {
+    IntContainer@Owned() {
         x = 0;
     }
 
-    transaction set() { // take no parameters
-        x = 5;
+    transaction set(int value) {
+        x = value;
     }
     transaction get() returns int{
         return x;
@@ -16,7 +16,7 @@ contract IntContainer{
 main contract SetGetNoArgs{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
-        ic.set();
+        ic.set(12);
         return (ic.get());
     }
 }
