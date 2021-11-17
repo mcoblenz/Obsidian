@@ -16,7 +16,6 @@ contract IntContainer{
 main contract SetGetConstructorNoArgs{
     transaction main() returns int{
         IntContainer ic = new IntContainer();
-        ic.set(12);
         return (ic.get());
     }
 }
