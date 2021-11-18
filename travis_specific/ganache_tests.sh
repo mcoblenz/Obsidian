@@ -127,7 +127,8 @@ do
 
   # start up ganache
   echo "starting ganache-cli"
-  ganache-cli --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
+  #ganache-cli --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null & # debug
+  ganache-cli --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH"  &
 
   # form the JSON object to ask for the list of accounts
   ACCT_DATA=$( jq -ncM \
@@ -138,6 +139,8 @@ do
                   '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
            )
 
+  echo $ACCT_DATA # debug
+
   # ganache-cli takes a little while to start up, and the first thing that we
   # need from it is the list of accounts. so we poll on the account endpoint
   # until we get a good result to avoid using sleep or something less precise.
@@ -146,7 +149,10 @@ do
   ACCTS=""
   until [ "$KEEPGOING" -eq 0 ] ;
   do
-      ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545)
+      # ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545) # debug
+      echo "top of loop"
+      ACCTS=$(curl -X POST --data "$ACCT_DATA" http://localhost:8545)
+      echo $ACCTS
       KEEPGOING=$?
       sleep 1
   done
