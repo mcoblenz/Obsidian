@@ -35,5 +35,4 @@ before_cache:
   - find $HOME/.sbt        -name "*.lock"               -print -delete
 
 addons:
-  hosts:
-    - localhost
+  hostname: localhost

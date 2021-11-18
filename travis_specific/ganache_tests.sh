@@ -62,6 +62,9 @@ then
         exit 1
 fi
 
+
+ganache_host="http://localhost:8545"
+
 for test in "${tests[@]}"
 do
   echo "---------------------------------------------------------------"
@@ -150,7 +153,7 @@ do
   do
       # ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545) # debug
       echo "top of loop"
-      ACCTS=$(curl -X POST --data "$ACCT_DATA" http://localhost:8545)
+      ACCTS=$(curl -X POST --data "$ACCT_DATA" "$ganache_host")
       echo $ACCTS
       KEEPGOING=$?
       sleep 1
@@ -187,7 +190,7 @@ do
   echo "$SEND_DATA" | jq
   echo
 
-  RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+  RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
   echo "response from ganache is: " #$RESP
   echo "$RESP" | jq
 
@@ -229,7 +232,7 @@ do
     echo "$SEND_DATA" | jq
     echo
 
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
     echo "response from ganache is: "
     echo "$RESP" | jq
 
@@ -309,7 +312,7 @@ do
     echo "$SEND_DATA" | jq
     echo
 
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
     echo "response from ganache is: "
     echo "$RESP" | jq
 
