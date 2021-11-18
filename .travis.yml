@@ -3,12 +3,11 @@ language: scala
 scala:
     - 2.13.5
 
-langauge: node_js
-node_js:
-     - 17
-
 jdk:
   - oraclejdk12 # as of 10 june 2021, up to jdk12 works but 13+ fail
+
+before_install:
+  - nvm install 17
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle
