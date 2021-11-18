@@ -19,6 +19,15 @@ then
     exit 1
 fi
 
+
+# print version info
+echo "-----------------------------"
+echo "VERSIONS:"
+echo "npm " $(npm --version)
+echo "node " $(node --version)
+echo "ganache " $(ganache-cli --version)
+echo "-----------------------------"
+
 # either test only the directories named as arguments or test everything if nothing is specified.
 # since the travis.yml file doesn't give any argument here, CI will test everything, but this makes
 # local testing easier.

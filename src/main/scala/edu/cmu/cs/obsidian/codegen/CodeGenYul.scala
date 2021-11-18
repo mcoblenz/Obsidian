@@ -522,7 +522,7 @@ object CodeGenYul extends CodeGenerator {
 
                     // return the address that the space starts at
                     assign1(retvar, id_memaddr)) ++ conCall
-                
+
 
             case StateInitializer(stateName, fieldName, obstype) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
