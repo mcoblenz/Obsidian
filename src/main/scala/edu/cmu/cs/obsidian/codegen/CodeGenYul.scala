@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.{NonPrimitiveType, ObsidianType}
+import edu.cmu.cs.obsidian.typecheck.{NonPrimitiveType, ObsidianType, UnitType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -134,7 +134,7 @@ object CodeGenYul extends CodeGenerator {
                 assert(assertion = false, "Java contracts not supported in Yul translation")
                 Seq()
             case c: Constructor =>
-                // given an obsidian type, pull out the nonprimitive type or raise an exception
+                // given an obsidian type, pull out the non-primitive type or raise an exception
                 def nonprim(t: ObsidianType): NonPrimitiveType = {
                     t match {
                         case npt: NonPrimitiveType => npt
@@ -500,7 +500,7 @@ object CodeGenYul extends CodeGenerator {
                     // translate the arguments and invoke the constructor as normal, with the hash appended to the name to call the right one
                     translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, args.map(e => e.obstype.get.toString)),
                         args = args,
-                        obstype = obstype,
+                        obstype = Some(UnitType()),
                         thisID = id_memaddr,
                         retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
 
