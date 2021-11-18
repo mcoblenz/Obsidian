@@ -62,7 +62,6 @@ then
         exit 1
 fi
 
-
 ganache_host="http://localhost:8545"
 
 for test in "${tests[@]}"
@@ -154,8 +153,8 @@ do
       # ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545) # debug
       echo "top of loop"
       ACCTS=$(curl -X POST --data "$ACCT_DATA" "$ganache_host")
-      echo $ACCTS
       KEEPGOING=$?
+      echo "$ACCTS"
       sleep 1
   done
   echo
