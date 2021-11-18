@@ -3,6 +3,7 @@ language: scala
 scala:
     - 2.13.5
 
+langauge: node_js
 node_js:
      - 17
 
