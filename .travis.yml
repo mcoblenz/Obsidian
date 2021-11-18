@@ -4,7 +4,7 @@ scala:
     - 2.13.5
 
 node_js:
-     - 15.11.0
+     - 17
 
 jdk:
   - oraclejdk12 # as of 10 june 2021, up to jdk12 works but 13+ fail
