@@ -490,19 +490,39 @@ object CodeGenYul extends CodeGenerator {
                     )
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
+                // grab an identifier to store memory
                 val id_memaddr = nextTemp()
+
+                // store the names of the types of the arguments
+                val typeNames = args.map(e => e.obstype.get.toString)
+
+                // given a declaration, test if it's a constructor with type arguments that match the usage here
+                def isMatchingConstructor(d: Declaration): Boolean =
+                    d match {
+                        case c: Constructor => typeNames == c.args.map(v => v.typIn.toString)
+                        case _ => false
+                    }
+
+                // check to to see if there is a constructor to call, and if so translate the
+                // arguments and invoke the constructor as normal transaction with the hash appended
+                // to the name to call the right one
+                val conCall = if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
+                    translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
+                        args = args,
+                        obstype = Some(UnitType()),
+                        thisID = id_memaddr,
+                        retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
+                } else {
+                    Seq()
+                }
+
                 Seq(
                     // grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
-                    assign1(retvar, id_memaddr)) ++
-                    // translate the arguments and invoke the constructor as normal, with the hash appended to the name to call the right one
-                    translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, args.map(e => e.obstype.get.toString)),
-                        args = args,
-                        obstype = Some(UnitType()),
-                        thisID = id_memaddr,
-                        retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
+                    assign1(retvar, id_memaddr)) ++ conCall
+                
 
             case StateInitializer(stateName, fieldName, obstype) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
