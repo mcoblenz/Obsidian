@@ -129,7 +129,7 @@ do
 
   # start up ganache
   echo "starting ganache-cli"
-  ganache-cli --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
+  ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
 
   # form the JSON object to ask for the list of accounts
   ACCT_DATA=$( jq -ncM \
