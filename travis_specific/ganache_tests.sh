@@ -23,9 +23,9 @@ fi
 # print version info
 echo "-----------------------------"
 echo "VERSIONS:"
-echo "npm " $(npm --version)
-echo "node " $(node --version)
-echo "ganache " $(ganache-cli --version)
+echo "npm     " "$(npm --version)"
+echo "node    " "$(node --version)"
+echo "ganache " "$(ganache-cli --version)"
 echo "-----------------------------"
 
 # either test only the directories named as arguments or test everything if nothing is specified.
@@ -52,7 +52,7 @@ fi
 failed=()
 
 # build a jar of Obsidian but removing all the tests; that happens in the other Travis matrix job, so we can assume it works here.
-sbt 'set assembly / test := {}' ++$TRAVIS_SCALA_VERSION assembly
+sbt 'set assembly / test := {}' ++"$TRAVIS_SCALA_VERSION" assembly
 
 # check that the jar file for obsidian exists; `sbt assembly` ought to have been run before this script gets run
 obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
@@ -96,7 +96,7 @@ do
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
-  if ! $(java -jar $obsidian_jar --yul "resources/tests/GanacheTests/$NAME.obs")
+  if ! $(java -jar "$obsidian_jar" --yul "resources/tests/GanacheTests/$NAME.obs")
   then
       echo "$NAME test failed: cannot compile obs to yul"
       failed+=("$test [compile obs to yul]")
@@ -140,7 +140,7 @@ do
                   '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
            )
 
-  echo $ACCT_DATA # debug
+  echo "account data is $ACCT_DATA" # debug
 
   # ganache-cli takes a little while to start up, and the first thing that we
   # need from it is the list of accounts. so we poll on the account endpoint
