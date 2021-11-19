@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
+import edu.cmu.cs.obsidian.typecheck.{NonPrimitiveType, ObsidianType, UnitType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -117,13 +117,13 @@ object CodeGenYul extends CodeGenerator {
       * @return the yul statements corresponding to the declaration
       */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
+        // nb there is a .asInstanceOf in the mustache glue code that only works if this really
+        // returns a sequence of FunctionDeclaration objects. that's OK for now because it's true,
+        // but as the cases below here get filled in that may not be true and we'll have to fix it.
+
         declaration match {
             case _: Field => Seq() // fields are translated as they are encountered
             case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, inMain))
-
-            // nb there is a .asInstanceOf in the mustache glue code that only works if this really
-            // returns a sequence of FunctionDeclaration objects. that's OK for now because it's true,
-            // but as the cases below here get filled in that may not be true and we'll have to fix it.
             case _: State =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -133,9 +133,35 @@ object CodeGenYul extends CodeGenerator {
             case _: JavaFFIContractImpl =>
                 assert(assertion = false, "Java contracts not supported in Yul translation")
                 Seq()
-            case _: Constructor =>
-                assert(assertion = false, "constructors not supported in Yul translation")
-                Seq()
+            case c: Constructor =>
+                // given an obsidian type, pull out the non-primitive type or raise an exception
+                def nonprim(t: ObsidianType): NonPrimitiveType = {
+                    t match {
+                        case npt: NonPrimitiveType => npt
+                        case _ => throw new RuntimeException("needed a non-primitive type")
+                    }
+                }
+
+                // constructors turn into transactions with a special name and the same body
+                Seq(translateTransaction(
+                    Transaction(
+                        //to support multiple constructors, constructors get the hash of their
+                        // argument types added to their name
+                        name = c.name + hashOfFunctionName(c.name, c.args.map(v => v.typIn.toString)),
+                        // we omit generic type information because we don't have it and would need
+                        // to reconstruct it, and we don't use it to translate to yul anyway
+                        params = Seq(),
+                        args = c.args,
+                        retType = c.retType,
+                        // we omit any ensures because that feature is largely deprecated
+                        ensures = Seq(),
+                        body = c.body,
+                        isStatic = false,
+                        isPrivate = false,
+                        thisType = nonprim(c.thisType),
+                        thisFinalType = nonprim(c.thisFinalType)
+                    ),
+                    contractName, checkedTable, inMain))
             case _: TypeDecl =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -163,10 +189,14 @@ object CodeGenYul extends CodeGenerator {
         // return the function definition formed from the above parts, with an added special argument called `this` for the address
         // of the allocated instance on which it should act
         addThisArgument(
-            FunctionDefinition(name = if (inMain) { transaction.name } else { transactionNameMapping(contractName, transaction.name) },
-            parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
-            ret,
-            body = Block(body)))
+            FunctionDefinition(name = if (inMain) {
+                transaction.name
+            } else {
+                transactionNameMapping(contractName, transaction.name)
+            },
+                parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
+                ret,
+                body = Block(body)))
     }
 
     /**
@@ -320,22 +350,22 @@ object CodeGenYul extends CodeGenerator {
     /** This encapsulates a general pattern of translation shared between both local and general
       * invocations, as called below in the two relevant cases of translate expression.
       *
-      * @param name the name of the thing being invoked
-      * @param args the arguments to the invokee
-      * @param obstype the type at the invocation site
-      * @param thisID where to look in memory for the relevant fields
-      * @param retvar the tempory variable to store the return
+      * @param name         the name of the thing being invoked
+      * @param args         the arguments to the invokee
+      * @param obstype      the type at the invocation site
+      * @param thisID       where to look in memory for the relevant fields
+      * @param retvar       the tempory variable to store the return
       * @param contractName the overall name of the contract being translated
       * @param checkedTable the checked tabled for the overall contract
-      * @param inMain whether or not this is being elborated in main
+      * @param inMain       whether or not this is being elborated in main
       * @return the sequence of yul statements that are the translation of the invocation so described
       */
-    def translateInvocation(name : String,
+    def translateInvocation(name: String,
                             args: Seq[Expression],
                             obstype: Option[ObsidianType],
                             thisID: Identifier,
                             retvar: Identifier, contractName: String, checkedTable: SymbolTable, inMain: Boolean
-                           ): Seq[YulStatement] ={
+                           ): Seq[YulStatement] = {
         // look up the name of the function in the table, get its return type, and then compute
         // how wide of a tuple that return type is. right now that's either 1 (if the
         // transaction returns) or 0 (because it's void)
@@ -456,27 +486,50 @@ object CodeGenYul extends CodeGenerator {
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
-                    // todo: this may be the cause of a bug in the future. this is how non-main functions get their names translated before calling, but i'm not sure that's right at all.
+                    // todo: this may be the cause of a bug in the future. this is how non-main
+                    //  functions get their names translated before calling, but that might not
+                    //  work with multiple contracts and private transactions. i'm not sure.
                     translateInvocation(transactionNameMapping(getContractName(recipient), name),
                         args,
                         obstype,
                         id_recipient,
-                        retvar, contractName, checkedTable, inMain
-                    )
+                        retvar, contractName, checkedTable, inMain)
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
-                // todo: currently we ignore the arguments to the constructor
-                assert(args.isEmpty, "contracts that take arguments are not yet supported")
-
+                // grab an identifier to store memory
                 val id_memaddr = nextTemp()
 
-                Seq(
-                    // grab the appropriate amount of space of memory sequentially, off the free memory pointer
+                // store the names of the types of the arguments
+                val typeNames = args.map(e => e.obstype.get.toString)
+
+                // given a declaration, test if it's a constructor with type arguments that match the usage here
+                def isMatchingConstructor(d: Declaration): Boolean =
+                    d match {
+                        case c: Constructor => typeNames == c.args.map(v => v.typIn.toString)
+                        case _ => false
+                    }
+
+                // check to to see if there is a constructor to call, and if so translate the
+                // arguments and invoke the constructor as normal transaction with the hash appended
+                // to the name to call the right one
+                val conCall =
+                    if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
+                        translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
+                            args = args,
+                            obstype = Some(UnitType()),
+                            thisID = id_memaddr,
+                            retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
+                    } else {
+                        Seq()
+                    }
+
+                Seq(// grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
-                    assign1(retvar, id_memaddr)
-                )
+                    assign1(retvar, id_memaddr)) ++ conCall
+
+
             case StateInitializer(stateName, fieldName, obstype) =>
                 assert(assertion = false, "TODO: translation of " + e.toString + " is not implemented")
                 Seq()

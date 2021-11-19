@@ -212,7 +212,7 @@ object Util {
                 case Int256Type() => 1
                 case UnitType() => 0
             }
-            case _: NonPrimitiveType => assert(assertion = false, "width not implemented for non-primitive types!"); -1
+            case _: NonPrimitiveType => 1
             case BottomType() => assert(assertion = false, "width not implemented for the bottom type!"); -1
         }
     }
