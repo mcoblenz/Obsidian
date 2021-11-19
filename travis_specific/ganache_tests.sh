@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# travis makes this env var available to all builds, so this stops us from installing things locally
-if [[ $CI == "true" ]]
-then
-  ./travis_specific/install_ganache.sh
-fi
-
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
 cd "$TRAVIS_BUILD_DIR" || exit 1
@@ -129,11 +123,7 @@ do
 
   # start up ganache
   echo "starting ganache-cli"
-  # ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
-  ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &
-
-  echo "checking for ganache-cli" ## debug
-  ps aux | grep 'ganache'
+  ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
 
   # form the JSON object to ask for the list of accounts
   ACCT_DATA=$( jq -ncM \
@@ -144,8 +134,6 @@ do
                   '{"jsonrpc":$jn,"method":$mn,"params":$pn,"id":$idn}'
            )
 
-  echo "account data is $ACCT_DATA" # debug
-
   # ganache-cli takes a little while to start up, and the first thing that we
   # need from it is the list of accounts. so we poll on the account endpoint
   # until we get a good result to avoid using sleep or something less precise.
@@ -154,11 +142,8 @@ do
   ACCTS=""
   until [ "$KEEPGOING" -eq 0 ] ;
   do
-      # ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545) # debug
-      echo "top of loop"
-      ACCTS=$(curl -X POST --data "$ACCT_DATA" "$ganache_host")
+      ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545) # debug
       KEEPGOING=$?
-      echo "$ACCTS"
       sleep 1
   done
   echo
