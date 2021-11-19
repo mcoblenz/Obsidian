@@ -10,6 +10,9 @@ before_install:
   - nvm install 16
   - npm install -g npm
   - npm install -g ganache-cli
+  - sudo apt update
+  - sudo apt install libcryptx-perl
+  - sudo snap install jq
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle
