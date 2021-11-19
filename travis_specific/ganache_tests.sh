@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# travis makes this env var available to all builds, so this stops us from installing things locally
-if [[ $CI == "true" ]]
-then
-  ./travis_specific/install_ganache.sh
-fi
-
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
 cd "$TRAVIS_BUILD_DIR" || exit 1
@@ -18,6 +12,15 @@ then
     echo "ganache-cli is not installed, Install it with 'npm install -g ganache-cli'."
     exit 1
 fi
+
+
+# print version info
+echo "-----------------------------"
+echo "VERSIONS:"
+echo "npm     " "$(npm --version)"
+echo "node    " "$(node --version)"
+echo "ganache " "$(ganache-cli --version)"
+echo "-----------------------------"
 
 # either test only the directories named as arguments or test everything if nothing is specified.
 # since the travis.yml file doesn't give any argument here, CI will test everything, but this makes
@@ -43,7 +46,7 @@ fi
 failed=()
 
 # build a jar of Obsidian but removing all the tests; that happens in the other Travis matrix job, so we can assume it works here.
-sbt 'set assembly / test := {}' ++$TRAVIS_SCALA_VERSION assembly
+sbt 'set assembly / test := {}' ++"$TRAVIS_SCALA_VERSION" assembly
 
 # check that the jar file for obsidian exists; `sbt assembly` ought to have been run before this script gets run
 obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
@@ -52,6 +55,8 @@ then
         echo "Error building Obsidian jar file, exiting."
         exit 1
 fi
+
+ganache_host="http://localhost:8545"
 
 for test in "${tests[@]}"
 do
@@ -85,7 +90,7 @@ do
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
-  if ! $(java -jar $obsidian_jar --yul "resources/tests/GanacheTests/$NAME.obs")
+  if ! $(java -jar "$obsidian_jar" --yul "resources/tests/GanacheTests/$NAME.obs")
   then
       echo "$NAME test failed: cannot compile obs to yul"
       failed+=("$test [compile obs to yul]")
@@ -118,7 +123,7 @@ do
 
   # start up ganache
   echo "starting ganache-cli"
-  ganache-cli --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
+  ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
 
   # form the JSON object to ask for the list of accounts
   ACCT_DATA=$( jq -ncM \
@@ -137,7 +142,7 @@ do
   ACCTS=""
   until [ "$KEEPGOING" -eq 0 ] ;
   do
-      ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545)
+      ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545) # debug
       KEEPGOING=$?
       sleep 1
   done
@@ -173,7 +178,7 @@ do
   echo "$SEND_DATA" | jq
   echo
 
-  RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+  RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
   echo "response from ganache is: " #$RESP
   echo "$RESP" | jq
 
@@ -215,7 +220,7 @@ do
     echo "$SEND_DATA" | jq
     echo
 
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
     echo "response from ganache is: "
     echo "$RESP" | jq
 
@@ -295,7 +300,7 @@ do
     echo "$SEND_DATA" | jq
     echo
 
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
     echo "response from ganache is: "
     echo "$RESP" | jq
 

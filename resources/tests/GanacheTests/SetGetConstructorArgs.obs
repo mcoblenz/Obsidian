@@ -1,8 +1,8 @@
 contract IntContainer{
     int x;
 
-    IntContainer@Owned() {
-        x = 0;
+    IntContainer@Owned(int init) {
+        x = init;
     }
 
     transaction set(int value) {
@@ -13,9 +13,9 @@ contract IntContainer{
     }
 }
 
-main contract SetGetConstructorNoArgs{
+main contract SetGetConstructorArgs{
     transaction main() returns int{
-        IntContainer ic = new IntContainer();
+        IntContainer ic = new IntContainer(5);
         ic.set(12);
         return (ic.get());
     }
