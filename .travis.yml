@@ -7,7 +7,7 @@ jdk:
   - oraclejdk12 # as of 10 june 2021, up to jdk12 works but 13+ fail
 
 before_install:
-  - nvm install 17
+  - nvm install 16
   - npm install -g npm
   - npm install -g ganache-cli
 
