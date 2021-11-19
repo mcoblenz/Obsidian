@@ -19,7 +19,7 @@ install:
 
 env:
   - TEST_SUITE=fabric_tests.sh
-  - TEST_SUITE=ganache_tests.sh NODE_OPTIONS=--openssl-legacy-provider
+  - TEST_SUITE=ganache_tests.sh
 
 script: "travis_specific/$TEST_SUITE"
 
