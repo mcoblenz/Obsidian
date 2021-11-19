@@ -117,13 +117,13 @@ object CodeGenYul extends CodeGenerator {
       * @return the yul statements corresponding to the declaration
       */
     def translateDeclaration(declaration: Declaration, contractName: String, checkedTable: SymbolTable, inMain: Boolean): Seq[YulStatement] = {
+        // nb there is a .asInstanceOf in the mustache glue code that only works if this really
+        // returns a sequence of FunctionDeclaration objects. that's OK for now because it's true,
+        // but as the cases below here get filled in that may not be true and we'll have to fix it.
+
         declaration match {
             case _: Field => Seq() // fields are translated as they are encountered
             case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, inMain))
-
-            // nb there is a .asInstanceOf in the mustache glue code that only works if this really
-            // returns a sequence of FunctionDeclaration objects. that's OK for now because it's true,
-            // but as the cases below here get filled in that may not be true and we'll have to fix it.
             case _: State =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -142,19 +142,24 @@ object CodeGenYul extends CodeGenerator {
                     }
                 }
 
-                //to support multiple constructors, constructors get the hash of their argument type sequence
-                // appended to their name
+                // constructors turn into transactions with a special name and the same body
                 Seq(translateTransaction(
-                    Transaction(name = c.name + hashOfFunctionName(c.name, c.args.map(v => v.typIn.toString)), // : String,
-                        params = Seq(), // : Seq[GenericType], // todo this is likely wrong
-                        args = c.args, // : Seq[VariableDeclWithSpec],
-                        retType = c.retType, //: Option[ObsidianType],
-                        ensures = Seq(), // : Seq[Ensures], // todo this could be wrong
-                        body = c.body, // : Seq[Statement],
-                        isStatic = false, //: Boolean,
-                        isPrivate = false, //: Boolean,
-                        thisType = nonprim(c.thisType), // : NonPrimitiveType,
-                        thisFinalType = nonprim(c.thisFinalType) //: NonPrimitiveType,
+                    Transaction(
+                        //to support multiple constructors, constructors get the hash of their
+                        // argument types added to their name
+                        name = c.name + hashOfFunctionName(c.name, c.args.map(v => v.typIn.toString)),
+                        // we omit generic type information because we don't have it and would need
+                        // to reconstruct it, and we don't use it to translate to yul anyway
+                        params = Seq(),
+                        args = c.args,
+                        retType = c.retType,
+                        // we omit any ensures because that feature is largely deprecated
+                        ensures = Seq(),
+                        body = c.body,
+                        isStatic = false,
+                        isPrivate = false,
+                        thisType = nonprim(c.thisType),
+                        thisFinalType = nonprim(c.thisFinalType)
                     ),
                     contractName, checkedTable, inMain))
             case _: TypeDecl =>
@@ -481,13 +486,14 @@ object CodeGenYul extends CodeGenerator {
                 val recipient_yul = translateExpr(id_recipient, recipient, contractName, checkedTable, inMain)
 
                 (decl_0exp(id_recipient) +: recipient_yul) ++
-                    // todo: this may be the cause of a bug in the future. this is how non-main functions get their names translated before calling, but i'm not sure that's right at all.
+                    // todo: this may be the cause of a bug in the future. this is how non-main
+                    //  functions get their names translated before calling, but that might not
+                    //  work with multiple contracts and private transactions. i'm not sure.
                     translateInvocation(transactionNameMapping(getContractName(recipient), name),
                         args,
                         obstype,
                         id_recipient,
-                        retvar, contractName, checkedTable, inMain
-                    )
+                        retvar, contractName, checkedTable, inMain)
 
             case Construction(contractType, args, isFFIInvocation, obstype) =>
                 // grab an identifier to store memory
@@ -506,18 +512,18 @@ object CodeGenYul extends CodeGenerator {
                 // check to to see if there is a constructor to call, and if so translate the
                 // arguments and invoke the constructor as normal transaction with the hash appended
                 // to the name to call the right one
-                val conCall = if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
-                    translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
-                        args = args,
-                        obstype = Some(UnitType()),
-                        thisID = id_memaddr,
-                        retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
-                } else {
-                    Seq()
-                }
+                val conCall =
+                    if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
+                        translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
+                            args = args,
+                            obstype = Some(UnitType()),
+                            thisID = id_memaddr,
+                            retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
+                    } else {
+                        Seq()
+                    }
 
-                Seq(
-                    // grab the appropriate amount of space of memory sequentially, off the free memory pointer
+                Seq(// grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
