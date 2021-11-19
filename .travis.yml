@@ -18,9 +18,8 @@ install:
   - gradle publish -b Obsidian_Runtime/build.gradle
 
 env:
-  - NODE_OPTIONS=--openssl-legacy-provider
   - TEST_SUITE=fabric_tests.sh
-  - TEST_SUITE=ganache_tests.sh
+  - TEST_SUITE=ganache_tests.sh NODE_OPTIONS=--openssl-legacy-provider
 
 script: "travis_specific/$TEST_SUITE"
 
