@@ -182,7 +182,7 @@ object Util {
     def baseTypeToYulName(typ: ObsidianType): String = {
         typ match {
             case primitiveType: PrimitiveType => primitiveType match {
-                case IntType() => "u256"
+                case IntType() => "int256"
                 case BoolType() => "bool"
                 case StringType() => "string"
                 case Int256Type() => "int256"
