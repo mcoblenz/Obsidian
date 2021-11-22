@@ -44,6 +44,8 @@ object "{{contractName}}" {
 
             {{abiEncodeTupleFuncs}}
 
+            {{abiDecodeFuncs}}
+
             function allocate_memory(size) -> memPtr {
                 memPtr := allocate_unbounded()
                 finalize_allocation(memPtr, size)

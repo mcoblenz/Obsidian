@@ -49,7 +49,7 @@ case class TypedName(name: String, typ: ObsidianType) extends YulAST {
 
 case class Case(value: Literal, body: Block) extends YulAST {
     override def toString: String = {
-        s"case ${value.toString} ${brace(body.toString)}"
+        s"case ${value.toString} ${brace(body.toString)}\n"
     }
 }
 
@@ -277,7 +277,7 @@ case class YulObject(contractName: String,
 
         def nextDeRet(): String = {
             deRetCnt = deRetCnt + 1
-            s"_dd_ret_${deRetCnt.toString}" //todo: better naming convention?
+            s"_dd_ret_${deRetCnt.toString}"
         }
 
         /**
@@ -290,9 +290,14 @@ case class YulObject(contractName: String,
             // temporary variables to store the return from calling the function
             val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
 
-            //todo: second argument to the application is highly speculative; check once you have more complex functions
-            // the actual call to f, and a possible declaration of the temporary variables if there are any returns
-            val call_to_f: Expression = apply(f.name, f.parameters.map(p => Identifier(p.name)): _*)
+            // temporary variables to store the results of decoding the args to the function
+            val params_from_decode: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
+
+            // f gets called with the special "this" parameter that's declared above, followed by
+            // the temporary variables that store the decoded arguments
+            val call_to_f: Expression = apply(f.name, Identifier("this") +: params_from_decode: _*)
+
+            // if f returns something then we assign to that but otherwise we just call it for effect
             val call_f_and_maybe_assign: YulStatement =
                 if (f.returnVariables.nonEmpty) {
                     codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))
@@ -303,10 +308,11 @@ case class YulObject(contractName: String,
             val mp_id: Identifier = Identifier("memPos")
 
             Seq(
+                LineComment(s"entry for ${f.name}"),
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
                 // abi_decode_tuple_(4, calldatasize())
-                codegen.ExpressionStatement(apply("abi_decode_tuple", intlit(4), apply("calldatasize"))),
+                decl_nexp(params_from_decode, apply(abi_decode_name(dropThisArgument(f)), intlit(4), apply("calldatasize"))),
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
                 //    let memPos := allocate_unbounded()
@@ -314,7 +320,7 @@ case class YulObject(contractName: String,
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
                 //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
-                decl_1exp(Identifier("memEnd"), apply("abi_encode_tuple_to_fromStack" + temps.length.toString, mp_id +: temps: _*)),
+                decl_1exp(Identifier("memEnd"), apply(abi_encode_name(temps.length), mp_id +: temps: _*)),
                 //    return(memPos, sub(memEnd, memPos))
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
@@ -336,6 +342,10 @@ case class YulObject(contractName: String,
             .toSet
             .map(write_abi_encode)
             .toSeq)
+
+        def abiDecodeFuncs() : YulStatement = Block(
+            LineComment("abi decode functions") +:
+                mainContractTransactions.map(t =>  write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))))
 
         def transactions(): YulStatement = Block(mainContractTransactions ++ otherTransactions)
     }

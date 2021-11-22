@@ -428,6 +428,16 @@ object Util {
         }
     }
 
+
+    /** given an integer, return the name of the abi tuple encoder for that integer
+      *
+      * @param n the size of the tuples encoded
+      * @return the name of the function used in the output
+      */
+    def abi_encode_name(n : Int): String = {
+        s"abi_encode_tuple_to_fromStack${n.toString}"
+    }
+
     /**
       * compute the abi tuple encode function for a given number of returns. for example, for 0,
       * 1, and 2 returns:
@@ -464,8 +474,38 @@ object Util {
                 apply("add", Identifier("headStart"), intlit((n - 1) * 32)))))
 
         val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
-        FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
+        FunctionDefinition(abi_encode_name(n),
             TypedName("headStart", IntType()) +: var_indices.map(i => TypedName("value" + i.toString, IntType())),
             Seq(TypedName("tail", IntType())), Block(bod))
+    }
+
+    /** given an function definition, return the name of the abi tuple decode for that functions
+      * arugments
+      *
+      * @param f the function whose arguments are to be decoded
+      * @return the name of the function that will be emitted to decode the arguments
+      */
+    def abi_decode_name(f: FunctionDefinition) : String = {
+        s"abi_decode_${f.parameters.map(tn => tn.typ.toString).mkString}"
+    }
+
+    /** TODO
+      *
+      * @param f
+      * @return
+      */
+    def write_abi_decode_tuple(f: FunctionDefinition): FunctionDefinition = {
+        val retVars: Seq[TypedName] = f.parameters.zipWithIndex.map{ case (tn, i) => TypedName(s"ret${i.toString}", tn.typ)}
+
+        val bod: Seq[YulStatement] =
+            Seq(
+                // if slt(sub(end, start), SUM) { revert(0,0) }
+                decl_1exp(Identifier("offset"),intlit(0)),
+            ) ++ f.parameters.zipWithIndex.map { case (tn, i) => Leave()}
+
+        FunctionDefinition(name = abi_decode_name(f),
+            parameters = Seq(TypedName("start",IntType()), TypedName("end", IntType())),
+            returnVariables = retVars,
+            body = Block(bod))
     }
 }
