@@ -242,7 +242,6 @@ object Util {
       *         no spaces are used"
       */
     def hashOfFunctionName(name: String, types: Seq[String]): String = {
-        // todo: the keccak256 implementation seems to agree with solc, but it's never been run on functions with arguments.
         keccak256(name + paren(types.mkString(",")))
     }
 
