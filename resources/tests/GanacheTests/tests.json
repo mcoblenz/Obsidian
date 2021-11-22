@@ -184,9 +184,14 @@
       "shows_that_we_support": "setting and getting where the container object has a constructor that does not take arguments and set never gets called"
     },
     {
-      "file": "SetGetMainArgs.obs",
+      "file": "SetGetMainArgs1.obs",
       "expected": "5",
-      "shows_that_we_support": "setting and getting where the argument to set comes from the client via ganache"
+      "shows_that_we_support": "setting and getting where the argument to set comes from the client via ganache with one argument"
+    },
+    {
+      "file": "SetGetMainArgs3.obs",
+      "expected": "8",
+      "shows_that_we_support": "setting and getting where the argument to set comes from the client via ganache with three arguments"
     },
     {
       "file": "SetGetNoArgsNoConstruct.obs",
