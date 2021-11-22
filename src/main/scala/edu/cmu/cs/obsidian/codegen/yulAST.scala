@@ -288,7 +288,7 @@ case class YulObject(contractName: String,
           */
         def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
             // temporary variables to store the return from calling the function
-            val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
+            val returns_from_call: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
 
             // temporary variables to store the results of decoding the args to the function
             val params_from_decode: Seq[Identifier] = dropThisArgument(f).parameters.map(_ => Identifier(nextDeRet()))
@@ -300,7 +300,7 @@ case class YulObject(contractName: String,
             // if f returns something then we assign to that but otherwise we just call it for effect
             val call_f_and_maybe_assign: YulStatement =
                 if (f.returnVariables.nonEmpty) {
-                    codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))
+                    codegen.VariableDeclaration(returns_from_call.map(i => (i, None)), Some(call_to_f))
                 } else {
                     ExpressionStatement(call_to_f)
                 }
@@ -320,7 +320,7 @@ case class YulObject(contractName: String,
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
                 //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
-                decl_1exp(Identifier("memEnd"), apply(abi_encode_name(temps.length), mp_id +: temps: _*)),
+                decl_1exp(Identifier("memEnd"), apply(abi_encode_name(returns_from_call.length), mp_id +: returns_from_call: _*)),
                 //    return(memPos, sub(memEnd, memPos))
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
@@ -328,6 +328,9 @@ case class YulObject(contractName: String,
 
         // TODO here and above in the dispatch table we do not respect privacy; we should iterate only over the things in the
         //   main contract that are public
+
+
+        // todo: there's a fair amount of repetition here with t.asInstanceOf and dropThisArgument; tighten that up so it's easier to follow
 
 
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
@@ -341,11 +344,13 @@ case class YulObject(contractName: String,
                     Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
 
         // traverse the transactions and compute the abi functions we need to emit.
-        def abiEncodeTupleFuncs(): YulStatement = Block((mainContractTransactions ++ otherTransactions)
-            .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
-            .toSet
-            .map(write_abi_encode_tuple_from_stack)
-            .toSeq)
+        def abiEncodeTupleFuncs(): YulStatement = Block(
+            LineComment("abi encode tuple functions") +:
+                (mainContractTransactions ++ otherTransactions)
+                .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
+                .toSet
+                .map(write_abi_encode_tuple_from_stack)
+                .toSeq)
 
         // collect up the types used in ant parameter in the transactions that will go to dispatch as a set so we can emit the right decoders
         val types_used_in_params: Set[ObsidianType] = mainContractTransactions
@@ -356,6 +361,6 @@ case class YulObject(contractName: String,
                 (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))) ++
                 types_used_in_params.toSeq.map(write_abi_decode)))
 
-        def transactions(): YulStatement = Block(mainContractTransactions ++ otherTransactions)
+        def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
     }
 }
