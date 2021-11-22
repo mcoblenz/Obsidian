@@ -196,6 +196,11 @@ case class Block(statements: Seq[YulStatement]) extends YulStatement {
     }
 }
 
+case class LineComment(s : String) extends YulStatement {
+    override def toString: String = {
+        s"// $s\n"
+    }
+}
 
 /*
     Object = 'object' StringLiteral '{' Code ( Object | Data )* '}'
