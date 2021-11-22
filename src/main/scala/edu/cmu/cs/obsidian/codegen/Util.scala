@@ -547,10 +547,9 @@ object Util {
                 revertIf(apply("slt", apply("sub", Identifier(end.name), Identifier(start.name)), intlit(offsets.last))),
                 //decl_1exp(Identifier("offset"),intlit(0))
             ) ++ f.parameters.zipWithIndex.zip(offsets).map { case ((tn, i), off) =>
+                //                     value0 := abi_decode_t_int256(add(headStart, offset), dataEnd)
                 assign1(Identifier(s"ret${i.toString}"), apply(abi_decode_name(tn.typ), apply("add", Identifier(start.name), intlit(off)),Identifier(end.name)))
             }
-            //                     value0 := abi_decode_t_int256(add(headStart, offset), dataEnd)
-
 
         FunctionDefinition(name = abi_decode_tuple_name(f),
             parameters = Seq(start, end) ,

@@ -291,7 +291,7 @@ case class YulObject(contractName: String,
             val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
 
             // temporary variables to store the results of decoding the args to the function
-            val params_from_decode: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
+            val params_from_decode: Seq[Identifier] = dropThisArgument(f).parameters.map(_ => Identifier(nextDeRet()))
 
             // f gets called with the special "this" parameter that's declared above, followed by
             // the temporary variables that store the decoded arguments
