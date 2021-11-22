@@ -13,7 +13,7 @@ contract IntContainer{
     }
 }
 
-main contract SetGetMainArgs1{
+main contract SetGetMainArgs3{
     transaction main(int fc1, int fc2, int fc3) returns int{
         IntContainer ic = new IntContainer(fc1 + fc2 + fc3);
         return (ic.get() + 2);
