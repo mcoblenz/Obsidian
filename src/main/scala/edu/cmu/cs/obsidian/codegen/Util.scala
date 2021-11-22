@@ -466,7 +466,7 @@ object Util {
       * @param n the number of returns
       * @return the function definition for output
       */
-    def write_abi_encode(n: Int): FunctionDefinition = {
+    def write_abi_encode_tuple_from_stack(n: Int): FunctionDefinition = {
         val var_indices: Seq[Int] = Seq.tabulate(n)(i => i)
         val encode_lines: Seq[YulStatement] = var_indices.map(i =>
             ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
@@ -485,8 +485,47 @@ object Util {
       * @param f the function whose arguments are to be decoded
       * @return the name of the function that will be emitted to decode the arguments
       */
-    def abi_decode_name(f: FunctionDefinition) : String = {
-        s"abi_decode_${f.parameters.map(tn => tn.typ.toString).mkString}"
+    def abi_decode_tuple_name(f: FunctionDefinition) : String = {
+        s"abi_decode_tuple_${f.parameters.map(tn => tn.typ.toString).mkString}"
+    }
+
+    /** TODO
+      * @param t
+      * @return
+      */
+    def abi_decode_name(t : ObsidianType) : String = {
+        s"abi_decode_${t.baseTypeName}"
+    }
+
+    /** TODO
+      * @param t
+      * @return
+      */
+    def write_abi_decode(t : ObsidianType) : FunctionDefinition = {
+        val offset = TypedName("offset",IntType())
+        val end = TypedName("end",IntType())
+        val ret = TypedName("ret", t)
+
+        val bod = t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() =>
+                    Seq(
+                        //value := calldataload(offset)
+                        assign1(Identifier(ret.name), apply("calldataload", Identifier(offset.name)))
+                    )
+                case BoolType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+                case StringType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+                case Int256Type() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+                case UnitType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            }
+            case _: NonPrimitiveType => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case BottomType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+        }
+
+        FunctionDefinition(name = abi_decode_name(t),
+            parameters = Seq(offset, end) ,
+            returnVariables = Seq(ret),
+            body = Block(bod))
     }
 
     /** TODO
@@ -497,14 +536,24 @@ object Util {
     def write_abi_decode_tuple(f: FunctionDefinition): FunctionDefinition = {
         val retVars: Seq[TypedName] = f.parameters.zipWithIndex.map{ case (tn, i) => TypedName(s"ret${i.toString}", tn.typ)}
 
+        val start = TypedName("start",IntType())
+        val end = TypedName("end",IntType())
+
+        val offsets: Seq[Int] = f.parameters.scanLeft(0)({ (acc, tn) => acc + sizeOfObsType(tn.typ) })
+
         val bod: Seq[YulStatement] =
             Seq(
-                // if slt(sub(end, start), SUM) { revert(0,0) }
-                decl_1exp(Identifier("offset"),intlit(0)),
-            ) ++ f.parameters.zipWithIndex.map { case (tn, i) => Leave()}
+                // if slt(sub(end, start), SUM_OF_SIZES) { revert(0,0) }
+                revertIf(apply("slt", apply("sub", Identifier(end.name), Identifier(start.name)), intlit(offsets.last))),
+                //decl_1exp(Identifier("offset"),intlit(0))
+            ) ++ f.parameters.zipWithIndex.zip(offsets).map { case ((tn, i), off) =>
+                assign1(Identifier(s"ret${i.toString}"), apply(abi_decode_name(tn.typ), apply("add", Identifier(start.name), intlit(off)),Identifier(end.name)))
+            }
+            //                     value0 := abi_decode_t_int256(add(headStart, offset), dataEnd)
 
-        FunctionDefinition(name = abi_decode_name(f),
-            parameters = Seq(TypedName("start",IntType()), TypedName("end", IntType())),
+
+        FunctionDefinition(name = abi_decode_tuple_name(f),
+            parameters = Seq(start, end) ,
             returnVariables = retVars,
             body = Block(bod))
     }
