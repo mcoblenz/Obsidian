@@ -1,0 +1,227 @@
+{
+  "defaults": {
+    "gas": 30000000000,
+    "gasprice": "0x9184e72a000",
+    "startingeth": 500000000,
+    "numaccts": 1,
+    "testexp": "main()"
+  },
+  "tests": [
+    {
+      "file": "AssignLocalAdd.obs",
+      "expected": "17",
+      "shows_that_we_support": "assignment to local variables of simple compound expressions"
+    },
+    {
+      "file": "BoolLiteral.obs",
+      "expected": "0",
+      "shows_that_we_support": "both boolean literals"
+    },
+    {
+      "file": "CombinedBasics.obs",
+      "expected": "24",
+      "shows_that_we_support": "compound uses of the basic language features"
+    },
+    {
+      "file": "CombinedBasicsRet.obs",
+      "expected": "24",
+      "shows_that_we_support": "compound uses of the basic language features and returning expressions"
+    },
+    {
+      "file": "EmptyContract.obs",
+      "expected": null,
+      "shows_that_we_support": "the empty contract"
+    },
+    {
+      "file": "If.obs",
+      "expected": "1",
+      "shows_that_we_support": "simple if statements on literals"
+    },
+    {
+      "file": "IfThenElse.obs",
+      "expected": "90",
+      "shows_that_we_support": "simple if-then-else statements on literals"
+    },
+    {
+      "file": "IntConst.obs",
+      "expected": "12",
+      "shows_that_we_support": "assignment to local variables of integer litearls"
+    },
+    {
+      "file": "MultiLineIfRet.obs",
+      "expected": "15",
+      "shows_that_we_support": "compound uses of the basic language features with multiple possible return points"
+    },
+    {
+      "file": "MultiLineIfRetSm.obs",
+      "expected": "24",
+      "shows_that_we_support": "compound uses of the basic language features with multiple possible return points, small enough to avoid needing the optimizer for stack variables"
+    },
+    {
+      "file": "PrimOpsAdd.obs",
+      "expected": "13",
+      "shows_that_we_support": "the primitive addition operation"
+    },
+    {
+      "file": "PrimOpsAnd.obs",
+      "expected": "0",
+      "shows_that_we_support": "the primitive and operation"
+    },
+    {
+      "file": "PrimOpsDiv.obs",
+      "expected": "2",
+      "shows_that_we_support": "the primitive division operation"
+    },
+    {
+      "file": "PrimOpsEq.obs",
+      "expected": "0",
+      "shows_that_we_support": "the primitive equals operation"
+    },
+    {
+      "file": "PrimOpsGreater.obs",
+      "expected": "0",
+      "shows_that_we_support": "the primitive greater than operation"
+    },
+    {
+      "file": "PrimOpsGreaterEq.obs",
+      "expected": "1",
+      "shows_that_we_support": "the primitive greater than or equal to operation"
+    },
+    {
+      "file": "PrimOpsLess.obs",
+      "expected": "1",
+      "shows_that_we_support": "the primitive less than operation"
+    },
+    {
+      "file": "PrimOpsLessEq.obs",
+      "expected": "1",
+      "shows_that_we_support": "the primitive less than or equal to operation"
+    },
+    {
+      "file": "PrimOpsMod.obs",
+      "expected": "5",
+      "shows_that_we_support": "the primitive modulus operation"
+    },
+    {
+      "file": "PrimOpsMul.obs",
+      "expected": "20",
+      "shows_that_we_support": "the primitive multiplication operation"
+    },
+    {
+      "file": "PrimOpsNEq.obs",
+      "expected": "1",
+      "shows_that_we_support": "the primitive not equal operation"
+    },
+    {
+      "file": "PrimOpsNeg.obs",
+      "expected": "-20",
+      "shows_that_we_support": "the primitive negation operation"
+    },
+    {
+      "file": "PrimOpsNotFalse.obs",
+      "expected": "1",
+      "shows_that_we_support": "the primitive not operation on false"
+    },
+    {
+      "file": "PrimOpsNotTrue.obs",
+      "expected": "0",
+      "shows_that_we_support": "the primitive not operation on true"
+    },
+    {
+      "file": "PrimOpsOr.obs",
+      "expected": "1",
+      "shows_that_we_support": "the primitive or operation"
+    },
+    {
+      "file": "PrimOpsSubNeg.obs",
+      "expected": "-15",
+      "shows_that_we_support": "the primitive subtraction operation when the answer is negative"
+    },
+    {
+      "file": "PrimOpsSubPos.obs",
+      "expected": "15",
+      "shows_that_we_support": "the primitive subtraction operation when the answer is positive"
+    },
+    {
+      "file": "Return.obs",
+      "expected": "8",
+      "shows_that_we_support": "returning compound expressions"
+    },
+    {
+      "file": "Return2.obs",
+      "expected": "8",
+      "test_exp": "g()",
+      "shows_that_we_support": "returning and functions called for effect only"
+    },
+    {
+      "file": "ReturnAdd.obs",
+      "expected": "16",
+      "shows_that_we_support": ""
+    },
+    {
+      "file": "SG.obs",
+      "expected": "1800",
+      "shows_that_we_support": "returning compound expressions that are a little more complex"
+    },
+    {
+      "file": "SGTwoContainers.obs",
+      "expected": "3600",
+      "shows_that_we_support": "setting and getting with two instances of the container object"
+    },
+    {
+      "file": "SetGetConstructorArgs.obs",
+      "expected": "12",
+      "shows_that_we_support": "setting and getting where the container object has a constructor that takes arguments"
+    },
+    {
+      "file": "SetGetConstructorNoArgs.obs",
+      "expected": "12",
+      "shows_that_we_support": "setting and getting where the container object has a constructor that does not take arguments"
+    },
+    {
+      "file": "SetGetConstructorNoArgsNoSet.obs",
+      "expected": "0",
+      "shows_that_we_support": "setting and getting where the container object has a constructor that does not take arguments and set never gets called"
+    },
+    {
+      "file": "SetGetMainArgs1.obs",
+      "expected": "5",
+      "shows_that_we_support": "setting and getting where the argument to set comes from the client via ganache with one argument"
+    },
+    {
+      "file": "SetGetMainArgs3.obs",
+      "expected": "8",
+      "shows_that_we_support": "setting and getting where the argument to set comes from the client via ganache with three arguments"
+    },
+    {
+      "file": "SetGetNoArgsNoConstruct.obs",
+      "expected": "10",
+      "shows_that_we_support": "setting and getting where the container object has no constructor and two sets that modify the same field"
+    },
+    {
+      "file": "SetGetNoArgsNoConstructNoInit.obs",
+      "expected": "5",
+      "shows_that_we_support": "a very simple setting and getting where the container object has no constructor and set doesn't take arguments"
+    },
+    {
+      "file": "SetGetPointer.obs",
+      "expected": "1800",
+      "shows_that_we_support": "setting and getting where the container object is stored in a pointer as a field in the main object"
+    },
+    {
+      "file": "SetGetTwoConstructors.obs",
+      "expected": "15",
+      "shows_that_we_support": "setting and getting where the container object has multiple constructors with different signatures"
+    },
+    {
+      "file": "SetGetWithArgs.obs",
+      "expected": "5",
+      "shows_that_we_support": "setting and getting without a constructor but where the container object's set takes arguments"
+    },
+    {
+      "file": "SimpleCall.obs",
+      "expected": "4",
+      "shows_that_we_support": "calling a transaction and setting a variable as a result"
+    }
+  ]
+}
