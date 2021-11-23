@@ -311,7 +311,7 @@ case class YulObject(contractName: String,
                 } else {
                     LineComment(s"${f.name} takes no parameters")
                 }
-            
+
             val mp_id: Identifier = Identifier("memPos")
 
             Seq(
@@ -360,8 +360,8 @@ case class YulObject(contractName: String,
             LineComment("abi decode functions") +:
                 (// for each transaction, emit the decoder for the tuple of its arguments
                     mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
-                 // for each transaction, collect up the types that it uses, and then emit the decodes for those types
-                 ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode))
+                        // for each transaction, collect up the types that it uses, and then emit the decodes for those types
+                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode))
         )
 
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))

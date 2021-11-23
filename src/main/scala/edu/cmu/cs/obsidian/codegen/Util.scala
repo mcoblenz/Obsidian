@@ -548,13 +548,12 @@ object Util {
 
         val bod: Seq[YulStatement] =
         // if slt(sub(end, start), SUM_OF_SIZES) { revert(0,0) }
-        revertIf(apply("slt", apply("sub", Identifier(end.name), Identifier(start.name)), intlit(offsets.last))) +:
-        // for each argument, `value0 := abi_decode_TYPE(add(headStart, offset), dataEnd)`
-        f.parameters.zipWithIndex.zip(offsets).map
-            {
-                case ((tn, i), off) =>
-                    assign1(Identifier(s"ret${i.toString}"), apply(abi_decode_name(tn.typ), apply("add", Identifier(start.name), intlit(off)), Identifier(end.name)))
-            }
+            revertIf(apply("slt", apply("sub", Identifier(end.name), Identifier(start.name)), intlit(offsets.last))) +:
+                // for each argument, `value0 := abi_decode_TYPE(add(headStart, offset), dataEnd)`
+                f.parameters.zipWithIndex.zip(offsets).map {
+                    case ((tn, i), off) =>
+                        assign1(Identifier(s"ret${i.toString}"), apply(abi_decode_name(tn.typ), apply("add", Identifier(start.name), intlit(off)), Identifier(end.name)))
+                }
 
         FunctionDefinition(name = abi_decode_tuple_name(f),
             parameters = Seq(start, end),
