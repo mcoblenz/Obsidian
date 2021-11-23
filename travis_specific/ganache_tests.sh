@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
@@ -72,14 +72,18 @@ do
   GAS_PRICE=$(<"$test" jq '.gasprice' | tr -d '"')
   START_ETH=$(<"$test" jq '.startingeth')
   NUM_ACCT=$(<"$test" jq '.numaccts')
-  TESTEXP=$(<"$test" jq '.testexp' | tr -d '"')
+  TESTEXP=$(<"$test" jq '.testexp' | tr -d '"') # used for tests that just call main with no args
   EXPECTED=$(<"$test" jq '.expected' | tr -d '"')
+
+  METHODNAME=$(<"$test" jq '.method_name' | tr -d '"') # used for tests that call something with args
+  METHODSIGNATURE=$(<"$test" jq '.method_signature' | tr -d '"')
+  METHODPARAMS=$(<"$test" jq '.method_params' | tr -d '[],' | sed -e '/^$/d' | awk '{print $1}' )
 
   CHECK_OUTPUT=true
 
-  if [[ $TESTEXP == "null" ]]
+  if [[ $TESTEXP == "null" && $METHODNAME == "null" ]]
   then
-    echo "*****WARNING: no test expression supplied"
+    echo "*****WARNING: no test expression or method name supplied"
     CHECK_OUTPUT=false
   fi
 
@@ -253,7 +257,13 @@ do
           exit 1
         fi
         echo "assuming that we are on travis and getting the Keccak256 via perl"
-        HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8)
+        if [[ $TESTEXP == "null" && $METHODNAME != "null" ]]
+        then
+          echo "test expression is null, so building a method call"
+          HASH_TO_CALL=$(echo -n "$METHODNAME($METHODSIGNATURE)" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8 )
+        else
+          HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8)
+        fi
     elif [[ $(uname) == "Darwin" ]]
     then
         # this should be what happens on OS X
@@ -264,7 +274,13 @@ do
           exit 1
         fi
         echo "assuming that we are on OS X and getting the Keccak256 via keccak-256sum"
-        HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+        if [[ $TESTEXP == "null" && $METHODNAME != "null" ]]
+        then
+            echo "test expression is null, so building a method call"
+            HASH_TO_CALL=$(echo -n "$METHODNAME($METHODSIGNATURE)" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+        else
+            HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+        fi
     else
         # if you are neither on travis nor OS X, you are on your own.
         echo "unable to determine OS type to pick a keccak256 implementation"
@@ -275,7 +291,18 @@ do
 
     # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
     # bytes."
-    PADDED_ARG=$(printf "%032g" 0)
+    if [[ $TESTEXP == "null" && $METHODNAME != "null" ]]
+    then
+      echo "building padded args from $METHODPARAMS"
+      PADDED_ARG=""
+      for k in $METHODPARAMS
+      do
+        PADDED_ARG+=$(printf "%032g" "$k")
+      done
+
+    else
+      PADDED_ARG=$(printf "%032g" 0)
+    fi
 
     DATA="$HASH_TO_CALL""$PADDED_ARG"
 
