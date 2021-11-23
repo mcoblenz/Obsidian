@@ -358,18 +358,16 @@ case class YulObject(contractName: String,
             LineComment("abi encode tuple functions") +:
                 (mainContractTransactions ++ otherTransactions)
                     .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
-                    .toSet
-                    .map(write_abi_encode_tuple_from_stack)
-                    .toSeq)
-
-        // collect up the types used in ant parameter in the transactions that will go to dispatch as a set so we can emit the right decoders
-        val types_used_in_params: Set[ObsidianType] = mainContractTransactions
-            .flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).toSet
+                    .distinct
+                    .map(write_abi_encode_tuple_from_stack))
 
         def abiDecodeFuncs(): YulStatement = Block(
             LineComment("abi decode functions") +:
-                (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct ++
-                    types_used_in_params.map(write_abi_decode).toSeq))
+                (// for each transaction, emit the decoder for the tuple of its arguments
+                    mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
+                 // for each transaction, collect up the types that it uses, and then emit the decodes for those types
+                 ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode))
+        )
 
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
     }
