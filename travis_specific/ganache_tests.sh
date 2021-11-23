@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
@@ -297,7 +297,7 @@ do
       PADDED_ARG=""
       for k in $METHODPARAMS
       do
-        PADDED_ARG+=$(printf "%032g" "$k")
+        PADDED_ARG+=$(printf "%064g" "$k")
       done
 
     else
