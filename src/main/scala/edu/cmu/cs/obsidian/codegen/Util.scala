@@ -421,6 +421,7 @@ object Util {
       */
     def dropThisArgument(f: FunctionDefinition): FunctionDefinition = {
         f.parameters match {
+            // todo: string type is a temporary hack here
             case TypedName("this", StringType()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body)
             case _ :: _ => throw new RuntimeException("dropping `this` argument from a sequence of args that doesn't start with `this`")
             case _ => throw new RuntimeException("dropping argument from empty list")
@@ -433,7 +434,7 @@ object Util {
       * @param n the size of the tuples encoded
       * @return the name of the function used in the output
       */
-    def abi_encode_name(n : Int): String = {
+    def abi_encode_name(n: Int): String = {
         s"abi_encode_tuple_to_fromStack${n.toString}"
     }
 
@@ -484,25 +485,27 @@ object Util {
       * @param f the function whose arguments are to be decoded
       * @return the name of the function that will be emitted to decode the arguments
       */
-    def abi_decode_tuple_name(f: FunctionDefinition) : String = {
+    def abi_decode_tuple_name(f: FunctionDefinition): String = {
         s"abi_decode_tuple_${f.parameters.map(tn => tn.typ.toString).mkString}"
     }
 
     /** TODO
+      *
       * @param t
       * @return
       */
-    def abi_decode_name(t : ObsidianType) : String = {
+    def abi_decode_name(t: ObsidianType): String = {
         s"abi_decode_${t.baseTypeName}"
     }
 
     /** TODO
+      *
       * @param t
       * @return
       */
-    def write_abi_decode(t : ObsidianType) : FunctionDefinition = {
-        val offset = TypedName("offset",IntType())
-        val end = TypedName("end",IntType())
+    def write_abi_decode(t: ObsidianType): FunctionDefinition = {
+        val offset = TypedName("offset", IntType())
+        val end = TypedName("end", IntType())
         val ret = TypedName("ret", t)
 
         val bod = t match {
@@ -522,7 +525,7 @@ object Util {
         }
 
         FunctionDefinition(name = abi_decode_name(t),
-            parameters = Seq(offset, end) ,
+            parameters = Seq(offset, end),
             returnVariables = Seq(ret),
             body = Block(bod))
     }
@@ -533,25 +536,25 @@ object Util {
       * @return
       */
     def write_abi_decode_tuple(f: FunctionDefinition): FunctionDefinition = {
-        val retVars: Seq[TypedName] = f.parameters.zipWithIndex.map{ case (tn, i) => TypedName(s"ret${i.toString}", tn.typ)}
+        val retVars: Seq[TypedName] = f.parameters.zipWithIndex.map { case (tn, i) => TypedName(s"ret${i.toString}", tn.typ) }
 
-        val start = TypedName("start",IntType())
-        val end = TypedName("end",IntType())
+        val start = TypedName("start", IntType())
+        val end = TypedName("end", IntType())
 
         val offsets: Seq[Int] = f.parameters.scanLeft(0)({ (acc, tn) => acc + sizeOfObsType(tn.typ) })
 
         val bod: Seq[YulStatement] =
-            Seq(
-                // if slt(sub(end, start), SUM_OF_SIZES) { revert(0,0) }
-                revertIf(apply("slt", apply("sub", Identifier(end.name), Identifier(start.name)), intlit(offsets.last))),
-                //decl_1exp(Identifier("offset"),intlit(0))
-            ) ++ f.parameters.zipWithIndex.zip(offsets).map { case ((tn, i), off) =>
-                //                     value0 := abi_decode_t_int256(add(headStart, offset), dataEnd)
-                assign1(Identifier(s"ret${i.toString}"), apply(abi_decode_name(tn.typ), apply("add", Identifier(start.name), intlit(off)),Identifier(end.name)))
+        // if slt(sub(end, start), SUM_OF_SIZES) { revert(0,0) }
+        revertIf(apply("slt", apply("sub", Identifier(end.name), Identifier(start.name)), intlit(offsets.last))) +:
+        // for each argument, `value0 := abi_decode_TYPE(add(headStart, offset), dataEnd)`
+        f.parameters.zipWithIndex.zip(offsets).map
+            {
+                case ((tn, i), off) =>
+                    assign1(Identifier(s"ret${i.toString}"), apply(abi_decode_name(tn.typ), apply("add", Identifier(start.name), intlit(off)), Identifier(end.name)))
             }
 
         FunctionDefinition(name = abi_decode_tuple_name(f),
-            parameters = Seq(start, end) ,
+            parameters = Seq(start, end),
             returnVariables = retVars,
             body = Block(bod))
     }
