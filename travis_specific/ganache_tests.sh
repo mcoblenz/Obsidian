@@ -300,7 +300,7 @@ do
         PADDED_ARG+=$(printf "%064g" "$k")
       done
     else
-      PADDED_ARG=$(printf "%032g" 0) # my guess is that this 32 should be a 64 to meet the padding but since there are no arguments in this case nothing reads it to notice that it's wrong
+      PADDED_ARG=$(printf "%064g" 0)
     fi
 
     DATA="$HASH_TO_CALL""$PADDED_ARG"

@@ -309,14 +309,9 @@ case class YulObject(contractName: String,
                 if (dropThisArgument(f).parameters.nonEmpty) {
                     decl_nexp(params_from_decode, apply(abi_decode_tuple_name(dropThisArgument(f)), intlit(4), apply("calldatasize")))
                 } else {
-                    // todo this is a bit of a hack; i know that the decode_tuple generator will get
-                    //   called and make something called this later.
-                    //
-                    // todo: if there're no params, do i even need to decode?
-                    codegen.ExpressionStatement(apply("abi_decode_tuple_", intlit(4), apply("calldatasize")))
+                    LineComment(s"${f.name} takes no parameters")
                 }
-
-
+            
             val mp_id: Identifier = Identifier("memPos")
 
             Seq(
