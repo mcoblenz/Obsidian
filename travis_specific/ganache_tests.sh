@@ -142,7 +142,7 @@ do
   ACCTS=""
   until [ "$KEEPGOING" -eq 0 ] ;
   do
-      ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545) # debug
+      ACCTS=$(curl --silent -X POST --data "$ACCT_DATA" http://localhost:8545)
       KEEPGOING=$?
       sleep 1
   done

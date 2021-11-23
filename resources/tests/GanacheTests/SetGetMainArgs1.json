@@ -7,5 +7,5 @@
     "expected" : "5"
     "method_name" : "main",
     "method_signature" : "int256",
-    "method_params" : "3"
+    "method_params" : [3]
 }

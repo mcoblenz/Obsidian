@@ -305,6 +305,18 @@ case class YulObject(contractName: String,
                     ExpressionStatement(call_to_f)
                 }
 
+            val maybe_assign_params: YulStatement =
+                if (dropThisArgument(f).parameters.nonEmpty) {
+                    decl_nexp(params_from_decode, apply(abi_decode_tuple_name(dropThisArgument(f)), intlit(4), apply("calldatasize")))
+                } else {
+                    // todo this is a bit of a hack; i know that the decode_tuple generator will get
+                    //   called and make something called this later.
+                    //
+                    // todo: if there're no params, do i even need to decode?
+                    codegen.ExpressionStatement(apply("abi_decode_tuple_", intlit(4), apply("calldatasize")))
+                }
+
+
             val mp_id: Identifier = Identifier("memPos")
 
             Seq(
@@ -312,7 +324,7 @@ case class YulObject(contractName: String,
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
                 // abi_decode_tuple_(4, calldatasize())
-                decl_nexp(params_from_decode, apply(abi_decode_tuple_name(dropThisArgument(f)), intlit(4), apply("calldatasize"))),
+                maybe_assign_params,
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
                 //    let memPos := allocate_unbounded()
@@ -356,8 +368,8 @@ case class YulObject(contractName: String,
 
         def abiDecodeFuncs(): YulStatement = Block(
             LineComment("abi decode functions") +:
-                (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))) ++
-                    types_used_in_params.toSeq.map(write_abi_decode)))
+                (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct ++
+                    types_used_in_params.map(write_abi_decode).toSeq))
 
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
     }
