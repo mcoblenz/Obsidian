@@ -333,10 +333,13 @@ case class YulObject(contractName: String,
             )
         }
 
-        // TODO here and above in the dispatch table we do not respect privacy; we should iterate only over the things in the
-        //   main contract that are public
+        // TODO here and above in the dispatch table we do not respect privacy; we should iterate
+        //  only over the things in the main contract that are public
 
-        // todo: there's a fair amount of repetition here with t.asInstanceOf and dropThisArgument; tighten that up so it's easier to follow
+        // todo: there's a fair amount of repetition here with t.asInstanceOf and dropThisArgument;
+        //   tighten that up so it's easier to follow. at the same time think about how to only emit
+        //   the decoders and encoders we actually need (i.e. if f only has `this` as a param, the decoder we
+        //   emit never gets called and gets optimized away. that's fine enough but why not make it better?)
 
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
