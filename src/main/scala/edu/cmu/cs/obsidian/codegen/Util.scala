@@ -489,19 +489,21 @@ object Util {
         s"abi_decode_tuple_${f.parameters.map(tn => tn.typ.toString).mkString}"
     }
 
-    /** TODO
+    /** Given an obsidian type, produce the name of the function that will be emitted to decode
+      * values of the corresponding yul type as parameters
       *
-      * @param t
-      * @return
+      * @param t the obsidian type to decode
+      * @return the name of the function that does the decoding
       */
     def abi_decode_name(t: ObsidianType): String = {
         s"abi_decode_${t.baseTypeName}"
     }
 
-    /** TODO
+    /** Given an obsidian type, produce the function to emit to decode
+      * values of the corresponding yul type as parameters
       *
-      * @param t
-      * @return
+      * @param t the obsidian type to decode
+      * @return the yul function that does the decoding
       */
     def write_abi_decode(t: ObsidianType): FunctionDefinition = {
         val offset = TypedName("offset", IntType())
@@ -530,10 +532,11 @@ object Util {
             body = Block(bod))
     }
 
-    /** TODO
+    /** Given a function definition, provide a function that decodes parameters of the argument type
+      * from the ABI.
       *
-      * @param f
-      * @return
+      * @param f the function to produce a parameter decoder for
+      * @return the decoder for the parameters of the argument function
       */
     def write_abi_decode_tuple(f: FunctionDefinition): FunctionDefinition = {
         val retVars: Seq[TypedName] = f.parameters.zipWithIndex.map { case (tn, i) => TypedName(s"ret${i.toString}", tn.typ) }

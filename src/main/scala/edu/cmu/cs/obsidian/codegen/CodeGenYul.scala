@@ -393,9 +393,6 @@ object CodeGenYul extends CodeGenerator {
 
         // the result is the recursive translation and the expression either using the temp
         // here or not.
-
-        // todo: this does not work with non-void functions that are called without binding
-        //  their results, ie "f()" if f returns an int
         ids.map(id => decl_0exp(id)) ++
             seqs.flatten ++ (width match {
             case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), thisID +: ids)))
