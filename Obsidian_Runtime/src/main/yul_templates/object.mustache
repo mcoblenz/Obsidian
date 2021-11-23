@@ -35,10 +35,6 @@ object "{{contractName}}" {
                 Solidity programs analagous to our test Obsidian programs.
              }}
 
-            function abi_decode_t_uint256_fromMemory(offset, end) -> value {
-                value := mload(offset)
-            }
-
             {{abiEncodeTupleFuncs}}
 
             {{abiDecodeFuncs}}
