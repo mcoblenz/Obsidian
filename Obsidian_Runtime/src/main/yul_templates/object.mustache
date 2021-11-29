@@ -34,15 +34,10 @@ object "{{contractName}}" {
             {{! these functions for memory management are produced by the solc IR backend for
                 Solidity programs analagous to our test Obsidian programs.
              }}
-            function abi_decode_tuple(headStart, dataEnd)   {
-                if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
-            }
-
-            function abi_decode_t_uint256_fromMemory(offset, end) -> value {
-                value := mload(offset)
-            }
 
             {{abiEncodeTupleFuncs}}
+
+            {{abiDecodeFuncs}}
 
             function allocate_memory(size) -> memPtr {
                 memPtr := allocate_unbounded()

@@ -182,7 +182,7 @@ object Util {
     def baseTypeToYulName(typ: ObsidianType): String = {
         typ match {
             case primitiveType: PrimitiveType => primitiveType match {
-                case IntType() => "u256"
+                case IntType() => "int256"
                 case BoolType() => "bool"
                 case StringType() => "string"
                 case Int256Type() => "int256"
@@ -242,7 +242,6 @@ object Util {
       *         no spaces are used"
       */
     def hashOfFunctionName(name: String, types: Seq[String]): String = {
-        // todo: the keccak256 implementation seems to agree with solc, but it's never been run on functions with arguments.
         keccak256(name + paren(types.mkString(",")))
     }
 
@@ -422,10 +421,21 @@ object Util {
       */
     def dropThisArgument(f: FunctionDefinition): FunctionDefinition = {
         f.parameters match {
+            // todo: string type is a temporary hack here
             case TypedName("this", StringType()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body)
             case _ :: _ => throw new RuntimeException("dropping `this` argument from a sequence of args that doesn't start with `this`")
             case _ => throw new RuntimeException("dropping argument from empty list")
         }
+    }
+
+
+    /** given an integer, return the name of the abi tuple encoder for that integer
+      *
+      * @param n the size of the tuples encoded
+      * @return the name of the function used in the output
+      */
+    def abi_encode_name(n: Int): String = {
+        s"abi_encode_tuple_to_fromStack${n.toString}"
     }
 
     /**
@@ -456,7 +466,7 @@ object Util {
       * @param n the number of returns
       * @return the function definition for output
       */
-    def write_abi_encode(n: Int): FunctionDefinition = {
+    def write_abi_encode_tuple_from_stack(n: Int): FunctionDefinition = {
         val var_indices: Seq[Int] = Seq.tabulate(n)(i => i)
         val encode_lines: Seq[YulStatement] = var_indices.map(i =>
             ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
@@ -464,8 +474,90 @@ object Util {
                 apply("add", Identifier("headStart"), intlit((n - 1) * 32)))))
 
         val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
-        FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
+        FunctionDefinition(abi_encode_name(n),
             TypedName("headStart", IntType()) +: var_indices.map(i => TypedName("value" + i.toString, IntType())),
             Seq(TypedName("tail", IntType())), Block(bod))
+    }
+
+    /** given an function definition, return the name of the abi tuple decode for that functions
+      * arugments
+      *
+      * @param f the function whose arguments are to be decoded
+      * @return the name of the function that will be emitted to decode the arguments
+      */
+    def abi_decode_tuple_name(f: FunctionDefinition): String = {
+        s"abi_decode_tuple_${f.parameters.map(tn => tn.typ.toString).mkString}"
+    }
+
+    /** Given an obsidian type, produce the name of the function that will be emitted to decode
+      * values of the corresponding yul type as parameters
+      *
+      * @param t the obsidian type to decode
+      * @return the name of the function that does the decoding
+      */
+    def abi_decode_name(t: ObsidianType): String = {
+        s"abi_decode_${t.baseTypeName}"
+    }
+
+    /** Given an obsidian type, produce the function to emit to decode
+      * values of the corresponding yul type as parameters
+      *
+      * @param t the obsidian type to decode
+      * @return the yul function that does the decoding
+      */
+    def write_abi_decode(t: ObsidianType): FunctionDefinition = {
+        val offset = TypedName("offset", IntType())
+        val end = TypedName("end", IntType())
+        val ret = TypedName("ret", t)
+
+        val bod = t match {
+            case primitiveType: PrimitiveType => primitiveType match {
+                case IntType() =>
+                    Seq(
+                        //value := calldataload(offset)
+                        assign1(Identifier(ret.name), apply("calldataload", Identifier(offset.name)))
+                    )
+                case BoolType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+                case StringType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+                case Int256Type() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+                case UnitType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            }
+            case _: NonPrimitiveType => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case BottomType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+        }
+
+        FunctionDefinition(name = abi_decode_name(t),
+            parameters = Seq(offset, end),
+            returnVariables = Seq(ret),
+            body = Block(bod))
+    }
+
+    /** Given a function definition, provide a function that decodes parameters of the argument type
+      * from the ABI.
+      *
+      * @param f the function to produce a parameter decoder for
+      * @return the decoder for the parameters of the argument function
+      */
+    def write_abi_decode_tuple(f: FunctionDefinition): FunctionDefinition = {
+        val retVars: Seq[TypedName] = f.parameters.zipWithIndex.map { case (tn, i) => TypedName(s"ret${i.toString}", tn.typ) }
+
+        val start = TypedName("start", IntType())
+        val end = TypedName("end", IntType())
+
+        val offsets: Seq[Int] = f.parameters.scanLeft(0)({ (acc, tn) => acc + sizeOfObsType(tn.typ) })
+
+        val bod: Seq[YulStatement] =
+        // if slt(sub(end, start), SUM_OF_SIZES) { revert(0,0) }
+            revertIf(apply("slt", apply("sub", Identifier(end.name), Identifier(start.name)), intlit(offsets.last))) +:
+                // for each argument, `value0 := abi_decode_TYPE(add(headStart, offset), dataEnd)`
+                f.parameters.zipWithIndex.zip(offsets).map {
+                    case ((tn, i), off) =>
+                        assign1(Identifier(s"ret${i.toString}"), apply(abi_decode_name(tn.typ), apply("add", Identifier(start.name), intlit(off)), Identifier(end.name)))
+                }
+
+        FunctionDefinition(name = abi_decode_tuple_name(f),
+            parameters = Seq(start, end),
+            returnVariables = retVars,
+            body = Block(bod))
     }
 }

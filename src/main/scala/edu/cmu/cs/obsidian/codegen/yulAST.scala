@@ -49,7 +49,7 @@ case class TypedName(name: String, typ: ObsidianType) extends YulAST {
 
 case class Case(value: Literal, body: Block) extends YulAST {
     override def toString: String = {
-        s"case ${value.toString} ${brace(body.toString)}"
+        s"case ${value.toString} ${brace(body.toString)}\n"
     }
 }
 
@@ -196,6 +196,11 @@ case class Block(statements: Seq[YulStatement]) extends YulStatement {
     }
 }
 
+case class LineComment(s: String) extends YulStatement {
+    override def toString: String = {
+        s"// $s\n"
+    }
+}
 
 /*
     Object = 'object' StringLiteral '{' Code ( Object | Data )* '}'
@@ -272,7 +277,7 @@ case class YulObject(contractName: String,
 
         def nextDeRet(): String = {
             deRetCnt = deRetCnt + 1
-            s"_dd_ret_${deRetCnt.toString}" //todo: better naming convention?
+            s"_dd_ret_${deRetCnt.toString}"
         }
 
         /**
@@ -283,25 +288,38 @@ case class YulObject(contractName: String,
           */
         def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
             // temporary variables to store the return from calling the function
-            val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
+            val returns_from_call: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
 
-            //todo: second argument to the application is highly speculative; check once you have more complex functions
-            // the actual call to f, and a possible declaration of the temporary variables if there are any returns
-            val call_to_f: Expression = apply(f.name, f.parameters.map(p => Identifier(p.name)): _*)
+            // temporary variables to store the results of decoding the args to the function
+            val params_from_decode: Seq[Identifier] = dropThisArgument(f).parameters.map(_ => Identifier(nextDeRet()))
+
+            // f gets called with the special "this" parameter that's declared above, followed by
+            // the temporary variables that store the decoded arguments
+            val call_to_f: Expression = apply(f.name, Identifier("this") +: params_from_decode: _*)
+
+            // if f returns something then we assign to that but otherwise we just call it for effect
             val call_f_and_maybe_assign: YulStatement =
                 if (f.returnVariables.nonEmpty) {
-                    codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))
+                    codegen.VariableDeclaration(returns_from_call.map(i => (i, None)), Some(call_to_f))
                 } else {
                     ExpressionStatement(call_to_f)
+                }
+
+            val maybe_assign_params: YulStatement =
+                if (dropThisArgument(f).parameters.nonEmpty) {
+                    decl_nexp(params_from_decode, apply(abi_decode_tuple_name(dropThisArgument(f)), intlit(4), apply("calldatasize")))
+                } else {
+                    LineComment(s"${f.name} takes no parameters")
                 }
 
             val mp_id: Identifier = Identifier("memPos")
 
             Seq(
+                LineComment(s"entry for ${f.name}"),
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
                 // abi_decode_tuple_(4, calldatasize())
-                codegen.ExpressionStatement(apply("abi_decode_tuple", intlit(4), apply("calldatasize"))),
+                maybe_assign_params,
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
                 //    let memPos := allocate_unbounded()
@@ -309,11 +327,19 @@ case class YulObject(contractName: String,
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
                 //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
-                decl_1exp(Identifier("memEnd"), apply("abi_encode_tuple_to_fromStack" + temps.length.toString, mp_id +: temps: _*)),
+                decl_1exp(Identifier("memEnd"), apply(abi_encode_name(returns_from_call.length), mp_id +: returns_from_call: _*)),
                 //    return(memPos, sub(memEnd, memPos))
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
         }
+
+        // TODO here and above in the dispatch table we do not respect privacy; we should iterate
+        //  only over the things in the main contract that are public
+
+        // todo: there's a fair amount of repetition here with t.asInstanceOf and dropThisArgument;
+        //   tighten that up so it's easier to follow. at the same time think about how to only emit
+        //   the decoders and encoders we actually need (i.e. if f only has `this` as a param, the decoder we
+        //   emit never gets called and gets optimized away. that's fine enough but why not make it better?)
 
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
@@ -326,12 +352,21 @@ case class YulObject(contractName: String,
                     Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
 
         // traverse the transactions and compute the abi functions we need to emit.
-        def abiEncodeTupleFuncs(): YulStatement = Block((mainContractTransactions ++ otherTransactions)
-            .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
-            .toSet
-            .map(write_abi_encode)
-            .toSeq)
+        def abiEncodeTupleFuncs(): YulStatement = Block(
+            LineComment("abi encode tuple functions") +:
+                (mainContractTransactions ++ otherTransactions)
+                    .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
+                    .distinct
+                    .map(write_abi_encode_tuple_from_stack))
 
-        def transactions(): YulStatement = Block(mainContractTransactions ++ otherTransactions)
+        def abiDecodeFuncs(): YulStatement = Block(
+            LineComment("abi decode functions") +:
+                (// for each transaction, emit the decoder for the tuple of its arguments
+                    mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
+                        // for each transaction, collect up the types that it uses, and then emit the decodes for those types
+                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode))
+        )
+
+        def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
     }
 }
