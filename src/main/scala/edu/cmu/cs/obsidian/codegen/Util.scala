@@ -173,6 +173,11 @@ object Util {
       */
     def decl_1exp(id: Identifier, e: Expression): VariableDeclaration = decl_nexp(Seq(id), e)
 
+    /** given an obsidian type, comptue the yul ABI type that it corresponds to
+      *
+      * @param typ the obsidian type in question
+      * @return the Yul type that represents it
+      */
     def obsTypeToYulType(typ: ObsidianType): YulABIType = {
         typ match {
             case primitiveType: PrimitiveType => primitiveType match {
@@ -280,6 +285,11 @@ object Util {
         }
     }
 
+    /** given a yul type, compute how much space it takes up in memory, in bytes
+      *
+      * @param t the yul type
+      * @return the amount of space it uses in bytes
+      */
     def sizeOfYulType(t: YulABIType): Int = {
         t match {
             case YATAddress() => 32
