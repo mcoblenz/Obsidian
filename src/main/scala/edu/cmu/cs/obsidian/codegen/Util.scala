@@ -182,7 +182,7 @@ object Util {
                 case Int256Type() => YATUInt32()
                 case UnitType() => throw new RuntimeException("unimplemented: unit type not encoded in Yul")
             }
-            case t: NonPrimitiveType => throw new RuntimeException("todo") // t.contractName
+            case t: NonPrimitiveType => YATContractName(t.contractName)
             case BottomType() => throw new RuntimeException("unimplemented: bottom type not encoded in Yul")
         }
     }
@@ -285,7 +285,8 @@ object Util {
             case YATAddress() => 32
             case YATUInt32() => 32
             case YATBool() => 32
-            case YATString() => throw new RuntimeException("strings not supported")
+            case YATContractName(_) => throw new RuntimeException("size of defined contracts not supported") //todo this might be 32 if it's just specific address or might need to call the size of OBStype method, which would add parameters here to do a look up
+            case YATString() => throw new RuntimeException("size of strings not supported")
         }
     }
 
@@ -520,23 +521,8 @@ object Util {
                                 )
             case YATBool() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
             case YATString() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATContractName(name) => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
         }
-
-//        val bod = t match {
-//            case primitiveType: PrimitiveType => primitiveType match {
-//                case IntType() =>
-//                    Seq(
-//                        //value := calldataload(offset)
-//                        assign1(Identifier(ret.name), apply("calldataload", Identifier(offset.name)))
-//                    )
-//                case BoolType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-//                case StringType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-//                case Int256Type() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-//                case UnitType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-//            }
-//            case _: NonPrimitiveType => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-//            case BottomType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-  //      }
 
         FunctionDefinition(name = abi_decode_name(t),
             parameters = Seq(offset, end),

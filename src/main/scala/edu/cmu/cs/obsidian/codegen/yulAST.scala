@@ -39,6 +39,10 @@ case class YATString() extends YulABIType {
     override def toString: String = "string"
 }
 
+case class YATContractName(name: String) extends YulABIType {
+    override def toString: String = name
+}
+
 // for each asm struct, create a case class
 case class TypedName(name: String, typ: YulABIType) extends YulAST {
     override def toString: String = {
