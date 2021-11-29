@@ -1,0 +1,11 @@
+{
+    "gas" : 30000000,
+    "gasprice" : "0x9184e72a000",
+    "startingeth" : 5000000,
+    "numaccts" : 1,
+    "testexp" : null,
+    "expected" : "8",
+    "method_name" : "main",
+    "method_signature" : "int256,int256,int256",
+    "method_params" : [3, 2, 1]
+}
