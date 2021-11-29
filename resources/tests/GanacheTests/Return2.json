@@ -1,0 +1,8 @@
+{
+    "gas" : 30000000,
+    "gasprice" : "0x9184e72a000",
+    "startingeth" : 5000000,
+    "numaccts" : 1,
+    "testexp" : "f()",
+    "expected" : "8"
+}

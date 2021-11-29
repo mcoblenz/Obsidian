@@ -393,9 +393,6 @@ object CodeGenYul extends CodeGenerator {
 
         // the result is the recursive translation and the expression either using the temp
         // here or not.
-
-        // todo: this does not work with non-void functions that are called without binding
-        //  their results, ie "f()" if f returns an int
         ids.map(id => decl_0exp(id)) ++
             seqs.flatten ++ (width match {
             case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), thisID +: ids)))
@@ -513,17 +510,17 @@ object CodeGenYul extends CodeGenerator {
                 // arguments and invoke the constructor as normal transaction with the hash appended
                 // to the name to call the right one
                 val conCall =
-                    if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
-                        translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
-                            args = args,
-                            obstype = Some(UnitType()),
-                            thisID = id_memaddr,
-                            retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
-                    } else {
-                        Seq()
-                    }
+                if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
+                    translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
+                        args = args,
+                        obstype = Some(UnitType()),
+                        thisID = id_memaddr,
+                        retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
+                } else {
+                    Seq()
+                }
 
-                Seq(// grab the appropriate amount of space of memory sequentially, off the free memory pointer
+                Seq( // grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at

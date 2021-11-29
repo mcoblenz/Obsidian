@@ -1,0 +1,9 @@
+main contract Return2 {
+    transaction f() returns int{
+        return (4+4);
+    }
+    transaction g(){
+        f();
+        return;
+    }
+}
