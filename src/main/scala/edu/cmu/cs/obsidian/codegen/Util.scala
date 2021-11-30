@@ -135,8 +135,8 @@ object Util {
       * @param t  the type for id
       * @return the expression declaring the variable
       */
-    def decl_0exp_t(id: Identifier, t: ObsidianType): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(baseTypeToYulName(t)))), None)
+    def decl_0exp_t(id: Identifier, t: YulABIType): VariableDeclaration =
+        VariableDeclaration(Seq((id, Some(t.toString))), None)
 
     /**
       * shorthand for building the yul expression that declares one variable with a type and no
@@ -147,8 +147,8 @@ object Util {
       * @param e  the expression of type t to which id will be bound
       * @return the expression declaring the variable
       */
-    def decl_0exp_t_init(id: Identifier, t: ObsidianType, e: Expression): VariableDeclaration =
-        VariableDeclaration(Seq((id, Some(baseTypeToYulName(t)))), Some(e))
+    def decl_0exp_t_init(id: Identifier, t: YulABIType, e: Expression): VariableDeclaration =
+        VariableDeclaration(Seq((id, Some(t.toString))), Some(e))
 
     /**
       * shorthand for building the yul expression that declares a sequence (non-empty) of identifiers
@@ -173,23 +173,22 @@ object Util {
       */
     def decl_1exp(id: Identifier, e: Expression): VariableDeclaration = decl_nexp(Seq(id), e)
 
-    /** if a given obsidian type is a base type that matches directly to a Yul base type,
-      * produce the string that names the Yul type. assert otherwise.
+    /** given an obsidian type, comptue the yul ABI type that it corresponds to
       *
       * @param typ the obsidian type in question
-      * @return the matching yul type name, if the argument is indeed a base type.
+      * @return the Yul type that represents it
       */
-    def baseTypeToYulName(typ: ObsidianType): String = {
+    def obsTypeToYulType(typ: ObsidianType): YulABIType = {
         typ match {
             case primitiveType: PrimitiveType => primitiveType match {
-                case IntType() => "int256"
-                case BoolType() => "bool"
-                case StringType() => "string"
-                case Int256Type() => "int256"
-                case UnitType() => assert(assertion = false, "unimplemented: unit type not encoded in Yul"); ""
+                case IntType() => YATUInt32()
+                case BoolType() => YATBool()
+                case StringType() => YATString()
+                case Int256Type() => YATUInt32()
+                case UnitType() => throw new RuntimeException("unimplemented: unit type not encoded in Yul")
             }
-            case t: NonPrimitiveType => t.contractName
-            case BottomType() => assert(assertion = false, "unimplemented: bottom type not encoded in Yul"); ""
+            case t: NonPrimitiveType => YATContractName(t.contractName)
+            case BottomType() => throw new RuntimeException("unimplemented: bottom type not encoded in Yul")
         }
     }
 
@@ -252,7 +251,7 @@ object Util {
       * @return its selector hash
       */
     def hashOfFunctionDef(f: FunctionDefinition): String = {
-        hashOfFunctionName(f.name, f.parameters.map(p => baseTypeToYulName(p.typ)))
+        hashOfFunctionName(f.name, f.parameters.map(p => p.typ.toString))
     }
 
     /**
@@ -283,6 +282,21 @@ object Util {
                     pointer_size
             }
             case BottomType() => 0
+        }
+    }
+
+    /** given a yul type, compute how much space it takes up in memory, in bytes
+      *
+      * @param t the yul type
+      * @return the amount of space it uses in bytes
+      */
+    def sizeOfYulType(t: YulABIType): Int = {
+        t match {
+            case YATAddress() => 32
+            case YATUInt32() => 32
+            case YATBool() => 32
+            case YATContractName(_) => throw new RuntimeException("size of defined contracts not supported") //todo this might be 32 if it's just specific address or might need to call the size of OBStype method, which would add parameters here to do a look up
+            case YATString() => throw new RuntimeException("size of strings not supported")
         }
     }
 
@@ -408,8 +422,7 @@ object Util {
       * @return the transformed definition with an added first argument
       */
     def addThisArgument(f: FunctionDefinition): FunctionDefinition = {
-        // todo: string type is a temporary hack here
-        FunctionDefinition(f.name, Seq(TypedName("this", StringType())) ++ f.parameters, f.returnVariables, f.body)
+        FunctionDefinition(f.name, Seq(TypedName("this", YATAddress())) ++ f.parameters, f.returnVariables, f.body)
     }
 
     /** given a function definition where the first argument is a named `this`, return the definition
@@ -421,8 +434,7 @@ object Util {
       */
     def dropThisArgument(f: FunctionDefinition): FunctionDefinition = {
         f.parameters match {
-            // todo: string type is a temporary hack here
-            case TypedName("this", StringType()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body)
+            case TypedName("this", YATAddress()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body)
             case _ :: _ => throw new RuntimeException("dropping `this` argument from a sequence of args that doesn't start with `this`")
             case _ => throw new RuntimeException("dropping argument from empty list")
         }
@@ -475,8 +487,8 @@ object Util {
 
         val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
         FunctionDefinition(abi_encode_name(n),
-            TypedName("headStart", IntType()) +: var_indices.map(i => TypedName("value" + i.toString, IntType())),
-            Seq(TypedName("tail", IntType())), Block(bod))
+            TypedName("headStart", YATUInt32()) +: var_indices.map(i => TypedName("value" + i.toString, YATUInt32())),
+            Seq(TypedName("tail", YATUInt32())), Block(bod))
     }
 
     /** given an function definition, return the name of the abi tuple decode for that functions
@@ -495,8 +507,8 @@ object Util {
       * @param t the obsidian type to decode
       * @return the name of the function that does the decoding
       */
-    def abi_decode_name(t: ObsidianType): String = {
-        s"abi_decode_${t.baseTypeName}"
+    def abi_decode_name(t: YulABIType): String = {
+        s"abi_decode_${t.toString}"
     }
 
     /** Given an obsidian type, produce the function to emit to decode
@@ -505,25 +517,21 @@ object Util {
       * @param t the obsidian type to decode
       * @return the yul function that does the decoding
       */
-    def write_abi_decode(t: ObsidianType): FunctionDefinition = {
-        val offset = TypedName("offset", IntType())
-        val end = TypedName("end", IntType())
+    def write_abi_decode(t: YulABIType): FunctionDefinition = {
+        val offset = TypedName("offset", YATUInt32())
+        val end = TypedName("end", YATUInt32())
         val ret = TypedName("ret", t)
 
         val bod = t match {
-            case primitiveType: PrimitiveType => primitiveType match {
-                case IntType() =>
-                    Seq(
-                        //value := calldataload(offset)
-                        assign1(Identifier(ret.name), apply("calldataload", Identifier(offset.name)))
-                    )
-                case BoolType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-                case StringType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-                case Int256Type() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-                case UnitType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-            }
-            case _: NonPrimitiveType => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-            case BottomType() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATAddress() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATUInt32() =>
+                                Seq(
+                                    //value := calldataload(offset)
+                                    assign1(Identifier(ret.name), apply("calldataload", Identifier(offset.name)))
+                                )
+            case YATBool() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATString() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATContractName(name) => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
         }
 
         FunctionDefinition(name = abi_decode_name(t),
@@ -541,10 +549,10 @@ object Util {
     def write_abi_decode_tuple(f: FunctionDefinition): FunctionDefinition = {
         val retVars: Seq[TypedName] = f.parameters.zipWithIndex.map { case (tn, i) => TypedName(s"ret${i.toString}", tn.typ) }
 
-        val start = TypedName("start", IntType())
-        val end = TypedName("end", IntType())
+        val start = TypedName("start", YATUInt32())
+        val end = TypedName("end", YATUInt32())
 
-        val offsets: Seq[Int] = f.parameters.scanLeft(0)({ (acc, tn) => acc + sizeOfObsType(tn.typ) })
+        val offsets: Seq[Int] = f.parameters.scanLeft(0)({ (acc, tn) => acc + sizeOfYulType(tn.typ) })
 
         val bod: Seq[YulStatement] =
         // if slt(sub(end, start), SUM_OF_SIZES) { revert(0,0) }
