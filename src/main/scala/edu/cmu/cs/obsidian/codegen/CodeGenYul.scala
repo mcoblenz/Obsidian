@@ -99,11 +99,11 @@ object CodeGenYul extends CodeGenerator {
 
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
-            data = Seq(), // nb: we currently ignore data so this is empty
+            data = Seq(),
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
-            otherTransactions = program.contracts.flatMap(translateNonMains)
-        )
+            otherTransactions = program.contracts.flatMap(translateNonMains),
+            tracers = Seq()) // TODO
     }
 
     /**

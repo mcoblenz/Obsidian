@@ -3,7 +3,6 @@ package edu.cmu.cs.obsidian.codegen
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
 import java.io.{FileReader, StringWriter}
 
@@ -247,12 +246,14 @@ case class StringLiteral(content: String) extends YulAST
   * @param mainContractTransactions the transactions that came from the main contract in obsidian
   * @param mainContractSize         the number of bytes that the main contract needs when laid out in memory
   * @param otherTransactions        the transactions that came from each of the other contracts in obsidian
+  * @param tracers                  the functions to trace memory for each non-zero sized contract
   */
 case class YulObject(contractName: String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
-                     otherTransactions: Seq[YulStatement]) extends YulAST {
+                     otherTransactions: Seq[YulStatement],
+                     tracers: Seq[FunctionDefinition]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -390,5 +391,7 @@ case class YulObject(contractName: String,
         )
 
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
+
+        def tracertransactions() : YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
     }
 }
