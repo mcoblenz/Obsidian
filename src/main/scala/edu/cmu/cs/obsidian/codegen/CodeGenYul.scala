@@ -123,10 +123,13 @@ object CodeGenYul extends CodeGenerator {
 
         for(d <- c.declarations){
             d match {
-                case Field(_, typ, _, _) => typ match {
+                case Field(_, typ, fname, _) => typ match {
                     case t : NonPrimitiveType => t match {
                         case ContractReferenceType(contractType, _, _) =>
-                            body = body :+ ExpressionStatement(apply(nameTracer(contractType.contractName),Identifier("this")))
+                            body = body ++
+                                Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname))),
+                                    ExpressionStatement(apply("log0",Identifier("this"),intlit(32)))
+                                )
                             others = others ++ writeTracers(ct, contractType.contractName)
                         case _ => Seq()
                     }
@@ -139,7 +142,7 @@ object CodeGenYul extends CodeGenerator {
         FunctionDefinition(name = nameTracer(name),
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
-                            body = Block(body)) +: others.distinctBy(fd => fd.name)
+                            body = Block(body :+ Leave())) +: others.distinctBy(fd => fd.name)
     }
 
     /**
