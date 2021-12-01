@@ -139,7 +139,7 @@ object CodeGenYul extends CodeGenerator {
         FunctionDefinition(name = nameTracer(name),
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
-                            body = Block(body)) +: others
+                            body = Block(body)) +: others.distinctBy(fd => fd.name)
     }
 
     /**
