@@ -1,13 +1,6 @@
 main contract AssignLocalAdd{
-    transaction assignlocaladd() {
-        int x;
-        bool y;
-        x = 5 + 12;
-        return;
-    }
-
-    transaction main() returns int {
-        int x = 5 + 12;
+    transaction main(int y) returns int {
+        int x = 5 + y;
         return x;
     }
 }
