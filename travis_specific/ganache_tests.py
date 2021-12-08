@@ -41,8 +41,10 @@ def run_one_test(test_info, verbose, obsidian_jar):
         progress = progress + ["compiled obsidian to yul"]
 
     # compile the yul to evm with solc
+    # docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
 
     # start up a ganache process (todo: can i run all the tests in one to save time?)
+    # ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
 
     # poll for an account to let it start up
 
@@ -66,8 +68,8 @@ def run_one_test(test_info, verbose, obsidian_jar):
 parser = argparse.ArgumentParser()
 parser.add_argument("-v", "--verbose", help="increase output verbosity",
                     action="store_true")
-parser.add_argument('tests', metavar='N', nargs='+',
-                    help='an integer for the accumulator', default=[])
+parser.add_argument('tests', nargs='*',
+                    help='names of tests to run; if this is empty, then we run all the tests', default=[])
 args = parser.parse_args()
 
 # todo; grab this off the commandline, also verbosity
@@ -118,13 +120,18 @@ if not jar_path:
 if args.verbose:
     print(f"using top of {pprint.pformat(jar_path)}")
 
-tests_to_run = list(filter(lambda t: os.path.splitext(t['file'])[0] in set(args.tests), tests_data['tests']))
+# todo gross
+tests_to_run = tests_data['tests']
+if args.tests:
+    tests_to_run = list(filter(lambda t: os.path.splitext(t['file'])[0] in set(args.tests), tests_data['tests']))
 
 if args.verbose:
     if args.tests:
         print(f"running only these tests:\n{pprint.pformat(tests_to_run)}")
     else:
-        print("no tests specified, so running the whole suite")
+        print(f"no tests specified, so running the whole suite:\n{pprint.pformat(tests_to_run)}")
+
+# todo: bark if the tests specified aren't in the json file, too.
 
 failed = []
 for test in tests_to_run:
