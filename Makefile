@@ -4,3 +4,6 @@ all: obsidianc
 
 obsidianc:
 	sbt assembly
+
+notest:
+	sbt 'set assembly / test := {}' assembly
