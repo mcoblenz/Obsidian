@@ -4,10 +4,10 @@ import glob
 import json
 import os
 import pprint
-import sys
 import subprocess
+import sys
+import argparse
 from shutil import which
-import eth_abi
 
 from termcolor import colored
 
@@ -27,15 +27,16 @@ def check_for_command(cmd):
 
 
 # return { result -> pass/fail, progress -> list of strings, reason -> string, non empty if we're in fail }
-def run_one_test(test_info, verbose):
+def run_one_test(test_info, verbose, obsidian_jar):
     ganache_host = "http://localhost:8545"
-    obsidian_jar = "" # todo
     progress = []
     # compile the obsidian file in question to yul with a jar of obsidianc
     comp_result = subprocess.run(
-        ["java", "-jar", obsidian_jar, "--yul", f"resources/tests/GanacheTests/{test_info['file']}.obs"], capture_output=True)
+        ["java", "-jar", obsidian_jar, "--yul", f"resources/tests/GanacheTests/{test_info['file']}"],
+        capture_output=True)
     if not comp_result.returncode == 0:
-        return {'result': "fail", 'progress': progress, "reason": f"obsidianc run failed with output {comp_result.stderr}"}
+        return {'result': "fail", 'progress': progress,
+                "reason": f"obsidianc run failed with output {comp_result.stderr}"}
     else:
         progress = progress + ["compiled obsidian to yul"]
 
@@ -62,12 +63,18 @@ def run_one_test(test_info, verbose):
     return {'result': "pass", 'progress': progress, "reason": ""}
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-v", "--verbose", help="increase output verbosity",
+                    action="store_true")
+parser.add_argument('tests', metavar='N', nargs='+',
+                    help='an integer for the accumulator', default=[])
+args = parser.parse_args()
 
 # todo; grab this off the commandline, also verbosity
 test_dir = 'resources/tests/GanacheTests/'
 
 # check to make sure the tools we need are installed and print versions; error otherwise
-cmds = ["ganache-cli", "node", "npm"]
+cmds = ["ganache-cli", "node", "npm"]  # todo add: java, solc
 for c in cmds:
     check_for_command(c)
     version = subprocess.run([c, "--version"], capture_output=True)
@@ -95,18 +102,33 @@ if extra_test_descriptions:
     warn("there are described tests that do not have present obsidian files:\n\t" + pprint.pformat(
         extra_test_descriptions))
 
-verbose = True
-
-# todo: make the obsidianc jar
-if verbose:
+if args.verbose:
     print("running sbt build")
 
-build = subprocess.run(["sbt" "\'set assembly / test := {}\'", ++"$TRAVIS_SCALA_VERSION", "assembly"], capture_output=True)
+# todo: os.environ.get("TRAVIS_SCALA_VERSION") <-- maybe in the make file
+build = subprocess.run(["make", "notest"], capture_output=True)  # todo output here
+if not build.returncode == 0:
+    print(build)
+    error(build.stdout.decode("utf8"))
 
-# todo: add ability to do one offs not just the whole suite
+jar_path = glob.glob("target/scala*/obsidianc.jar")
+if not jar_path:
+    error("could not find an obsidianc jar file after running sbt")
+
+if args.verbose:
+    print(f"using top of {pprint.pformat(jar_path)}")
+
+tests_to_run = list(filter(lambda t: os.path.splitext(t['file'])[0] in set(args.tests), tests_data['tests']))
+
+if args.verbose:
+    if args.tests:
+        print(f"running only these tests:\n{pprint.pformat(tests_to_run)}")
+    else:
+        print("no tests specified, so running the whole suite")
+
 failed = []
-for test in tests_data['tests']:
-    result = run_one_test(test, False)
+for test in tests_to_run:
+    result = run_one_test(test, args.verbose, jar_path[0])
     if result['result'] == "pass":
         print(colored("PASS:", 'green'), test['file'])
     elif result['result'] == "fail":
@@ -116,9 +138,9 @@ for test in tests_data['tests']:
     else:
         error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
 
-if len(failed) == 0:
-    print(colored(f"\nALL {str(len(tests_data['tests']))} TESTS PASSED", 'green'))
-    sys.exit(0)
-else:
-    print(colored(f"\n{len(failed)}/{str(len(tests_data['tests']))} TESTS FAILED", 'red'))
+if failed:
+    print(colored(f"\n{len(failed)}/{str(len(tests_to_run))} TESTS FAILED", 'red'))
     sys.exit(1)
+else:
+    print(colored(f"\nALL {str(len(tests_to_run))} TESTS PASSED", 'green'))
+    sys.exit(0)
