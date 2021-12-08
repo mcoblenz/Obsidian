@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import glob
 import json
 import os
@@ -46,7 +48,7 @@ def run_one_test(test_info, verbose):
 
     # decode the logs from the bloom filter, if the test JSON includes a requirement for logs
 
-    # kill ganache 
+    # kill ganache
 
     if len(test_info['file']) > 6:
         return None

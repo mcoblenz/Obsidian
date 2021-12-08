@@ -11,7 +11,6 @@ before_install:
   - npm install -g npm # update npm
   - npm install -g ganache-cli # install ganache
   - sudo python -m pip install termcolor eth_abi requests
-  - sudo snap install jq # JSON tool needed for ganache interactions
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle
