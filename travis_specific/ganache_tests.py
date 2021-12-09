@@ -7,12 +7,10 @@ import os
 import pprint
 import subprocess
 import sys
-import polling
-#import requests
-import httpx
-import time
 from shutil import which
 
+import httpx
+import polling
 from termcolor import colored
 
 
@@ -58,34 +56,48 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
     evm_bytecode = run_solc.stdout.decode("utf8").split("\n")[4]
 
-    #### start up a ganache process (todo: can i run all the tests in one to save time?)
+    #### start up a ganache process
     run_ganache = subprocess.Popen(["ganache-cli",
-                                    "--debug", "--verbose",
+                                    "--verbose",
                                     "--host", "localhost",
                                     "--gasLimit", str(test_info.get('gas', defaults['gas'])),
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
-                                    ]) #, stdout=subprocess.PIPE)
+                                    ])  # , stdout=subprocess.PIPE) todo
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
     #### poll for an account to let it start up
-
-    # r =
-    #
-    # if not r.status_code == httpx.codes.OK:
-    #     run_ganache.terminate()
-    #     return {'result': "fail", 'progress': progress,
-    #             "reason": f"accounts request had non-ok status code: {r.status_code}"}
-
+    retries = 100
+    id = 1  # todo i don't really know what this does
     account_reply = polling.poll(
-        lambda: httpx.post(ganache_host, json={"jsonrpc": "2.0", "method": "eth_accounts", "params": [], "id": 1}).status_code == httpx.codes.OK,
+        lambda: httpx.post(ganache_host, json={"jsonrpc": "2.0", "method": "eth_accounts", "params": [], "id": id}),
+        check_success=lambda x: x.status_code == httpx.codes.OK,
         ignore_exceptions=(httpx.ConnectError,),
-        step=1,
-        max_tries=100
+        step=0.5,
+        max_tries=retries
     )
-    print(account_reply)
+
+    if not account_reply:
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"after {retries} tries, ganache-cli did not produce any account data"}
+    else:
+        progress = progress + [f"account reply is {str(account_reply.json())}"]
+
+    account_number = account_reply.json()['result'][0]
 
     #### send a transaction
+    transaction_reply = httpx.post(ganache_host, json={"jsonrpc": "2.0",
+                                                       "method": "eth_sendTransaction",
+                                                       "params": {
+                                                           "from": str(account_number),
+                                                           "gas": str(test_info.get('gas', defaults['gas'])),
+                                                           "gasPrice": str(
+                                                               test_info.get('gasprice', defaults['gasprice'])),
+                                                           "value": "0x0",  # todo i don't know what this does
+                                                           "data": f"0x{evm_bytecode}",
+                                                       },
+                                                       "id": id})
 
     #### get a transaction receipt to get the contract address
 
@@ -98,7 +110,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
 
     #### kill ganache and return a pass
-    run_ganache.terminate()
+    run_ganache.kill()
     return {'result': "pass", 'progress': progress, "reason": "nothing failed"}
 
 
@@ -172,7 +184,7 @@ if args.verbose:
 
 failed = []
 for test in tests_to_run:
-    result = run_one_test(test, args.verbose, jar_path[0],tests_data['defaults'])
+    result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
     if result['result'] == "pass":
         print(colored("PASS:", 'green'), test['file'])
     elif result['result'] == "fail":
