@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
+import argparse
 import glob
 import json
 import os
 import pprint
 import subprocess
 import sys
-import argparse
 from shutil import which
 
 from termcolor import colored
@@ -27,26 +27,53 @@ def check_for_command(cmd):
 
 
 # return { result -> pass/fail, progress -> list of strings, reason -> string, non empty if we're in fail }
-def run_one_test(test_info, verbose, obsidian_jar):
+def run_one_test(test_info, verbose, obsidian_jar, defaults):
     ganache_host = "http://localhost:8545"
+    test_name = os.path.splitext(test_info['file'])[0]
     progress = []
     # compile the obsidian file in question to yul with a jar of obsidianc
-    comp_result = subprocess.run(
+    run_obsidianc = subprocess.run(
         ["java", "-jar", obsidian_jar, "--yul", f"resources/tests/GanacheTests/{test_info['file']}"],
         capture_output=True)
-    if not comp_result.returncode == 0:
+    if not run_obsidianc.returncode == 0:
         return {'result': "fail", 'progress': progress,
-                "reason": f"obsidianc run failed with output {comp_result.stderr}"}
+                "reason": f"obsidianc run failed with output {run_obsidianc.stderr}"}
     else:
-        progress = progress + ["compiled obsidian to yul"]
+        progress = progress + ["obsidianc compiled obsidian to yul"]
 
     # compile the yul to evm with solc
-    # docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
+    run_solc = subprocess.run(
+        ["docker", "run", "-v", f"{os.getcwd().format()}/{test_name}/:/src", "ethereum/solc:stable",
+         "--bin", "--strict-assembly", "--optimize", f"/src/{test_name}.yul"], capture_output=True)
+    if not run_solc.returncode == 0:
+        return {'result': "fail", 'progress': progress,
+                "reason": f"solc run failed with output {run_solc.stderr}"}
+    else:
+        progress = progress + ["solc compiled yul to evm"]
+
+    evm_bytecode = run_solc.stdout.decode("utf8").split("\n")[4]
 
     # start up a ganache process (todo: can i run all the tests in one to save time?)
     # ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
+    run_ganache = subprocess.Popen(["ganache-cli",
+                                    "--host", "localhost",
+                                    "--gasLimit", str(test_info.get('gas', defaults['gas'])),
+                                    "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
+                                    "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
+                                    ])
+    print(str(run_ganache))
 
     # poll for an account to let it start up
+    # r = requests.post('https://httpbin.org/post', data={'key': 'value'})
+    # r.json()
+    # r.status_code == requests.codes.ok
+    #
+    # import polling  # Wait until Google homepage returns 200 status code
+    # x = polling.poll(
+    #     lambda: requests.get('http://google.com').status_code == 200,
+    #     step=60,
+    #     poll_forever=True
+    # )
 
     # send a transaction
 
@@ -61,6 +88,7 @@ def run_one_test(test_info, verbose, obsidian_jar):
     # decode the logs from the bloom filter, if the test JSON includes a requirement for logs
 
     # kill ganache
+    run_ganache.terminate()
 
     return {'result': "pass", 'progress': progress, "reason": ""}
 
@@ -72,7 +100,7 @@ parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 args = parser.parse_args()
 
-# todo; grab this off the commandline, also verbosity
+# todo; grab this off the commandline
 test_dir = 'resources/tests/GanacheTests/'
 
 # check to make sure the tools we need are installed and print versions; error otherwise
@@ -135,7 +163,7 @@ if args.verbose:
 
 failed = []
 for test in tests_to_run:
-    result = run_one_test(test, args.verbose, jar_path[0])
+    result = run_one_test(test, args.verbose, jar_path[0],tests_data['defaults'])
     if result['result'] == "pass":
         print(colored("PASS:", 'green'), test['file'])
     elif result['result'] == "fail":
