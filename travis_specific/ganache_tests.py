@@ -7,6 +7,10 @@ import os
 import pprint
 import subprocess
 import sys
+import polling
+#import requests
+import httpx
+import time
 from shutil import which
 
 from termcolor import colored
@@ -31,7 +35,8 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     ganache_host = "http://localhost:8545"
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
-    # compile the obsidian file in question to yul with a jar of obsidianc
+
+    #### compile the obsidian file in question to yul with a jar of obsidianc
     run_obsidianc = subprocess.run(
         ["java", "-jar", obsidian_jar, "--yul", f"resources/tests/GanacheTests/{test_info['file']}"],
         capture_output=True)
@@ -41,7 +46,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     else:
         progress = progress + ["obsidianc compiled obsidian to yul"]
 
-    # compile the yul to evm with solc
+    #### compile the yul to evm with solc
     run_solc = subprocess.run(
         ["docker", "run", "-v", f"{os.getcwd().format()}/{test_name}/:/src", "ethereum/solc:stable",
          "--bin", "--strict-assembly", "--optimize", f"/src/{test_name}.yul"], capture_output=True)
@@ -53,44 +58,48 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
     evm_bytecode = run_solc.stdout.decode("utf8").split("\n")[4]
 
-    # start up a ganache process (todo: can i run all the tests in one to save time?)
-    # ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
+    #### start up a ganache process (todo: can i run all the tests in one to save time?)
     run_ganache = subprocess.Popen(["ganache-cli",
+                                    "--debug", "--verbose",
                                     "--host", "localhost",
                                     "--gasLimit", str(test_info.get('gas', defaults['gas'])),
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
-                                    ])
-    print(str(run_ganache))
+                                    ]) #, stdout=subprocess.PIPE)
+    progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
-    # poll for an account to let it start up
-    # r = requests.post('https://httpbin.org/post', data={'key': 'value'})
-    # r.json()
-    # r.status_code == requests.codes.ok
+    #### poll for an account to let it start up
+
+    # r =
     #
-    # import polling  # Wait until Google homepage returns 200 status code
-    # x = polling.poll(
-    #     lambda: requests.get('http://google.com').status_code == 200,
-    #     step=60,
-    #     poll_forever=True
-    # )
+    # if not r.status_code == httpx.codes.OK:
+    #     run_ganache.terminate()
+    #     return {'result': "fail", 'progress': progress,
+    #             "reason": f"accounts request had non-ok status code: {r.status_code}"}
 
-    # send a transaction
+    account_reply = polling.poll(
+        lambda: httpx.post(ganache_host, json={"jsonrpc": "2.0", "method": "eth_accounts", "params": [], "id": 1}).status_code == httpx.codes.OK,
+        ignore_exceptions=(httpx.ConnectError,),
+        step=1,
+        max_tries=100
+    )
+    print(account_reply)
 
-    # get a transaction receipt to get the contract address
+    #### send a transaction
 
-    # get the contract address from the transaction receipt
+    #### get a transaction receipt to get the contract address
 
-    # use call and the contract address to get the result of the function
+    #### get the contract address from the transaction receipt
 
-    # pull the result out of the JSON objec
+    #### use call and the contract address to get the result of the function
 
-    # decode the logs from the bloom filter, if the test JSON includes a requirement for logs
+    #### pull the result out of the JSON object
 
-    # kill ganache
+    #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
+
+    #### kill ganache and return a pass
     run_ganache.terminate()
-
-    return {'result': "pass", 'progress': progress, "reason": ""}
+    return {'result': "pass", 'progress': progress, "reason": "nothing failed"}
 
 
 parser = argparse.ArgumentParser()
@@ -168,7 +177,7 @@ for test in tests_to_run:
         print(colored("PASS:", 'green'), test['file'])
     elif result['result'] == "fail":
         print(colored("FAIL:", 'red'), test['file'])
-        print(f"\t{result}")
+        pprint.pprint(result, indent=4)
         failed = failed + [test['file']]
     else:
         error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
