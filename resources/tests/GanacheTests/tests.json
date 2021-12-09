@@ -4,7 +4,8 @@
     "gasprice": "0x9184e72a000",
     "startingeth": 500000000,
     "numaccts": 1,
-    "testexp": "main()"
+    "testtrans": "main",
+    "testargs": []
   },
   "tests": [
     {
@@ -150,7 +151,7 @@
     {
       "file": "Return2.obs",
       "expected": "8",
-      "test_exp": "g()",
+      "testtrans": "g",
       "shows_that_we_support": "returning and functions called for effect only"
     },
     {

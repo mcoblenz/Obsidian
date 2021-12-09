@@ -60,17 +60,17 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     run_ganache = subprocess.Popen(["ganache-cli",
                                     "--verbose",
                                     "--host", "localhost",
-                                    "--gasLimit", str(test_info.get('gas', defaults['gas'])),
+                                    "--gasLimit", str(hex(test_info.get('gas', defaults['gas']))),
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
-                                    ])  # , stdout=subprocess.PIPE) todo
+                                    ])  # , stdout=subprocess.PIPE) todo deal with output
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
     #### poll for an account to let it start up
     retries = 100
-    id = 1  # todo i don't really know what this does
+    eth_id = 1  # todo i don't really know what this does
     account_reply = polling.poll(
-        lambda: httpx.post(ganache_host, json={"jsonrpc": "2.0", "method": "eth_accounts", "params": [], "id": id}),
+        lambda: httpx.post(ganache_host, json={"jsonrpc": "2.0", "method": "eth_accounts", "params": [], "id": eth_id}),
         check_success=lambda x: x.status_code == httpx.codes.OK,
         ignore_exceptions=(httpx.ConnectError,),
         step=0.5,
@@ -97,11 +97,45 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                                                            "value": "0x0",  # todo i don't know what this does
                                                            "data": f"0x{evm_bytecode}",
                                                        },
-                                                       "id": id})
+                                                       "id": eth_id})
+
+    if not transaction_reply.status_code == httpx.codes.OK:
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"posting to eth_sendTransaction got {transaction_reply.status_code} which is not OK"}
+    elif "error" in transaction_reply.json().keys():
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"posting to eth_sendTransaction returned an error: {str(transaction_reply.json())}"}
+    else:
+        progress = progress + [f"transaction reply is {str(transaction_reply.json())}"]
+
+    #### warn if there's no expected result because this is as far as we go
+    if not test_info['expected']:
+        warn(f"no expected result given for test {test_name} so exiting early")
+        run_ganache.kill()
+        return {'result': "pass", 'progress': progress,
+                "reason": "nothing failed; note that no result was checked, though"}
+
+    transaction_hash = transaction_reply.json()['result']
 
     #### get a transaction receipt to get the contract address
+    get_transaction_recipt_reply = httpx.post(ganache_host, json={"jsonrpc": "2.0",
+                                                                  "method": "eth_getTransactionReceipt",
+                                                                  "params": [transaction_hash],
+                                                                  "id": eth_id})
+    if not get_transaction_recipt_reply.status_code == httpx.codes.OK:
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"posting to eth_getTransactionReceipt got {get_transaction_recipt_reply.status_code} which is not OK"}
+    elif not get_transaction_recipt_reply.json()['result']['status'] == "0x1":
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"eth_getTransactionReceipt has non-0x1 status {str(get_transaction_recipt_reply.json())}"}
+    else:
+        progress = progress + [f"getTransactionReceipt reply is {str(get_transaction_recipt_reply.json())}"]
 
-    #### get the contract address from the transaction receipt
+    contract_address = get_transaction_recipt_reply.json()['result']['contractAddress']
 
     #### use call and the contract address to get the result of the function
 
