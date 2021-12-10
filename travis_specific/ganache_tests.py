@@ -38,6 +38,11 @@ def twos_comp(val, bits):
     return val
 
 
+def is_port_in_use(port):
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
 # return { result -> pass/fail, progress -> list of strings, reason -> string, non empty if we're in fail }
 def run_one_test(test_info, verbose, obsidian_jar, defaults):
     ganache_host = "http://localhost:8545"
@@ -86,7 +91,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     account_reply = polling.poll(
         lambda: httpx.post(ganache_host,
                            json={"jsonrpc": json_rpc, "method": "eth_accounts", "params": [], "id": eth_id}),
-        check_success=lambda x: x.status_code == httpx.codes.OK,
+        check_success=lambda r: r.status_code == httpx.codes.OK,
         ignore_exceptions=(httpx.ConnectError,),
         step=0.5,
         max_tries=retries
@@ -143,7 +148,8 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     if not get_transaction_recipt_reply.status_code == httpx.codes.OK:
         run_ganache.kill()
         return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_getTransactionReceipt got {get_transaction_recipt_reply.status_code} which is not OK"}
+                "reason": f"posting to eth_getTransactionReceipt got {get_transaction_recipt_reply.status_code}" 
+                          "which is not OK"}
     elif not get_transaction_recipt_reply.json()['result']['status'] == "0x1":
         run_ganache.kill()
         return {'result': "fail", 'progress': progress,
@@ -194,6 +200,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + ["got matched expected"]
 
     #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
+    # TODO
 
     #### kill ganache and return a pass
     run_ganache.kill()
@@ -209,25 +216,25 @@ parser.add_argument("-q", "--quick", help="take some short cuts to run quickly i
                     action="store_true")
 parser.add_argument("-c", "--clean", help="delete intermediate files after the run is complete",
                     action="store_true")
+parser.add_argument("-d", "--dir", help="directory that contains the test json and obsidian files",
+                    type=str, default='resources/tests/GanacheTests/')
 parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 args = parser.parse_args()
 
-# todo; grab this off the commandline
-test_dir = 'resources/tests/GanacheTests/'
-
 # read the tests json file into a dictionary
-f = open(test_dir + 'tests.json')
+f = open(args.dir + 'tests.json')
 if not f:
     error("could not open tests.json file")
 tests_data = json.load(f)
 f.close()
 
-#todo error if 8545 isn't clear
+if is_port_in_use(8548):
+    error("ganache-cli won't be able to start up, port 8545 isn't free")
 
 # compare the files present to the tests described, producing a warning in either direction
 files_with_tests = [test['file'] for test in tests_data['tests']]
-files_present = [os.path.basename(obs) for obs in glob.glob(test_dir + '*.obs')]
+files_present = [os.path.basename(obs) for obs in glob.glob(args.dir + '*.obs')]
 
 extra_files = list(set(files_present) - set(files_with_tests))
 extra_test_descriptions = list(set(files_with_tests) - set(files_present))
@@ -258,11 +265,13 @@ if args.verbose:
 
 # check to make sure the tools we need are installed and print versions; error otherwise
 if not args.quick:
-    cmds = ["ganache-cli", "node", "npm"]  # todo add: java, solc
+    cmds = ["ganache-cli", "node", "npm", "java", "docker"]  # todo add: solc
+    print("-------- versions --------")
     for c in cmds:
         check_for_command(c)
         version = subprocess.run([c, "--version"], capture_output=True)
         print(f"{c}\t{version.stdout.strip().decode()}")
+    print("--------------------------\n")
 else:
     warn("taking a shortcut and not outputting version info or checking for commands")
 
@@ -272,7 +281,7 @@ else:
     if args.verbose:
         print("running sbt build")
 
-    build = subprocess.run(["make", "notest"], capture_output=True)  # todo output here
+    build = subprocess.run(["make", "notest"], capture_output=True)
     if not build.returncode == 0:
         print(build)
         error(build.stdout.decode("utf8"))
