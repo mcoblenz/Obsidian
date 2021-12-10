@@ -9,6 +9,8 @@ import subprocess
 import sys
 from shutil import which
 
+import eth_abi
+from Crypto.Hash import keccak
 import httpx
 import polling
 from termcolor import colored
@@ -26,6 +28,13 @@ def error(s):
 def check_for_command(cmd):
     if not which(cmd):
         error(f"{cmd} not installed")
+
+
+def twos_comp(val, bits):
+    """compute the 2's complement of int value val"""
+    if (val & (1 << (bits - 1))) != 0:
+        val = val - (1 << bits)
+    return val
 
 
 # return { result -> pass/fail, progress -> list of strings, reason -> string, non empty if we're in fail }
@@ -69,8 +78,10 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     #### poll for an account to let it start up
     retries = 100
     eth_id = 1  # todo i don't really know what this does
+    json_rpc = "2.0"
     account_reply = polling.poll(
-        lambda: httpx.post(ganache_host, json={"jsonrpc": "2.0", "method": "eth_accounts", "params": [], "id": eth_id}),
+        lambda: httpx.post(ganache_host,
+                           json={"jsonrpc": json_rpc, "method": "eth_accounts", "params": [], "id": eth_id}),
         check_success=lambda x: x.status_code == httpx.codes.OK,
         ignore_exceptions=(httpx.ConnectError,),
         step=0.5,
@@ -87,7 +98,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     account_number = account_reply.json()['result'][0]
 
     #### send a transaction
-    transaction_reply = httpx.post(ganache_host, json={"jsonrpc": "2.0",
+    transaction_reply = httpx.post(ganache_host, json={"jsonrpc": json_rpc,
                                                        "method": "eth_sendTransaction",
                                                        "params": {
                                                            "from": str(account_number),
@@ -120,10 +131,11 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     transaction_hash = transaction_reply.json()['result']
 
     #### get a transaction receipt to get the contract address
-    get_transaction_recipt_reply = httpx.post(ganache_host, json={"jsonrpc": "2.0",
+    get_transaction_recipt_reply = httpx.post(ganache_host, json={"jsonrpc": json_rpc,
                                                                   "method": "eth_getTransactionReceipt",
                                                                   "params": [transaction_hash],
                                                                   "id": eth_id})
+
     if not get_transaction_recipt_reply.status_code == httpx.codes.OK:
         run_ganache.kill()
         return {'result': "fail", 'progress': progress,
@@ -138,8 +150,44 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     contract_address = get_transaction_recipt_reply.json()['result']['contractAddress']
 
     #### use call and the contract address to get the result of the function
+    method_name = test_info.get('trans', defaults['trans'])
+    method_types = test_info.get('types', defaults['types'])
+    method_args = test_info.get('args', defaults['args'])
 
-    #### pull the result out of the JSON object
+    keccak_hash = keccak.new(digest_bits=256)
+    keccak_hash.update(bytes(method_name + "(" + ",".join(method_types) + ")", "utf8"))
+    hash_to_call = keccak_hash.hexdigest()[:8]
+    encoded_args = eth_abi.encode_abi(method_types, method_args).decode("utf8")
+
+    call_reply = httpx.post(ganache_host, json={"jsonrpc": json_rpc,
+                                                "method": "eth_call",
+                                                "params": [
+                                                    {"from": account_number,
+                                                     "to": contract_address,
+                                                     "data": f"0x{hash_to_call}{encoded_args}"
+                                                     }, "latest"],
+                                                "id": eth_id})
+
+    if not call_reply.status_code == httpx.codes.OK:
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"posting to eth_call got {call_reply.status_code} which is not OK"}
+    elif 'error' in call_reply.json().keys():
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"eth_call reply contains error information {str(call_reply.json())}"}
+    else:
+        progress = progress + [f"eth_call reply is {str(call_reply.json())}"]
+
+    #### compare the result to the expected answer
+    got = twos_comp(int(call_reply.json()['result'], 16), 8*32)
+    expected = int(test_info['expected'])
+    if not got == expected:
+        run_ganache.kill()
+        return {'result': "fail", 'progress': progress,
+                "reason": f"expected {expected} but got {got}"}
+    else:
+        progress = progress + ["got matched expected"]
 
     #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
 
@@ -151,19 +199,18 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 parser = argparse.ArgumentParser()
 parser.add_argument("-v", "--verbose", help="increase output verbosity",
                     action="store_true")
+parser.add_argument("-q", "--quick", help="take some short cuts to run quickly in a local, non-travis "
+                                          "setting. note that this should NOT be taken as the standard, "
+                                          "it's just a debugging convenience",
+                    action="store_true")
+parser.add_argument("-c", "--clean", help="delete intermediate files after the run is complete",
+                    action="store_true")
 parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 args = parser.parse_args()
 
 # todo; grab this off the commandline
 test_dir = 'resources/tests/GanacheTests/'
-
-# check to make sure the tools we need are installed and print versions; error otherwise
-cmds = ["ganache-cli", "node", "npm"]  # todo add: java, solc
-for c in cmds:
-    check_for_command(c)
-    version = subprocess.run([c, "--version"], capture_output=True)
-    print(f"{c}\t{version.stdout.strip().decode()}")
 
 # read the tests json file into a dictionary
 f = open(test_dir + 'tests.json')
@@ -187,25 +234,14 @@ if extra_test_descriptions:
     warn("there are described tests that do not have present obsidian files:\n\t" + pprint.pformat(
         extra_test_descriptions))
 
-if args.verbose:
-    print("running sbt build")
-
-# todo: os.environ.get("TRAVIS_SCALA_VERSION") <-- maybe in the make file
-build = subprocess.run(["make", "notest"], capture_output=True)  # todo output here
-if not build.returncode == 0:
-    print(build)
-    error(build.stdout.decode("utf8"))
-
-jar_path = glob.glob("target/scala*/obsidianc.jar")
-if not jar_path:
-    error("could not find an obsidianc jar file after running sbt")
-
-if args.verbose:
-    print(f"using top of {pprint.pformat(jar_path)}")
-
-# todo gross
+# by default, we'll run the whole suite, but if there are positional arguments we'll do those instead (or error if
+# they don't exist in the json file)
 tests_to_run = tests_data['tests']
 if args.tests:
+    for x in args.tests:
+        if x not in set(map(lambda t: os.path.splitext(t['file'])[0], tests_data['tests'])):
+            error(f"{x} is not a defined test")
+    # if there are no undefined names, filter the data from the json according to the arguments given
     tests_to_run = list(filter(lambda t: os.path.splitext(t['file'])[0] in set(args.tests), tests_data['tests']))
 
 if args.verbose:
@@ -214,7 +250,33 @@ if args.verbose:
     else:
         print(f"no tests specified, so running the whole suite:\n{pprint.pformat(tests_to_run)}")
 
-# todo: bark if the tests specified aren't in the json file, too.
+# check to make sure the tools we need are installed and print versions; error otherwise
+if not args.quick:
+    cmds = ["ganache-cli", "node", "npm"]  # todo add: java, solc
+    for c in cmds:
+        check_for_command(c)
+        version = subprocess.run([c, "--version"], capture_output=True)
+        print(f"{c}\t{version.stdout.strip().decode()}")
+else:
+    warn("taking a shortcut and not outputting version info or checking for commands")
+
+if args.quick and glob.glob("target/scala*/obsidianc.jar"):
+    warn("taking a shortcut and using an existing obsidianc jar")
+else:
+    if args.verbose:
+        print("running sbt build")
+
+    build = subprocess.run(["make", "notest"], capture_output=True)  # todo output here
+    if not build.returncode == 0:
+        print(build)
+        error(build.stdout.decode("utf8"))
+
+jar_path = glob.glob("target/scala*/obsidianc.jar")
+if not jar_path:
+    error("could not find an obsidianc jar file after running sbt")
+
+if args.verbose:
+    print(f"using top of {pprint.pformat(jar_path)}")
 
 failed = []
 for test in tests_to_run:
@@ -227,6 +289,13 @@ for test in tests_to_run:
         failed = failed + [test['file']]
     else:
         error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
+
+    if args.clean:
+        name = os.path.splitext(test['file'])[0]
+        warn(f"removing directory for {name}")
+        os.remove(f"{name}/{name}.yul")
+        os.rmdir(f"{name}")
+
 
 if failed:
     print(colored(f"\n{len(failed)}/{str(len(tests_to_run))} TESTS FAILED", 'red'))
