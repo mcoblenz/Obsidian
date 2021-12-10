@@ -299,6 +299,8 @@ for test in tests_to_run:
 
 if failed:
     print(colored(f"\n{len(failed)}/{str(len(tests_to_run))} TESTS FAILED", 'red'))
+    if args.verbose:
+        pprint.pprint(failed)
     sys.exit(1)
 else:
     print(colored(f"\nALL {str(len(tests_to_run))} TESTS PASSED", 'green'))
