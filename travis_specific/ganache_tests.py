@@ -67,13 +67,16 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     evm_bytecode = run_solc.stdout.decode("utf8").split("\n")[4]
 
     #### start up a ganache process
+    stdout_redirect = subprocess.PIPE
+    if verbose:
+        stdout_redirect = None
     run_ganache = subprocess.Popen(["ganache-cli",
                                     "--verbose",
                                     "--host", "localhost",
                                     "--gasLimit", str(hex(test_info.get('gas', defaults['gas']))),
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
-                                    ])  # , stdout=subprocess.PIPE) todo deal with output
+                                    ], stdout=stdout_redirect)
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
     #### poll for an account to let it start up
