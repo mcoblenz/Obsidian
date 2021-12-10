@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import argparse
+import binascii
 import glob
 import json
 import os
@@ -157,7 +158,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     keccak_hash = keccak.new(digest_bits=256)
     keccak_hash.update(bytes(method_name + "(" + ",".join(method_types) + ")", "utf8"))
     hash_to_call = keccak_hash.hexdigest()[:8]
-    encoded_args = eth_abi.encode_abi(method_types, method_args).decode("utf8")
+    encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
     call_reply = httpx.post(ganache_host, json={"jsonrpc": json_rpc,
                                                 "method": "eth_call",
@@ -218,6 +219,8 @@ if not f:
     error("could not open tests.json file")
 tests_data = json.load(f)
 f.close()
+
+#todo error if 8545 isn't clear
 
 # compare the files present to the tests described, producing a warning in either direction
 files_with_tests = [test['file'] for test in tests_data['tests']]
@@ -280,6 +283,7 @@ if args.verbose:
 
 failed = []
 for test in tests_to_run:
+    # todo error if there's directories present with test names and we're in -c
     result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
     if result['result'] == "pass":
         print(colored("PASS:", 'green'), test['file'])

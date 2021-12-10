@@ -204,11 +204,15 @@
         },
         {
             "file": "SetGetMainArgs1.obs",
+            "args": [3],
+            "types": ["int256"],
             "expected": "5",
             "shows_that_we_support": "setting and getting where the argument to set comes from the client via ganache with one argument"
         },
         {
             "file": "SetGetMainArgs3.obs",
+            "args": [3,2,1],
+            "types": ["int256","int256","int256"],
             "expected": "8",
             "shows_that_we_support": "setting and getting where the argument to set comes from the client via ganache with three arguments"
         },
