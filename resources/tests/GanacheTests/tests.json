@@ -169,7 +169,7 @@
         {
             "file": "Return2.obs",
             "expected": "8",
-            "testtrans": "g",
+            "trans": "f",
             "shows_that_we_support": "returning and functions called for effect only"
         },
         {
