@@ -7,12 +7,7 @@ contract Return {
         return (4+4);
     }
     
-    function g() public pure {
-        int x = f();
-        return;
-    }
-    
-    function main() public pure returns (int) {
-        return f();
+    function main(int y) public pure returns (int) {
+        return f() + y;
     }
 }

@@ -14,10 +14,10 @@ contract CombinedBasics {
         return x;
     }
     
-    function main() public pure returns (int) {
+    function main(int y) public pure returns (int) {
         int x;
         x = 9 + 0;
-        x = val();
+        x = val() + y;
         return x;
     }
 }

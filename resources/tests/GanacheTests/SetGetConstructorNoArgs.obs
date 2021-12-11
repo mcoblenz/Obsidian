@@ -1,0 +1,22 @@
+contract IntContainer{
+    int x;
+
+    IntContainer@Owned() {
+        x = 0;
+    }
+
+    transaction set(int value) {
+        x = value;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+main contract SetGetConstructorNoArgs{
+    transaction main() returns int{
+        IntContainer ic = new IntContainer();
+        ic.set(12);
+        return (ic.get());
+    }
+}

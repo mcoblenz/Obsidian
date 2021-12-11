@@ -13,10 +13,10 @@ main contract CombinedBasics {
         }
         return x;
     }
-    transaction main() returns int{
+    transaction main(int y) returns int{
         int x;
         x = 9 + 0;
-        x = val();
+        x = val() + y;
         return x;
     }
 }

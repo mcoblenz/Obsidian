@@ -1,5 +1,0 @@
-main contract PrimOpsGreaterEq{
-    transaction primopsgreatereq() returns bool {
-        return(12 >= 12);
-    }
-}

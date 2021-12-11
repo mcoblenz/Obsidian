@@ -1,0 +1,18 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int value) {
+        x = value;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+main contract SetGetWithArgs{
+    transaction main() returns int{
+        IntContainer ic = new IntContainer();
+        ic.set(5);
+        return (ic.get());
+    }
+}

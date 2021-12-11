@@ -7,10 +7,10 @@ contract SimpleCall {
         return 4;
     }
     
-    function main() public pure returns (int) {
+    function main(int y) public pure returns (int) {
         int x;
         x = 9;
         x = val();
-        return x;
+        return x + y;
     }
 }

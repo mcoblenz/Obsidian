@@ -1,11 +1,5 @@
 main contract IntConst{
-    transaction intconst() {
-        int x;
-        x = 12;
-        return;
-    }
-
-    transaction main() returns int {
-        return 12;
+    transaction main(int y) returns int {
+        return y;
     }
 }

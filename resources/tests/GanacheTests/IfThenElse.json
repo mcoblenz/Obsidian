@@ -2,7 +2,10 @@
     "gas" : 30000000,
     "gasprice" : "0x9184e72a000",
     "startingeth" : 5000000,
-    "numaccts" : 1,
+    "numaccts" : 2,
     "testexp" : "main()",
-    "expected" : "90"
+    "expected" : "93",
+    "method_name" : "main",
+    "method_signature" : "int256",
+    "method_params" : [3]
 }

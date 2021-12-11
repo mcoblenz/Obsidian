@@ -1,5 +1,5 @@
 main contract PrimOpsAdd{
-    transaction primopsadd() returns int {
-        return(5+8);
+    transaction primopsadd(int y) returns int {
+        return(5+y);
     }
 }

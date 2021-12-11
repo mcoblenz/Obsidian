@@ -1,5 +1,0 @@
-main contract PrimOpsOr{
-    transaction primopsor() returns bool {
-        return(true || false);
-    }
-}
