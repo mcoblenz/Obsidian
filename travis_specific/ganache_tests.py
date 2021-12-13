@@ -38,14 +38,19 @@ def twos_comp(val, bits):
     return val
 
 
-def is_port_in_use(port):
+def is_port_in_use(host, port):
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('localhost', port)) == 0
+        return s.connect_ex((host, port)) == 0
+
+
+ganache_host = 'localhost'
+ganache_port = 8545
+
 
 # return { result -> pass/fail, progress -> list of strings, reason -> string, non empty if we're in fail }
 def run_one_test(test_info, verbose, obsidian_jar, defaults):
-    ganache_host = "http://localhost:8545"
+    ganache_url = f"http://{ganache_host}:{str(ganache_port)}"
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
 
@@ -89,7 +94,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     eth_id = 1  # todo i don't really know what this does
     json_rpc = "2.0"
     account_reply = polling.poll(
-        lambda: httpx.post(ganache_host,
+        lambda: httpx.post(ganache_url,
                            json={"jsonrpc": json_rpc, "method": "eth_accounts", "params": [], "id": eth_id}),
         check_success=lambda r: r.status_code == httpx.codes.OK,
         ignore_exceptions=(httpx.ConnectError,),
@@ -107,7 +112,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     account_number = account_reply.json()['result'][0]
 
     #### send a transaction
-    transaction_reply = httpx.post(ganache_host, json={"jsonrpc": json_rpc,
+    transaction_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
                                                        "method": "eth_sendTransaction",
                                                        "params": {
                                                            "from": str(account_number),
@@ -140,7 +145,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     transaction_hash = transaction_reply.json()['result']
 
     #### get a transaction receipt to get the contract address
-    get_transaction_recipt_reply = httpx.post(ganache_host, json={"jsonrpc": json_rpc,
+    get_transaction_recipt_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
                                                                   "method": "eth_getTransactionReceipt",
                                                                   "params": [transaction_hash],
                                                                   "id": eth_id})
@@ -148,7 +153,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     if not get_transaction_recipt_reply.status_code == httpx.codes.OK:
         run_ganache.kill()
         return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_getTransactionReceipt got {get_transaction_recipt_reply.status_code}" 
+                "reason": f"posting to eth_getTransactionReceipt got {get_transaction_recipt_reply.status_code}"
                           "which is not OK"}
     elif not get_transaction_recipt_reply.json()['result']['status'] == "0x1":
         run_ganache.kill()
@@ -169,7 +174,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     hash_to_call = keccak_hash.hexdigest()[:8]
     encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
-    call_reply = httpx.post(ganache_host, json={"jsonrpc": json_rpc,
+    call_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
                                                 "method": "eth_call",
                                                 "params": [
                                                     {"from": account_number,
@@ -190,7 +195,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + [f"eth_call reply is {str(call_reply.json())}"]
 
     #### compare the result to the expected answer
-    got = twos_comp(int(call_reply.json()['result'], 16), 8*32)
+    got = twos_comp(int(call_reply.json()['result'], 16), 8 * 32)
     expected = int(test_info['expected'])
     if not got == expected:
         run_ganache.kill()
@@ -229,7 +234,7 @@ if not f:
 tests_data = json.load(f)
 f.close()
 
-if is_port_in_use(8548):
+if is_port_in_use(ganache_host, ganache_port):
     error("ganache-cli won't be able to start up, port 8545 isn't free")
 
 # compare the files present to the tests described, producing a warning in either direction
@@ -311,7 +316,6 @@ for test in tests_to_run:
         warn(f"removing directory for {name}")
         os.remove(f"{name}/{name}.yul")
         os.rmdir(f"{name}")
-
 
 if failed:
     print(colored(f"\n{len(failed)}/{str(len(tests_to_run))} TESTS FAILED", 'red'))
