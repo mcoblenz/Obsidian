@@ -11,9 +11,9 @@ import sys
 from shutil import which
 
 import eth_abi
-from Crypto.Hash import keccak
 import httpx
 import polling
+from Crypto.Hash import keccak
 from termcolor import colored
 
 
@@ -46,11 +46,11 @@ def is_port_in_use(host, port):
 
 ganache_host = 'localhost'
 ganache_port = 8545
+ganache_url = f"http://{ganache_host}:{str(ganache_port)}"
 
 
 # return { result -> pass/fail, progress -> list of strings, reason -> string, non empty if we're in fail }
 def run_one_test(test_info, verbose, obsidian_jar, defaults):
-    ganache_url = f"http://{ganache_host}:{str(ganache_port)}"
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
 
@@ -113,16 +113,16 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
     #### send a transaction
     transaction_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                       "method": "eth_sendTransaction",
-                                                       "params": {
-                                                           "from": str(account_number),
-                                                           "gas": str(test_info.get('gas', defaults['gas'])),
-                                                           "gasPrice": str(
-                                                               test_info.get('gasprice', defaults['gasprice'])),
-                                                           "value": "0x0",  # todo i don't know what this does
-                                                           "data": f"0x{evm_bytecode}",
-                                                       },
-                                                       "id": eth_id})
+                                                      "method": "eth_sendTransaction",
+                                                      "params": {
+                                                          "from": str(account_number),
+                                                          "gas": str(test_info.get('gas', defaults['gas'])),
+                                                          "gasPrice": str(
+                                                              test_info.get('gasprice', defaults['gasprice'])),
+                                                          "value": "0x0",  # todo i don't know what this does
+                                                          "data": f"0x{evm_bytecode}",
+                                                      },
+                                                      "id": eth_id})
 
     if not transaction_reply.status_code == httpx.codes.OK:
         run_ganache.kill()
@@ -146,9 +146,9 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
     #### get a transaction receipt to get the contract address
     get_transaction_recipt_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                                  "method": "eth_getTransactionReceipt",
-                                                                  "params": [transaction_hash],
-                                                                  "id": eth_id})
+                                                                 "method": "eth_getTransactionReceipt",
+                                                                 "params": [transaction_hash],
+                                                                 "id": eth_id})
 
     if not get_transaction_recipt_reply.status_code == httpx.codes.OK:
         run_ganache.kill()
@@ -175,13 +175,13 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
     call_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                "method": "eth_call",
-                                                "params": [
-                                                    {"from": account_number,
-                                                     "to": contract_address,
-                                                     "data": f"0x{hash_to_call}{encoded_args}"
-                                                     }, "latest"],
-                                                "id": eth_id})
+                                               "method": "eth_call",
+                                               "params": [
+                                                   {"from": account_number,
+                                                    "to": contract_address,
+                                                    "data": f"0x{hash_to_call}{encoded_args}"
+                                                    }, "latest"],
+                                               "id": eth_id})
 
     if not call_reply.status_code == httpx.codes.OK:
         run_ganache.kill()
