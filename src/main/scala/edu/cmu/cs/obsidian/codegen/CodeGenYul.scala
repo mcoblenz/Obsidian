@@ -176,7 +176,7 @@ object CodeGenYul extends CodeGenerator {
             transaction.retType match {
                 case Some(t) =>
                     id = Some(nextRet())
-                    Seq(TypedName(id.get.name, t))
+                    Seq(TypedName(id.get.name, obsTypeToYulType(t)))
                 case None => Seq()
             }
         }
@@ -194,7 +194,7 @@ object CodeGenYul extends CodeGenerator {
             } else {
                 transactionNameMapping(contractName, transaction.name)
             },
-                parameters = transaction.args.map(v => TypedName(v.varName, v.typIn)),
+                parameters = transaction.args.map(v => TypedName(v.varName, obsTypeToYulType(v.typIn))),
                 ret,
                 body = Block(body)))
     }
@@ -271,13 +271,13 @@ object CodeGenYul extends CodeGenerator {
                         decl_0exp(id) +: translateExpr(id, e, contractName, checkedTable, inMain)
                 }
             case VariableDecl(typ, varName) =>
-                Seq(decl_0exp_t(Identifier(varName), typ))
+                Seq(decl_0exp_t(Identifier(varName), obsTypeToYulType(typ)))
             case VariableDeclWithInit(typ, varName, e) =>
                 val id = nextTemp()
                 val e_yul = translateExpr(id, e, contractName, checkedTable, inMain)
                 decl_0exp(id) +:
                     e_yul :+
-                    decl_0exp_t_init(Identifier(varName), typ, id)
+                    decl_0exp_t_init(Identifier(varName), obsTypeToYulType(typ), id)
             case VariableDeclWithSpec(typIn, typOut, varName) =>
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()

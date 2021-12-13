@@ -21,8 +21,30 @@ trait Expression extends YulAST
 
 trait YulStatement extends YulAST
 
+sealed trait YulABIType
+
+case class YATAddress() extends YulABIType {
+    override def toString: String = "address"
+}
+
+case class YATUInt32() extends YulABIType {
+    override def toString: String = "int256"
+}
+
+case class YATBool() extends YulABIType {
+    override def toString: String = "bool"
+}
+
+case class YATString() extends YulABIType {
+    override def toString: String = "string"
+}
+
+case class YATContractName(name: String) extends YulABIType {
+    override def toString: String = name
+}
+
 // for each asm struct, create a case class
-case class TypedName(name: String, typ: ObsidianType) extends YulAST {
+case class TypedName(name: String, typ: YulABIType) extends YulAST {
     override def toString: String = {
         name
         /*
