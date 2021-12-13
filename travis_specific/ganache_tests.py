@@ -49,8 +49,13 @@ ganache_port = 8545
 ganache_url = f"http://{ganache_host}:{str(ganache_port)}"
 
 
-# return { result -> pass/fail, progress -> list of strings, reason -> string, non empty if we're in fail }
 def run_one_test(test_info, verbose, obsidian_jar, defaults):
+    """run a test given its info, verbosity, and the location of the jar file. this returns a dictionary of the form
+       { "result" -> "pass" or "fail",
+         "progress" -> list of strings describing how far we got in the test,
+         "reason" -> string, which describes the failure or is empty if it's a pass }
+    """
+    # todo there's a bunch of repeated code for checking the replies from httpx below.
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
 
@@ -82,16 +87,18 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         stdout_redirect = None
     run_ganache = subprocess.Popen(["ganache-cli",
                                     "--verbose",
-                                    "--host", "localhost",
+                                    "--host", ganache_host,
+                                    "--port", ganache_port,
                                     "--gasLimit", str(hex(test_info.get('gas', defaults['gas']))),
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
                                     ], stdout=stdout_redirect)
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
+    eth_id = 1  # this can be any number; replies should have the same one. we don't check that.
+
     #### poll for an account to let it start up
     retries = 100
-    eth_id = 1  # todo i don't really know what this does
     json_rpc = "2.0"
     account_reply = polling.poll(
         lambda: httpx.post(ganache_url,
@@ -119,7 +126,8 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                                                           "gas": str(test_info.get('gas', defaults['gas'])),
                                                           "gasPrice": str(
                                                               test_info.get('gasprice', defaults['gasprice'])),
-                                                          "value": "0x0",  # todo i don't know what this does
+                                                          # the amount of wei to send, which is always nothing
+                                                          "value": "0x0",
                                                           "data": f"0x{evm_bytecode}",
                                                       },
                                                       "id": eth_id})
@@ -228,14 +236,15 @@ parser.add_argument('tests', nargs='*',
 args = parser.parse_args()
 
 # read the tests json file into a dictionary
-f = open(args.dir + 'tests.json')
+test_filename = "tests.json"
+f = open(args.dir + test_filename)
 if not f:
-    error("could not open tests.json file")
+    error(f"could not open {test_filename} file")
 tests_data = json.load(f)
 f.close()
 
 if is_port_in_use(ganache_host, ganache_port):
-    error("ganache-cli won't be able to start up, port 8545 isn't free")
+    error(f"ganache-cli won't be able to start up, port {ganache_port} isn't free on {ganache_host}")
 
 # compare the files present to the tests described, producing a warning in either direction
 files_with_tests = [test['file'] for test in tests_data['tests']]
@@ -252,6 +261,8 @@ if extra_test_descriptions:
     warn("there are described tests that do not have present obsidian files:\n\t" + pprint.pformat(
         extra_test_descriptions))
 
+# todo: there's a fair amount of repetition here with splitting the file name and that sort of thing
+
 # by default, we'll run the whole suite, but if there are positional arguments we'll do those instead (or error if
 # they don't exist in the json file)
 tests_to_run = tests_data['tests']
@@ -261,6 +272,11 @@ if args.tests:
             error(f"{x} is not a defined test")
     # if there are no undefined names, filter the data from the json according to the arguments given
     tests_to_run = list(filter(lambda t: os.path.splitext(t['file'])[0] in set(args.tests), tests_data['tests']))
+
+if args.clean:
+    for x in tests_to_run:
+        if os.path.isdir(os.path.splitext(x['file'])[0]):
+            error(f"running {str(x['file'])} would delete an existing directory")
 
 if args.verbose:
     if args.tests:
@@ -300,7 +316,6 @@ if args.verbose:
 
 failed = []
 for test in tests_to_run:
-    # todo error if there's directories present with test names and we're in -c
     result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
     if result['result'] == "pass":
         print(colored("PASS:", 'green'), test['file'])
