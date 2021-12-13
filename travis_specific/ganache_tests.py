@@ -88,7 +88,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     run_ganache = subprocess.Popen(["ganache-cli",
                                     "--verbose",
                                     "--host", ganache_host,
-                                    "--port", ganache_port,
+                                    "--port", str(ganache_port),
                                     "--gasLimit", str(hex(test_info.get('gas', defaults['gas']))),
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
@@ -244,7 +244,7 @@ tests_data = json.load(f)
 f.close()
 
 if is_port_in_use(ganache_host, ganache_port):
-    error(f"ganache-cli won't be able to start up, port {ganache_port} isn't free on {ganache_host}")
+    error(f"ganache-cli won't be able to start up, port {int(ganache_port)} isn't free on {ganache_host}")
 
 # compare the files present to the tests described, producing a warning in either direction
 files_with_tests = [test['file'] for test in tests_data['tests']]
