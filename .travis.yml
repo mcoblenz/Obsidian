@@ -10,16 +10,14 @@ before_install:
   - nvm install 16 # as of 19 nov 2021, this version of node works with ganache and 17 does not
   - npm install -g npm # update npm
   - npm install -g ganache-cli # install ganache
-  - sudo apt update
-  - sudo apt install libcryptx-perl # crypto library needed for hashing in ganache interactions
-  - sudo snap install jq # JSON tool needed for ganache interactions
+  - python -m pip install termcolor eth_abi polling httpx pycryptodome
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle
 
 env:
   - TEST_SUITE=fabric_tests.sh
-  - TEST_SUITE=ganache_tests.sh
+  - TEST_SUITE=ganache_tests.py
 
 script: "travis_specific/$TEST_SUITE"
 
