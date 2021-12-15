@@ -235,6 +235,14 @@ parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 args = parser.parse_args()
 
+if is_port_in_use(ganache_host, ganache_port):
+    error(f"ganache-cli won't be able to start up, port {int(ganache_port)} isn't free on {ganache_host}")
+
+# docker stats --no-stream
+run_dstats = subprocess.run(["docker", "stats", "--no-stream"], capture_output=True)
+if not run_dstats.returncode == 0:
+    error(f"cannot connect to a docker daemon")
+
 # read the tests json file into a dictionary
 test_filename = "tests.json"
 f = open(args.dir + test_filename)
@@ -242,9 +250,6 @@ if not f:
     error(f"could not open {test_filename} file")
 tests_data = json.load(f)
 f.close()
-
-if is_port_in_use(ganache_host, ganache_port):
-    error(f"ganache-cli won't be able to start up, port {int(ganache_port)} isn't free on {ganache_host}")
 
 # compare the files present to the tests described, producing a warning in either direction
 files_with_tests = [test['file'] for test in tests_data['tests']]
