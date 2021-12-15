@@ -1,12 +1,10 @@
 package edu.cmu.cs.obsidian.parser
 
-import java.io.{InputStream, StringWriter}
-
-import edu.cmu.cs.obsidian.{lexer, parser}
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.typecheck._
 import org.apache.commons.io.IOUtils
 
+import java.io.{InputStream, StringWriter}
 import scala.util.parsing.combinator._
 import scala.util.parsing.input.Position
 
@@ -44,7 +42,8 @@ object Parser extends Parsers {
     private def parseId: Parser[Identifier] = {
         accept("identifier", {
             case t@IdentifierT(name) => (name, t.pos)
-            case t@ThisT() => ("this", t.pos)})
+            case t@ThisT() => ("this", t.pos)
+        })
     }
 
     private def parseIdAlternatives: Parser[Seq[Identifier]] = {
@@ -72,7 +71,6 @@ object Parser extends Parsers {
     }
 
 
-
     private def parseDotPath: Parser[Seq[Identifier]] = DotT() ~ parseId ~ opt(parseDotPath) ^^ {
         case _ ~ ident ~ rest => {
             rest match {
@@ -82,13 +80,13 @@ object Parser extends Parsers {
         }
     }
 
-    private def parsePath: Parser[Seq[Identifier]] = parseId ~ opt(parseDotPath) ^^{
-      case ident ~ rest => {
-        rest match {
-          case Some(path) => List(ident) ++ path
-          case None => List(ident)
+    private def parsePath: Parser[Seq[Identifier]] = parseId ~ opt(parseDotPath) ^^ {
+        case ident ~ rest => {
+            rest match {
+                case Some(path) => List(ident) ++ path
+                case None => List(ident)
+            }
         }
-      }
     }
 
     private def parseNonPrimitive: Parser[NonPrimitiveType] = {
@@ -114,7 +112,7 @@ object Parser extends Parsers {
         val intPrim = IntT() ^^ { t => IntType().setLoc(t) }
         val boolPrim = BoolT() ^^ { t => BoolType().setLoc(t) }
         val stringPrim = StringT() ^^ { t => StringType().setLoc(t) }
-        val int256Prim = Int256T() ^^ {t => Int256Type().setLoc(t)}
+        val int256Prim = Int256T() ^^ { t => Int256Type().setLoc(t) }
 
         parseNonPrimitive | intPrim | boolPrim | stringPrim | int256Prim
     }
@@ -154,6 +152,7 @@ object Parser extends Parsers {
                     case (typIn, typOut) ~ name => VariableDeclWithSpec(typIn, typOut, name._1).setLoc(name)
                 }
             }
+
             def isDefinedAt(x: (ObsidianType, ObsidianType) ~ Identifier): Boolean = {
                 x match {
                     case ((typIn, typOut) ~ name) =>
@@ -212,7 +211,7 @@ object Parser extends Parsers {
 
         val parseUpdate = {
             val oneUpdate = parseId ~! EqT() ~! parseExpr ^^ {
-                case f ~ _ ~ e => (ReferenceIdentifier(f._1).setLoc(f), e)
+                case f ~ _ ~ e => (ReferenceIdentifier(f._1, None).setLoc(f), e)
             }
             LParenT() ~ repsep(oneUpdate, CommaT()) ~ RParenT() ^^ {
                 case _ ~ updates ~ _ => updates
@@ -220,7 +219,7 @@ object Parser extends Parsers {
         }
 
         val parseTransition = RightArrowT() ~ parseId ~
-                              opt(parseUpdate) ~! SemicolonT() ^^ {
+            opt(parseUpdate) ~! SemicolonT() ^^ {
             case arrow ~ name ~ updates ~ _ => Transition(name._1, updates, Inferred()).setLoc(arrow)
         }
 
@@ -228,7 +227,7 @@ object Parser extends Parsers {
             parseType ~ parseId ~ EqT() ~! parseExpr ~! SemicolonT() ^^ {
                 case typ ~ name ~ _ ~ e ~ _ =>
                     VariableDeclWithInit(typ, name._1, e).setLoc(typ)
-        }
+            }
 
         val parseVarDecl =
             parseType ~ parseId ~! SemicolonT() ^^ {
@@ -243,7 +242,6 @@ object Parser extends Parsers {
         val parseRevert = RevertT() ~! opt(parseExpr) ~! SemicolonT() ^^ {
             case t ~ expr ~ _ => Revert(expr).setLoc(t)
         }
-
 
 
         val parseOnlyIf = IfT() ~! opt(LParenT()) ~ parseExpr ~! opt(InT() ~! parseId) ~ opt(RParenT()) ~! LBraceT() ~! parseBody ~! RBraceT()
@@ -265,7 +263,7 @@ object Parser extends Parsers {
         }
 
         val parseTryCatch = TryT() ~! LBraceT() ~! parseBody ~! RBraceT() ~!
-                            CatchT() ~! LBraceT() ~! parseBody <~ RBraceT() ^^ {
+            CatchT() ~! LBraceT() ~! parseBody <~ RBraceT() ^^ {
             case _try ~ _ ~ s1 ~ _ ~ _ ~ _ ~ s2 => TryCatch(s1, s2).setLoc(_try)
         }
 
@@ -276,7 +274,7 @@ object Parser extends Parsers {
         val parseSwitch =
             SwitchT() ~! parseExpr ~! LBraceT() ~! rep(parseCase) ~! RBraceT() ^^ {
                 case switch ~ e ~ _ ~ cases ~ _ => Switch(e, cases).setLoc(switch)
-        }
+            }
 
         val parseTypeState = parseIdAlternatives ^^ {
             idents =>
@@ -307,8 +305,8 @@ object Parser extends Parsers {
         }
 
         parseReturn | parseTransition | parseRevert |
-        parseVarDeclAssn | parseVarDecl | parseIf | parseSwitch |
-        parseTryCatch | parseExprFirst | parseStaticAssertion
+            parseVarDeclAssn | parseVarDecl | parseIf | parseSwitch |
+            parseTryCatch | parseExprFirst | parseStaticAssertion
     }
 
 
@@ -328,9 +326,9 @@ object Parser extends Parsers {
     }
 
     private def parseUnary(t: Token,
-                   makeExpr: Expression => Expression,
-                   nextParser: Parser[Expression]
-                  ): Parser[Expression] = {
+                           makeExpr: Expression => Expression,
+                           nextParser: Parser[Expression]
+                          ): Parser[Expression] = {
         val hasOpParser = t ~ parseUnary(t, makeExpr, nextParser) ^^ {
             case op ~ e => makeExpr(e).setLoc(op)
         }
@@ -339,24 +337,38 @@ object Parser extends Parsers {
     }
 
     private def parseExpr = parseDisown
+
     private def parseDisown = parseUnary(DisownT(), Disown
         .apply, parseAnd)
+
     private def parseAnd = parseBinary(AndT(), Conjunction.apply, parseOr)
+
     private def parseOr = parseBinary(OrT(), Disjunction.apply, parseEq)
 
     private def parseEq = parseBinary(EqEqT(), Equals.apply, parseNeq)
+
     private def parseNeq = parseBinary(NotEqT(), NotEquals.apply, parseGt)
+
     private def parseGt = parseBinary(GtT(), GreaterThan.apply, parseLt)
+
     private def parseLt = parseBinary(LtT(), LessThan.apply, parseLtEq)
+
     private def parseLtEq = parseBinary(LtEqT(), LessThanOrEquals.apply, parseGtEq)
+
     private def parseGtEq = parseBinary(GtEqT(), GreaterThanOrEquals.apply, parseAddition)
 
     private def parseAddition = parseBinary(PlusT(), Add.apply, parseSubtraction)
+
     private def parseSubtraction = parseBinary(MinusT(), Subtract.apply, parseMultiplication)
+
     private def parseMultiplication = parseBinary(StarT(), Multiply.apply, parseDivision)
+
     private def parseDivision = parseBinary(ForwardSlashT(), Divide.apply, parseMod)
+
     private def parseMod = parseBinary(PercentT(), Mod.apply, parseNot)
+
     private def parseNot = parseUnary(NotT(), LogicalNegation.apply, parseUnaryMinus)
+
     private def parseUnaryMinus = parseUnary(MinusT(), Negate.apply, parseExprBottom)
 
 
@@ -378,7 +390,7 @@ object Parser extends Parsers {
         def parseLocalInv = {
             parseId ~ parseTypeList ~ LParenT() ~ parseArgList ~ RParenT() ^^ {
                 // genericParams will be filled in later by the typechecker
-                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, Nil, params, args).setLoc(name)
+                case name ~ params ~ _ ~ args ~ _ => LocalInvocation(name._1, Nil, params, args, None).setLoc(name)
             }
         }
 
@@ -390,7 +402,7 @@ object Parser extends Parsers {
                 (e: Expression, inv: DotExpr) => inv match {
                     case Left(fieldName) => Dereference(e, fieldName._1).setLoc(fieldName)
                     // genericParams will be filled in later by the typechecker
-                    case Right((funcName, params, args)) => Invocation(e, Nil, params, funcName._1, args, false).setLoc(funcName)
+                    case Right((funcName, params, args)) => Invocation(e, Nil, params, funcName._1, args, false, None).setLoc(funcName)
                 }
             )
         }
@@ -409,10 +421,10 @@ object Parser extends Parsers {
             case _ ~ e ~ _ => e
         }
 
-        val parseVar = parseId ^^ { (id: Identifier) => ReferenceIdentifier(id._1).setLoc(id) }
+        val parseVar = parseId ^^ { (id: Identifier) => ReferenceIdentifier(id._1, None).setLoc(id) }
 
         val parseStateInitializer = parseId ~ ColonColonT() ~! parseId ^^ {
-            case stateName ~ _ ~ fieldName => StateInitializer(stateName, fieldName).setLoc(stateName)
+            case stateName ~ _ ~ fieldName => StateInitializer(stateName, fieldName, None).setLoc(stateName)
         }
 
         val parseNumLiteral = {
@@ -427,31 +439,37 @@ object Parser extends Parsers {
                         case None => Nil
                     }
 
-                    Construction(ContractType(name._1, typeParams), args, false).setLoc(_new)
+                    Construction(ContractType(name._1, typeParams), args, false, None).setLoc(_new)
             }
         }
 
-        val parseTrue = { accept("bool literal", { case t@TrueT() => TrueLiteral().setLoc(t) })}
-        val parseFalse = { accept("bool literal", { case t@FalseT() => FalseLiteral().setLoc(t) })}
+        val parseTrue = {
+            accept("bool literal", { case t@TrueT() => TrueLiteral().setLoc(t) })
+        }
+        val parseFalse = {
+            accept("bool literal", { case t@FalseT() => FalseLiteral().setLoc(t) })
+        }
 
         val parseLiterals: Parser[Expression] =
             parseTrue | parseFalse | parseNumLiteral | parseStringLiteral
 
-        val parseThis = { ThisT() ^^ (t => This().setLoc(t))}
+        val parseThis = {
+            ThisT() ^^ (t => This(None).setLoc(t))
+        }
 
         val fail = failure("expression expected")
 
         val simpleExpr: Parser[Expression] =
             parseThis | parseNew | parseLocalInv |
-            parseLiterals | parseStateInitializer | parseVar | parenExpr | fail
+                parseLiterals | parseStateInitializer | parseVar | parenExpr | fail
 
         simpleExpr ~ parseDots ^^ { case e ~ applyDots => applyDots(e) }
     }
 
     private def parseFieldDecl: Parser[Field] = {
         opt(ConstT()) ~ parseType ~ parseId ~! opt(parseAvailableIn) ~!
-                opt(EqT() ~! parseExpr ~! failure("fields may only be assigned inside of transactions")) ~!
-                SemicolonT() ^^ {
+            opt(EqT() ~! parseExpr ~! failure("fields may only be assigned inside of transactions")) ~!
+            SemicolonT() ^^ {
             case isConst ~ typ ~ name ~ availableIn ~ None ~ _ =>
                 val availableInSet = availableIn match {
                     case Some(idents) => Some(idents.map(_._1))
@@ -462,7 +480,7 @@ object Parser extends Parsers {
                         Field(isConst = true, typ, name._1, availableInSet).setLoc(constToken)
                     case None =>
                         Field(isConst = false, typ, name._1, availableInSet).setLoc(typ)
-            }
+                }
             //TODO: replace this RuntimeException with a more appropriate error, maybe a call to failure()
             case _ ~ _ ~ _ ~ _ ~ Some(x) ~ _ => throw new RuntimeException("available in fields only permitted at the top level of contracts")
         }
@@ -474,8 +492,8 @@ object Parser extends Parsers {
 
     private def parseStatesList: Parser[Set[Identifier]] =
         rep(parseId ~ CommaT()) ~! parseId ^^ {
-        case ors ~ last => ors.map(_._1).toSet + last
-    }
+            case ors ~ last => ors.map(_._1).toSet + last
+        }
 
     private def parseEnsures = {
         EnsuresT() ~! parseExpr ~! SemicolonT() ^^ {
@@ -489,8 +507,8 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseTransBody(isInterface:Boolean) =  {
-        if(isInterface) SemicolonT() ^^ {
+    private def parseTransBody(isInterface: Boolean) = {
+        if (isInterface) SemicolonT() ^^ {
             case _ => Seq.empty[Statement]
         }
         else LBraceT() ~! parseBody ~! RBraceT() ^^ {
@@ -498,7 +516,7 @@ object Parser extends Parsers {
         }
     }
 
-    case class TransactionOptions (isStatic: Boolean, isPrivate: Boolean)
+    case class TransactionOptions(isStatic: Boolean, isPrivate: Boolean)
 
     private def parseTransactionOptions: Parser[TransactionOptions] = {
         rep(StaticT() | PrivateT()) ^^ {
@@ -531,10 +549,10 @@ object Parser extends Parsers {
     }
 
 
-    private def parseTransDecl(params: List[GenericType], isInterface:Boolean)(contractName: String, contractParams: Seq[GenericType]): Parser[Transaction] = {
+    private def parseTransDecl(params: List[GenericType], isInterface: Boolean)(contractName: String, contractParams: Seq[GenericType]): Parser[Transaction] = {
         parseTransactionOptions ~ opt(LParenT() ~! parseArgDefList(contractName) ~! RParenT()) ~ TransactionT() ~! (parseId | MainT()) ~!
             opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ~! LParenT() ~! parseArgDefList(contractName) ~! RParenT() ~!
-            opt(parseReturns) ~! rep(parseEnsures) ~!  parseTransBody(isInterface) ^^ {
+            opt(parseReturns) ~! rep(parseEnsures) ~! parseTransBody(isInterface) ^^ {
             case opts ~ privateMethodFieldTypes ~ t ~ name ~ paramsOpt ~ _ ~ args ~ _ ~ returns ~ ensures ~ body =>
                 val nameString = name match {
                     case MainT() => "main"
@@ -559,11 +577,11 @@ object Parser extends Parsers {
                 def makeRemoteNonPrimitiveTypeTopLevelIfNeeded(np: NonPrimitiveType): NonPrimitiveType =
                     name match {
                         case MainT() =>
-                                if (np.isRemote) {
-                                    np.remoteType(TopLevelRemoteReferenceType())
-                                } else {
-                                    np
-                                }
+                            if (np.isRemote) {
+                                np.remoteType(TopLevelRemoteReferenceType())
+                            } else {
+                                np
+                            }
                         case _ => np
                     }
 
@@ -572,9 +590,9 @@ object Parser extends Parsers {
                         case MainT() => t match {
                             case np: NonPrimitiveType => makeRemoteNonPrimitiveTypeTopLevelIfNeeded(np)
                             case _ => t
-                            }
-                        case _ => t
                         }
+                        case _ => t
+                    }
 
                 val thisContractType = ContractType(contractName, contractParams)
 
@@ -598,7 +616,7 @@ object Parser extends Parsers {
                     case Some(_ ~ argDefList ~ _) => argDefList.map((v: VariableDeclWithSpec) => (v.varName, makeRemoteTypeTopLevelIfNeeded(v.typOut)))
                 }
 
-                val argTypesUpdatedWithRemoteTypes = filteredArgs.map( (d: VariableDeclWithSpec) =>
+                val argTypesUpdatedWithRemoteTypes = filteredArgs.map((d: VariableDeclWithSpec) =>
                     d match {
                         case VariableDeclWithSpec(typIn, typOut, varName) =>
                             VariableDeclWithSpec(makeRemoteTypeTopLevelIfNeeded(typIn), makeRemoteTypeTopLevelIfNeeded(typOut), varName).setLoc(d)
@@ -617,13 +635,13 @@ object Parser extends Parsers {
             case isAsset ~ st ~ name ~ maybeDefs ~ _ =>
                 maybeDefs match {
                     case None => State(name._1, Seq.empty, isAsset.isDefined).setLoc(st)
-                    case Some (_ ~ defs ~ _)  => State(name._1, defs, isAsset.isDefined).setLoc(st)
+                    case Some(_ ~ defs ~ _) => State(name._1, defs, isAsset.isDefined).setLoc(st)
                 }
         }
     }
 
     // TODO: maybe we can check here that the constructor has the appropriate name?
-    private def parseConstructor (params: Seq[GenericType]) = {
+    private def parseConstructor(params: Seq[GenericType]) = {
         parseId ~ opt(AtT() ~! parseIdAlternatives) ~! LParenT() ~! parseArgDefList("") ~! RParenT() ~! LBraceT() ~! parseBody ~! RBraceT() ^^ {
             case name ~ permission ~ _ ~ args ~ _ ~ _ ~ body ~ _ =>
                 val resultType = extractTypeFromPermission(permission, name._1, params, NotRemoteReferenceType(), defaultOwned = false)
@@ -631,8 +649,8 @@ object Parser extends Parsers {
         }
     }
 
-    private def parseDeclInContract(params: List[GenericType], isInterface:Boolean,
-                                    sourcePath: String)(contractName: String, contractParams: List[GenericType]):  Parser[Declaration] = {
+    private def parseDeclInContract(params: List[GenericType], isInterface: Boolean,
+                                    sourcePath: String)(contractName: String, contractParams: List[GenericType]): Parser[Declaration] = {
         parseFieldDecl | parseStateDecl | parseConstructor(contractParams) | parseContractDecl(sourcePath) |
             parseTransDecl(params, isInterface)(contractName, contractParams)
     }
@@ -712,7 +730,7 @@ object Parser extends Parsers {
         parseId ~! opt(LBracketT() ~ repsep(genericParam, CommaT()) ~ RBracketT()) ^^ {
             case id ~ optParams =>
                 optParams match {
-                    case Some(_ ~ params ~ _) =>  (id, params)
+                    case Some(_ ~ params ~ _) => (id, params)
                     case None => (id, List())
                 }
         }
@@ -731,32 +749,32 @@ object Parser extends Parsers {
                 }
 
                 LBraceT() ~! rep(parseTransitions | parseDeclInContract(params, isInterface, srcPath)(name._1, params)) ~! RBraceT() ^^ {
-                case _ ~ contents ~ _ =>
-                    // Make sure there's only one transition diagram.
-                    val separateTransitions = contents.filter({
-                        case t: Transitions => true
-                        case _ => false
-                    }).map(_.asInstanceOf[Transitions])
+                    case _ ~ contents ~ _ =>
+                        // Make sure there's only one transition diagram.
+                        val separateTransitions = contents.filter({
+                            case t: Transitions => true
+                            case _ => false
+                        }).map(_.asInstanceOf[Transitions])
 
-                    // For now, combine all the state transitions from all the different
-                    // transitions blocks.
-                    // Maybe eventually require that there is only one transitions block.
-                    val transitionsEdges = separateTransitions.foldLeft(List.empty[FSMEdge])((edges, t) => edges ++ t.edges)
+                        // For now, combine all the state transitions from all the different
+                        // transitions blocks.
+                        // Maybe eventually require that there is only one transitions block.
+                        val transitionsEdges = separateTransitions.foldLeft(List.empty[FSMEdge])((edges, t) => edges ++ t.edges)
 
-                    val transitions =
-                        if (transitionsEdges.isEmpty) {
-                            None
-                        } else {
-                            Some(Transitions(transitionsEdges))
-                        }
+                        val transitions =
+                            if (transitionsEdges.isEmpty) {
+                                None
+                            } else {
+                                Some(Transitions(transitionsEdges))
+                            }
 
-                    val decls = contents.filter({
-                        case d: Declaration => true
-                        case _ => false
-                    }).map(_.asInstanceOf[Declaration])
+                        val decls = contents.filter({
+                            case d: Declaration => true
+                            case _ => false
+                        }).map(_.asInstanceOf[Declaration])
 
-                    ObsidianContractImpl(mod.toSet, name._1, params, implementBound, decls, transitions, isInterface, srcPath).setLoc(ct)
-            }
+                        ObsidianContractImpl(mod.toSet, name._1, params, implementBound, decls, transitions, isInterface, srcPath).setLoc(ct)
+                }
         }
     }
 
@@ -786,7 +804,7 @@ object Parser extends Parsers {
         parseProgram(srcPath)(reader) match {
             case Success(result, _) => Right(result)
             case Failure(msg, reader) => Left(s"Parser failure at ${reader.pos}: $msg")
-            case Error(msg , next) =>
+            case Error(msg, next) =>
                 if (next.atEnd) {
                     Left(s"Parser Error: $msg at end of file")
                 }

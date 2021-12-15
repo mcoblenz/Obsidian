@@ -3,6 +3,7 @@ package edu.cmu.cs.obsidian.codegen
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
+import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
 import java.io.{FileReader, StringWriter}
 
@@ -21,30 +22,39 @@ trait Expression extends YulAST
 trait YulStatement extends YulAST
 
 // for each asm struct, create a case class
-case class TypedName(name: String, ntype: String) extends YulAST {
+case class TypedName(name: String, typ: ObsidianType) extends YulAST {
     override def toString: String = {
-        s"$name ${
-            if (ntype.isEmpty) {
-                ""
-            } else {
-                s" : $ntype"
-            }
-        }"
+        name
+        /*
+        ideally we'd want to do something like this:
+
+                s"$name ${
+                    if (ntype.isEmpty) {
+                        ""
+                    } else {
+                        s" : $ntype"
+                    }
+                }"
+
+        but as of Sept2021, solc does not support that output even though it's in the def, e.g.
+
+        Error: "string" is not a valid type (user defined types are not yet supported).
+           --> /sources/SetGetNoArgsNoConstructNoInit.yul:144:29:
+            |
+        144 | function IntContainer___get(this  : string) -> _ret_2 {
+            |                             ^^^^^^^^^^^^^^
+        */
     }
 }
 
 case class Case(value: Literal, body: Block) extends YulAST {
     override def toString: String = {
-        s"case ${value.toString} ${brace(body.toString)}"
+        s"case ${value.toString} ${brace(body.toString)}\n"
     }
 }
 
 case class Literal(kind: LiteralKind.LiteralKind, value: String, vtype: String) extends Expression {
     override def toString: String = {
-        /* todo/iev: i'm not positive if these assertions are the best idea, but they might be
-           a nice seatbelt. the constants i'm checking against may be wrong or incomplete right now,
-           this needs to be tested. add more complex assertions?
-        */
         val msg: String = "internal error: literal with inconsistent type string"
         kind match {
             case LiteralKind.number => assert(vtype == "int", msg)
@@ -117,12 +127,12 @@ case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], val
             variables.map(v => v._1.name).mkString(", ")
         }" +
             (value match {
-            case Some (e) => s" := ${e.toString}"
-        case None => ""
-    }
+                case Some(e) => s" := ${e.toString}"
+                case None => ""
+            }
 
-    )
-}
+                )
+    }
 }
 
 case class FunctionDefinition(name: String,
@@ -145,9 +155,13 @@ case class If(condition: Expression, body: Block) extends YulStatement {
 
 case class Switch(expression: Expression, cases: Seq[Case]) extends YulStatement {
     override def toString: String = {
-        s"switch ${expression.toString}" + "\n" +
-            (if (cases.isEmpty) brace("") else cases.map(c => c.toString).mkString("\n")) +
-            "\n"
+        if (cases.nonEmpty) {
+            s"switch ${expression.toString}" + "\n" +
+                cases.map(c => c.toString).mkString("\n") +
+                "\n"
+        } else {
+            ""
+        }
     }
 }
 
@@ -182,6 +196,11 @@ case class Block(statements: Seq[YulStatement]) extends YulStatement {
     }
 }
 
+case class LineComment(s: String) extends YulStatement {
+    override def toString: String = {
+        s"// $s\n"
+    }
+}
 
 /*
     Object = 'object' StringLiteral '{' Code ( Object | Data )* '}'
@@ -198,11 +217,24 @@ case class HexLiteral(content: String) extends YulAST
 
 case class StringLiteral(content: String) extends YulAST
 
-case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data: Seq[Data]) extends YulAST {
+/** This class encapsulates how we write the Yul program resulting from the translation of an obsidian
+  * program out to a string that can be written to a file and compiled to EVM.
+  *
+  * @param contractName             the name of the contract to write to a file
+  * @param data                     the data of the contract -- CURRENTLY IGNORED
+  * @param mainContractTransactions the transactions that came from the main contract in obsidian
+  * @param mainContractSize         the number of bytes that the main contract needs when laid out in memory
+  * @param otherTransactions        the transactions that came from each of the other contracts in obsidian
+  */
+case class YulObject(contractName: String,
+                     data: Seq[Data],
+                     mainContractTransactions: Seq[YulStatement],
+                     mainContractSize: Int,
+                     otherTransactions: Seq[YulStatement]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
-        val scope = new ObjScope(this)
+        val scope = new YulMustache(this)
         val raw: String = mustache.execute(new StringWriter(), scope).toString
         // mustache butchers certain characters; this fixes that. there may be other characters that
         // need to be added here
@@ -214,69 +246,80 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
             replaceAll("&#13;", "\r")
     }
 
-    // ObjScope and FuncScope are designed to facilitate mustache templates, with the following rules
-    // - Each val is a tag in the template.
-    // - If you need to fill in a section with non-empty list, define a function (which takes no args)
-    //   named by the section tag, let it return an array of object, the object name does not matter,
-    //   but the it must contain a val named by the tag inside the section tag (the best way to understand
-    //   this is to track down an example)
-    // temporary function, not designed for a full recursive walk through of the object
-    class ObjScope(obj: YulObject) {
-
-        val mainContractName: String = obj.name
-        val creationObject: String = mainContractName
-        val runtimeObject: String = mainContractName + "_deployed"
-        var runtimeFunctionArray: Array[Func] = Array[Func]()
-        var deployFunctionArray: Array[Func] = Array[Func]()
-        var dispatch = false
-        var dispatchArray: Array[codegen.Case] = Array[codegen.Case]()
-        var deployCall: Array[Call] = Array[Call]()
+    /** This class encapulsates the interaction between our representation of a Yul object and
+      * the mustache description given in `object.mustache`, and from there how it's written to a file.
+      *
+      * @param obj the object to present to mustache
+      */
+    class YulMustache(obj: YulObject) {
+        // the values here are defined, as much as possible, in the same order as the mustache file
+        val contractName: String = obj.contractName
+        val deployedName: String = obj.contractName + "_deployed"
 
         val freeMemPointer = 64 // 0x40: currently allocated memory size (aka. free memory pointer)
         val firstFreeMem = 128 //  0x80: first byte in memory not reserved for special usages
+
         // the free memory pointer points to 0x80 initially
-
-        var memoryInitRuntime: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
-
-        var memoryInit: Expression = memoryInitRuntime
+        var memoryInit: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
 
         def callValueCheck(): YulStatement = callvaluecheck
+
+        val datasize: Expression = apply("datasize", rawstringlit(deployedName))
+
+        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(deployedName)), datasize)
+
+        def defaultReturn(): Expression = apply("return", intlit(0), datasize)
+
+        val mainSize: Int = mainContractSize
 
         // together, these keep track of and create temporary variables for returns in the dispatch table
         var deRetCnt = 0
 
         def nextDeRet(): String = {
             deRetCnt = deRetCnt + 1
-            s"_dd_ret_${deRetCnt.toString}" //todo: better naming convention?
+            s"_dd_ret_${deRetCnt.toString}"
         }
 
         /**
-          * compute the sequence of statements for the dispatch table for a function
+          * compute the sequence of statements for the dispatch entry table for a function
           *
           * @param f the function to be added to dispatch
           * @return the sequence to add to dispatch
           */
         def dispatchEntry(f: FunctionDefinition): Seq[YulStatement] = {
             // temporary variables to store the return from calling the function
-            val temps: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
+            val returns_from_call: Seq[Identifier] = f.returnVariables.map(_ => Identifier(nextDeRet()))
 
-            //todo: second argument to the application is highly speculative; check once you have more complex functions
-            // the actual call to f, and a possible declaration of the temporary variables if there are any returns
-            val call_to_f: Expression = apply(functionRename(f.name), f.parameters.map(p => Identifier(p.name)): _*)
+            // temporary variables to store the results of decoding the args to the function
+            val params_from_decode: Seq[Identifier] = dropThisArgument(f).parameters.map(_ => Identifier(nextDeRet()))
+
+            // f gets called with the special "this" parameter that's declared above, followed by
+            // the temporary variables that store the decoded arguments
+            val call_to_f: Expression = apply(f.name, Identifier("this") +: params_from_decode: _*)
+
+            // if f returns something then we assign to that but otherwise we just call it for effect
             val call_f_and_maybe_assign: YulStatement =
                 if (f.returnVariables.nonEmpty) {
-                    codegen.VariableDeclaration(temps.map(i => (i, None)), Some(call_to_f))
+                    codegen.VariableDeclaration(returns_from_call.map(i => (i, None)), Some(call_to_f))
                 } else {
                     ExpressionStatement(call_to_f)
+                }
+
+            val maybe_assign_params: YulStatement =
+                if (dropThisArgument(f).parameters.nonEmpty) {
+                    decl_nexp(params_from_decode, apply(abi_decode_tuple_name(dropThisArgument(f)), intlit(4), apply("calldatasize")))
+                } else {
+                    LineComment(s"${f.name} takes no parameters")
                 }
 
             val mp_id: Identifier = Identifier("memPos")
 
             Seq(
+                LineComment(s"entry for ${f.name}"),
                 //    if callvalue() { revert(0, 0) }
                 callvaluecheck,
                 // abi_decode_tuple_(4, calldatasize())
-                codegen.ExpressionStatement(apply("abi_decode_tuple", intlit(4), apply("calldatasize"))),
+                maybe_assign_params,
                 //    fun_retrieve_24()
                 call_f_and_maybe_assign,
                 //    let memPos := allocate_unbounded()
@@ -284,120 +327,46 @@ case class YulObject(name: String, code: Code, subobjects: Seq[YulObject], data:
                 //    let memEnd := abi_encode_tuple__to__fromStack(memPos)
                 //    let memEnd := abi_encode_tuple_t_uint256__to_t_uint256__fromStack(memPos , ret_0), etc.
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
-                decl_1exp(Identifier("memEnd"), apply("abi_encode_tuple_to_fromStack" + temps.length.toString, mp_id +: temps: _*)),
+                decl_1exp(Identifier("memEnd"), apply(abi_encode_name(returns_from_call.length), mp_id +: returns_from_call: _*)),
                 //    return(memPos, sub(memEnd, memPos))
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
         }
 
-        def deploy(): Array[Call] = deployCall
+        // TODO here and above in the dispatch table we do not respect privacy; we should iterate
+        //  only over the things in the main contract that are public
 
-        def deployFunctions(): Array[Func] = deployFunctionArray
+        // todo: there's a fair amount of repetition here with t.asInstanceOf and dropThisArgument;
+        //   tighten that up so it's easier to follow. at the same time think about how to only emit
+        //   the decoders and encoders we actually need (i.e. if f only has `this` as a param, the decoder we
+        //   emit never gets called and gets optimized away. that's fine enough but why not make it better?)
 
-        for (s <- obj.code.block.statements) {
-            s match {
-                case f: FunctionDefinition =>
-                    deployFunctionArray = deployFunctionArray :+ new Func(f.toString)
-                case e: ExpressionStatement =>
-                    e.expression match {
-                        case f: FunctionCall => deployCall = deployCall :+ new Call(f.toString)
-                        case _ =>
-                            assert(assertion = false, "TODO: objscope not implemented for expression statement " + e.toString)
-                            () // TODO unimplemented
-                    }
-                case _ =>
-                    assert(assertion = false, "TODO: objscope not implemented for statement " + s.toString)
-                    () // TODO unimplemented
-            }
-        }
+        // the dispatch table gets one entry for each transaction in the main contract. the transactions
+        // elaborations are added below, and those have a `this` argument added, which is supplied in the
+        // dispatch table from an allocated instance of the main contract at the top of memory. but the
+        // outside world does not see that, so the hashes in the dispatch array are the ones that
+        // result from the transaction definitions WITHOUT the `this` argument.
+        def dispatchTable(): codegen.Switch =
+            codegen.Switch(Identifier("selector"),
+                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
+                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
 
-        def runtimeFunctions(): Array[Func] = runtimeFunctionArray
+        // traverse the transactions and compute the abi functions we need to emit.
+        def abiEncodeTupleFuncs(): YulStatement = Block(
+            LineComment("abi encode tuple functions") +:
+                (mainContractTransactions ++ otherTransactions)
+                    .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
+                    .distinct
+                    .map(write_abi_encode_tuple_from_stack))
 
-        var abiEncodesNeeded: Set[Int] = Set()
+        def abiDecodeFuncs(): YulStatement = Block(
+            LineComment("abi decode functions") +:
+                (// for each transaction, emit the decoder for the tuple of its arguments
+                    mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
+                        // for each transaction, collect up the types that it uses, and then emit the decodes for those types
+                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode))
+        )
 
-        for (sub <- obj.subobjects) { // TODO separate runtime object out as a module (make it verbose)
-            for (s <- sub.code.block.statements) { // temporary fix due to issue above
-                s match {
-                    case f: FunctionDefinition =>
-                        dispatch = true
-                        runtimeFunctionArray = runtimeFunctionArray :+ new Func(f.toString)
-                        // generate the dispatch table entry
-                        dispatchArray = dispatchArray :+ codegen.Case(hexlit(hashOfFunctionDef(f)), Block(dispatchEntry(f)))
-                        // note the number of return variables so that we generate the appropriate abi encode functions (without repetitions)
-                        abiEncodesNeeded = abiEncodesNeeded + f.returnVariables.length
-                    case e: ExpressionStatement =>
-                        e.expression match {
-                            case _: FunctionCall =>
-                                //TODO what was this line doing?
-                                //memoryInitRuntime = f.toString
-                                ()
-                            case _ =>
-                                assert(assertion = false, "TODO: " + e.toString())
-                                () // TODO unimplemented
-                        }
-                    case x =>
-                        assert(assertion = false, s"subobject case for ${x.toString} unimplemented")
-                        ()
-                }
-            }
-        }
-
-        def dispatchCase(): codegen.Switch = codegen.Switch(Identifier("selector"), dispatchArray.toSeq)
-
-        val datasize: Expression = apply("datasize", stringlit(runtimeObject))
-
-        def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", stringlit(runtimeObject)), datasize)
-
-        def defaultReturn(): Expression = apply("return", intlit(0), datasize)
-
-        /**
-          * compute the abi tuple encode function for a given number of returns. for example, for 0,
-          * 1, and 2 returns:
-          *
-          * {{{
-          * function abi_encode_tuple__to__fromStack(headStart ) -> tail {
-          *    tail := add(headStart, 0)
-          * }
-          * }}}
-          *
-          * {{{
-          * function abi_encode_tuple_t_uint256__to_t_uint256__fromStack(headStart , value0) -> tail {
-          *    tail := add(headStart, 32)
-          *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
-          * }
-          * }}}
-          *
-          * {{{
-          * function abi_encode_tuple_t_uint256_t_uint256__to_t_uint256_t_uint256__fromStack(headStart , value0, value1) -> tail {
-          *    tail := add(headStart, 64)
-          *    abi_encode_t_uint256_to_t_uint256_fromStack(value0,  add(headStart, 0))
-          *    abi_encode_t_uint256_to_t_uint256_fromStack(value1,  add(headStart, 32))
-          * }
-          * }}}
-          *
-          * @param n the number of returns
-          * @return the function definition for output
-          */
-        def write_abi_encode(n: Int): FunctionDefinition = {
-            val var_indices: Seq[Int] = Seq.tabulate(n)(i => i)
-            val encode_lines: Seq[YulStatement] = var_indices.map(i =>
-                ExpressionStatement(apply("abi_encode_t_uint256_to_t_uint256_fromStack",
-                    Identifier("value" + i.toString),
-                    apply("add", Identifier("headStart"), intlit((n-1) * 32)))))
-
-            val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
-            FunctionDefinition("abi_encode_tuple_to_fromStack" + n.toString,
-                TypedName("headStart", "") +: var_indices.map(i => TypedName("value" + i.toString, "")),
-                Seq(TypedName("tail", "")), Block(bod))
-        }
-
-        def abiEncodeTupleFuncs(): YulStatement = Block(abiEncodesNeeded.map(write_abi_encode).toSeq)
-
-        class Func(val code: String) {}
-
-        class Case(val hash: String) {}
-
-        class Call(val call: String) {}
+        def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
     }
-
 }

@@ -5,41 +5,28 @@ ethereum/solidity/libsolidity/codegen/ir/IRGenerator.cpp
 Consulting example yul code is also helpful in understanding the template.
 https://solidity.readthedocs.io/en/latest/yul.html#specification-of-yul-object
 }}
-object "{{creationObject}}" {
+object "{{contractName}}" {
     code {
         {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
         {{memoryInit}}
         {{! protection against sending Ether }}
         {{callValueCheck}}
-        {{! not impletmented by the current stage, cited from IRGenerator.cpp (link in file comment above) }}
-        {{#notLibrary}}
-            {{#constructorHasParams}} let {{constructorParams}} := {{copyConstructorArguments}}() {{/constructorHasParams}}
-            {{implicitConstructor}}({{constructorParams}})
-        {{/notLibrary}}
-        {{! todo: write and call constructor }}
-        {{#deploy}}
-            {{call}}
-        {{/deploy}}
-        {{! functions related to constructor }}
-        {{#deployFunctions}}
-            {{code}}
-        {{/deployFunctions}}
         {{codeCopy}}
         {{defaultReturn}}
     }
-    object "{{runtimeObject}}" {
+    object "{{deployedName}}" {
         code {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
-            {{memoryInitRuntime}}
+            {{memoryInit}}
+
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
 
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
             if iszero(lt(calldatasize(), 4)) {
-                {{#dispatch}}
-                    {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
-                    let selector := shr(224, calldataload(0))
-                    {{dispatchCase}}
-                {{/dispatch}}
+                {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
+                let this := allocate_memory({{mainSize}})
+                let selector := shr(224, calldataload(0))
+                {{dispatchTable}}
             }
             if iszero(calldatasize()) {  }
             revert(0, 0)
@@ -47,10 +34,10 @@ object "{{creationObject}}" {
             {{! these functions for memory management are produced by the solc IR backend for
                 Solidity programs analagous to our test Obsidian programs.
              }}
-            function abi_decode_tuple(headStart, dataEnd)   {
-                if slt(sub(dataEnd, headStart), 0) { revert(0, 0) }
-            }
+
             {{abiEncodeTupleFuncs}}
+
+            {{abiDecodeFuncs}}
 
             function allocate_memory(size) -> memPtr {
                 memPtr := allocate_unbounded()
@@ -58,14 +45,14 @@ object "{{creationObject}}" {
             }
 
             function allocate_unbounded() -> memPtr {
-                memPtr := mload(64)
+                memPtr := mload(0x40)
             }
 
             function finalize_allocation(memPtr, size) {
                 let newFreePtr := add(memPtr, round_up_to_mul_of_32(size))
                 // protect against overflow
                 if or(gt(newFreePtr, 0xffffffffffffffff), lt(newFreePtr, memPtr)) {  panic_error_0x41() }
-                mstore(64, newFreePtr)
+                mstore(0x40, newFreePtr)
             }
 
             function panic_error_0x41() {
@@ -82,16 +69,20 @@ object "{{creationObject}}" {
                 mstore(pos, cleanup_t_uint256(value))
             }
 
+            {{! revert, but also include the return data from the most recent call }}
+            function revert_forward_1() {
+                let pos := allocate_unbounded()
+                returndatacopy(pos, 0, returndatasize())
+                revert(pos, returndatasize())
+            }
+
             {{! the "cleanup" functions enforce the invariants on the types from the abi wrt how they're encoded;
                 with uint256, there are none, so it just returns. }}
             function cleanup_t_uint256(value) -> cleaned {
                 cleaned := value
             }
-            {{#runtimeFunctions}}
-                {{code}}
-            {{/runtimeFunctions}}
+
+            {{transactions}}
         }
-        {{runtimeSubObjects}}
     }
-    {{subObjects}}
 }

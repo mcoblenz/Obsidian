@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
     "gas" : 30000000,
     "gasprice" : "0x9184e72a000",
@@ -6,3 +7,14 @@
     "testexp" : "main()",
     "expected" : "3600"
 }
+||||||| caa951f4
+=======
+{
+    "gas" : 30000000,
+    "gasprice" : "0x9184e72a000",
+    "startingeth" : 5000000,
+    "numaccts" : 1,
+    "testexp" : "main()",
+    "expected" : "3600"
+}
+>>>>>>> master

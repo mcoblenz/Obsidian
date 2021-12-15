@@ -1,0 +1,16 @@
+main contract Lock {
+    state Locked;
+    state Unlocked;
+
+    Lock@Locked() {
+        ->Locked;
+    }
+
+    transaction unlock(Lock@Locked >> Unlocked this) {
+        ->Unlocked;
+    }
+
+    transaction lock(Lock@Unlocked >> Locked this) {
+        ->Locked;
+    }
+}

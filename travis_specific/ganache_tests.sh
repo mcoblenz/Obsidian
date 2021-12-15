@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# travis makes this env var available to all builds, so this stops us from installing things locally
-if [[ $CI == "true" ]]
-then
-  ./travis_specific/install_ganache.sh
-fi
-
 # note: this won't be set locally so either set it on your machine to make
 # sense or run this only via travis.
 cd "$TRAVIS_BUILD_DIR" || exit 1
@@ -18,6 +12,15 @@ then
     echo "ganache-cli is not installed, Install it with 'npm install -g ganache-cli'."
     exit 1
 fi
+
+
+# print version info
+echo "-----------------------------"
+echo "VERSIONS:"
+echo "npm     " "$(npm --version)"
+echo "node    " "$(node --version)"
+echo "ganache " "$(ganache-cli --version)"
+echo "-----------------------------"
 
 # either test only the directories named as arguments or test everything if nothing is specified.
 # since the travis.yml file doesn't give any argument here, CI will test everything, but this makes
@@ -33,7 +36,7 @@ else
   tests=(resources/tests/GanacheTests/*.json)
 fi
 
-missing_json=$(diff --changed-group-format='%<%>' --unchanged-group-format='' <(ls resources/tests/GanacheTests/*.json | xargs basename -s '.json') <(ls resources/tests/GanacheTests/*.obs | xargs basename -s '.obs'))
+missing_json=$(bin/skipped_tests.sh)
 if [ "$missing_json" ]
 then
   echo "******** warning: some tests are defined but do not have json files and will not be run:"
@@ -43,7 +46,7 @@ fi
 failed=()
 
 # build a jar of Obsidian but removing all the tests; that happens in the other Travis matrix job, so we can assume it works here.
-sbt 'set assembly / test := {}' ++$TRAVIS_SCALA_VERSION assembly
+sbt 'set assembly / test := {}' ++"$TRAVIS_SCALA_VERSION" assembly
 
 # check that the jar file for obsidian exists; `sbt assembly` ought to have been run before this script gets run
 obsidian_jar="$(find target/scala* -name obsidianc.jar | head -n1)"
@@ -52,6 +55,8 @@ then
         echo "Error building Obsidian jar file, exiting."
         exit 1
 fi
+
+ganache_host="http://localhost:8545"
 
 for test in "${tests[@]}"
 do
@@ -67,14 +72,18 @@ do
   GAS_PRICE=$(<"$test" jq '.gasprice' | tr -d '"')
   START_ETH=$(<"$test" jq '.startingeth')
   NUM_ACCT=$(<"$test" jq '.numaccts')
-  TESTEXP=$(<"$test" jq '.testexp' | tr -d '"')
+  TESTEXP=$(<"$test" jq '.testexp' | tr -d '"') # used for tests that just call main with no args
   EXPECTED=$(<"$test" jq '.expected' | tr -d '"')
+
+  METHODNAME=$(<"$test" jq '.method_name' | tr -d '"') # used for tests that call something with args
+  METHODSIGNATURE=$(<"$test" jq '.method_signature' | tr -d '"')
+  METHODPARAMS=$(<"$test" jq '.method_params' | tr -d '[],' | sed -e '/^$/d' | awk '{print $1}' )
 
   CHECK_OUTPUT=true
 
-  if [[ $TESTEXP == "null" ]]
+  if [[ $TESTEXP == "null" && $METHODNAME == "null" ]]
   then
-    echo "*****WARNING: no test expression supplied"
+    echo "*****WARNING: no test expression or method name supplied"
     CHECK_OUTPUT=false
   fi
 
@@ -85,7 +94,7 @@ do
   fi
 
   # compile the contract to yul, also creating the directory to work in, failing otherwise
-  if ! $(java -jar $obsidian_jar --yul resources/tests/GanacheTests/$NAME.obs)
+  if ! $(java -jar "$obsidian_jar" --yul "resources/tests/GanacheTests/$NAME.obs")
   then
       echo "$NAME test failed: cannot compile obs to yul"
       failed+=("$test [compile obs to yul]")
@@ -102,7 +111,7 @@ do
 
   # generate the evm from yul, failing if not
   echo "running solc to produce evm bytecode"
-  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --abi --bin --strict-assembly /sources/"$NAME".yul > "$NAME".evm
+  if ! docker run -v "$( pwd -P )":/sources ethereum/solc:stable --bin --strict-assembly --optimize /sources/"$NAME".yul > "$NAME".evm
   then
       echo "$NAME test failed: solc cannot compile yul code"
       failed+=("$test [solc]")
@@ -111,15 +120,14 @@ do
 
   # grep through the format output by solc in yul producing mode for the binary representation
   TOP=$(grep -n "Binary representation" "$NAME".evm | cut -f1 -d:)
-  BOT=$(grep -n "Text representation" "$NAME".evm | cut -f1 -d:)
+  BOT=$(wc -l "$NAME".evm | awk '{print $1}' )
   TOP=$((TOP+1)) # drop the line with the name
-  BOT=$((BOT-1)) # drop the empty line after the binary
   EVM_BIN=$(sed -n $TOP','$BOT'p' "$NAME".evm)
   echo "binary representation is: $EVM_BIN"
 
   # start up ganache
   echo "starting ganache-cli"
-  ganache-cli --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
+  ganache-cli --host localhost --gasLimit "$GAS" --accounts="$NUM_ACCT" --defaultBalanceEther="$START_ETH" &> /dev/null &
 
   # form the JSON object to ask for the list of accounts
   ACCT_DATA=$( jq -ncM \
@@ -174,7 +182,7 @@ do
   echo "$SEND_DATA" | jq
   echo
 
-  RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+  RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
   echo "response from ganache is: " #$RESP
   echo "$RESP" | jq
 
@@ -216,7 +224,7 @@ do
     echo "$SEND_DATA" | jq
     echo
 
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
     echo "response from ganache is: "
     echo "$RESP" | jq
 
@@ -249,7 +257,13 @@ do
           exit 1
         fi
         echo "assuming that we are on travis and getting the Keccak256 via perl"
-        HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8)
+        if [[ $TESTEXP == "null" && $METHODNAME != "null" ]]
+        then
+          echo "test expression is null, so building a method call"
+          HASH_TO_CALL=$(echo -n "$METHODNAME($METHODSIGNATURE)" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8 )
+        else
+          HASH_TO_CALL=$(echo -n "$TESTEXP" | perl -e 'use Crypt::Digest::Keccak256 qw( :all ); print(keccak256_hex(<STDIN>)."\n")' | cut -c1-8)
+        fi
     elif [[ $(uname) == "Darwin" ]]
     then
         # this should be what happens on OS X
@@ -260,7 +274,13 @@ do
           exit 1
         fi
         echo "assuming that we are on OS X and getting the Keccak256 via keccak-256sum"
-        HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+        if [[ $TESTEXP == "null" && $METHODNAME != "null" ]]
+        then
+            echo "test expression is null, so building a method call"
+            HASH_TO_CALL=$(echo -n "$METHODNAME($METHODSIGNATURE)" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+        else
+            HASH_TO_CALL=$(echo -n "$TESTEXP" | keccak-256sum | cut -d' ' -f1 | cut -c1-8)
+        fi
     else
         # if you are neither on travis nor OS X, you are on your own.
         echo "unable to determine OS type to pick a keccak256 implementation"
@@ -271,7 +291,17 @@ do
 
     # "The documentation then tells to take the parameter, encode it in hex and pad it left to 32
     # bytes."
-    PADDED_ARG=$(printf "%032g" 0)
+    if [[ $TESTEXP == "null" && $METHODNAME != "null" ]]
+    then
+      echo "building padded args from $METHODPARAMS"
+      PADDED_ARG=""
+      for k in $METHODPARAMS
+      do
+        PADDED_ARG+=$(printf "%064g" "$k")
+      done
+    else
+      PADDED_ARG=$(printf "%064g" 0)
+    fi
 
     DATA="$HASH_TO_CALL""$PADDED_ARG"
 
@@ -327,7 +357,7 @@ do
     echo "$SEND_DATA" | jq
     echo
 
-    RESP=$(curl -s -X POST --data "$SEND_DATA" http://localhost:8545)
+    RESP=$(curl -s -X POST --data "$SEND_DATA" "$ganache_host")
     echo "response from ganache is: "
     echo "$RESP" | jq
 
