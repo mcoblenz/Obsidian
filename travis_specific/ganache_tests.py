@@ -235,10 +235,13 @@ parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 args = parser.parse_args()
 
+# sanity check that there isn't anything on the port we'll use ganache for; this can happen between consecutive runs
+# if ganache didn't exit cleanly
 if is_port_in_use(ganache_host, ganache_port):
     error(f"ganache-cli won't be able to start up, port {int(ganache_port)} isn't free on {ganache_host}")
 
-# docker stats --no-stream
+# sanity check that there is a docker daemon running, so that we don't get through the sbt build below only to have to
+# rerun the script after launching Docker
 run_dstats = subprocess.run(["docker", "stats", "--no-stream"], capture_output=True)
 if not run_dstats.returncode == 0:
     error(f"cannot connect to a docker daemon")
@@ -278,11 +281,13 @@ if args.tests:
     # if there are no undefined names, filter the data from the json according to the arguments given
     tests_to_run = list(filter(lambda t: os.path.splitext(t['file'])[0] in set(args.tests), tests_data['tests']))
 
+# if the clean flag is set, before running tests make sure that no directories with names that would collide exist
 if args.clean:
     for x in tests_to_run:
         if os.path.isdir(os.path.splitext(x['file'])[0]):
             error(f"running {str(x['file'])} would delete an existing directory")
 
+# if we're being chatty, print out the test cases we're about to run
 if args.verbose:
     if args.tests:
         print(f"running only these tests:\n{pprint.pformat(tests_to_run)}")
@@ -301,6 +306,7 @@ if not args.quick:
 else:
     warn("taking a shortcut and not outputting version info or checking for commands")
 
+# build the obsidian jar, unless it exists and we're in fast-and-dirty mode
 if args.quick and glob.glob("target/scala*/obsidianc.jar"):
     warn("taking a shortcut and using an existing obsidianc jar")
 else:
@@ -319,6 +325,7 @@ if not jar_path:
 if args.verbose:
     print(f"using top of {pprint.pformat(jar_path)}")
 
+# run each test, keeping track of which ones fail
 failed = []
 for test in tests_to_run:
     result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
@@ -337,6 +344,7 @@ for test in tests_to_run:
         os.remove(f"{name}/{name}.yul")
         os.rmdir(f"{name}")
 
+# print out a quick summary at the bottom of the test run
 if failed:
     print(colored(f"\n{len(failed)}/{str(len(tests_to_run))} TESTS FAILED", 'red'))
     if args.verbose:
