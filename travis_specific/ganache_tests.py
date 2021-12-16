@@ -1,5 +1,5 @@
-#!/usr/bin/python
 
+#!/usr/bin/python
 import argparse
 import binascii
 import glob
@@ -213,7 +213,14 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + ["got matched expected"]
 
     #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
-    # TODO
+    getlogs_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
+                                                  "method": "eth_getLogs",
+                                                  "params": [
+                                                      {
+                                                          "address": contract_address,
+                                                      }
+                                                  ],
+                                                  "id": eth_id})
 
     #### kill ganache and return a pass
     run_ganache.kill()
