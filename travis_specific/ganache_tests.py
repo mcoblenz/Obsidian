@@ -1,4 +1,3 @@
-
 #!/usr/bin/python
 import argparse
 import binascii
@@ -8,13 +7,14 @@ import os
 import pprint
 import subprocess
 import sys
+import time
 from shutil import which
 
 import eth_abi
 import httpx
-import polling
 from Crypto.Hash import keccak
 from termcolor import colored
+from web3 import Web3
 
 
 def warn(s):
@@ -53,7 +53,8 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     """run a test given its info, verbosity, and the location of the jar file. this returns a dictionary of the form
        { "result" -> "pass" or "fail",
          "progress" -> list of strings describing how far we got in the test,
-         "reason" -> string, which describes the failure or is empty if it's a pass }
+         "reason" -> string, which describes the failure or is empty if it's a pass,
+         }
     """
     # todo there's a bunch of repeated code for checking the replies from httpx below.
     test_name = os.path.splitext(test_info['file'])[0]
@@ -89,59 +90,29 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                                     "--verbose",
                                     "--host", ganache_host,
                                     "--port", str(ganache_port),
-                                    "--gasLimit", str(hex(test_info.get('gas', defaults['gas']))),
+                                    "--gasLimit", str(test_info.get('gas', defaults['gas'])),
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
                                     ], stdout=stdout_redirect)
+
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
     eth_id = 1  # this can be any number; replies should have the same one. we don't check that.
 
-    #### poll for an account to let it start up
-    retries = 100
-    json_rpc = "2.0"
-    account_reply = polling.poll(
-        lambda: httpx.post(ganache_url,
-                           json={"jsonrpc": json_rpc, "method": "eth_accounts", "params": [], "id": eth_id}),
-        check_success=lambda r: r.status_code == httpx.codes.OK,
-        ignore_exceptions=(httpx.ConnectError,),
-        step=0.5,
-        max_tries=retries
-    )
+    # open a connection to ganache and wait it connects
+    w3 = Web3(Web3.HTTPProvider(ganache_url))
+    while not w3.isConnected():
+        time.sleep(0.5)
 
-    if not account_reply:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"after {retries} tries, ganache-cli did not produce any account data"}
-    else:
-        progress = progress + [f"account reply is {str(account_reply.json())}"]
-
-    account_number = account_reply.json()['result'][0]
+    # get the account number
+    account_number = w3.eth.accounts[0]
 
     #### send a transaction
-    transaction_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                      "method": "eth_sendTransaction",
-                                                      "params": {
-                                                          "from": str(account_number),
-                                                          "gas": str(test_info.get('gas', defaults['gas'])),
-                                                          "gasPrice": str(
-                                                              test_info.get('gasprice', defaults['gasprice'])),
-                                                          # the amount of wei to send, which is always nothing
-                                                          "value": "0x0",
-                                                          "data": f"0x{evm_bytecode}",
-                                                      },
-                                                      "id": eth_id})
-
-    if not transaction_reply.status_code == httpx.codes.OK:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_sendTransaction got {transaction_reply.status_code} which is not OK"}
-    elif "error" in transaction_reply.json().keys():
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_sendTransaction returned an error: {str(transaction_reply.json())}"}
-    else:
-        progress = progress + [f"transaction reply is {str(transaction_reply.json())}"]
+    transaction_hash = w3.eth.sendTransaction({"from": account_number,
+                                               "gas": int(test_info.get('gas', defaults['gas'])),
+                                               # todo gasPrice is deprecated in pyweb3
+                                               "gasPrice": str(test_info.get('gasprice', defaults['gasprice'])),
+                                               "data": f"0x{evm_bytecode}"})
 
     #### warn if there's no expected result because this is as far as we go
     if not test_info['expected']:
@@ -150,33 +121,15 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         return {'result': "pass", 'progress': progress,
                 "reason": "nothing failed; note that no result was checked, though"}
 
-    transaction_hash = transaction_reply.json()['result']
-
     #### get a transaction receipt to get the contract address
-    get_transaction_recipt_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                                 "method": "eth_getTransactionReceipt",
-                                                                 "params": [transaction_hash],
-                                                                 "id": eth_id})
-
-    if not get_transaction_recipt_reply.status_code == httpx.codes.OK:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_getTransactionReceipt got {get_transaction_recipt_reply.status_code}"
-                          "which is not OK"}
-    elif not get_transaction_recipt_reply.json()['result']['status'] == "0x1":
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"eth_getTransactionReceipt has non-0x1 status {str(get_transaction_recipt_reply.json())}"}
-    else:
-        progress = progress + [f"getTransactionReceipt reply is {str(get_transaction_recipt_reply.json())}"]
-
-    contract_address = get_transaction_recipt_reply.json()['result']['contractAddress']
+    transaction_receipt = w3.eth.get_transaction_receipt(transaction_hash)
 
     #### use call and the contract address to get the result of the function
     method_name = test_info.get('trans', defaults['trans'])
     method_types = test_info.get('types', defaults['types'])
     method_args = test_info.get('args', defaults['args'])
 
+    # todo web3 probably does all this better than i am doing it.
     keccak_hash = keccak.new(digest_bits=256)
     keccak_hash.update(bytes(method_name + "(" + ",".join(method_types) + ")", "utf8"))
     hash_to_call = keccak_hash.hexdigest()[:8]
@@ -186,7 +139,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                                                "method": "eth_call",
                                                "params": [
                                                    {"from": account_number,
-                                                    "to": contract_address,
+                                                    "to": transaction_receipt.contractAddress,
                                                     "data": f"0x{hash_to_call}{encoded_args}"
                                                     }, "latest"],
                                                "id": eth_id})
