@@ -10,7 +10,7 @@ before_install:
   - nvm install 16 # as of 19 nov 2021, this version of node works with ganache and 17 does not
   - npm install -g npm # update npm
   - npm install -g ganache-cli # install ganache
-  - python -m pip install termcolor eth_abi polling pycryptodome web3
+  - python -m pip install termcolor eth_abi polling web3
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle
