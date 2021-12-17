@@ -7,12 +7,10 @@ import os
 import pprint
 import subprocess
 import sys
-import time
 from shutil import which
 
 import eth_abi
 import polling
-from Crypto.Hash import keccak
 from termcolor import colored
 from web3 import Web3
 
@@ -95,6 +93,8 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                                     ], stdout=stdout_redirect)
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
+    # step through the sequence of interaction with ganache, catching all errors so that they stay contained to this
+    # test and so that we can kill the ganache process cleanly
     try:
         # open a connection to ganache and wait it connects
         w3 = Web3(Web3.HTTPProvider(ganache_url))
@@ -108,8 +108,6 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         #### send a transaction
         transaction_hash = w3.eth.sendTransaction({"from": account_number,
                                                    "gas": int(test_info.get('gas', defaults['gas'])),
-                                                   # todo gasPrice is deprecated in pyweb3
-                                                   "gasPrice": str(test_info.get('gasprice', defaults['gasprice'])),
                                                    "data": f"0x{evm_bytecode}"})
         progress = progress + ["sent transaction"]
 
@@ -130,15 +128,13 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         method_args = test_info.get('args', defaults['args'])
 
         # todo web3 probably does all this better than i am doing it.
-        keccak_hash = keccak.new(digest_bits=256)
-        keccak_hash.update(bytes(method_name + "(" + ",".join(method_types) + ")", "utf8"))
-        hash_to_call = keccak_hash.hexdigest()[:8]
+        hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
         encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
         call_reply = w3.eth.call({
             "from": account_number,
             "to": transaction_receipt.contractAddress,
-            "data": f"0x{hash_to_call}{encoded_args}"
+            "data": f"{hash_to_call}{encoded_args}"
         })
         progress = progress + [f"made call to eth_call"]
 
@@ -152,7 +148,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         #### get the logs
         filt = w3.eth.filter("latest")
         w3.eth.get_filter_logs(filt.filter_id)
-        # w3.eth.get_logs("latest")
+        # w3.eth.get_logs()
 
     except BaseException as err:
         run_ganache.kill()
