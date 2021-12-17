@@ -123,6 +123,9 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + ["got transaction receipt"]
 
         #### use call and the contract address to get the result of the function
+
+
+
         method_name = test_info.get('trans', defaults['trans'])
         method_types = test_info.get('types', defaults['types'])
         method_args = test_info.get('args', defaults['args'])
@@ -130,13 +133,11 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         # todo web3 probably does all this better than i am doing it.
         hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
         encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
-        foo = Web3.solidityKeccak(method_types, method_args).hex()
-        warn(foo[2:])
 
         call_reply = w3.eth.call({
             "from": account_number,
             "to": transaction_receipt.contractAddress,
-            "data": f"{hash_to_call}{foo[2:]}"
+            "data": f"{hash_to_call}{encoded_args}"
         })
         progress = progress + [f"made call to eth_call"]
 
