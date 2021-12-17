@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.{NonPrimitiveType, ObsidianType, UnitType}
+import edu.cmu.cs.obsidian.typecheck.{BottomType, ContractReferenceType, GenericType, InterfaceContractType, NonPrimitiveType, ObsidianType, PrimitiveType, StateType, UnitType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -97,13 +97,52 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
-            data = Seq(), // nb: we currently ignore data so this is empty
+            data = Seq(),
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
-            otherTransactions = program.contracts.flatMap(translateNonMains)
+            otherTransactions = program.contracts.flatMap(translateNonMains),
+            tracers = writeTracers(checkedTable, mainContract.name)
         )
+    }
+
+    def nameTracer(name: String): String = {
+        s"trace_$name"
+    }
+
+    def writeTracers(ct : SymbolTable, name: String): Seq[FunctionDefinition] = {
+        val c: Contract = ct.contract(name) match {
+            case Some(value) => value.contract
+            case None => throw new RuntimeException()
+        }
+
+        var body: Seq[YulStatement] = Seq()
+        var others: Seq[FunctionDefinition] = Seq()
+
+        for(d <- c.declarations){
+            d match {
+                case Field(_, typ, fname, _) => typ match {
+                    case t : NonPrimitiveType => t match {
+                        case ContractReferenceType(contractType, _, _) =>
+                            body = body ++
+                                Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname))),
+                                    ExpressionStatement(apply("log0",Identifier("this"),intlit(32)))
+                                )
+                            others = others ++ writeTracers(ct, contractType.contractName)
+                        case _ => Seq()
+                    }
+                    case _ => Seq()
+                }
+                case _ => Seq()
+            }
+        }
+
+        FunctionDefinition(name = nameTracer(name),
+                            parameters = Seq(TypedName("this",YATAddress())),
+                            returnVariables = Seq(),
+                            body = Block(body :+ Leave())) +: others.distinctBy(fd => fd.name)
     }
 
     /**

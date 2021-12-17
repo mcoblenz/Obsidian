@@ -1,0 +1,55 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int arg) {
+        x = arg;
+    }
+
+    transaction get() returns int{
+        return x;
+    }
+}
+
+contract IntContainerBox{
+    IntContainer@Owned ic1;
+    IntContainer@Owned ic2;
+    IntContainer@Owned ic3;
+
+    transaction set3(int arg1, int arg2, int arg3) {
+        ic1.set(arg1);
+        ic2.set(arg2);
+        ic3.set(arg3);
+    }
+
+    transaction getsum() returns int{
+        return ic1.get() + ic2.get() + ic3.get() + 4;
+    }
+}
+
+contract IntContainerBoxBag{
+    IntContainerBox@Owned icb1;
+    IntContainerBox@Owned icb2;
+
+    transaction set2(int arg1, int arg2, int arg3) {
+        icb1.set3(arg1 * arg1, arg2 * arg2, arg3 * arg3);
+        icb2.set3(arg1 + arg1, arg2 + arg2, arg3 + arg3);
+    }
+
+    transaction get() returns int{
+        return icb1.getsum() - icb2.getsum();
+    }
+}
+
+main contract TraceThis {
+    // having two will show that the tracer gets called twice and on two different addresses
+    IntContainerBoxBag@Owned ic1;
+    IntContainerBoxBag@Owned ic2;
+
+    transaction main() returns int{
+        ic1 = new IntContainerBoxBag();
+        ic1.set2(5,20,-19);
+        ic2 = new IntContainerBoxBag();
+        ic2.set2(500,0,1219);
+        return ic1.get() + ic2.get();
+    }
+}
