@@ -56,7 +56,6 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
          "reason" -> string, which describes the failure or is empty if it's a pass,
          }
     """
-    # todo there's a bunch of repeated code for checking the replies from httpx below.
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
 
@@ -94,86 +93,93 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                                     "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
                                     "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
                                     ], stdout=stdout_redirect)
-
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
-    eth_id = 1  # this can be any number; replies should have the same one. we don't check that.
+    try:
+        # open a connection to ganache and wait it connects
+        w3 = Web3(Web3.HTTPProvider(ganache_url))
+        # todo still use polling for this
+        while not w3.isConnected():
+            time.sleep(0.5)
+        progress = progress + ["connected to web3 provider"]
 
-    # open a connection to ganache and wait it connects
-    w3 = Web3(Web3.HTTPProvider(ganache_url))
-    while not w3.isConnected():
-        time.sleep(0.5)
+        # get the account number
+        account_number = w3.eth.accounts[0]
+        progress = progress + ["got account from web3"]
 
-    # get the account number
-    account_number = w3.eth.accounts[0]
+        #### send a transaction
+        transaction_hash = w3.eth.sendTransaction({"from": account_number,
+                                                   "gas": int(test_info.get('gas', defaults['gas'])),
+                                                   # todo gasPrice is deprecated in pyweb3
+                                                   "gasPrice": str(test_info.get('gasprice', defaults['gasprice'])),
+                                                   "data": f"0x{evm_bytecode}"})
+        progress = progress + ["sent transaction"]
 
-    #### send a transaction
-    transaction_hash = w3.eth.sendTransaction({"from": account_number,
-                                               "gas": int(test_info.get('gas', defaults['gas'])),
-                                               # todo gasPrice is deprecated in pyweb3
-                                               "gasPrice": str(test_info.get('gasprice', defaults['gasprice'])),
-                                               "data": f"0x{evm_bytecode}"})
+        #### warn if there's no expected result because this is as far as we go
+        if not test_info['expected']:
+            warn(f"no expected result given for test {test_name} so exiting early")
+            run_ganache.kill()
+            return {'result': "pass", 'progress': progress,
+                    "reason": "nothing failed; note that no result was checked, though"}
 
-    #### warn if there's no expected result because this is as far as we go
-    if not test_info['expected']:
-        warn(f"no expected result given for test {test_name} so exiting early")
-        run_ganache.kill()
-        return {'result': "pass", 'progress': progress,
-                "reason": "nothing failed; note that no result was checked, though"}
+        #### get a transaction receipt to get the contract address
+        transaction_receipt = w3.eth.get_transaction_receipt(transaction_hash)
+        progress = progress + ["got transaction receipt"]
 
-    #### get a transaction receipt to get the contract address
-    transaction_receipt = w3.eth.get_transaction_receipt(transaction_hash)
+        #### use call and the contract address to get the result of the function
+        method_name = test_info.get('trans', defaults['trans'])
+        method_types = test_info.get('types', defaults['types'])
+        method_args = test_info.get('args', defaults['args'])
 
-    #### use call and the contract address to get the result of the function
-    method_name = test_info.get('trans', defaults['trans'])
-    method_types = test_info.get('types', defaults['types'])
-    method_args = test_info.get('args', defaults['args'])
+        # todo web3 probably does all this better than i am doing it.
+        keccak_hash = keccak.new(digest_bits=256)
+        keccak_hash.update(bytes(method_name + "(" + ",".join(method_types) + ")", "utf8"))
+        hash_to_call = keccak_hash.hexdigest()[:8]
+        encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
-    # todo web3 probably does all this better than i am doing it.
-    keccak_hash = keccak.new(digest_bits=256)
-    keccak_hash.update(bytes(method_name + "(" + ",".join(method_types) + ")", "utf8"))
-    hash_to_call = keccak_hash.hexdigest()[:8]
-    encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
+        call_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
+                                                   "method": "eth_call",
+                                                   "params": [
+                                                       {"from": account_number,
+                                                        "to": transaction_receipt.contractAddress,
+                                                        "data": f"0x{hash_to_call}{encoded_args}"
+                                                        }, "latest"],
+                                                   "id": eth_id})
 
-    call_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                               "method": "eth_call",
-                                               "params": [
-                                                   {"from": account_number,
-                                                    "to": transaction_receipt.contractAddress,
-                                                    "data": f"0x{hash_to_call}{encoded_args}"
-                                                    }, "latest"],
-                                               "id": eth_id})
+        if not call_reply.status_code == httpx.codes.OK:
+            run_ganache.kill()
+            return {'result': "fail", 'progress': progress,
+                    "reason": f"posting to eth_call got {call_reply.status_code} which is not OK"}
+        elif 'error' in call_reply.json().keys():
+            run_ganache.kill()
+            return {'result': "fail", 'progress': progress,
+                    "reason": f"eth_call reply contains error information {str(call_reply.json())}"}
+        else:
+            progress = progress + [f"eth_call reply is {str(call_reply.json())}"]
 
-    if not call_reply.status_code == httpx.codes.OK:
+        #### compare the result to the expected answer
+        got = twos_comp(int(call_reply.json()['result'], 16), 8 * 32)
+        expected = int(test_info['expected'])
+        if not got == expected:
+            run_ganache.kill()
+            return {'result': "fail", 'progress': progress,
+                    "reason": f"expected {expected} but got {got}"}
+        else:
+            progress = progress + ["got matched expected"]
+
+        #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
+        getlogs_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
+                                                      "method": "eth_getLogs",
+                                                      "params": [
+                                                          {
+                                                              "address": contract_address,
+                                                          }
+                                                      ],
+                                                      "id": eth_id})
+    except BaseException as err:
         run_ganache.kill()
         return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_call got {call_reply.status_code} which is not OK"}
-    elif 'error' in call_reply.json().keys():
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"eth_call reply contains error information {str(call_reply.json())}"}
-    else:
-        progress = progress + [f"eth_call reply is {str(call_reply.json())}"]
-
-    #### compare the result to the expected answer
-    got = twos_comp(int(call_reply.json()['result'], 16), 8 * 32)
-    expected = int(test_info['expected'])
-    if not got == expected:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"expected {expected} but got {got}"}
-    else:
-        progress = progress + ["got matched expected"]
-
-    #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
-    getlogs_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                  "method": "eth_getLogs",
-                                                  "params": [
-                                                      {
-                                                          "address": contract_address,
-                                                      }
-                                                  ],
-                                                  "id": eth_id})
+                "reason": f"caught an exception:{str(err)}"}
 
     #### kill ganache and return a pass
     run_ganache.kill()
