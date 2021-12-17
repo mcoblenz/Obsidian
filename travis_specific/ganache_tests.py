@@ -11,7 +11,7 @@ import time
 from shutil import which
 
 import eth_abi
-import httpx
+import polling
 from Crypto.Hash import keccak
 from termcolor import colored
 from web3 import Web3
@@ -98,9 +98,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     try:
         # open a connection to ganache and wait it connects
         w3 = Web3(Web3.HTTPProvider(ganache_url))
-        # todo still use polling for this
-        while not w3.isConnected():
-            time.sleep(0.5)
+        polling.poll(w3.isConnected, step=0.2, max_tries=100)
         progress = progress + ["connected to web3 provider"]
 
         # get the account number
@@ -148,14 +146,13 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         got = twos_comp(int(call_reply.hex(), 16), 8 * 32)
         expected = int(test_info['expected'])
         if not got == expected:
-            run_ganache.kill()
-            return {'result': "fail", 'progress': progress,
-                    "reason": f"expected {expected} but got {got}"}
-        else:
-            progress = progress + ["got matched expected"]
+            raise RuntimeError(f"expected {expected} but got {got}")
+        progress = progress + ["got matched expected"]
 
         #### get the logs
-        # print(str(w3.eth.get_logs()))
+        filt = w3.eth.filter("latest")
+        w3.eth.get_filter_logs(filt.filter_id)
+        # w3.eth.get_logs("latest")
 
     except BaseException as err:
         run_ganache.kill()
