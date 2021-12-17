@@ -137,28 +137,15 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         hash_to_call = keccak_hash.hexdigest()[:8]
         encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
-        call_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                   "method": "eth_call",
-                                                   "params": [
-                                                       {"from": account_number,
-                                                        "to": transaction_receipt.contractAddress,
-                                                        "data": f"0x{hash_to_call}{encoded_args}"
-                                                        }, "latest"],
-                                                   "id": eth_id})
-
-        if not call_reply.status_code == httpx.codes.OK:
-            run_ganache.kill()
-            return {'result': "fail", 'progress': progress,
-                    "reason": f"posting to eth_call got {call_reply.status_code} which is not OK"}
-        elif 'error' in call_reply.json().keys():
-            run_ganache.kill()
-            return {'result': "fail", 'progress': progress,
-                    "reason": f"eth_call reply contains error information {str(call_reply.json())}"}
-        else:
-            progress = progress + [f"eth_call reply is {str(call_reply.json())}"]
+        call_reply = w3.eth.call({
+            "from": account_number,
+            "to": transaction_receipt.contractAddress,
+            "data": f"0x{hash_to_call}{encoded_args}"
+        })
+        progress = progress + [f"made call to eth_call"]
 
         #### compare the result to the expected answer
-        got = twos_comp(int(call_reply.json()['result'], 16), 8 * 32)
+        got = twos_comp(int(call_reply.hex(), 16), 8 * 32)
         expected = int(test_info['expected'])
         if not got == expected:
             run_ganache.kill()
@@ -167,19 +154,12 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         else:
             progress = progress + ["got matched expected"]
 
-        #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
-        getlogs_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                      "method": "eth_getLogs",
-                                                      "params": [
-                                                          {
-                                                              "address": contract_address,
-                                                          }
-                                                      ],
-                                                      "id": eth_id})
+        #### get the logs
+        # print(str(w3.eth.get_logs()))
+
     except BaseException as err:
         run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"caught an exception:{str(err)}"}
+        return {'result': 'fail', 'progress': progress, 'reason': f"caught an exception:{str(err)}"}
 
     #### kill ganache and return a pass
     run_ganache.kill()
