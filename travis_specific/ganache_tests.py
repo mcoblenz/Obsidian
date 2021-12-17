@@ -130,7 +130,6 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         method_types = test_info.get('types', defaults['types'])
         method_args = test_info.get('args', defaults['args'])
 
-        # todo web3 probably does all this better than i am doing it.
         hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
         encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
