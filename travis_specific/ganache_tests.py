@@ -130,11 +130,13 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         # todo web3 probably does all this better than i am doing it.
         hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
         encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
+        foo = Web3.solidityKeccak(method_types, method_args).hex()
+        warn(foo[2:])
 
         call_reply = w3.eth.call({
             "from": account_number,
             "to": transaction_receipt.contractAddress,
-            "data": f"{hash_to_call}{encoded_args}"
+            "data": f"{hash_to_call}{foo[2:]}"
         })
         progress = progress + [f"made call to eth_call"]
 
