@@ -457,7 +457,8 @@ object CodeGenYul extends CodeGenerator {
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
                             Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))),
-                                assign1(retvar, store_id))
+                                assign1(retvar, store_id),
+                                ExpressionStatement(apply("log0",Identifier("this"),intlit(32))))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
                         }
