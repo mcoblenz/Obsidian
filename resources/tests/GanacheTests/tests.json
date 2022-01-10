@@ -249,7 +249,12 @@
         {
             "file": "SetGetNestedPointerPassThrough.obs",
             "expected": "5",
-            "shows_that_we_support": "contracts with fields that refer to other contracts"
+            "shows_that_we_support": "contracts with fields that refer to other contracts when the wrapper is a simple pass through"
+        },
+        {
+            "file": "SetGetNestedPointerArg.obs",
+            "expected": "5",
+            "shows_that_we_support": "contracts with fields that refer to other contracts that they take as arguments"
         },
         {
             "file": "TraceThis.obs",

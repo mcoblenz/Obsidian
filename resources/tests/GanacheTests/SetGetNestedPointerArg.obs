@@ -1,0 +1,40 @@
+contract IntContainer{
+    int x;
+
+    IntContainer@Owned(int init) {
+        x = init;
+    }
+
+    transaction set(int value) {
+        x = value;
+    }
+
+    transaction get() returns int{
+        return x;
+    }
+}
+
+contract IntContainerWrapper{
+    IntContainer@Unowned ic;
+
+    IntContainerWrapper@Owned(IntContainer@Unowned icarg) {
+        ic = icarg;
+    }
+
+    transaction set(int value) {
+        ic.set(value);
+    }
+
+    transaction get() returns int{
+        return (ic.get());
+    }
+}
+
+main contract SetGetNestedPointerArg{
+    transaction main() returns int{
+        IntContainer ic = new IntContainer(0);
+        IntContainerWrapper iw = new IntContainerWrapper(ic);
+        iw.set(5);
+        return(iw.get());
+    }
+}
