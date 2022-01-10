@@ -32,10 +32,12 @@ contract IntContainerWrapper{
 
 main contract SetGetNestedPointer{
     transaction main() returns int{
-        IntContainer ic = new IntContainer(30);
-        IntContainerWrapper iw = new IntContainerWrapper(ic);
-        int x = iw.get();
+        //IntContainer ic = new IntContainer(30);
+        //IntContainerWrapper iw = new IntContainerWrapper(ic);
+        IntContainerWrapper iw = new IntContainerWrapper();
+        //int x = iw.get();
         iw.set(5);
-        return (x + ic.get());
+        return(iw.get());
+        //return (x + ic.get());
     }
 }

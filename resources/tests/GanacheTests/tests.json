@@ -246,10 +246,10 @@
             "expected": "4",
             "shows_that_we_support": "calling a transaction and setting a variable as a result"
         },
-	{
+        {
             "file": "SetGetNestedPointer.obs",
-            "expected": "1800",
+            "expected": "5",
             "shows_that_we_support": "contracts with fields that refer to other contracts"
-	}
+        }
     ]
 }
