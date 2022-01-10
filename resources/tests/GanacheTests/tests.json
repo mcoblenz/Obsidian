@@ -255,12 +255,6 @@
             "file": "SetGetNestedPointerArg.obs",
             "expected": "5",
             "shows_that_we_support": "contracts with fields that refer to other contracts that they take as arguments"
-        },
-        {
-            "file": "TraceThis.obs",
-            "expected": "1800",
-            "shows_that_we_support": "emitting stub tracers per contract present",
-            "gas": 9007199254740991
         }
     ]
 }
