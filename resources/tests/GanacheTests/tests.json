@@ -255,6 +255,12 @@
             "file": "SetGetNestedPointerArg.obs",
             "expected": "5",
             "shows_that_we_support": "contracts with fields that refer to other contracts that they take as arguments"
+        },
+        {
+            "file": "SetGetStashing.obs",
+            "expected": "5",
+            "stashed" : [1,2,3,5],
+            "shows_that_we_support": "simple set-get, but also stashing values in storage as a proxy for logging"
         }
     ]
 }

@@ -1,0 +1,21 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int value) {
+        x = value;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+main contract SetGetStashing{
+    transaction main() returns int{
+        IntContainer ic = new IntContainer();
+        ic.set(1);
+        ic.set(2);
+        ic.set(3);
+        ic.set(5);
+        return (ic.get());
+    }
+}
