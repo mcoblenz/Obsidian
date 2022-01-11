@@ -7,5 +7,5 @@ import edu.cmu.cs.obsidian.parser.SymbolTable
 
 trait CodeGenerator {
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
-            options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean
+            options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable, stash: Option[Boolean]): Boolean
 }

@@ -28,7 +28,8 @@ case class CompilerOptions (outputPath: Option[String],
                             printAST: Boolean,
                             buildClient: Boolean,
                             target: Target.Target,
-                            includePaths: List[Path])
+                            includePaths: List[Path],
+                            stash: Boolean)
 
 object Main {
 
@@ -43,6 +44,7 @@ object Main {
           |    --print-ast                  print output of the parser
           |    --build-client               build a client application rather than a server
           |    --yul                        outputs yul code
+          |    --stash                      include stashing in output yul (only makes sense with --yul)
           |    -L <dir>                     resolve import statements using <dir>
         """.stripMargin
 
@@ -56,6 +58,7 @@ object Main {
         var printTokens = false
         var printAST = false
         var buildClient = false
+        var stash = false
         var target: Target.Target = Target.fabric
 
         def parseOptionsRec(remainingArgs: List[String]) : Unit = {
@@ -84,6 +87,9 @@ object Main {
                     parseOptionsRec(tail)
                 case "--yul" :: tail =>
                     target = Target.yul
+                    parseOptionsRec(tail)
+                case "--stash" :: tail =>
+                    stash = true
                     parseOptionsRec(tail)
 
                 case "-L" :: dir :: tail =>
@@ -116,6 +122,11 @@ object Main {
 
         parseOptionsRec(args)
 
+        if(target != Target.yul && stash){
+            println("Do not pass the --stash option when outputting fabric")
+            sys.exit(2)
+        }
+
         if (inputFiles.isEmpty) {
             println("Must pass at least one file")
             sys.exit(2)
@@ -129,7 +140,7 @@ object Main {
         // We want to check include paths in the order they are specified on
         // the command line, so we reverse them to get them in the right order
         CompilerOptions(outputPath, debugPath, inputFiles, verbose, checkerDebug,
-                        printTokens, printAST, buildClient, target, includePaths.reverse)
+                        printTokens, printAST, buildClient, target, includePaths.reverse, stash)
     }
 
     def findMainContractName(prog: Program): String = {
@@ -267,13 +278,13 @@ object Main {
             }
 
             if (options.target == Target.fabric) {
-                if (!CodeGenJava.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable)){
+                if (!CodeGenJava.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable, None)){
                     return false
                 }
             }
 
             if (options.target == Target.yul) {
-                CodeGenYul.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable)
+                CodeGenYul.gen(filename, srcDir, outputPath, protoDir, options,checkedTable,transformedTable, Some(options.stash))
             }
 
         } catch {

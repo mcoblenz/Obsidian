@@ -19,6 +19,15 @@ object "{{contractName}}" {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
             {{memoryInit}}
 
+            {{#stash}}
+                function setstash(value) {
+                    sstore(0xC0DECAFE,value)
+                }
+                function getstash() -> result{
+                    result := sload(0xC0DECAFE)
+                }
+            {{/stash}}
+
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
 
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}

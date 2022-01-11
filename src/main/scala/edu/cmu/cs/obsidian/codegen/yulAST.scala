@@ -253,7 +253,8 @@ case class YulObject(contractName: String,
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
                      otherTransactions: Seq[YulStatement],
-                     tracers: Seq[FunctionDefinition]) extends YulAST {
+                     tracers: Seq[FunctionDefinition],
+                     stash: Boolean) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -269,7 +270,7 @@ case class YulObject(contractName: String,
             replaceAll("&#13;", "\r")
     }
 
-    /** This class encapulsates the interaction between our representation of a Yul object and
+    /** This class encapsulates the interaction between our representation of a Yul object and
       * the mustache description given in `object.mustache`, and from there how it's written to a file.
       *
       * @param obj the object to present to mustache
@@ -284,6 +285,8 @@ case class YulObject(contractName: String,
 
         // the free memory pointer points to 0x80 initially
         var memoryInit: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
+
+        var stash = obj.stash
 
         def callValueCheck(): YulStatement = callvaluecheck
 
