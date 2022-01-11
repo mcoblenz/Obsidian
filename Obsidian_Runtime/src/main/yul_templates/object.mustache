@@ -23,8 +23,8 @@ object "{{contractName}}" {
                 function setstash(value) {
                     sstore(0xC0DECAFE,value)
                 }
-                function getstash() -> result{
-                    result := sload(0xC0DECAFE)
+                function getstash(this, offset) -> result{
+                    result := sload(add(0xC0DECAFE,offset))
                 }
             {{/stash}}
 

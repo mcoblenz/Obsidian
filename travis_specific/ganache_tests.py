@@ -47,6 +47,19 @@ ganache_port = 8545
 ganache_url = f"http://{ganache_host}:{str(ganache_port)}"
 
 
+def makeweb3call(w3, method_name, method_types, method_args, account_number, contract_address):
+    hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
+    encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
+
+    call_reply = w3.eth.call({
+        "from": account_number,
+        "to": contract_address,
+        "data": f"{hash_to_call}{encoded_args}"
+    })
+
+    return call_reply
+
+
 def run_one_test(test_info, verbose, obsidian_jar, defaults):
     """run a test given its info, verbosity, and the location of the jar file. this returns a dictionary of the form
        { "result" -> "pass" or "fail",
@@ -57,13 +70,17 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
 
+    stashing = []
+    if 'stashed' in test_info.keys():
+        stashing = ["--stash"]
+
     #### compile the obsidian file in question to yul with a jar of obsidianc
     run_obsidianc = subprocess.run(
-        ["java", "-jar", obsidian_jar, "--yul", f"resources/tests/GanacheTests/{test_info['file']}"],
+        ["java", "-jar", obsidian_jar, "--yul"] + stashing + [f"resources/tests/GanacheTests/{test_info['file']}"],
         capture_output=True)
     if not run_obsidianc.returncode == 0:
         return {'result': "fail", 'progress': progress,
-                "reason": f"obsidianc run failed with output {run_obsidianc.stderr}"}
+                "reason": f"obsidianc run failed with output {run_obsidianc.stdout} and error {run_obsidianc.stderr};{run_obsidianc.args}"}
     else:
         progress = progress + ["obsidianc compiled obsidian to yul"]
 
@@ -123,21 +140,12 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + ["got transaction receipt"]
 
         #### use call and the contract address to get the result of the function
-
-
-
-        method_name = test_info.get('trans', defaults['trans'])
-        method_types = test_info.get('types', defaults['types'])
-        method_args = test_info.get('args', defaults['args'])
-
-        hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
-        encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
-
-        call_reply = w3.eth.call({
-            "from": account_number,
-            "to": transaction_receipt.contractAddress,
-            "data": f"{hash_to_call}{encoded_args}"
-        })
+        call_reply = makeweb3call(w3=w3,
+                                  method_name=test_info.get('trans', defaults['trans']),
+                                  method_types=test_info.get('types', defaults['types']),
+                                  method_args=test_info.get('args', defaults['args']),
+                                  account_number=account_number,
+                                  contract_address=transaction_receipt.contractAddress)
         progress = progress + [f"made call to eth_call"]
 
         #### compare the result to the expected answer
@@ -146,6 +154,22 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         if not got == expected:
             raise RuntimeError(f"expected {expected} but got {got}")
         progress = progress + ["got matched expected"]
+
+        if 'stashed' in test_info.keys():
+            # for now, we assume that this is always going to be a list of integers.
+            got_stashed = []
+            expected_stashed = test_info['stashed']
+            for i in range(len(expected_stashed)):
+                reply = makeweb3call(w3=w3,
+                                     method_name="getstash",
+                                     method_types=["int256"],
+                                     method_args=[32 * i],
+                                     account_number=account_number,
+                                     contract_address=transaction_receipt.contractAddress)
+                got_stashed = got_stashed + [twos_comp(int(reply.hex(), 16), 8 * 32)]
+            if not got_stashed == expected_stashed:
+                raise RuntimeError(f"expected {expected_stashed} but got {got_stashed}")
+            progress = progress + [f"stash looks like {pprint.pformat(got_stashed)} which matches the expected stashing"]
 
         #### get the logs
         filt = w3.eth.filter("latest")
