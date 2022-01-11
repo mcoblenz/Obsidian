@@ -247,10 +247,14 @@
             "shows_that_we_support": "calling a transaction and setting a variable as a result"
         },
         {
-            "file": "TraceThis.obs",
-            "expected": "1800",
-            "shows_that_we_support": "emitting stub tracers per contract present",
-            "gas": 9007199254740991
+            "file": "SetGetNestedPointerPassThrough.obs",
+            "expected": "5",
+            "shows_that_we_support": "contracts with fields that refer to other contracts when the wrapper is a simple pass through"
+        },
+        {
+            "file": "SetGetNestedPointerArg.obs",
+            "expected": "5",
+            "shows_that_we_support": "contracts with fields that refer to other contracts that they take as arguments"
         }
     ]
 }
