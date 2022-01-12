@@ -340,6 +340,15 @@ case class YulObject(contractName: String,
 
             val mp_id: Identifier = Identifier("memPos")
 
+            // this is kind of a hack, but it assumes that if you're stashing and have a function called main
+            // you want the tracer to run after main gets called. this is probably good enough for now.
+            val maybe_trace : YulStatement =
+                if(f.name == "main" && stash) {
+                    ExpressionStatement(apply("trace_SetGetStashing", Identifier("this")))
+                } else {
+                    LineComment("do not trace")
+                }
+
             Seq(
                 LineComment(s"entry for ${f.name}"),
                 //    if callvalue() { revert(0, 0) }
@@ -355,6 +364,7 @@ case class YulObject(contractName: String,
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
                 decl_1exp(Identifier("memEnd"), apply(abi_encode_name(returns_from_call.length), mp_id +: returns_from_call: _*)),
                 //    return(memPos, sub(memEnd, memPos))
+                maybe_trace,
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
         }
