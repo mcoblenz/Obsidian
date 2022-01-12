@@ -20,8 +20,11 @@ object "{{contractName}}" {
             {{memoryInit}}
 
             {{#stash}}
-                function setstash(value) {
-                    sstore(0xC0DECAFE,value)
+                function stash(value) {
+                    // the word before the stashes stores how many times stash has been called
+                    offset := sload(sub(0xC0DECAFE,32))
+                    sstore(add(0xC0DECAFE,mul(32,offset)),value)
+                    sstore(sub(0xC0DECAFE,32),add(offset,1))
                 }
                 function getstash(this, offset) -> result{
                     result := sload(add(0xC0DECAFE,offset))
@@ -93,7 +96,9 @@ object "{{contractName}}" {
 
             {{transactions}}
 
-            {{tracertransactions}}
+            {{#stash}}
+                {{tracertransactions}}
+            {{/stash}}
         }
     }
 }

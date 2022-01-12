@@ -129,10 +129,7 @@ object CodeGenYul extends CodeGenerator {
                 case Field(_, typ, fname, _) => typ match {
                     case t : NonPrimitiveType => t match {
                         case ContractReferenceType(contractType, _, _) =>
-                            body = body ++
-                                Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname))),
-                                    ExpressionStatement(apply("log0",Identifier("this"),intlit(32)))
-                                )
+                            body = body :+ ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname)))
                             others = others ++ writeTracers(ct, contractType.contractName)
                         case _ => Seq()
                     }
@@ -145,7 +142,7 @@ object CodeGenYul extends CodeGenerator {
         FunctionDefinition(name = nameTracer(name),
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
-                            body = Block(body :+ Leave())) +: others.distinctBy(fd => fd.name)
+                            body = Block(ExpressionStatement(apply("stash",Identifier("this"))) +: body :+ Leave())) +: others.distinctBy(fd => fd.name)
     }
 
     /**
@@ -460,8 +457,7 @@ object CodeGenYul extends CodeGenerator {
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
                             Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))),
-                                assign1(retvar, store_id),
-                                ExpressionStatement(apply("log0",Identifier("this"),intlit(32))))
+                                assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
                         }

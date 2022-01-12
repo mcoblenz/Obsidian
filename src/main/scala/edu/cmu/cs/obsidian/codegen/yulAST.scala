@@ -376,7 +376,7 @@ case class YulObject(contractName: String,
             }
 
         val stash_decode_tuple : Seq[YulStatement] =
-            if(stash){ // write_abi_decode_tuple
+            if(stash){
                 Seq(write_abi_decode_tuple(dropThisArgument(faux_stash)), write_abi_decode(YATUInt32()))
             } else {
                 Seq()
