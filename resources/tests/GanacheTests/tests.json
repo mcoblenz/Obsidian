@@ -258,7 +258,7 @@
         },
         {
             "file": "SetGetStashing.obs",
-            "expected": "5",
+            "expected": "15",
             "stashed" : [1,2,3,5],
             "shows_that_we_support": "simple set-get, but also stashing values in storage as a proxy for logging"
         }

@@ -10,12 +10,17 @@ contract IntContainer{
 }
 
 main contract SetGetStashing{
+    IntContainer@Owned ic1;
+    IntContainer@Owned ic2;
+    IntContainer@Owned ic3;
+
     transaction main() returns int{
-        IntContainer ic = new IntContainer();
-        ic.set(1);
-        ic.set(2);
-        ic.set(3);
-        ic.set(5);
-        return (ic.get());
+        ic1 = new IntContainer();
+        ic2 = new IntContainer();
+        ic3 = new IntContainer();
+        ic1.set(5);
+        ic2.set(5);
+        ic3.set(5);
+        return (ic1.get() + ic2.get() + ic3.get());
     }
 }
