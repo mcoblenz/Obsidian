@@ -22,7 +22,7 @@ object "{{contractName}}" {
             {{#stash}}
                 function stash(value) {
                     // the word before the stashes stores how many times stash has been called
-                    offset := sload(sub(0xC0DECAFE,32))
+                    let offset := sload(sub(0xC0DECAFE,32))
                     sstore(add(0xC0DECAFE,mul(32,offset)),value)
                     sstore(sub(0xC0DECAFE,32),add(offset,1))
                 }
