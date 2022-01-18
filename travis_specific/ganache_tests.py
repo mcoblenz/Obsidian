@@ -155,6 +155,9 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
             raise RuntimeError(f"expected {expected} but got {got}")
         progress = progress + ["got matched expected"]
 
+        # w3.eth.get_storage_at(transaction_receipt.contractAddress,"0xC0DECAFE","latest")
+        # w3.eth.get_storage_at(account_number,"0xC0DECAFE","latest")
+
         if 'stashed' in test_info.keys():
             # for now, we assume that this is always going to be a list of integers.
             got_stashed = []
@@ -170,6 +173,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
             if not got_stashed == expected_stashed:
                 raise RuntimeError(f"expected {expected_stashed} but got {got_stashed}")
             progress = progress + [f"stash looks like {pprint.pformat(got_stashed)} which matches the expected stashing"]
+
 
         #### get the logs
         filt = w3.eth.filter("latest")

@@ -21,6 +21,7 @@ object CodeGenYul extends CodeGenerator {
     // todo: this is getting redundant; better way to manage different vars we create?
     var tempCnt: Int = 0
     var retCnt: Int = 0
+    val stash_address = "0x0"
 
     def nextTemp(): Identifier = {
         tempCnt = tempCnt + 1
@@ -142,7 +143,14 @@ object CodeGenYul extends CodeGenerator {
         FunctionDefinition(name = nameTracer(name),
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
-                            body = Block(ExpressionStatement(apply("stash",Identifier("this"))) +: body :+ Leave())) +: others.distinctBy(fd => fd.name)
+                            body = Block(Seq(ExpressionStatement(apply("sstore",hexlit(stash_address),intlit(12))),
+                                    edu.cmu.cs.obsidian.codegen.If(apply("not", apply("eq",intlit(12),apply("sload", hexlit(stash_address)))),
+                                                            Block(Seq(Leave())))
+                            ) ++ body :+ Leave())
+        ) +: others.distinctBy(fd => fd.name)
+//
+//                                ExpressionStatement(apply("invalid")) +:
+//                                (ExpressionStatement(apply("sstore",hexlit("0xc0decafe"),intlit(12))) +: body :+ Leave())) +: others.distinctBy(fd => fd.name))
     }
 
     /**
