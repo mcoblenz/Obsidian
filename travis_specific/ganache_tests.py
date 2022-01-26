@@ -7,6 +7,7 @@ import os
 import pprint
 import subprocess
 import sys
+import socket
 from shutil import which
 
 import eth_abi
@@ -37,7 +38,6 @@ def twos_comp(val, bits):
 
 
 def is_port_in_use(host, port):
-    import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex((host, port)) == 0
 
@@ -45,19 +45,6 @@ def is_port_in_use(host, port):
 ganache_host = 'localhost'
 ganache_port = 8545
 ganache_url = f"http://{ganache_host}:{str(ganache_port)}"
-
-
-def makeweb3call(w3, method_name, method_types, method_args, account_number, contract_address):
-    hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
-    encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
-
-    call_reply = w3.eth.call({
-        "from": account_number,
-        "to": contract_address,
-        "data": f"{hash_to_call}{encoded_args}"
-    })
-
-    return call_reply
 
 
 def run_one_test(test_info, verbose, obsidian_jar, defaults):
@@ -85,9 +72,14 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + ["obsidianc compiled obsidian to yul"]
 
     #### compile the yul to evm with solc
-    run_solc = subprocess.run(
-        ["docker", "run", "-v", f"{os.getcwd().format()}/{test_name}/:/src", "ethereum/solc:stable",
-         "--bin", "--strict-assembly", "--optimize", f"/src/{test_name}.yul"], capture_output=True)
+    run_solc = subprocess.run(["docker",
+                               "run",
+                               "-v", f"{os.getcwd().format()}/{test_name}/:/src",
+                               "ethereum/solc:stable",
+                               "--bin",
+                               "--strict-assembly",
+                               "--optimize",
+                               f"/src/{test_name}.yul"], capture_output=True)
     if not run_solc.returncode == 0:
         return {'result': "fail", 'progress': progress,
                 "reason": f"solc run failed with output {run_solc.stderr}"}
@@ -124,10 +116,10 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + ["got account from web3"]
 
         #### send a transaction
-        transaction_hash = w3.eth.sendTransaction({"from": account_number,
-                                                   "gas": int(test_info.get('gas', defaults['gas'])),
-                                                   "data": f"0x{evm_bytecode}"})
-        progress = progress + ["sent transaction"]
+        deploy_transaction_hash = w3.eth.send_transaction({"from": account_number,
+                                                           "gas": int(test_info.get('gas', defaults['gas'])),
+                                                           "data": f"0x{evm_bytecode}"})
+        progress = progress + ["sent deploy transaction"]
 
         #### warn if there's no expected result because this is as far as we go
         if not test_info['expected']:
@@ -137,16 +129,23 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                     "reason": "nothing failed; note that no result was checked, though"}
 
         #### get a transaction receipt to get the contract address
-        transaction_receipt = w3.eth.get_transaction_receipt(transaction_hash)
-        progress = progress + ["got transaction receipt"]
+        deploy_transaction_receipt = w3.eth.wait_for_transaction_receipt(deploy_transaction_hash)
+        progress = progress + ["got deploy transaction receipt"]
 
-        #### use call and the contract address to get the result of the function
-        call_reply = makeweb3call(w3=w3,
-                                  method_name=test_info.get('trans', defaults['trans']),
-                                  method_types=test_info.get('types', defaults['types']),
-                                  method_args=test_info.get('args', defaults['args']),
-                                  account_number=account_number,
-                                  contract_address=transaction_receipt.contractAddress)
+        #### use call and the contract address to get the result of running the function locally to
+        #### the node for the result of the code
+
+        method_name = test_info.get('trans', defaults['trans'])
+        method_types = test_info.get('types', defaults['types'])
+        method_args = test_info.get('args', defaults['args'])
+        hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
+        encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
+
+        call_reply = w3.eth.call({
+            "from": account_number,
+            "to": deploy_transaction_receipt.contractAddress,
+            "data": f"{hash_to_call}{encoded_args}"
+        })
         progress = progress + [f"made call to eth_call"]
 
         #### compare the result to the expected answer
@@ -156,30 +155,34 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
             raise RuntimeError(f"expected {expected} but got {got}")
         progress = progress + ["got matched expected"]
 
-        w3.eth.get_storage_at(account_number, "0xC0DECAFE")
-        w3.eth.get_storage_at(transaction_receipt.contractAddress, "0xC0DECAFE")
+        ## invoking transaction for effects
+        invoke_transaction_hash = w3.eth.send_transaction({
+            "from": account_number,
+            "to": deploy_transaction_receipt.contractAddress,
+            "data": f"{hash_to_call}{encoded_args}"
+        })
+        progress = progress + ["sent transaction for invocation"]
+
+        invoke_transaction_receipt = w3.eth.wait_for_transaction_receipt(invoke_transaction_hash)
+        progress = progress + [f"got receipt for invocation"]
 
         if 'stashed' in test_info.keys():
             # for now, we assume that this is always going to be a list of integers.
             got_stashed = []
             expected_stashed = test_info['stashed']
             for i in range(len(expected_stashed)):
-                reply = makeweb3call(w3=w3,
-                                     method_name="getstash",
-                                     method_types=["int256"],
-                                     method_args=[32 * i],
-                                     account_number=account_number,
-                                     contract_address=transaction_receipt.contractAddress)
-                got_stashed = got_stashed + [twos_comp(int(reply.hex(), 16), 8 * 32)]
+                storage_contents = w3.eth.get_storage_at(deploy_transaction_receipt.contractAddress,
+                                                         "0xc0decafe")
+                print(storage_contents)
+                got_stashed = got_stashed + [twos_comp(int(storage_contents.hex(), 16), 8 * 32)]
             if not got_stashed == expected_stashed:
                 raise RuntimeError(f"expected {expected_stashed} but got {got_stashed}")
             progress = progress + [f"stash looks like {pprint.pformat(got_stashed)} which matches the expected stashing"]
 
-
         #### get the logs
-        #filt = w3.eth.filter("latest")
-        #w3.eth.get_filter_logs(filt.filter_id)
-        # w3.eth.get_logs()
+        logs = invoke_transaction_receipt.logs
+        if logs:
+            warn("produced logs!")
 
     except BaseException as err:
         run_ganache.kill()
