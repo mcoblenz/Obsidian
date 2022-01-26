@@ -177,8 +177,8 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
 
         #### get the logs
-        filt = w3.eth.filter("latest")
-        w3.eth.get_filter_logs(filt.filter_id)
+        #filt = w3.eth.filter("latest")
+        #w3.eth.get_filter_logs(filt.filter_id)
         # w3.eth.get_logs()
 
     except BaseException as err:

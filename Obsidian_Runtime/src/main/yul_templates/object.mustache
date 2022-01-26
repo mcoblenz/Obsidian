@@ -28,13 +28,6 @@ object "{{contractName}}" {
                     //sstore(0xC0DECAFE,value)
                     sstore(0xC0DECAFE,value)
                 }
-                function getstash(this, offset) -> result{
-                    //result := sload(add(0xC0DECAFE,offset))
-                    //result := sload(0xC0DECAFE)
-                    //result := 12 // this produces [12, 12, 12, 12] which is right
-                    //result := offset // this produces [0, 32, 64, 96] which is also probably right
-                    result := sload(0xC0DECAFE) // produces [0,0,0,0] when stash is sstore(0xC0DECAFE,12) which is wrong
-                }
             {{/stash}}
 
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}

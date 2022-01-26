@@ -369,29 +369,6 @@ case class YulObject(contractName: String,
             )
         }
 
-        // this is a bit of a hack: if we're emitting the stashing code, it needs to appear in the
-        // dispatch table so that the test harness can call it, so we need to gin up an entry for code
-        // that's getting emitted but has no obsidian as an ancestor.
-        val faux_stash: FunctionDefinition = FunctionDefinition("getstash",
-            Seq(TypedName("this", YATAddress()),TypedName("offset",YATUInt32())),
-            Seq(TypedName("result",YATUInt32())),
-            Block(Seq()))
-
-        val stash_dispatch: Seq[Case] =
-            if(stash){
-                Seq(Case(hexlit("0xe61d09fd"), // this is the top bytes of the hash of the string "getstash"
-                    Block(dispatchEntry(faux_stash))))
-            } else {
-                Seq()
-            }
-
-        val stash_decode_tuple : Seq[YulStatement] =
-            if(stash){
-                Seq(write_abi_decode_tuple(dropThisArgument(faux_stash)), write_abi_decode(YATUInt32()))
-            } else {
-                Seq()
-            }
-
 
         // TODO here and above in the dispatch table we do not respect privacy; we should iterate
         //  only over the things in the main contract that are public
@@ -409,8 +386,7 @@ case class YulObject(contractName: String,
         def dispatchTable(): codegen.Switch =
             codegen.Switch(Identifier("selector"),
                 mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
-                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))) ++ stash_dispatch
-            )
+                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
 
         // traverse the transactions and compute the abi functions we need to emit.
         def abiEncodeTupleFuncs(): YulStatement = Block(
@@ -426,7 +402,7 @@ case class YulObject(contractName: String,
                     (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
                         // for each transaction, collect up the types that it uses, and then emit the decodes for those types
                         ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
-                        ++ stash_decode_tuple).distinct
+                        ).distinct
                     )
         )
 
