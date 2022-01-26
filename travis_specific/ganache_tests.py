@@ -171,9 +171,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
             got_stashed = []
             expected_stashed = test_info['stashed']
             for i in range(len(expected_stashed)):
-                storage_contents = w3.eth.get_storage_at(deploy_transaction_receipt.contractAddress,
-                                                         "0xc0decafe")
-                print(storage_contents)
+                storage_contents = w3.eth.get_storage_at(deploy_transaction_receipt.contractAddress,str(hex(0xc0decafe + (32 * i))))
                 got_stashed = got_stashed + [twos_comp(int(storage_contents.hex(), 16), 8 * 32)]
             if not got_stashed == expected_stashed:
                 raise RuntimeError(f"expected {expected_stashed} but got {got_stashed}")
