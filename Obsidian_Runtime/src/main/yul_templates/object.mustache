@@ -25,7 +25,8 @@ object "{{contractName}}" {
                     //let offset := sload(sub(0xC0DECAFE,32))
                     //sstore(add(0xC0DECAFE,mul(32,offset)),value)
                     //sstore(sub(0xC0DECAFE,32),add(offset,1))
-                    sstore(0xC0DECAFE,12)
+                    //sstore(0xC0DECAFE,value)
+                    sstore(0xC0DECAFE,value)
                 }
                 function getstash(this, offset) -> result{
                     //result := sload(add(0xC0DECAFE,offset))

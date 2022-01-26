@@ -155,8 +155,8 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
             raise RuntimeError(f"expected {expected} but got {got}")
         progress = progress + ["got matched expected"]
 
-        # w3.eth.get_storage_at(transaction_receipt.contractAddress,"0xC0DECAFE","latest")
-        # w3.eth.get_storage_at(account_number,"0xC0DECAFE","latest")
+        w3.eth.get_storage_at(account_number, "0xC0DECAFE")
+        w3.eth.get_storage_at(transaction_receipt.contractAddress, "0xC0DECAFE")
 
         if 'stashed' in test_info.keys():
             # for now, we assume that this is always going to be a list of integers.

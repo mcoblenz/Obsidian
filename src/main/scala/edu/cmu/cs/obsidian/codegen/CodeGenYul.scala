@@ -14,6 +14,10 @@ import edu.cmu.cs.obsidian.typecheck.ContractType
 
 object CodeGenYul extends CodeGenerator {
 
+    // the address in storage that we'll use to stash log-like info, if that is enabled.
+    val stash_address = "0xC0DECAFE"
+
+
     // we generate new temporary variables with a little bit of global state; i am making the
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
     // though that is not enforced statically.
@@ -21,7 +25,6 @@ object CodeGenYul extends CodeGenerator {
     // todo: this is getting redundant; better way to manage different vars we create?
     var tempCnt: Int = 0
     var retCnt: Int = 0
-    val stash_address = "0x0"
 
     def nextTemp(): Identifier = {
         tempCnt = tempCnt + 1
@@ -143,14 +146,11 @@ object CodeGenYul extends CodeGenerator {
         FunctionDefinition(name = nameTracer(name),
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
-                            body = Block(Seq(ExpressionStatement(apply("sstore",hexlit(stash_address),intlit(12))),
-                                    edu.cmu.cs.obsidian.codegen.If(apply("not", apply("eq",intlit(12),apply("sload", hexlit(stash_address)))),
-                                                            Block(Seq(Leave())))
-                            ) ++ body :+ Leave())
+                            body = Block(Seq(
+                                            ExpressionStatement(apply("stash",intlit(12)))
+                                            //, edu.cmu.cs.obsidian.codegen.If(apply("not", apply("eq",intlit(12),apply("sload", hexlit(stash_address)))), Block(Seq(Leave())))
+                                            ) ++ body :+ Leave())
         ) +: others.distinctBy(fd => fd.name)
-//
-//                                ExpressionStatement(apply("invalid")) +:
-//                                (ExpressionStatement(apply("sstore",hexlit("0xc0decafe"),intlit(12))) +: body :+ Leave())) +: others.distinctBy(fd => fd.name))
     }
 
     /**
