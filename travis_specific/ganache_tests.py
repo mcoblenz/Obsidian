@@ -180,7 +180,9 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         #### get the logs
         logs = invoke_transaction_receipt.logs
         if logs:
-            warn("produced logs!")
+            warn(f"produced logs!")
+            if verbose:
+                pprint.pprint(logs)
 
     except BaseException as err:
         run_ganache.kill()

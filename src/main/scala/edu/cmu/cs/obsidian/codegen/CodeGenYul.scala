@@ -147,8 +147,8 @@ object CodeGenYul extends CodeGenerator {
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
                             body = Block(Seq(
-                                            ExpressionStatement(apply("stash",intlit(12)))
-                                            //, edu.cmu.cs.obsidian.codegen.If(apply("not", apply("eq",intlit(12),apply("sload", hexlit(stash_address)))), Block(Seq(Leave())))
+                                            ExpressionStatement(apply("stash",intlit(12))),
+                                            ExpressionStatement(apply("log0",intlit(64),intlit(32)))
                                             ) ++ body :+ Leave())
         ) +: others.distinctBy(fd => fd.name)
     }
