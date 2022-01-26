@@ -100,13 +100,14 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     stdout_redirect = subprocess.PIPE
     if verbose:
         stdout_redirect = None
-    run_ganache = subprocess.Popen(["ganache-cli",
-                                    "--verbose",
-                                    "--host", ganache_host,
-                                    "--port", str(ganache_port),
-                                    "--gasLimit", str(test_info.get('gas', defaults['gas'])),
-                                    "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
-                                    "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
+    run_ganache = subprocess.Popen(["ganache",
+                                    "--logging.verbose",
+                                    "--logging.debug",
+                                    "--server.host", ganache_host,
+                                    "--server.port", str(ganache_port),
+                                    "--miner.blockGasLimit", str(test_info.get('gas', defaults['gas'])),
+                                    "--wallet.totalAccounts", str(test_info.get('numaccts', defaults['numaccts'])),
+                                    "--wallet.defaultBalance", str(test_info.get('startingeth', defaults['startingeth']))
                                     ], stdout=stdout_redirect)
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
