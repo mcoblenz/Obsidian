@@ -253,8 +253,7 @@ case class YulObject(contractName: String,
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
                      otherTransactions: Seq[YulStatement],
-                     tracers: Seq[FunctionDefinition],
-                     stash: Boolean) extends YulAST {
+                     tracers: Seq[FunctionDefinition]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -285,8 +284,6 @@ case class YulObject(contractName: String,
 
         // the free memory pointer points to 0x80 initially
         var memoryInit: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
-
-        var stash: Boolean = obj.stash
 
         def callValueCheck(): YulStatement = callvaluecheck
 
@@ -343,7 +340,7 @@ case class YulObject(contractName: String,
             // this is kind of a hack, but it assumes that if you're stashing and have a function called main
             // you want the tracer to run after main gets called. this is probably good enough for now.
             val maybe_trace : YulStatement =
-                if(f.name == "main" && stash) {
+                if(f.name == "main") {
                     ExpressionStatement(apply("trace_SetGetStashing", Identifier("this")))
                 } else {
                     LineComment("do not trace")

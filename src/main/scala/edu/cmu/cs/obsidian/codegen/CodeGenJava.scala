@@ -75,9 +75,8 @@ object CodeGenJava extends CodeGenerator{
     }
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
-            options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable, stash: Option[Boolean]): Boolean = {
+            options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
         // nb: stash is ignored when outputting Java
-        assert(stash.isEmpty, "java code gen passed a stash option")
         val lastSlash = filename.lastIndexOf(File.separator)
         val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 

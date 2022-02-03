@@ -39,9 +39,7 @@ object CodeGenYul extends CodeGenerator {
 
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
-            options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable, stash: Option[Boolean]): Boolean = {
-
-        assert(stash.nonEmpty, "yul codegen not passed a stash option")
+            options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
 
         //  throw an exception if there is no main contract
         if (findMainContract(checkedTable.ast).isEmpty) {
@@ -57,7 +55,7 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // translate from obsidian AST to yul AST
-        val translated_obj = translateProgram(checkedTable.ast, checkedTable, stash.get)
+        val translated_obj = translateProgram(checkedTable.ast, checkedTable)
 
         // generate yul string from yul AST, write to the output file
         val s = translated_obj.yulString()
@@ -68,7 +66,7 @@ object CodeGenYul extends CodeGenerator {
         true
     }
 
-    def translateProgram(program: Program, checkedTable: SymbolTable, stash: Boolean): YulObject = {
+    def translateProgram(program: Program, checkedTable: SymbolTable): YulObject = {
 
         // translate main contract, or fail if none is found or only a java contract is present
         val mainContract: ObsidianContractImpl =
@@ -110,8 +108,7 @@ object CodeGenYul extends CodeGenerator {
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
             otherTransactions = program.contracts.flatMap(translateNonMains),
-            tracers = writeTracers(checkedTable, mainContract.name),
-            stash = stash
+            tracers = writeTracers(checkedTable, mainContract.name)
         )
     }
 

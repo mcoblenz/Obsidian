@@ -52,7 +52,3 @@ assembly / assemblyMergeStrategy := {
         val oldStrategy = ( assembly / assemblyMergeStrategy).value
     	oldStrategy(x)
 }
-
-// adding this to squelch a warning per https://github.com/sbt/sbt/pull/6237
-
-// ThisBuild / packageTimestamp := Package.keepTimestamps

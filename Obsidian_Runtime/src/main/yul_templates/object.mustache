@@ -19,15 +19,6 @@ object "{{contractName}}" {
             {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
             {{memoryInit}}
 
-            {{#stash}}
-                function stash(value) {
-                    // the word before the stashes stores how many times stash has been called
-                    let offset := sload(sub(0xC0DECAFE,32))
-                    sstore(add(0xC0DECAFE,mul(32,offset)),value)
-                    sstore(sub(0xC0DECAFE,32),add(offset,1))
-                }
-            {{/stash}}
-
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
 
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
@@ -93,9 +84,7 @@ object "{{contractName}}" {
 
             {{transactions}}
 
-            {{#stash}}
-                {{tracertransactions}}
-            {{/stash}}
+            {{tracertransactions}}
         }
     }
 }
