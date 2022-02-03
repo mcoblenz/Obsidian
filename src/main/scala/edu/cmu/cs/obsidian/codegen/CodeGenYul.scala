@@ -13,11 +13,6 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
 object CodeGenYul extends CodeGenerator {
-
-    // the address in storage that we'll use to stash log-like info, if that is enabled.
-    val stash_address = "0xC0DECAFE"
-
-
     // we generate new temporary variables with a little bit of global state; i am making the
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
     // though that is not enforced statically.
@@ -144,7 +139,6 @@ object CodeGenYul extends CodeGenerator {
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
                             body = Block(Seq(
-                                            ExpressionStatement(apply("stash",intlit(12))),
                                             ExpressionStatement(apply("log0",intlit(64),intlit(32)))
                                             ) ++ body :+ Leave())
         ) +: others.distinctBy(fd => fd.name)

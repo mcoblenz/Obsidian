@@ -337,11 +337,13 @@ case class YulObject(contractName: String,
 
             val mp_id: Identifier = Identifier("memPos")
 
-            // this is kind of a hack, but it assumes that if you're stashing and have a function called main
-            // you want the tracer to run after main gets called. this is probably good enough for now.
+            // this is a hack to get the tracer to be run on the main call of the specific test that
+            // is in SetGetLogs.
+            // todo remove this once tracers get called on-demand
+            // todo this is a way to make exactly one test work but produces bizarre output on anything else
             val maybe_trace : YulStatement =
                 if(f.name == "main") {
-                    ExpressionStatement(apply("trace_SetGetStashing", Identifier("this")))
+                    ExpressionStatement(apply("trace_SetGetLogs", Identifier("this")))
                 } else {
                     LineComment("do not trace")
                 }

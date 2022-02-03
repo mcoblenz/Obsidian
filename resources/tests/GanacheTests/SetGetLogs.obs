@@ -9,7 +9,7 @@ contract IntContainer{
     }
 }
 
-main contract SetGetStashing{
+main contract SetGetLogs{
     IntContainer@Owned ic1;
     IntContainer@Owned ic2;
     IntContainer@Owned ic3;

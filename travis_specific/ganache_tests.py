@@ -57,13 +57,9 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
 
-    stashing = []
-    if 'stashed' in test_info.keys():
-        stashing = ["--stash"]
-
     #### compile the obsidian file in question to yul with a jar of obsidianc
     run_obsidianc = subprocess.run(
-        ["java", "-jar", obsidian_jar, "--yul"] + stashing + [f"resources/tests/GanacheTests/{test_info['file']}"],
+        ["java", "-jar", obsidian_jar, "--yul", f"resources/tests/GanacheTests/{test_info['file']}"],
         capture_output=True)
     if not run_obsidianc.returncode == 0:
         return {'result': "fail", 'progress': progress,
@@ -166,23 +162,18 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         invoke_transaction_receipt = w3.eth.wait_for_transaction_receipt(invoke_transaction_hash)
         progress = progress + [f"got receipt for invocation"]
 
-        if 'stashed' in test_info.keys():
-            # for now, we assume that this is always going to be a list of integers.
-            got_stashed = []
-            expected_stashed = test_info['stashed']
-            for i in range(len(expected_stashed)):
-                storage_contents = w3.eth.get_storage_at(deploy_transaction_receipt.contractAddress,str(hex(0xc0decafe + (32 * i))))
-                got_stashed = got_stashed + [twos_comp(int(storage_contents.hex(), 16), 8 * 32)]
-            if not got_stashed == expected_stashed:
-                raise RuntimeError(f"expected {expected_stashed} but got {got_stashed}")
-            progress = progress + [f"stash looks like {pprint.pformat(got_stashed)} which matches the expected stashing"]
-
-        #### get the logs
-        logs = invoke_transaction_receipt.logs
-        if logs:
-            warn(f"produced logs!")
+        #### get the logs and check against the expected values, if such is present.
+        # todo this is pretty rudimentary and really specific to one test case for now
+        if 'logged' in test_info.keys():
+            logs = invoke_transaction_receipt.logs
             if verbose:
                 pprint.pprint(logs)
+            if not logs:
+                raise RuntimeError("expected logs to be present for this test but none were in the receipt")
+            got_logged_data = [twos_comp(int(log['data'], 16), 8*32) for log in logs]
+            if not test_info['logged'] == got_logged_data:
+                raise RuntimeError(f"expected logs {test_info['logged']} but got {got_logged_data}")
+            progress = progress + ["logs matched expected"]
 
     except BaseException as err:
         run_ganache.kill()
