@@ -255,6 +255,13 @@
             "file": "SetGetNestedPointerArg.obs",
             "expected": "5",
             "shows_that_we_support": "contracts with fields that refer to other contracts that they take as arguments"
+        },
+        {
+            "file": "SetGetLogs.obs",
+            "expected": "15",
+            "trans" : "main_sgl",
+            "logged" : [320,320,320,320],
+            "shows_that_we_support": "simple set-get with tracers that emit logged values"
         }
     ]
 }

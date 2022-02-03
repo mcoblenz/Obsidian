@@ -1,0 +1,26 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int value) {
+        x = value;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+main contract SetGetLogs{
+    IntContainer@Owned ic1;
+    IntContainer@Owned ic2;
+    IntContainer@Owned ic3;
+
+    transaction main_sgl() returns int{
+        ic1 = new IntContainer();
+        ic2 = new IntContainer();
+        ic3 = new IntContainer();
+        ic1.set(5);
+        ic2.set(5);
+        ic3.set(5);
+        return (ic1.get() + ic2.get() + ic3.get());
+    }
+}

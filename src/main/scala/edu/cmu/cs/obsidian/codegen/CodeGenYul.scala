@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.{BottomType, ContractReferenceType, GenericType, InterfaceContractType, NonPrimitiveType, ObsidianType, PrimitiveType, StateType, UnitType}
+import edu.cmu.cs.obsidian.typecheck.{ContractReferenceType, NonPrimitiveType, ObsidianType, UnitType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -13,7 +13,6 @@ import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck.ContractType
 
 object CodeGenYul extends CodeGenerator {
-
     // we generate new temporary variables with a little bit of global state; i am making the
     // implicit assumption that nothing except nextTemp will modify the contents of tempCnt, even
     // though that is not enforced statically.
@@ -126,10 +125,7 @@ object CodeGenYul extends CodeGenerator {
                 case Field(_, typ, fname, _) => typ match {
                     case t : NonPrimitiveType => t match {
                         case ContractReferenceType(contractType, _, _) =>
-                            body = body ++
-                                Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname))),
-                                    ExpressionStatement(apply("log0",Identifier("this"),intlit(32)))
-                                )
+                            body = body :+ ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname)))
                             others = others ++ writeTracers(ct, contractType.contractName)
                         case _ => Seq()
                     }
@@ -142,7 +138,10 @@ object CodeGenYul extends CodeGenerator {
         FunctionDefinition(name = nameTracer(name),
                             parameters = Seq(TypedName("this",YATAddress())),
                             returnVariables = Seq(),
-                            body = Block(body :+ Leave())) +: others.distinctBy(fd => fd.name)
+                            body = Block(Seq(
+                                            ExpressionStatement(apply("log0",intlit(64),intlit(32)))
+                                            ) ++ body :+ Leave())
+        ) +: others.distinctBy(fd => fd.name)
     }
 
     /**
@@ -457,8 +456,7 @@ object CodeGenYul extends CodeGenerator {
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
                             Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))),
-                                assign1(retvar, store_id),
-                                ExpressionStatement(apply("log0",Identifier("this"),intlit(32))))
+                                assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
                         }

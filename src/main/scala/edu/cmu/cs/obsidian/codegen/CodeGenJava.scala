@@ -76,6 +76,7 @@ object CodeGenJava extends CodeGenerator{
 
     def gen(filename: String, srcDir: Path, outputPath: Path, protoDir: Path,
             options: CompilerOptions, checkedTable: SymbolTable, transformedTable: SymbolTable): Boolean = {
+
         val lastSlash = filename.lastIndexOf(File.separator)
         val sourceFilename = if (lastSlash < 0) filename else filename.substring(lastSlash + 1)
 
