@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.{ContractReferenceType, NonPrimitiveType, ObsidianType, UnitType}
+import edu.cmu.cs.obsidian.typecheck.{ContractReferenceType, NonPrimitiveType, ObsidianType, UnitType, PrimitiveType}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -122,15 +122,26 @@ object CodeGenYul extends CodeGenerator {
 
         for (d <- c.declarations) {
             d match {
-                case Field(_, typ, fname, _) => typ match {
-                    case t: NonPrimitiveType => t match {
-                        case ContractReferenceType(contractType, _, _) =>
-                            body = body :+ ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name), fname)))
-                            others = others ++ writeTracers(ct, contractType.contractName)
+                case Field(_, typ, fname, _) =>
+                    val loc = fieldFromThis(ct.contractLookup(name), fname)
+                    typ match {
+                        case t: NonPrimitiveType => t match {
+                            case ContractReferenceType(contractType, _, _) =>
+                                body = body ++ Seq(
+                                    //sstore(add(this,offset), mload(add(this,offset)))
+                                    ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
+                                    ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
+                                )
+                                others = others ++ writeTracers(ct, contractType.contractName)
+                            case _ => Seq()
+                        }
+                        case _: PrimitiveType => {
+                            body = body :+
+                                //sstore(add(this,offset), mload(add(this,offset)))
+                                ExpressionStatement(apply("sstore", loc, apply("mload", loc)))
+                        }
                         case _ => Seq()
                     }
-                    case _ => Seq()
-                }
                 case _ => Seq()
             }
         }
