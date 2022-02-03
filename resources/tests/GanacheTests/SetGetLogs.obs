@@ -14,7 +14,7 @@ main contract SetGetLogs{
     IntContainer@Owned ic2;
     IntContainer@Owned ic3;
 
-    transaction main() returns int{
+    transaction main_sgl() returns int{
         ic1 = new IntContainer();
         ic2 = new IntContainer();
         ic3 = new IntContainer();

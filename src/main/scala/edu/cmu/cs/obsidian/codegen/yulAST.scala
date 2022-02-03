@@ -342,7 +342,7 @@ case class YulObject(contractName: String,
             // todo remove this once tracers get called on-demand
             // todo this is a way to make exactly one test work but produces bizarre output on anything else
             val maybe_trace : YulStatement =
-                if(f.name == "main") {
+                if(f.name == "main_sgl") {
                     ExpressionStatement(apply("trace_SetGetLogs", Identifier("this")))
                 } else {
                     LineComment("do not trace")
