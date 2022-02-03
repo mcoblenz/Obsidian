@@ -111,7 +111,7 @@ object CodeGenYul extends CodeGenerator {
         s"trace_$name"
     }
 
-    def writeTracers(ct : SymbolTable, name: String): Seq[FunctionDefinition] = {
+    def writeTracers(ct: SymbolTable, name: String): Seq[FunctionDefinition] = {
         val c: Contract = ct.contract(name) match {
             case Some(value) => value.contract
             case None => throw new RuntimeException()
@@ -120,12 +120,12 @@ object CodeGenYul extends CodeGenerator {
         var body: Seq[YulStatement] = Seq()
         var others: Seq[FunctionDefinition] = Seq()
 
-        for(d <- c.declarations){
+        for (d <- c.declarations) {
             d match {
                 case Field(_, typ, fname, _) => typ match {
-                    case t : NonPrimitiveType => t match {
+                    case t: NonPrimitiveType => t match {
                         case ContractReferenceType(contractType, _, _) =>
-                            body = body :+ ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname)))
+                            body = body :+ ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name), fname)))
                             others = others ++ writeTracers(ct, contractType.contractName)
                         case _ => Seq()
                     }
@@ -136,11 +136,11 @@ object CodeGenYul extends CodeGenerator {
         }
 
         FunctionDefinition(name = nameTracer(name),
-                            parameters = Seq(TypedName("this",YATAddress())),
-                            returnVariables = Seq(),
-                            body = Block(Seq(
-                                            ExpressionStatement(apply("log0",intlit(64),intlit(32)))
-                                            ) ++ body :+ Leave())
+            parameters = Seq(TypedName("this", YATAddress())),
+            returnVariables = Seq(),
+            body = Block(Seq(
+                ExpressionStatement(apply("log0", intlit(64), intlit(32)))
+            ) ++ body :+ Leave())
         ) +: others.distinctBy(fd => fd.name)
     }
 
