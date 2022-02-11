@@ -572,7 +572,7 @@ object CodeGenYul extends CodeGenerator {
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
-                    assign1(retvar, id_memaddr)) ++ conCall
+                    assign1(retvar, id_memaddr)) ++ conCall :+ ExpressionStatement(apply(nameTracer(contractType.contractName), Identifier("this")))
 
 
             case StateInitializer(stateName, fieldName, obstype) =>
