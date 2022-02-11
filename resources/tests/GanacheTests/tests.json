@@ -262,6 +262,13 @@
             "trans" : "main_sgl",
             "logged" : [320,320,320,320],
             "shows_that_we_support": "simple set-get with tracers that emit logged values"
+        },
+        {
+            "file": "SetGetConstructorField.obs",
+            "expected": "15",
+            "trans" : "main",
+            "logged" : [320,320,320,320],
+            "shows_that_we_support": "simple set-get with tracers that emit logged values"
         }
     ]
 }
