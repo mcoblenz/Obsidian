@@ -135,11 +135,10 @@ object CodeGenYul extends CodeGenerator {
                                 others = others ++ writeTracers(ct, contractType.contractName)
                             case _ => Seq()
                         }
-                        case _: PrimitiveType => {
+                        case _: PrimitiveType =>
                             body = body :+
                                 //sstore(add(this,offset), mload(add(this,offset)))
                                 ExpressionStatement(apply("sstore", loc, apply("mload", loc)))
-                        }
                         case _ => Seq()
                     }
                 case _ => Seq()
