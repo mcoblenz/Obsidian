@@ -265,10 +265,9 @@
         },
         {
             "file": "SetGetConstructorField.obs",
-            "expected": "15",
+            "expected": "12",
             "trans" : "main",
-            "logged" : [320,320,320,320],
-            "shows_that_we_support": "simple set-get with tracers that emit logged values"
+            "shows_that_we_support": "set-get with a field so that the emitted tracer is not trivial, and that uses the constructor for that field "
         }
     ]
 }

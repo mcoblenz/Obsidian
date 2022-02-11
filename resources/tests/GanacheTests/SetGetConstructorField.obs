@@ -14,10 +14,15 @@ contract IntContainer{
 }
 
 main contract SetGetConstructorField{
-    IncContainer ic;
+    IntContainer@Owned ic;
+
+    SetGetConstructorField@Owned(){
+        ic = new IntContainer(5);
+    }
 
     transaction main() returns int{
-        ic = new IntContainer(5);
+        //this makes yul that has a free variable in it; whose fault is that?
+        //SetGetConstructorField dummy = new SetGetConstructorField();
         ic.set(12);
         return (ic.get());
     }
