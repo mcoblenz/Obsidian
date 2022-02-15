@@ -267,6 +267,7 @@
             "file": "SetGetConstructorField.obs",
             "expected": "12",
             "trans" : "main",
+            "logged" : [224, 224, 224],
             "shows_that_we_support": "set-get with a field so that the emitted tracer is not trivial, and that uses the constructor for that field "
         }
     ]
