@@ -554,12 +554,20 @@ object CodeGenYul extends CodeGenerator {
                         case _ => false
                     }
 
+                // the constructor(s) for the main contract are not prefixed with the name of the contract.
+                val invoke_name =
+                    if(checkedTable.contractLookup(contractType.contractName).contract.isMain) {
+                        contractType.contractName + hashOfFunctionName(contractType.contractName, typeNames)
+                    } else {
+                        transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames)
+                    }
+
                 // check to to see if there is a constructor to call, and if so translate the
                 // arguments and invoke the constructor as normal transaction with the hash appended
                 // to the name to call the right one
                 val conCall =
                 if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
-                    translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
+                    translateInvocation(name = invoke_name,
                         args = args,
                         obstype = Some(UnitType()),
                         thisID = id_memaddr,
