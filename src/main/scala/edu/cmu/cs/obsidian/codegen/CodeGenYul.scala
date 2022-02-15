@@ -85,7 +85,7 @@ object CodeGenYul extends CodeGenerator {
         def translateNonMains(c: Contract): Seq[YulStatement] = {
             c match {
                 case _: ObsidianContractImpl =>
-                    if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
+                    if (!c.modifiers.contains(IsMain())) {
                         c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
                     } else {
                         // skip the main and the self contracts
@@ -96,14 +96,15 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        val contracts = program.contracts.filter(c => c.name != ContractType.topContractName)
 
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
             data = Seq(),
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
-            otherTransactions = program.contracts.flatMap(translateNonMains),
-            tracers = writeTracers(checkedTable, mainContract.name)
+            otherTransactions = contracts.flatMap(translateNonMains),
+            tracers = contracts.flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name) // writeTracers(checkedTable, mainContract.name)
         )
     }
 
@@ -132,6 +133,8 @@ object CodeGenYul extends CodeGenerator {
                                     ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
                                     ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
                                 )
+                                // todo: this recursive call may not be needed if we generate tracers
+                                //   for every contract in the program
                                 others = others ++ writeTracers(ct, contractType.contractName)
                             case _ => Seq()
                         }
