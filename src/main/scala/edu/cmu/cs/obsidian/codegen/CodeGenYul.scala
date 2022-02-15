@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.{ContractReferenceType, NonPrimitiveType, ObsidianType, UnitType}
+import edu.cmu.cs.obsidian.typecheck._
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -85,10 +85,10 @@ object CodeGenYul extends CodeGenerator {
         def translateNonMains(c: Contract): Seq[YulStatement] = {
             c match {
                 case _: ObsidianContractImpl =>
-                    if (!c.modifiers.contains(IsMain()) && c.name != ContractType.topContractName) {
+                    if (!c.modifiers.contains(IsMain())) {
                         c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
                     } else {
-                        // skip the main and the self contracts
+                        // skip the main contract
                         Seq()
                     }
                 case _: JavaFFIContractImpl =>
@@ -96,14 +96,15 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        val real_contracts = program.contracts.filter(c => c.name != ContractType.topContractName)
 
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
             data = Seq(),
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
-            otherTransactions = program.contracts.flatMap(translateNonMains),
-            tracers = writeTracers(checkedTable, mainContract.name)
+            otherTransactions = real_contracts.flatMap(translateNonMains),
+            tracers = real_contracts.flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )
     }
 
@@ -111,7 +112,7 @@ object CodeGenYul extends CodeGenerator {
         s"trace_$name"
     }
 
-    def writeTracers(ct : SymbolTable, name: String): Seq[FunctionDefinition] = {
+    def writeTracers(ct: SymbolTable, name: String): Seq[FunctionDefinition] = {
         val c: Contract = ct.contract(name) match {
             case Some(value) => value.contract
             case None => throw new RuntimeException()
@@ -120,27 +121,39 @@ object CodeGenYul extends CodeGenerator {
         var body: Seq[YulStatement] = Seq()
         var others: Seq[FunctionDefinition] = Seq()
 
-        for(d <- c.declarations){
+        for (d <- c.declarations) {
             d match {
-                case Field(_, typ, fname, _) => typ match {
-                    case t : NonPrimitiveType => t match {
-                        case ContractReferenceType(contractType, _, _) =>
-                            body = body :+ ExpressionStatement(apply(nameTracer(contractType.contractName), fieldFromThis(ct.contractLookup(name),fname)))
-                            others = others ++ writeTracers(ct, contractType.contractName)
+                case Field(_, typ, fname, _) =>
+                    val loc = fieldFromThis(ct.contractLookup(name), fname)
+                    typ match {
+                        case t: NonPrimitiveType => t match {
+                            case ContractReferenceType(contractType, _, _) =>
+                                body = body ++ Seq(
+                                    //sstore(add(this,offset), mload(add(this,offset)))
+                                    ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
+                                    ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
+                                )
+                                // todo: this recursive call may not be needed if we generate tracers
+                                //   for every contract in the program
+                                others = others ++ writeTracers(ct, contractType.contractName)
+                            case _ => Seq()
+                        }
+                        case _: PrimitiveType =>
+                            body = body :+
+                                //sstore(add(this,offset), mload(add(this,offset)))
+                                ExpressionStatement(apply("sstore", loc, apply("mload", loc)))
                         case _ => Seq()
                     }
-                    case _ => Seq()
-                }
                 case _ => Seq()
             }
         }
 
         FunctionDefinition(name = nameTracer(name),
-                            parameters = Seq(TypedName("this",YATAddress())),
-                            returnVariables = Seq(),
-                            body = Block(Seq(
-                                            ExpressionStatement(apply("log0",intlit(64),intlit(32)))
-                                            ) ++ body :+ Leave())
+            parameters = Seq(TypedName("this", YATAddress())),
+            returnVariables = Seq(),
+            body = Block(Seq(
+                ExpressionStatement(apply("log0", intlit(64), intlit(32)))
+            ) ++ body :+ Leave())
         ) +: others.distinctBy(fd => fd.name)
     }
 
@@ -544,12 +557,20 @@ object CodeGenYul extends CodeGenerator {
                         case _ => false
                     }
 
+                // the constructor(s) for the main contract are not prefixed with the name of the contract.
+                val invoke_name =
+                    if (checkedTable.contractLookup(contractType.contractName).contract.isMain) {
+                        contractType.contractName + hashOfFunctionName(contractType.contractName, typeNames)
+                    } else {
+                        transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames)
+                    }
+
                 // check to to see if there is a constructor to call, and if so translate the
                 // arguments and invoke the constructor as normal transaction with the hash appended
                 // to the name to call the right one
                 val conCall =
                 if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
-                    translateInvocation(name = transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames),
+                    translateInvocation(name = invoke_name,
                         args = args,
                         obstype = Some(UnitType()),
                         thisID = id_memaddr,
@@ -562,7 +583,7 @@ object CodeGenYul extends CodeGenerator {
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at
-                    assign1(retvar, id_memaddr)) ++ conCall
+                    assign1(retvar, id_memaddr)) ++ conCall :+ ExpressionStatement(apply(nameTracer(contractType.contractName), Identifier("this")))
 
 
             case StateInitializer(stateName, fieldName, obstype) =>

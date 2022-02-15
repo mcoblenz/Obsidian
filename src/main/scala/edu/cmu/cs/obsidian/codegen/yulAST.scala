@@ -337,17 +337,6 @@ case class YulObject(contractName: String,
 
             val mp_id: Identifier = Identifier("memPos")
 
-            // this is a hack to get the tracer to be run on the main call of the specific test that
-            // is in SetGetLogs.
-            // todo remove this once tracers get called on-demand
-            // todo this is a way to make exactly one test work but produces bizarre output on anything else
-            val maybe_trace : YulStatement =
-                if(f.name == "main_sgl") {
-                    ExpressionStatement(apply("trace_SetGetLogs", Identifier("this")))
-                } else {
-                    LineComment("do not trace")
-                }
-
             Seq(
                 LineComment(s"entry for ${f.name}"),
                 //    if callvalue() { revert(0, 0) }
@@ -363,7 +352,6 @@ case class YulObject(contractName: String,
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
                 decl_1exp(Identifier("memEnd"), apply(abi_encode_name(returns_from_call.length), mp_id +: returns_from_call: _*)),
                 //    return(memPos, sub(memEnd, memPos))
-                maybe_trace,
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
         }
