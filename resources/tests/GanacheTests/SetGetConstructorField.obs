@@ -21,8 +21,7 @@ main contract SetGetConstructorField{
     }
 
     transaction main() returns int{
-        //this makes yul that has a free variable in it; whose fault is that?
-        //SetGetConstructorField dummy = new SetGetConstructorField();
+        SetGetConstructorField local = new SetGetConstructorField();
         ic.set(12);
         return (ic.get());
     }
