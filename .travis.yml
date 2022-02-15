@@ -7,10 +7,10 @@ jdk:
   - oraclejdk12 # as of 10 june 2021, up to jdk12 works but 13+ fail
 
 before_install:
-  - nvm install 16 # as of 19 nov 2021, this version of node works with ganache and 17 does not
+  - nvm install 17 # as of 26 jan 2022, node 17 works with ganache 7 (below)
   - npm install -g npm # update npm
-  - npm install -g ganache-cli # install ganache
-  - python -m pip install termcolor eth_abi polling httpx pycryptodome
+  - npm install -g ganache@>=7.0.0 # install ganache
+  - python -m pip install termcolor eth_abi polling web3
 
 install:
   - gradle publish -b Obsidian_Runtime/build.gradle

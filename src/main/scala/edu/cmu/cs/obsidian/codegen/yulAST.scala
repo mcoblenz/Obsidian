@@ -3,7 +3,6 @@ package edu.cmu.cs.obsidian.codegen
 import com.github.mustachejava.DefaultMustacheFactory
 import edu.cmu.cs.obsidian.codegen
 import edu.cmu.cs.obsidian.codegen.Util._
-import edu.cmu.cs.obsidian.typecheck.ObsidianType
 
 import java.io.{FileReader, StringWriter}
 
@@ -247,12 +246,14 @@ case class StringLiteral(content: String) extends YulAST
   * @param mainContractTransactions the transactions that came from the main contract in obsidian
   * @param mainContractSize         the number of bytes that the main contract needs when laid out in memory
   * @param otherTransactions        the transactions that came from each of the other contracts in obsidian
+  * @param tracers                  the functions to trace memory for each non-zero sized contract
   */
 case class YulObject(contractName: String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
-                     otherTransactions: Seq[YulStatement]) extends YulAST {
+                     otherTransactions: Seq[YulStatement],
+                     tracers: Seq[FunctionDefinition]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -268,7 +269,7 @@ case class YulObject(contractName: String,
             replaceAll("&#13;", "\r")
     }
 
-    /** This class encapulsates the interaction between our representation of a Yul object and
+    /** This class encapsulates the interaction between our representation of a Yul object and
       * the mustache description given in `object.mustache`, and from there how it's written to a file.
       *
       * @param obj the object to present to mustache
@@ -336,6 +337,17 @@ case class YulObject(contractName: String,
 
             val mp_id: Identifier = Identifier("memPos")
 
+            // this is a hack to get the tracer to be run on the main call of the specific test that
+            // is in SetGetLogs.
+            // todo remove this once tracers get called on-demand
+            // todo this is a way to make exactly one test work but produces bizarre output on anything else
+            val maybe_trace : YulStatement =
+                if(f.name == "main_sgl") {
+                    ExpressionStatement(apply("trace_SetGetLogs", Identifier("this")))
+                } else {
+                    LineComment("do not trace")
+                }
+
             Seq(
                 LineComment(s"entry for ${f.name}"),
                 //    if callvalue() { revert(0, 0) }
@@ -351,9 +363,11 @@ case class YulObject(contractName: String,
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
                 decl_1exp(Identifier("memEnd"), apply(abi_encode_name(returns_from_call.length), mp_id +: returns_from_call: _*)),
                 //    return(memPos, sub(memEnd, memPos))
+                maybe_trace,
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
         }
+
 
         // TODO here and above in the dispatch table we do not respect privacy; we should iterate
         //  only over the things in the main contract that are public
@@ -384,11 +398,15 @@ case class YulObject(contractName: String,
         def abiDecodeFuncs(): YulStatement = Block(
             LineComment("abi decode functions") +:
                 (// for each transaction, emit the decoder for the tuple of its arguments
-                    mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
+                    (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
                         // for each transaction, collect up the types that it uses, and then emit the decodes for those types
-                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode))
+                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
+                        ).distinct
+                    )
         )
 
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
+
+        def tracertransactions() : YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
     }
 }

@@ -1,0 +1,39 @@
+contract IntContainer{
+    int x;
+
+    IntContainer@Owned(int init) {
+        x = init;
+    }
+
+    transaction set(int value) {
+        x = value;
+    }
+
+    transaction get() returns int{
+        return x;
+    }
+}
+
+contract IntContainerWrapper{
+    IntContainer@Owned ic;
+
+    IntContainerWrapper@Owned() {
+        ic = new IntContainer(0);
+    }
+
+    transaction set(int value) {
+        ic.set(value);
+    }
+
+    transaction get() returns int{
+        return (ic.get());
+    }
+}
+
+main contract SetGetNestedPointerPassThrough{
+    transaction main() returns int{
+        IntContainerWrapper iw = new IntContainerWrapper();
+        iw.set(5);
+        return(iw.get());
+    }
+}

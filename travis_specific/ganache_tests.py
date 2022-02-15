@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 import argparse
 import binascii
 import glob
@@ -8,13 +7,13 @@ import os
 import pprint
 import subprocess
 import sys
+import socket
 from shutil import which
 
 import eth_abi
-import httpx
 import polling
-from Crypto.Hash import keccak
 from termcolor import colored
+from web3 import Web3
 
 
 def warn(s):
@@ -39,7 +38,6 @@ def twos_comp(val, bits):
 
 
 def is_port_in_use(host, port):
-    import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex((host, port)) == 0
 
@@ -53,9 +51,9 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     """run a test given its info, verbosity, and the location of the jar file. this returns a dictionary of the form
        { "result" -> "pass" or "fail",
          "progress" -> list of strings describing how far we got in the test,
-         "reason" -> string, which describes the failure or is empty if it's a pass }
+         "reason" -> string, which describes the failure or is empty if it's a pass,
+         }
     """
-    # todo there's a bunch of repeated code for checking the replies from httpx below.
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
 
@@ -65,14 +63,19 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         capture_output=True)
     if not run_obsidianc.returncode == 0:
         return {'result': "fail", 'progress': progress,
-                "reason": f"obsidianc run failed with output {run_obsidianc.stderr}"}
+                "reason": f"obsidianc run failed with output {run_obsidianc.stdout} and error {run_obsidianc.stderr};{run_obsidianc.args}"}
     else:
         progress = progress + ["obsidianc compiled obsidian to yul"]
 
     #### compile the yul to evm with solc
-    run_solc = subprocess.run(
-        ["docker", "run", "-v", f"{os.getcwd().format()}/{test_name}/:/src", "ethereum/solc:stable",
-         "--bin", "--strict-assembly", "--optimize", f"/src/{test_name}.yul"], capture_output=True)
+    run_solc = subprocess.run(["docker",
+                               "run",
+                               "-v", f"{os.getcwd().format()}/{test_name}/:/src",
+                               "ethereum/solc:stable",
+                               "--bin",
+                               "--strict-assembly",
+                               "--optimize",
+                               f"/src/{test_name}.yul"], capture_output=True)
     if not run_solc.returncode == 0:
         return {'result': "fail", 'progress': progress,
                 "reason": f"solc run failed with output {run_solc.stderr}"}
@@ -85,135 +88,96 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     stdout_redirect = subprocess.PIPE
     if verbose:
         stdout_redirect = None
-    run_ganache = subprocess.Popen(["ganache-cli",
-                                    "--verbose",
-                                    "--host", ganache_host,
-                                    "--port", str(ganache_port),
-                                    "--gasLimit", str(hex(test_info.get('gas', defaults['gas']))),
-                                    "--accounts", str(test_info.get('numaccts', defaults['numaccts'])),
-                                    "--defaultBalanceEther", str(test_info.get('startingeth', defaults['startingeth']))
+    run_ganache = subprocess.Popen(["ganache",
+                                    "--logging.verbose",
+                                    "--logging.debug",
+                                    "--server.host", ganache_host,
+                                    "--server.port", str(ganache_port),
+                                    "--miner.blockGasLimit", str(test_info.get('gas', defaults['gas'])),
+                                    "--wallet.totalAccounts", str(test_info.get('numaccts', defaults['numaccts'])),
+                                    "--wallet.defaultBalance", str(test_info.get('startingeth', defaults['startingeth']))
                                     ], stdout=stdout_redirect)
     progress = progress + [f"started ganache-cli process: {str(run_ganache)}"]
 
-    eth_id = 1  # this can be any number; replies should have the same one. we don't check that.
+    # step through the sequence of interaction with ganache, catching all errors so that they stay contained to this
+    # test and so that we can kill the ganache process cleanly
+    try:
+        # open a connection to ganache and wait it connects
+        w3 = Web3(Web3.HTTPProvider(ganache_url))
+        polling.poll(w3.isConnected, step=0.2, max_tries=100)
+        progress = progress + ["connected to web3 provider"]
 
-    #### poll for an account to let it start up
-    retries = 100
-    json_rpc = "2.0"
-    account_reply = polling.poll(
-        lambda: httpx.post(ganache_url,
-                           json={"jsonrpc": json_rpc, "method": "eth_accounts", "params": [], "id": eth_id}),
-        check_success=lambda r: r.status_code == httpx.codes.OK,
-        ignore_exceptions=(httpx.ConnectError,),
-        step=0.5,
-        max_tries=retries
-    )
+        # get the account number
+        account_number = w3.eth.accounts[0]
+        progress = progress + ["got account from web3"]
 
-    if not account_reply:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"after {retries} tries, ganache-cli did not produce any account data"}
-    else:
-        progress = progress + [f"account reply is {str(account_reply.json())}"]
+        #### send a transaction
+        deploy_transaction_hash = w3.eth.send_transaction({"from": account_number,
+                                                           "gas": int(test_info.get('gas', defaults['gas'])),
+                                                           "data": f"0x{evm_bytecode}"})
+        progress = progress + ["sent deploy transaction"]
 
-    account_number = account_reply.json()['result'][0]
+        #### warn if there's no expected result because this is as far as we go
+        if not test_info['expected']:
+            warn(f"no expected result given for test {test_name} so exiting early")
+            run_ganache.kill()
+            return {'result': "pass", 'progress': progress,
+                    "reason": "nothing failed; note that no result was checked, though"}
 
-    #### send a transaction
-    transaction_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                      "method": "eth_sendTransaction",
-                                                      "params": {
-                                                          "from": str(account_number),
-                                                          "gas": str(test_info.get('gas', defaults['gas'])),
-                                                          "gasPrice": str(
-                                                              test_info.get('gasprice', defaults['gasprice'])),
-                                                          # the amount of wei to send, which is always nothing
-                                                          "value": "0x0",
-                                                          "data": f"0x{evm_bytecode}",
-                                                      },
-                                                      "id": eth_id})
+        #### get a transaction receipt to get the contract address
+        deploy_transaction_receipt = w3.eth.wait_for_transaction_receipt(deploy_transaction_hash)
+        progress = progress + ["got deploy transaction receipt"]
 
-    if not transaction_reply.status_code == httpx.codes.OK:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_sendTransaction got {transaction_reply.status_code} which is not OK"}
-    elif "error" in transaction_reply.json().keys():
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_sendTransaction returned an error: {str(transaction_reply.json())}"}
-    else:
-        progress = progress + [f"transaction reply is {str(transaction_reply.json())}"]
+        #### use call and the contract address to get the result of running the function locally to
+        #### the node for the result of the code
 
-    #### warn if there's no expected result because this is as far as we go
-    if not test_info['expected']:
-        warn(f"no expected result given for test {test_name} so exiting early")
-        run_ganache.kill()
-        return {'result': "pass", 'progress': progress,
-                "reason": "nothing failed; note that no result was checked, though"}
+        method_name = test_info.get('trans', defaults['trans'])
+        method_types = test_info.get('types', defaults['types'])
+        method_args = test_info.get('args', defaults['args'])
+        hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
+        encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
 
-    transaction_hash = transaction_reply.json()['result']
+        call_reply = w3.eth.call({
+            "from": account_number,
+            "to": deploy_transaction_receipt.contractAddress,
+            "data": f"{hash_to_call}{encoded_args}"
+        })
+        progress = progress + [f"made call to eth_call"]
 
-    #### get a transaction receipt to get the contract address
-    get_transaction_recipt_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                                                 "method": "eth_getTransactionReceipt",
-                                                                 "params": [transaction_hash],
-                                                                 "id": eth_id})
-
-    if not get_transaction_recipt_reply.status_code == httpx.codes.OK:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_getTransactionReceipt got {get_transaction_recipt_reply.status_code}"
-                          "which is not OK"}
-    elif not get_transaction_recipt_reply.json()['result']['status'] == "0x1":
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"eth_getTransactionReceipt has non-0x1 status {str(get_transaction_recipt_reply.json())}"}
-    else:
-        progress = progress + [f"getTransactionReceipt reply is {str(get_transaction_recipt_reply.json())}"]
-
-    contract_address = get_transaction_recipt_reply.json()['result']['contractAddress']
-
-    #### use call and the contract address to get the result of the function
-    method_name = test_info.get('trans', defaults['trans'])
-    method_types = test_info.get('types', defaults['types'])
-    method_args = test_info.get('args', defaults['args'])
-
-    keccak_hash = keccak.new(digest_bits=256)
-    keccak_hash.update(bytes(method_name + "(" + ",".join(method_types) + ")", "utf8"))
-    hash_to_call = keccak_hash.hexdigest()[:8]
-    encoded_args = binascii.hexlify(eth_abi.encode_abi(method_types, method_args)).decode()
-
-    call_reply = httpx.post(ganache_url, json={"jsonrpc": json_rpc,
-                                               "method": "eth_call",
-                                               "params": [
-                                                   {"from": account_number,
-                                                    "to": contract_address,
-                                                    "data": f"0x{hash_to_call}{encoded_args}"
-                                                    }, "latest"],
-                                               "id": eth_id})
-
-    if not call_reply.status_code == httpx.codes.OK:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"posting to eth_call got {call_reply.status_code} which is not OK"}
-    elif 'error' in call_reply.json().keys():
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"eth_call reply contains error information {str(call_reply.json())}"}
-    else:
-        progress = progress + [f"eth_call reply is {str(call_reply.json())}"]
-
-    #### compare the result to the expected answer
-    got = twos_comp(int(call_reply.json()['result'], 16), 8 * 32)
-    expected = int(test_info['expected'])
-    if not got == expected:
-        run_ganache.kill()
-        return {'result': "fail", 'progress': progress,
-                "reason": f"expected {expected} but got {got}"}
-    else:
+        #### compare the result to the expected answer
+        got = twos_comp(int(call_reply.hex(), 16), 8 * 32)
+        expected = int(test_info['expected'])
+        if not got == expected:
+            raise RuntimeError(f"expected {expected} but got {got}")
         progress = progress + ["got matched expected"]
 
-    #### decode the logs from the bloom filter, if the test JSON includes a requirement for logs
-    # TODO
+        ## invoking transaction for effects
+        invoke_transaction_hash = w3.eth.send_transaction({
+            "from": account_number,
+            "to": deploy_transaction_receipt.contractAddress,
+            "data": f"{hash_to_call}{encoded_args}"
+        })
+        progress = progress + ["sent transaction for invocation"]
+
+        invoke_transaction_receipt = w3.eth.wait_for_transaction_receipt(invoke_transaction_hash)
+        progress = progress + [f"got receipt for invocation"]
+
+        #### get the logs and check against the expected values, if such is present.
+        # todo this is pretty rudimentary and really specific to one test case for now
+        if 'logged' in test_info.keys():
+            logs = invoke_transaction_receipt.logs
+            if verbose:
+                pprint.pprint(logs)
+            if not logs:
+                raise RuntimeError("expected logs to be present for this test but none were in the receipt")
+            got_logged_data = [twos_comp(int(log['data'], 16), 8*32) for log in logs]
+            if not test_info['logged'] == got_logged_data:
+                raise RuntimeError(f"expected logs {test_info['logged']} but got {got_logged_data}")
+            progress = progress + ["logs matched expected"]
+
+    except BaseException as err:
+        run_ganache.kill()
+        return {'result': 'fail', 'progress': progress, 'reason': f"caught an exception:{str(err)}"}
 
     #### kill ganache and return a pass
     run_ganache.kill()
@@ -235,6 +199,17 @@ parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 args = parser.parse_args()
 
+# sanity check that there isn't anything on the port we'll use ganache for; this can happen between consecutive runs
+# if ganache didn't exit cleanly
+if is_port_in_use(ganache_host, ganache_port):
+    error(f"ganache-cli won't be able to start up, port {int(ganache_port)} isn't free on {ganache_host}")
+
+# sanity check that there is a docker daemon running, so that we don't get through the sbt build below only to have to
+# rerun the script after launching Docker
+run_dstats = subprocess.run(["docker", "stats", "--no-stream"], capture_output=True)
+if not run_dstats.returncode == 0:
+    error(f"cannot connect to a docker daemon")
+
 # read the tests json file into a dictionary
 test_filename = "tests.json"
 f = open(args.dir + test_filename)
@@ -242,9 +217,6 @@ if not f:
     error(f"could not open {test_filename} file")
 tests_data = json.load(f)
 f.close()
-
-if is_port_in_use(ganache_host, ganache_port):
-    error(f"ganache-cli won't be able to start up, port {int(ganache_port)} isn't free on {ganache_host}")
 
 # compare the files present to the tests described, producing a warning in either direction
 files_with_tests = [test['file'] for test in tests_data['tests']]
@@ -273,11 +245,13 @@ if args.tests:
     # if there are no undefined names, filter the data from the json according to the arguments given
     tests_to_run = list(filter(lambda t: os.path.splitext(t['file'])[0] in set(args.tests), tests_data['tests']))
 
+# if the clean flag is set, before running tests make sure that no directories with names that would collide exist
 if args.clean:
     for x in tests_to_run:
         if os.path.isdir(os.path.splitext(x['file'])[0]):
             error(f"running {str(x['file'])} would delete an existing directory")
 
+# if we're being chatty, print out the test cases we're about to run
 if args.verbose:
     if args.tests:
         print(f"running only these tests:\n{pprint.pformat(tests_to_run)}")
@@ -296,6 +270,7 @@ if not args.quick:
 else:
     warn("taking a shortcut and not outputting version info or checking for commands")
 
+# build the obsidian jar, unless it exists and we're in fast-and-dirty mode
 if args.quick and glob.glob("target/scala*/obsidianc.jar"):
     warn("taking a shortcut and using an existing obsidianc jar")
 else:
@@ -314,6 +289,7 @@ if not jar_path:
 if args.verbose:
     print(f"using top of {pprint.pformat(jar_path)}")
 
+# run each test, keeping track of which ones fail
 failed = []
 for test in tests_to_run:
     result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
@@ -332,6 +308,7 @@ for test in tests_to_run:
         os.remove(f"{name}/{name}.yul")
         os.rmdir(f"{name}")
 
+# print out a quick summary at the bottom of the test run
 if failed:
     print(colored(f"\n{len(failed)}/{str(len(tests_to_run))} TESTS FAILED", 'red'))
     if args.verbose:
