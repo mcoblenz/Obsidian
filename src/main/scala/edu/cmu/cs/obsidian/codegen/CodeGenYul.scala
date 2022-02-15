@@ -88,7 +88,7 @@ object CodeGenYul extends CodeGenerator {
                     if (!c.modifiers.contains(IsMain())) {
                         c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
                     } else {
-                        // skip the main and the self real_contracts
+                        // skip the main contract
                         Seq()
                     }
                 case _: JavaFFIContractImpl =>
@@ -182,7 +182,7 @@ object CodeGenYul extends CodeGenerator {
                 assert(assertion = false, "TODO")
                 Seq()
             case _: JavaFFIContractImpl =>
-                assert(assertion = false, "Java real_contracts not supported in Yul translation")
+                assert(assertion = false, "Java contracts not supported in Yul translation")
                 Seq()
             case c: Constructor =>
                 // given an obsidian type, pull out the non-primitive type or raise an exception
@@ -536,7 +536,7 @@ object CodeGenYul extends CodeGenerator {
                 (decl_0exp(id_recipient) +: recipient_yul) ++
                     // todo: this may be the cause of a bug in the future. this is how non-main
                     //  functions get their names translated before calling, but that might not
-                    //  work with multiple real_contracts and private transactions. i'm not sure.
+                    //  work with multiple contracts and private transactions. i'm not sure.
                     translateInvocation(transactionNameMapping(getContractName(recipient), name),
                         args,
                         obstype,
