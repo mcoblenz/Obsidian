@@ -128,9 +128,22 @@ object CodeGenYul extends CodeGenerator {
                     typ match {
                         case t: NonPrimitiveType => t match {
                             case ContractReferenceType(contractType, _, _) =>
+                                val logtemp = nextTemp()
                                 body = body ++ Seq(
                                     //sstore(add(this,offset), mload(add(this,offset)))
+                                    LineComment("loading"),
                                     ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
+
+                                    // todo: refactor this so that it appears in both branches. figure out why it emits zero
+                                    LineComment("logging"),
+                                    // allocate memory to log from
+                                    decl_1exp(logtemp, apply("allocate_memory",intlit(32))),
+                                    // load what we just wrote to storage to that location
+                                    ExpressionStatement(apply("mstore", logtemp, apply("sload", loc))),
+                                    // emit the log
+                                    ExpressionStatement(apply("log0", logtemp, intlit(32))),
+
+                                    LineComment("traversal"),
                                     ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
                                 )
                                 // todo: this recursive call may not be needed if we generate tracers
@@ -152,7 +165,7 @@ object CodeGenYul extends CodeGenerator {
             parameters = Seq(TypedName("this", YATAddress())),
             returnVariables = Seq(),
             body = Block(Seq(
-                ExpressionStatement(apply("log0", intlit(64), intlit(32)))
+                //ExpressionStatement(apply("log0", intlit(64), intlit(32)))
             ) ++ body :+ Leave())
         ) +: others.distinctBy(fd => fd.name)
     }
