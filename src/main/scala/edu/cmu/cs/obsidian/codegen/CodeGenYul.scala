@@ -1,7 +1,7 @@
 package edu.cmu.cs.obsidian.codegen
 
 import edu.cmu.cs.obsidian.CompilerOptions
-import edu.cmu.cs.obsidian.typecheck.{ContractReferenceType, NonPrimitiveType, ObsidianType, UnitType, PrimitiveType}
+import edu.cmu.cs.obsidian.typecheck._
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
@@ -88,7 +88,7 @@ object CodeGenYul extends CodeGenerator {
                     if (!c.modifiers.contains(IsMain())) {
                         c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
                     } else {
-                        // skip the main and the self contracts
+                        // skip the main and the self real_contracts
                         Seq()
                     }
                 case _: JavaFFIContractImpl =>
@@ -96,15 +96,15 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        val contracts = program.contracts.filter(c => c.name != ContractType.topContractName)
+        val real_contracts = program.contracts.filter(c => c.name != ContractType.topContractName)
 
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
             data = Seq(),
             mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
-            otherTransactions = contracts.flatMap(translateNonMains),
-            tracers = contracts.flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name) // writeTracers(checkedTable, mainContract.name)
+            otherTransactions = real_contracts.flatMap(translateNonMains),
+            tracers = real_contracts.flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )
     }
 
@@ -182,7 +182,7 @@ object CodeGenYul extends CodeGenerator {
                 assert(assertion = false, "TODO")
                 Seq()
             case _: JavaFFIContractImpl =>
-                assert(assertion = false, "Java contracts not supported in Yul translation")
+                assert(assertion = false, "Java real_contracts not supported in Yul translation")
                 Seq()
             case c: Constructor =>
                 // given an obsidian type, pull out the non-primitive type or raise an exception
@@ -536,7 +536,7 @@ object CodeGenYul extends CodeGenerator {
                 (decl_0exp(id_recipient) +: recipient_yul) ++
                     // todo: this may be the cause of a bug in the future. this is how non-main
                     //  functions get their names translated before calling, but that might not
-                    //  work with multiple contracts and private transactions. i'm not sure.
+                    //  work with multiple real_contracts and private transactions. i'm not sure.
                     translateInvocation(transactionNameMapping(getContractName(recipient), name),
                         args,
                         obstype,
@@ -559,7 +559,7 @@ object CodeGenYul extends CodeGenerator {
 
                 // the constructor(s) for the main contract are not prefixed with the name of the contract.
                 val invoke_name =
-                    if(checkedTable.contractLookup(contractType.contractName).contract.isMain) {
+                    if (checkedTable.contractLookup(contractType.contractName).contract.isMain) {
                         contractType.contractName + hashOfFunctionName(contractType.contractName, typeNames)
                     } else {
                         transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames)
