@@ -131,7 +131,6 @@ object CodeGenYul extends CodeGenerator {
                         LineComment("loading"),
                         ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
 
-                        // todo: refactor this so that it appears in both branches. figure out why it emits zero
                         LineComment("logging"),
                         // allocate memory to log from
                         decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
@@ -143,7 +142,6 @@ object CodeGenYul extends CodeGenerator {
                     typ match {
                         case t: NonPrimitiveType => t match {
                             case ContractReferenceType(contractType, _, _) =>
-                                val logtemp = nextTemp()
                                 body = body ++ load_and_log ++
                                     Seq(
                                         LineComment("traversal"),
@@ -165,9 +163,7 @@ object CodeGenYul extends CodeGenerator {
         FunctionDefinition(name = nameTracer(name),
             parameters = Seq(TypedName("this", YATAddress())),
             returnVariables = Seq(),
-            body = Block(Seq(
-                //ExpressionStatement(apply("log0", intlit(64), intlit(32)))
-            ) ++ body :+ Leave())
+            body = Block(body :+ Leave())
         ) +: others.distinctBy(fd => fd.name)
     }
 
