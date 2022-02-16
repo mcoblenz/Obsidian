@@ -125,36 +125,37 @@ object CodeGenYul extends CodeGenerator {
             d match {
                 case Field(_, typ, fname, _) =>
                     val loc = fieldFromThis(ct.contractLookup(name), fname)
+                    val log_temp = nextTemp()
+                    val load_and_log = Seq(
+                        //sstore(add(this,offset), mload(add(this,offset)))
+                        LineComment("loading"),
+                        ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
+
+                        // todo: refactor this so that it appears in both branches. figure out why it emits zero
+                        LineComment("logging"),
+                        // allocate memory to log from
+                        decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
+                        // load what we just wrote to storage to that location
+                        ExpressionStatement(apply("mstore", log_temp, apply("sload", loc))),
+                        // emit the log
+                        ExpressionStatement(apply("log0", log_temp, intlit(32))),
+                    )
                     typ match {
                         case t: NonPrimitiveType => t match {
                             case ContractReferenceType(contractType, _, _) =>
                                 val logtemp = nextTemp()
-                                body = body ++ Seq(
-                                    //sstore(add(this,offset), mload(add(this,offset)))
-                                    LineComment("loading"),
-                                    ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
-
-                                    // todo: refactor this so that it appears in both branches. figure out why it emits zero
-                                    LineComment("logging"),
-                                    // allocate memory to log from
-                                    decl_1exp(logtemp, apply("allocate_memory",intlit(32))),
-                                    // load what we just wrote to storage to that location
-                                    ExpressionStatement(apply("mstore", logtemp, apply("sload", loc))),
-                                    // emit the log
-                                    ExpressionStatement(apply("log0", logtemp, intlit(32))),
-
-                                    LineComment("traversal"),
-                                    ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
-                                )
+                                body = body ++ load_and_log ++
+                                    Seq(
+                                        LineComment("traversal"),
+                                        ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
+                                    )
                                 // todo: this recursive call may not be needed if we generate tracers
                                 //   for every contract in the program
                                 others = others ++ writeTracers(ct, contractType.contractName)
                             case _ => Seq()
                         }
                         case _: PrimitiveType =>
-                            body = body :+
-                                //sstore(add(this,offset), mload(add(this,offset)))
-                                ExpressionStatement(apply("sstore", loc, apply("mload", loc)))
+                            body = body ++ load_and_log
                         case _ => Seq()
                     }
                 case _ => Seq()
