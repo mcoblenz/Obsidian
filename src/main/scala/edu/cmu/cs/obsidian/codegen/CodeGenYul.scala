@@ -163,8 +163,8 @@ object CodeGenYul extends CodeGenerator {
                             case _ => Seq()
                         }
                         case _: PrimitiveType =>
-                        case _ => Seq()
                             body = body ++ load ++ log
+                        case _ => Seq()
                     }
                 case _ => Seq()
             }
