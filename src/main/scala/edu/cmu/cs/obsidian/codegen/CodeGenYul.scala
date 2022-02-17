@@ -113,6 +113,10 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def writeTracers(ct: SymbolTable, name: String): Seq[FunctionDefinition] = {
+        // this is a stand in for a more robust mechanism for choosing when to emit logs.
+        // we'll want to be able to turn it off to do performance testing in the future.
+        val emit_logs: Boolean = true
+
         val c: Contract = ct.contract(name) match {
             case Some(value) => value.contract
             case None => throw new RuntimeException()
@@ -126,23 +130,29 @@ object CodeGenYul extends CodeGenerator {
                 case Field(_, typ, fname, _) =>
                     val loc = fieldFromThis(ct.contractLookup(name), fname)
                     val log_temp = nextTemp()
-                    val load_and_log = Seq(
+                    val log =
+                        if (emit_logs) {
+                            Seq(LineComment("logging"),
+                                // allocate memory to log from
+                                decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
+                                // load what we just wrote to storage to that location
+                                ExpressionStatement(apply("mstore", log_temp, apply("sload", loc))),
+                                // emit the log
+                                ExpressionStatement(apply("log0", log_temp, intlit(32)))
+                            )
+                        } else {
+                            Seq()
+                        }
+                    val load = Seq(
                         //sstore(add(this,offset), mload(add(this,offset)))
                         LineComment("loading"),
-                        ExpressionStatement(apply("sstore", loc, apply("mload", loc))),
+                        ExpressionStatement(apply("sstore", loc, apply("mload", loc))))
 
-                        LineComment("logging"),
-                        // allocate memory to log from
-                        decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
-                        // load what we just wrote to storage to that location
-                        ExpressionStatement(apply("mstore", log_temp, apply("sload", loc))),
-                        // emit the log
-                        ExpressionStatement(apply("log0", log_temp, intlit(32))),
-                    )
+
                     typ match {
                         case t: NonPrimitiveType => t match {
                             case ContractReferenceType(contractType, _, _) =>
-                                body = body ++ load_and_log ++
+                                body = body ++ load ++ log ++
                                     Seq(
                                         LineComment("traversal"),
                                         ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
@@ -153,8 +163,8 @@ object CodeGenYul extends CodeGenerator {
                             case _ => Seq()
                         }
                         case _: PrimitiveType =>
-                            body = body ++ load_and_log
                         case _ => Seq()
+                            body = body ++ load ++ log
                     }
                 case _ => Seq()
             }
