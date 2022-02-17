@@ -568,4 +568,30 @@ object Util {
             returnVariables = retVars,
             body = Block(bod))
     }
+
+    // storage is 2**256 big; this is (2**256)/2.
+    val storage_threshold: Literal = hexlit("0x8000000000000000000000000000000000000000000000000000000000000000")
+
+    /** given an expression representing a memory address its corresponding place in storage
+      * @param x the expression representing the memory address
+      * @return an expression that computes to the corresponding address in storage
+      */
+    def mapToStorageAddress(x: Expression) : Expression = {
+        apply("add", x, storage_threshold)
+    }
+
+    /** given an expression that represents an address, compute the yul statement that checks if it's
+      * a storage address or not and execute a sequence of statements in either case. if it does not
+      * represent an address, the behaviour is undefined.
+      *
+      * @param x the expression to check for being in storage
+      * @param true_case what to do if the address is a storage address
+      * @param false_case what to to if the address is not a storage address
+      * @return the expression performing the check
+      */
+    def ifInStorge(x: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]) : YulStatement = {
+        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", x, storage_threshold),
+            Seq(Case(boollit(true), Block(true_case)),
+                Case(boollit(false), Block(false_case))))
+    }
 }

@@ -1,6 +1,6 @@
 package edu.cmu.cs.obsidian.codegen
 
-import edu.cmu.cs.obsidian.CompilerOptions
+import edu.cmu.cs.obsidian.{CompilerOptions, codegen}
 import edu.cmu.cs.obsidian.typecheck._
 
 import java.io.{File, FileWriter}
@@ -128,25 +128,28 @@ object CodeGenYul extends CodeGenerator {
         for (d <- c.declarations) {
             d match {
                 case Field(_, typ, fname, _) =>
-                    val loc = fieldFromThis(ct.contractLookup(name), fname)
-                    val log_temp = nextTemp()
-                    val log =
+                    val mem_loc: codegen.Expression = fieldFromThis(ct.contractLookup(name), fname)
+                    val sto_loc: codegen.Expression = mapToStorageAddress(mem_loc)
+                    val log_temp: Identifier = nextTemp()
+
+                    val load = Seq(
+                        //sstore(add(this,offset), mload(add(this,offset)))
+                        LineComment("loading"),
+                        ExpressionStatement(apply("sstore", sto_loc, apply("mload", mem_loc))))
+
+                    val log : Seq[YulStatement] =
                         if (emit_logs) {
                             Seq(LineComment("logging"),
                                 // allocate memory to log from
                                 decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
                                 // load what we just wrote to storage to that location
-                                ExpressionStatement(apply("mstore", log_temp, apply("sload", loc))),
+                                ExpressionStatement(apply("mstore", log_temp, apply("sload", sto_loc))),
                                 // emit the log
                                 ExpressionStatement(apply("log0", log_temp, intlit(32)))
                             )
                         } else {
                             Seq()
                         }
-                    val load = Seq(
-                        //sstore(add(this,offset), mload(add(this,offset)))
-                        LineComment("loading"),
-                        ExpressionStatement(apply("sstore", loc, apply("mload", loc))))
 
 
                     typ match {
@@ -155,7 +158,7 @@ object CodeGenYul extends CodeGenerator {
                                 body = body ++ load ++ log ++
                                     Seq(
                                         LineComment("traversal"),
-                                        ExpressionStatement(apply(nameTracer(contractType.contractName), loc))
+                                        ExpressionStatement(apply(nameTracer(contractType.contractName), mem_loc))
                                     )
                                 // todo: this recursive call may not be needed if we generate tracers
                                 //   for every contract in the program
