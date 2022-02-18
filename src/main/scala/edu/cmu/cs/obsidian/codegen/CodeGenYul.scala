@@ -584,9 +584,12 @@ object CodeGenYul extends CodeGenerator {
                         case _ => false
                     }
 
+                // does this constructor belong to the main contract?
+                val isMainContract = checkedTable.contractLookup(contractType.contractName).contract.isMain
+
                 // the constructor(s) for the main contract are not prefixed with the name of the contract.
                 val invoke_name =
-                    if (checkedTable.contractLookup(contractType.contractName).contract.isMain) {
+                    if (isMainContract) {
                         contractType.contractName + hashOfFunctionName(contractType.contractName, typeNames)
                     } else {
                         transactionNameMapping(contractType.contractName, contractType.contractName) + hashOfFunctionName(contractType.contractName, typeNames)
@@ -596,21 +599,30 @@ object CodeGenYul extends CodeGenerator {
                 // arguments and invoke the constructor as normal transaction with the hash appended
                 // to the name to call the right one
                 val conCall =
-                if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
-                    translateInvocation(name = invoke_name,
-                        args = args,
-                        obstype = Some(UnitType()),
-                        thisID = id_memaddr,
-                        retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
-                } else {
-                    Seq()
-                }
+                    if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
+                        translateInvocation(name = invoke_name,
+                            args = args,
+                            obstype = Some(UnitType()),
+                            thisID = id_memaddr,
+                            retvar = retvar, contractName = contractName, checkedTable = checkedTable, inMain = inMain)
+                    } else {
+                        Seq()
+                    }
+
+                // we only call the tracer after the constructor for the main contract
+                val traceCall =
+                    if(isMainContract){
+                        Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), Identifier("this"))))
+                    } else {
+                        Seq()
+                    }
+
 
                 Seq( // grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
-                    // return the address that the space starts at
-                    assign1(retvar, id_memaddr)) ++ conCall :+ ExpressionStatement(apply(nameTracer(contractType.contractName), Identifier("this")))
+                    // return the address that the space starts at, call the constructor and the tracer as above
+                    assign1(retvar, id_memaddr)) ++ conCall ++ traceCall
 
 
             case StateInitializer(stateName, fieldName, obstype) =>
