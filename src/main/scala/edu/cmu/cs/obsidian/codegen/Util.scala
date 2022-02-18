@@ -523,15 +523,15 @@ object Util {
         val ret = TypedName("ret", t)
 
         val bod = t match {
-            case YATAddress() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATAddress() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
             case YATUInt32() =>
-                                Seq(
-                                    //value := calldataload(offset)
-                                    assign1(Identifier(ret.name), apply("calldataload", Identifier(offset.name)))
-                                )
-            case YATBool() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-            case YATString() =>  throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
-            case YATContractName(name) => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+                Seq(
+                    //value := calldataload(offset)
+                    assign1(Identifier(ret.name), apply("calldataload", Identifier(offset.name)))
+                )
+            case YATBool() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATString() => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
+            case YATContractName(_) => throw new RuntimeException(s"abi decoding not implemented for ${t.toString}")
         }
 
         FunctionDefinition(name = abi_decode_name(t),
@@ -573,10 +573,11 @@ object Util {
     val storage_threshold: Expression = apply("shl", intlit(255), intlit(1))
 
     /** given an expression representing a memory address its corresponding place in storage
+      *
       * @param x the expression representing the memory address
       * @return an expression that computes to the corresponding address in storage
       */
-    def mapToStorageAddress(x: Expression) : Expression = {
+    def mapToStorageAddress(x: Expression): Expression = {
         apply("add", x, storage_threshold)
     }
 
@@ -584,13 +585,13 @@ object Util {
       * a storage address or not and execute a sequence of statements in either case. if it does not
       * represent an address, the behaviour is undefined.
       *
-      * @param x the expression to check for being in storage
-      * @param true_case what to do if the address is a storage address
+      * @param addr_to_check          the expression to check for being in storage
+      * @param true_case  what to do if the address is a storage address
       * @param false_case what to to if the address is not a storage address
       * @return the expression performing the check
       */
-    def ifInStorge(x: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]) : YulStatement = {
-        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", x, storage_threshold),
+    def ifInStorge(addr_to_check: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]): YulStatement = {
+        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, storage_threshold),
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
     }

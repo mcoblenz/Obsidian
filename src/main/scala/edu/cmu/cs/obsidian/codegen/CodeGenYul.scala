@@ -304,10 +304,14 @@ object CodeGenYul extends CodeGenerator {
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable, inMain)
                         val ct = checkedTable.contractLookup(contractName)
+                        val address_of_field = Util.fieldFromThis(ct, x)
                         decl_0exp(id) +:
                             e_yul :+
                             (if (ct.allFields.exists(f => f.name.equals(x))) {
-                                ExpressionStatement(apply("mstore", Util.fieldFromThis(ct, x), id))
+                                ifInStorge(addr_to_check = address_of_field,
+                                    true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, id))),
+                                    false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, id)))
+                                )
                             } else {
                                 assign1(Identifier(x), id)
                             })
