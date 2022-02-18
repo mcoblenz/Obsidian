@@ -260,14 +260,13 @@
             "file": "SetGetLogs.obs",
             "expected": "15",
             "trans" : "main_sgl",
-            "logged" : [0, 224, 224],
-            "shows_that_we_support": "simple set-get with tracers that emit values to the logs. this shows that the harness can read logs; the values logged are immaterial"
+            "shows_that_we_support": "simple set-get with tracers that emit values to the logs. this shows that the harness can read logs; at the moment the tracers here do not emit any"
         },
         {
             "file": "SetGetConstructorField.obs",
             "expected": "12",
             "trans" : "main",
-            "logged" : [0,0,0],
+            "logged" : [0,0],
             "shows_that_we_support": "set-get with a field so that the emitted tracer is not trivial, and that uses the constructor for that field "
         }
     ]
