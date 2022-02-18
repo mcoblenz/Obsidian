@@ -569,9 +569,9 @@ object Util {
             body = Block(bod))
     }
 
-    // storage is 2**256 big; this is (2**256)/2.
-    val storage_threshold: Literal = hexlit("0x8000000000000000000000000000000000000000000000000000000000000000")
-
+    // storage is 2**256 big; this is (2**256)/2, which is the same as 1 << 255 or shl(255,1) in yul
+    val storage_threshold: Expression = apply("shl", intlit(255), intlit(1))
+    
     /** given an expression representing a memory address its corresponding place in storage
       * @param x the expression representing the memory address
       * @return an expression that computes to the corresponding address in storage
