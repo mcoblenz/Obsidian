@@ -122,7 +122,9 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
             warn(f"no expected result given for test {test_name} so exiting early")
             run_ganache.kill()
             return {'result': "pass", 'progress': progress,
-                    "reason": "nothing failed; note that no result was checked, though"}
+                    "reason": "nothing failed; note that no result was checked, though",
+                    "gas_invoke": "n/a",
+                    "gas_deploy": "n/a"}
 
         #### get a transaction receipt to get the contract address
         deploy_transaction_receipt = w3.eth.wait_for_transaction_receipt(deploy_transaction_hash)
@@ -181,7 +183,11 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
     #### kill ganache and return a pass
     run_ganache.kill()
-    return {'result': "pass", 'progress': progress, "reason": "nothing failed"}
+    return {'result': "pass",
+            'progress': progress,
+            "reason": "nothing failed",
+            "gas_invoke": invoke_transaction_receipt.gasUsed,
+            "gas_deploy": deploy_transaction_receipt.gasUsed}
 
 
 parser = argparse.ArgumentParser()
@@ -291,22 +297,26 @@ if args.verbose:
 
 # run each test, keeping track of which ones fail
 failed = []
-for test in tests_to_run:
-    result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
-    if result['result'] == "pass":
-        print(colored("PASS:", 'green'), test['file'])
-    elif result['result'] == "fail":
-        print(colored("FAIL:", 'red'), test['file'])
-        pprint.pprint(result, indent=4)
-        failed = failed + [test['file']]
-    else:
-        error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
+with open('benchmarks.csv', 'w') as bench:
+    bench.write("test name,gas used for invoke,gas used for deploy\n")
+    for test in tests_to_run:
+        result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
+        if result['result'] == "pass":
+            print(colored("PASS:", 'green'), test['file'])
+            bench.write(f"{test['file']},{result['gas_invoke']},{result['gas_deploy']}\n")
+        elif result['result'] == "fail":
+            print(colored("FAIL:", 'red'), test['file'])
+            pprint.pprint(result, indent=4)
+            failed = failed + [test['file']]
+            bench.write(f"{test['file']},FAILED,FAILED\n")
+        else:
+            error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
 
-    if args.clean:
-        name = os.path.splitext(test['file'])[0]
-        warn(f"removing directory for {name}")
-        os.remove(f"{name}/{name}.yul")
-        os.rmdir(f"{name}")
+        if args.clean:
+            name = os.path.splitext(test['file'])[0]
+            warn(f"removing directory for {name}")
+            os.remove(f"{name}/{name}.yul")
+            os.rmdir(f"{name}")
 
 # print out a quick summary at the bottom of the test run
 if failed:
