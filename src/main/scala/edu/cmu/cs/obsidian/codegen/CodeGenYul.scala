@@ -74,6 +74,35 @@ object CodeGenYul extends CodeGenerator {
                 case None => throw new RuntimeException("No main contract found")
             }
 
+        /** returns true iff the argument contract has at least one constructor, false otherwise.
+          *
+          * @param c the contract to inspect
+          * @return true if it has a constructor, false otherwise
+          */
+        def hasConstructor(c : Contract) : Boolean = {
+            c.declarations.exists(d => d match {
+                case decl : InvokableDeclaration => decl match {
+                    case Constructor(_, _, _, _) => true
+                    case _ => false
+                }
+                case _ => false
+            })
+        }
+
+        /** given a contract, return the empty sequence if it has a constructor or the sequence
+          * containing a default constructor if it doesn't have one.
+          *
+          * @param c the contract of interest
+          * @return  the empty sequence if it has a constructor or the sequence containing a
+          *          default constructor if it doesn't have one
+          */
+        def defaultConstructor(c : Contract): Seq[FunctionDefinition] = {
+            if(hasConstructor(c)){
+                Seq()
+            } else {
+                Seq(writeDefaultConstructor(c))
+            }
+        }
 
         /** given a contract, if it is not the main one and it is not the special contract `Contract`,
           * translate all the declarations it contains into yul and produce that sequence. if it is
@@ -86,7 +115,7 @@ object CodeGenYul extends CodeGenerator {
             c match {
                 case _: ObsidianContractImpl =>
                     if (!c.modifiers.contains(IsMain())) {
-                        c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
+                        defaultConstructor(c) ++ c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable, inMain = false))
                     } else {
                         // skip the main contract
                         Seq()
@@ -101,11 +130,15 @@ object CodeGenYul extends CodeGenerator {
         // nb: we do not process imports
         YulObject(contractName = mainContract.name,
             data = Seq(),
-            mainContractTransactions = mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
+            mainContractTransactions = defaultConstructor(mainContract) ++ mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable, inMain = true)),
             mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
             otherTransactions = real_contracts.flatMap(translateNonMains),
             tracers = real_contracts.flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )
+    }
+
+    def writeDefaultConstructor(c : Contract): FunctionDefinition = {
+        throw new RuntimeException()
     }
 
     def nameTracer(name: String): String = {
