@@ -8,6 +8,7 @@ import pprint
 import subprocess
 import sys
 import socket
+import datetime
 from shutil import which
 
 import eth_abi
@@ -297,7 +298,8 @@ if args.verbose:
 
 # run each test, keeping track of which ones fail
 failed = []
-with open('benchmarks.csv', 'w') as bench:
+timestring = datetime.datetime.now().strftime("%d%b%Y-%H:%M:%S")
+with open(f"benchmarks-{timestring}.csv", 'w') as bench:
     bench.write("test name,gas used for invoke,gas used for deploy\n")
     for test in tests_to_run:
         result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
