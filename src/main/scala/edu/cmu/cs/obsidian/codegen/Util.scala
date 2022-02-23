@@ -595,4 +595,8 @@ object Util {
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
     }
+
+    def flattenedName(transactionName : String, fromMain: Boolean, constructor: Boolean): String = {
+        transactionName // TODO use this to deprecate the other helper functions and unify the flattened naming convention, per #418
+    }
 }
