@@ -69,11 +69,11 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         progress = progress + ["obsidianc compiled obsidian to yul"]
 
     #### compile the yul to evm with solc
+    subdir_name = f"{os.getcwd().format()}/{test_name}/"
     run_solc = subprocess.run(["docker",
                                "run",
-                               "-v", f"{os.getcwd().format()}/{test_name}/:/src",
+                               "-v", f"{subdir_name}:/src",
                                "ethereum/solc:stable",
-                               "--bin",
                                "--strict-assembly",
                                "--optimize",
                                f"/src/{test_name}.yul"], capture_output=True)
@@ -83,7 +83,16 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     else:
         progress = progress + ["solc compiled yul to evm"]
 
-    evm_bytecode = run_solc.stdout.decode("utf8").split("\n")[4]
+    decoded_output = run_solc.stdout.decode("utf8").split("\n")
+
+    if args.optimized_yul:
+        with open(f"{subdir_name}/{test_name}-pretty.yul", 'w') as pretty:
+            top = decoded_output.index("Pretty printed source:")+1
+            bottom = decoded_output.index("Binary representation:")-1
+            for line in decoded_output[top:bottom]:
+                pretty.write(f"{line}\n")
+
+    evm_bytecode = decoded_output[decoded_output.index("Binary representation:")+1]
 
     #### start up a ganache process
     stdout_redirect = subprocess.PIPE
@@ -204,6 +213,8 @@ parser.add_argument("-d", "--dir", help="directory that contains the test json a
                     type=str, default='resources/tests/GanacheTests/')
 parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
+parser.add_argument("-o", "--optimized_yul", help="write optimized yul to disk as well; ignored if -c is set",
+                    action="store_true")
 args = parser.parse_args()
 
 # sanity check that there isn't anything on the port we'll use ganache for; this can happen between consecutive runs
@@ -318,6 +329,8 @@ with open(f"benchmarks-{timestring}.csv", 'w') as bench:
             name = os.path.splitext(test['file'])[0]
             warn(f"removing directory for {name}")
             os.remove(f"{name}/{name}.yul")
+            if args.optimized_yul:
+                os.remove(f"{name}/{name}-pretty.yul")
             os.rmdir(f"{name}")
 
 # print out a quick summary at the bottom of the test run
