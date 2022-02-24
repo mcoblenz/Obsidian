@@ -12,6 +12,7 @@
         {
             "file": "AssignLocalAdd.obs",
             "expected": "17",
+            "trans":"main",
             "shows_that_we_support": "assignment to local variables of simple compound expressions"
         },
         {
@@ -47,7 +48,7 @@
         {
             "file": "IntConst.obs",
             "expected": "12",
-            "shows_that_we_support": "assignment to local variables of integer litearls"
+            "shows_that_we_support": "assignment to local variables of integer literals"
         },
         {
             "file": "MultiLineIfRet.obs",
@@ -61,103 +62,103 @@
         },
         {
             "file": "PrimOpsAdd.obs",
-	    "trans" : "primopsadd",
+            "trans" : "primopsadd",
             "expected": "13",
             "shows_that_we_support": "the primitive addition operation"
         },
         {
             "file": "PrimOpsAnd.obs",
-	    "trans" : "primopsand",
+            "trans" : "primopsand",
             "expected": "0",
             "shows_that_we_support": "the primitive and operation"
         },
         {
             "file": "PrimOpsDiv.obs",
-	    "trans" : "primopsdiv",
+            "trans" : "primopsdiv",
             "expected": "2",
             "shows_that_we_support": "the primitive division operation"
         },
         {
             "file": "PrimOpsEq.obs",
-	    "trans" : "primopseq",
+            "trans" : "primopseq",
             "expected": "0",
             "shows_that_we_support": "the primitive equals operation"
         },
         {
             "file": "PrimOpsGreater.obs",
-	    "trans" : "primopsgreater",
+            "trans" : "primopsgreater",
             "expected": "0",
             "shows_that_we_support": "the primitive greater than operation"
         },
         {
             "file": "PrimOpsGreaterEq.obs",
-	    "trans" : "primopsgreatereq",
+            "trans" : "primopsgreatereq",
             "expected": "1",
             "shows_that_we_support": "the primitive greater than or equal to operation"
         },
         {
             "file": "PrimOpsLess.obs",
-	    "trans" : "primopsless",
+            "trans" : "primopsless",
             "expected": "1",
             "shows_that_we_support": "the primitive less than operation"
         },
         {
             "file": "PrimOpsLessEq.obs",
-	    "trans" : "primopslesseq",
+            "trans" : "primopslesseq",
             "expected": "1",
             "shows_that_we_support": "the primitive less than or equal to operation"
         },
         {
             "file": "PrimOpsMod.obs",
-	    "trans" : "primopsmod",
+            "trans" : "primopsmod",
             "expected": "5",
             "shows_that_we_support": "the primitive modulus operation"
         },
         {
             "file": "PrimOpsMul.obs",
-	    "trans" : "primopsmul",
+            "trans" : "primopsmul",
             "expected": "20",
             "shows_that_we_support": "the primitive multiplication operation"
         },
         {
             "file": "PrimOpsNEq.obs",
-	    "trans" : "primopsneq",
+            "trans" : "primopsneq",
             "expected": "1",
             "shows_that_we_support": "the primitive not equal operation"
         },
         {
             "file": "PrimOpsNeg.obs",
-	    "trans" : "primopsneg",
+            "trans" : "primopsneg",
             "expected": "-20",
             "shows_that_we_support": "the primitive negation operation"
         },
         {
             "file": "PrimOpsNotFalse.obs",
-	    "trans" : "primopsnotfalse",
+            "trans" : "primopsnotfalse",
             "expected": "1",
             "shows_that_we_support": "the primitive not operation on false"
         },
         {
             "file": "PrimOpsNotTrue.obs",
-	    "trans" : "primopsnottrue",
+            "trans" : "primopsnottrue",
             "expected": "0",
             "shows_that_we_support": "the primitive not operation on true"
         },
         {
             "file": "PrimOpsOr.obs",
-	    "trans" : "primopsor",
+            "trans" : "primopsor",
             "expected": "1",
             "shows_that_we_support": "the primitive or operation"
         },
         {
             "file": "PrimOpsSubNeg.obs",
-	    "trans" : "primopssubneg",
+            "trans" : "primopssubneg",
             "expected": "-15",
             "shows_that_we_support": "the primitive subtraction operation when the answer is negative"
         },
         {
             "file": "PrimOpsSubPos.obs",
-	    "trans" : "primopssubpos",
+            "trans" : "primopssubpos",
             "expected": "15",
             "shows_that_we_support": "the primitive subtraction operation when the answer is positive"
         },
