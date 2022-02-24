@@ -143,7 +143,10 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         #### use call and the contract address to get the result of running the function locally to
         #### the node for the result of the code
 
-        method_name = test_info.get('trans', defaults['trans'])
+        # we assume that the method being called lives in the main contract, is not a constructor, and that the
+        # main contract has the same name as the file name. prepending the file name and ___ to the transaction name
+        # is the same translation as the compiler does while flattening the objects into one yul object.
+        method_name = f"{test_name}___" + (test_info.get('trans', defaults['trans']))
         method_types = test_info.get('types', defaults['types'])
         method_args = test_info.get('args', defaults['args'])
         hash_to_call = Web3.keccak(text=method_name + "(" + ",".join(method_types) + ")")[:4].hex()
