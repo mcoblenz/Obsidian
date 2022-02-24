@@ -279,7 +279,7 @@ object CodeGenYul extends CodeGenerator {
 
         declaration match {
             case _: Field => Seq() // fields are translated as they are encountered
-            case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, inMain))
+            case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, inMain, false))
             case _: State =>
                 assert(assertion = false, "TODO")
                 Seq()
@@ -303,7 +303,7 @@ object CodeGenYul extends CodeGenerator {
                     Transaction(
                         //to support multiple constructors, constructors get the hash of their
                         // argument types added to their name
-                        name = c.name + hashOfFunctionName(c.name, c.args.map(v => v.typIn.toString)),
+                        name = c.name,
                         // we omit generic type information because we don't have it and would need
                         // to reconstruct it, and we don't use it to translate to yul anyway
                         params = Seq(),
@@ -317,14 +317,14 @@ object CodeGenYul extends CodeGenerator {
                         thisType = nonprim(c.thisType),
                         thisFinalType = nonprim(c.thisFinalType)
                     ),
-                    contractName, checkedTable, inMain))
+                    contractName, checkedTable, inMain, true))
             case _: TypeDecl =>
                 assert(assertion = false, "TODO")
                 Seq()
         }
     }
 
-    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean): FunctionDefinition = {
+    def translateTransaction(transaction: Transaction, contractName: String, checkedTable: SymbolTable, inMain: Boolean, isCons: Boolean): FunctionDefinition = {
         var id: Option[Identifier] = None
 
         // translate the return type to the ABI names
@@ -342,10 +342,17 @@ object CodeGenYul extends CodeGenerator {
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable, inMain))
 
+        val typenames =
+            if (isCons) {
+                Some(transaction.args.map(vd => vd.typIn.toString))
+            } else {
+                None
+            }
+
         // return the function definition formed from the above parts, with an added special argument called `this` for the address
         // of the allocated instance on which it should act
         addThisArgument(
-            FunctionDefinition(name = flattenedName(contractName, transaction.name, None),
+            FunctionDefinition(name = flattenedName(contractName, transaction.name, typenames),
                 parameters = transaction.args.map(v => TypedName(v.varName, obsTypeToYulType(v.typIn))),
                 ret,
                 body = Block(body)))
