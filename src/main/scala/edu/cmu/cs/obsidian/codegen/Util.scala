@@ -377,33 +377,6 @@ object Util {
         }
     }
 
-    /**
-      * given a contract name and a transaction name, produce the name of the contract in the flat
-      * yul object that corresponds to it
-      *
-      * @param contractName    the name of the contract
-      * @param transactionName the name of the transaction
-      * @return the name of the Yul transaction for that contract
-      */
-    def transactionNameMapping(contractName: String, transactionName: String): String =
-        s"${contractName}___$transactionName"
-
-    /**
-      * if a and b do not contain three underscores in a row, then
-      * transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
-      *
-      * @param s the string to break
-      * @return the two halves of the string
-      */
-    def transactionNameUnmapping(s: String): Option[(String, String)] = {
-        val halves: Array[String] = s.split("___")
-        if (halves.length != 2) {
-            None
-        } else {
-            Some(halves(0), halves(1))
-        }
-    }
-
     /** given a contract table and a name of a field, produce the expression that computes
       * the address of that field offset into the contract
       *
@@ -596,7 +569,19 @@ object Util {
                 Case(boollit(false), Block(false_case))))
     }
 
-    def flattenedName(transactionName : String, fromMain: Boolean, constructor: Boolean): String = {
-        transactionName // TODO use this to deprecate the other helper functions and unify the flattened naming convention, per #418
+
+    /** given info about a transaction, provide its name in the flattened representation
+      *
+      * @param contractName the name of the contract that the transaction originates from
+      * @param transactionName the name of the transaction itself
+      * @param types if the transaction is a constructor, the sequences of names of types that it takes; none otherwise.
+      * @return
+      */
+    def flattenedName(contractName : String, transactionName : String, types : Option[Seq[String]]): String = {
+        val suffix = types match {
+            case Some(value) => hashOfFunctionName(contractName, value)
+            case None => ""
+        }
+        s"${contractName}___$transactionName" + suffix
     }
 }
