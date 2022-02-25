@@ -111,7 +111,7 @@ object CodeGenYul extends CodeGenerator {
         val (main_contract, other_contracts): (Contract, Seq[Contract]) =
             program.contracts.filter(c => c.name != ContractType.topContractName).partition(c => c.modifiers.contains(IsMain())) match {
                 case (Seq(x), l) => (x, l)
-                case _ => assert(assertion = false, "program does not have exactly one main contract")
+                case _ => throw new RuntimeException("program does not have exactly one main contract")
             }
 
         // nb: we do not process imports
