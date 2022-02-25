@@ -62,18 +62,6 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def translateProgram(program: Program, checkedTable: SymbolTable): YulObject = {
-
-        // translate main contract, or fail if none is found or only a java contract is present
-        val mainContract: ObsidianContractImpl =
-            findMainContract(program) match {
-                case Some(p) => p match {
-                    case c@ObsidianContractImpl(_, _, _, _, _, _, _, _) => c
-                    case JavaFFIContractImpl(_, _, _, _, _) =>
-                        throw new RuntimeException("Java contract not supported in yul translation")
-                }
-                case None => throw new RuntimeException("No main contract found")
-            }
-
         /** returns true iff the argument contract has at least one constructor, false otherwise.
           *
           * @param c the contract to inspect
@@ -104,36 +92,35 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        /** given a contract, if it is not the main one and it is not the special contract `Contract`,
-          * translate all the declarations it contains into yul and produce that sequence. if it is
-          * one of the other two, we return nothing at all.
+        /** given a contract,
+          * translate all the declarations it contains into yul and produce that sequence and
+          * produce a default constructor for it if it does not have any constructors.
           *
           * @param c the contract to translate
           * @return the sequence of yul statements for each declaration in the contract
           */
-        def translateNonMains(c: Contract): Seq[YulStatement] = {
+        def translateContract(c: Contract): Seq[YulStatement] = {
             c match {
                 case _: ObsidianContractImpl =>
-                    if (!c.modifiers.contains(IsMain())) {
-                        defaultConstructor(c) ++ c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable))
-                    } else {
-                        // skip the main contract
-                        Seq()
-                    }
+                    defaultConstructor(c) ++ c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable))
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
-        val real_contracts = program.contracts.filter(c => c.name != ContractType.topContractName)
+        val (main_contract, other_contracts): (Contract, Seq[Contract]) =
+            program.contracts.filter(c => c.name != ContractType.topContractName).partition(c => c.modifiers.contains(IsMain())) match {
+                case (Seq(x), l) => (x, l)
+                case _ => assert(assertion = false, "program does not have exactly one main contract")
+            }
 
         // nb: we do not process imports
-        YulObject(contractName = mainContract.name,
+        YulObject(contractName = main_contract.name,
             data = Seq(),
-            mainContractTransactions = defaultConstructor(mainContract) ++ mainContract.declarations.flatMap(d => translateDeclaration(d, mainContract.name, checkedTable)),
-            mainContractSize = sizeOfContractST(mainContract.name, checkedTable),
-            otherTransactions = real_contracts.flatMap(translateNonMains),
-            tracers = real_contracts.flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
+            mainContractTransactions = translateContract(main_contract),
+            mainContractSize = sizeOfContractST(main_contract.name, checkedTable),
+            otherTransactions = other_contracts.flatMap(translateContract),
+            tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )
     }
 
@@ -183,15 +170,6 @@ object CodeGenYul extends CodeGenerator {
         // todo: to generate the body
         // if the field is a primitive type, take an argument at that type and assign to it.
         // if the field is not a primitive type, figure out its default constructor, take enough arguments, call that, and assign the result.
-    }
-
-    /** given the name of a contract, return the name of its copying tracer function
-      *
-      * @param name the name of the contract being traced
-      * @return the name of the tracer
-      */
-    def nameTracer(name: String): String = {
-        s"trace_$name"
     }
 
     def writeTracers(ct: SymbolTable, name: String): Seq[FunctionDefinition] = {
@@ -300,8 +278,6 @@ object CodeGenYul extends CodeGenerator {
                 // constructors turn into transactions with a special name and the same body
                 Seq(translateTransaction(
                     Transaction(
-                        //to support multiple constructors, constructors get the hash of their
-                        // argument types added to their name
                         name = c.name,
                         // we omit generic type information because we don't have it and would need
                         // to reconstruct it, and we don't use it to translate to yul anyway
@@ -339,7 +315,7 @@ object CodeGenYul extends CodeGenerator {
         // form the body of the transaction by translating each statement found
         val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))
 
-        val typenames =
+        val type_names =
             if (isCons) {
                 Some(transaction.args.map(vd => vd.typIn.toString))
             } else {
@@ -349,7 +325,7 @@ object CodeGenYul extends CodeGenerator {
         // return the function definition formed from the above parts, with an added special argument called `this` for the address
         // of the allocated instance on which it should act
         addThisArgument(
-            FunctionDefinition(name = flattenedName(contractName, transaction.name, typenames),
+            FunctionDefinition(name = flattenedName(contractName, transaction.name, type_names),
                 parameters = transaction.args.map(v => TypedName(v.varName, obsTypeToYulType(v.typIn))),
                 ret,
                 body = Block(body)))

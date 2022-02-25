@@ -584,4 +584,13 @@ object Util {
         }
         s"${contractName}___$transactionName" + suffix
     }
+
+    /** given the name of a contract, return the name of its copying tracer function
+      *
+      * @param name the name of the contract being traced
+      * @return the name of the tracer
+      */
+    def nameTracer(name: String): String = {
+        s"trace_$name"
+    }
 }
