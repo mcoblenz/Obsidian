@@ -154,11 +154,14 @@ object CodeGenYul extends CodeGenerator {
         c.declarations.flatMap(proc)
     }
 
-    /**
-      * @param c
-      * @param sig
-      * @param ct
-      * @return
+    /** given a contract and the list of arguments its default constructor accepts, produce a
+      * series of assignments that assign the fields of that contract to those arguments, recurring
+      * into the subcontracts and calling their default constructors as appropriate.
+      *
+      * @param c the contract to generate the assignments for
+      * @param sig the signature of that contracts default constructor
+      * @param ct the context in which the contract exists
+      * @return the sequence of assignments for the default constructor
       */
     def defaultConstructorAssignments(c: Contract, sig: Seq[TypedName], ct: SymbolTable): Seq[YulStatement] = {
 
@@ -204,11 +207,11 @@ object CodeGenYul extends CodeGenerator {
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
                                         , rest)
-                                case _ => (Seq(), sig) //todo maybe acc?
+                                case _ => (Seq(), sig)
                             }
-                        case _ => (Seq(), sig) //todo maybe acc?
+                        case _ => (Seq(), sig)
                     }
-                case _ => (Seq(), sig) //todo maybe acc?
+                case _ => (Seq(), sig)
             }
         }
 
