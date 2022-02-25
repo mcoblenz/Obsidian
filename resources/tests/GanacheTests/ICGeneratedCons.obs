@@ -1,0 +1,24 @@
+contract TwoIntContainer{
+    int x;
+    int a;
+
+    transaction set(int value) {
+        x = value;
+	a = value*value;
+    }
+
+    transaction get() returns int{
+        return x+a;
+    }
+}
+
+main contract ICGeneratedCons{
+    int f;
+    TwoIntContainer@Owned ic1;
+    TwoIntContainer@Owned ic2;
+    int x;
+
+    transaction main() returns int{
+        return (10);
+    }
+}

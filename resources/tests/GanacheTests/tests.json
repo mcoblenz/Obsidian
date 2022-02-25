@@ -269,6 +269,11 @@
             "trans" : "main",
             "logged" : [0,0],
             "shows_that_we_support": "set-get with a field so that the emitted tracer is not trivial, and that uses the constructor for that field "
+        },
+        {
+            "file": "ICGeneratedCons.obs",
+            "expected": "10",
+            "shows_that_we_support": "generating default constructors for contracts that lack any"
         }
     ]
 }
