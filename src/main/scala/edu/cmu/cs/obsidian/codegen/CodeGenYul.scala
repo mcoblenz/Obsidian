@@ -171,7 +171,10 @@ object CodeGenYul extends CodeGenerator {
                         case _: PrimitiveType =>
                             sig match {
                                 case use +: rest =>
-                                    (acc ++ Seq(assign1(Identifier(name), Identifier(use.name))), rest)
+                                    (Seq(LineComment(s"this.${name} := ${use.name}"),
+                                                assign1(Identifier(name), Identifier(use.name))
+                                                ) ++ acc,
+                                        rest)
                                 case _ => throw new RuntimeException("ran out of variables building default constructor; this is a bug")
                             }
                         // if the field is a contract . . .
@@ -194,12 +197,12 @@ object CodeGenYul extends CodeGenerator {
                                     // make a temporary variable to store the address in memory for the subobject
                                     val sub_this: Identifier = nextTemp()
 
-                                    (acc ++ Seq(
+                                    (Seq(
                                         // grab some memory for the subcontract
                                         assign1(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
 
                                         // call the constructor on that for the this argument and the right
-                                        ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*)))
+                                        ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
                                         , rest)
                                 case _ => (Seq(), sig) //todo maybe acc?
                             }
@@ -209,7 +212,7 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
-        c.declarations.foldRight((Seq(): Seq[YulStatement], sig))(proc)._1
+        c.declarations.foldRight((Seq(): Seq[YulStatement], sig.reverse))(proc)._1
     }
 
     /** given a contract, produce a default constructor that takes enough arguments to instantiate
