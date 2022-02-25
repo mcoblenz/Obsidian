@@ -23,8 +23,8 @@ object "{{contractName}}" {
 
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
             if iszero(lt(calldatasize(), 4)) {
+                {{buildMain}}
                 {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
-                let this := allocate_memory({{mainSize}})
                 let selector := shr(224, calldataload(0))
                 {{dispatchTable}}
             }

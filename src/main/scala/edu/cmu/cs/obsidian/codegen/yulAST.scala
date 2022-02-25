@@ -252,6 +252,7 @@ case class YulObject(contractName: String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
+                     mainConstructorTypeNames : Seq[String],
                      otherTransactions: Seq[YulStatement],
                      tracers: Seq[FunctionDefinition]) extends YulAST {
     def yulString(): String = {
@@ -292,8 +293,6 @@ case class YulObject(contractName: String,
         def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(deployedName)), datasize)
 
         def defaultReturn(): Expression = apply("return", intlit(0), datasize)
-
-        val mainSize: Int = mainContractSize
 
         // together, these keep track of and create temporary variables for returns in the dispatch table
         var deRetCnt = 0
@@ -364,6 +363,15 @@ case class YulObject(contractName: String,
         //   tighten that up so it's easier to follow. at the same time think about how to only emit
         //   the decoders and encoders we actually need (i.e. if f only has `this` as a param, the decoder we
         //   emit never gets called and gets optimized away. that's fine enough but why not make it better?)
+
+        def buildMain(): YulStatement = Block(
+            Seq(
+                //let this := allocate_memory({{mainSize}})
+                decl_1exp(Identifier("this"), apply("allocate_memory", intlit(mainContractSize))),
+                // todo call the constructor for the main contract on this and ... what?
+                ExpressionStatement(apply(flattenedName(contractName,contractName,Some(mainConstructorTypeNames)), Identifier("this")))
+            )
+        )
 
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
