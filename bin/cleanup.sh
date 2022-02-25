@@ -7,5 +7,5 @@ do
     name=$(basename -s '.obs' "$f")
     rm -f "$name/$name.yul"
     rm -f "$name/$name-pretty.yul"
-    rmdir "$name"
+    [ -d "$name" ] && rmdir "$name"
 done
