@@ -5,8 +5,6 @@ import edu.cmu.cs.obsidian.{CompilerOptions, codegen}
 
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Path, Paths}
-import scala.collection.immutable.{AbstractSeq, LinearSeq}
-import scala.xml.NodeSeq
 // note: some constructor names collide with edu.cmu.cs.obsidian.codegen.
 // in those places we use the fully qualified name
 import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
@@ -156,8 +154,8 @@ object CodeGenYul extends CodeGenerator {
         c.declarations.flatMap(proc)
     }
 
-    def defaultConstructorAssignments(c : Contract, sig : Seq[TypedName], ct: SymbolTable): Seq[YulStatement] = {
-        def proc (d : Declaration, sig : Seq[TypedName]) : (Seq[YulStatement], Seq[TypedName]) = {
+    def defaultConstructorAssignments(c: Contract, sig: Seq[TypedName], ct: SymbolTable): Seq[YulStatement] = {
+        def proc(d: Declaration, sig: Seq[TypedName]): (Seq[YulStatement], Seq[TypedName]) = {
             d match {
                 case Field(_, typ, name, _) =>
                     typ match {
@@ -175,14 +173,14 @@ object CodeGenYul extends CodeGenerator {
                                     // learn about the subcontract being called and compute its default constructor's signature
                                     val sub_contract_ct: ContractTable = ct.contractLookup(contractType.contractName)
                                     val sub_contract: Contract = sub_contract_ct.contract
-                                    val sub_contract_default_sig: Seq[TypedName] = defaultConstructorSignature(sub_contract,ct, "")
+                                    val sub_contract_default_sig: Seq[TypedName] = defaultConstructorSignature(sub_contract, ct, "")
                                     val sub_constructor_name: String =
-                                        flattenedName(sub_contract.name,sub_contract.name,Some(sub_contract_default_sig.map(tn => tn.typ.toString)))
+                                        flattenedName(sub_contract.name, sub_contract.name, Some(sub_contract_default_sig.map(tn => tn.typ.toString)))
 
                                     // break off the right number of arguments from the signature to call that default constructor
                                     val (args_for_sub, rest): (Seq[Identifier], Seq[TypedName]) =
                                         sig.splitAt(sub_contract_default_sig.length) match {
-                                            case (l1,l2) => (l1.map(tn => Identifier(tn.name)),l2)
+                                            case (l1, l2) => (l1.map(tn => Identifier(tn.name)), l2)
                                         }
 
                                     // make a temporary varible to store the address in memory for the subobject
@@ -193,11 +191,11 @@ object CodeGenYul extends CodeGenerator {
                                         assign1(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
 
                                         // call the constructor on that for the this argument and the right
-                                        ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub :_*)))
-                                    , rest)
+                                        ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*)))
+                                        , rest)
                                 case _ => (Seq(), sig)
                             }
-                        case _ => (Seq(),sig)
+                        case _ => (Seq(), sig)
                     }
                 case _ => (Seq(), sig)
             }
