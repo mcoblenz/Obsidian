@@ -191,7 +191,7 @@ object CodeGenYul extends CodeGenerator {
                                     // break off the right number of arguments from the signature to call that default constructor
                                     val (args_for_sub, rest): (Seq[Identifier], Seq[TypedName]) =
                                         sig.splitAt(sub_contract_default_sig.length) match {
-                                            case (l1, l2) => (l1.map(tn => Identifier(tn.name)), l2)
+                                            case (l1, l2) => (l1.map(tn => Identifier(tn.name)).reverse, l2)
                                         }
 
                                     // make a temporary variable to store the address in memory for the subobject
