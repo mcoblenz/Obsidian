@@ -385,7 +385,23 @@ object Util {
       * @return the expression computing the offset
       */
     def fieldFromThis(ct: ContractTable, x: String): Expression = {
+        // todo: is hardcoding "this" a good idea? am i ever going to call it anything else?
         apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
+    }
+
+    /** return the expression that sets a field from a contract either in memory or storage as appropriate
+      *
+      * @param ct the information about the contract
+      * @param fieldName the field name to set
+      * @param value the value to set it to
+      * @return the statement that does the check and then sets
+      */
+    def updateField(ct: ContractTable, fieldName: String, value: Expression) : YulStatement = {
+        val address_of_field = fieldFromThis(ct, fieldName)
+        ifInStorge(addr_to_check = address_of_field,
+            true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, value))),
+            false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, value)))
+        )
     }
 
     /** given a function definition, return a function definition that is the same but with an extra

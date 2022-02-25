@@ -172,8 +172,8 @@ object CodeGenYul extends CodeGenerator {
                             sig match {
                                 case use +: rest =>
                                     (Seq(LineComment(s"this.${name} := ${use.name}"),
-                                                assign1(Identifier(name), Identifier(use.name))
-                                                ) ++ acc,
+                                        updateField(ct.contractLookup(c.name), name, Identifier(use.name))
+                                    ) ++ acc,
                                         rest)
                                 case _ => throw new RuntimeException("ran out of variables building default constructor; this is a bug")
                             }
@@ -423,14 +423,10 @@ object CodeGenYul extends CodeGenerator {
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         val ct = checkedTable.contractLookup(contractName)
-                        val address_of_field = Util.fieldFromThis(ct, x)
                         decl_0exp(id) +:
                             e_yul :+
                             (if (ct.allFields.exists(f => f.name.equals(x))) {
-                                ifInStorge(addr_to_check = address_of_field,
-                                    true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, id))),
-                                    false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, id)))
-                                )
+                                updateField(ct, x, id)
                             } else {
                                 assign1(Identifier(x), id)
                             })
@@ -613,7 +609,7 @@ object CodeGenYul extends CodeGenerator {
                         val ct = checkedTable.contractLookup(contractName)
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
-                            Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))),
+                            Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))), // todo this may be updating in the wrong place beacuse it doesn't check for memory vs storage
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
