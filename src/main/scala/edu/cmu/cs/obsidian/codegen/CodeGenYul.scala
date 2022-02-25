@@ -154,8 +154,16 @@ object CodeGenYul extends CodeGenerator {
         c.declarations.flatMap(proc)
     }
 
+    /**
+      * @param c
+      * @param sig
+      * @param ct
+      * @return
+      */
     def defaultConstructorAssignments(c: Contract, sig: Seq[TypedName], ct: SymbolTable): Seq[YulStatement] = {
-        def proc(d: Declaration, sig: Seq[TypedName]): (Seq[YulStatement], Seq[TypedName]) = {
+
+        def proc(d: Declaration, stateSoFar: (Seq[YulStatement], Seq[TypedName])): (Seq[YulStatement], Seq[TypedName]) = {
+            val (acc, sig) = stateSoFar
             d match {
                 case Field(_, typ, name, _) =>
                     typ match {
@@ -163,7 +171,7 @@ object CodeGenYul extends CodeGenerator {
                         case _: PrimitiveType =>
                             sig match {
                                 case use +: rest =>
-                                    (Seq(assign1(Identifier(name), Identifier(use.name))), rest)
+                                    (acc ++ Seq(assign1(Identifier(name), Identifier(use.name))), rest)
                                 case _ => throw new RuntimeException("ran out of variables building default constructor; this is a bug")
                             }
                         // if the field is a contract . . .
@@ -183,36 +191,34 @@ object CodeGenYul extends CodeGenerator {
                                             case (l1, l2) => (l1.map(tn => Identifier(tn.name)), l2)
                                         }
 
-                                    // make a temporary varible to store the address in memory for the subobject
+                                    // make a temporary variable to store the address in memory for the subobject
                                     val sub_this: Identifier = nextTemp()
 
-                                    (Seq(
+                                    (acc ++ Seq(
                                         // grab some memory for the subcontract
                                         assign1(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
 
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*)))
                                         , rest)
-                                case _ => (Seq(), sig)
+                                case _ => (Seq(), sig) //todo maybe acc?
                             }
-                        case _ => (Seq(), sig)
+                        case _ => (Seq(), sig) //todo maybe acc?
                     }
-                case _ => (Seq(), sig)
+                case _ => (Seq(), sig) //todo maybe acc?
             }
         }
 
-        Seq()
-
-        //c.declarations.flatMap(proc)
-        // todo: to generate the body
-        // if the field is a primitive type, take an argument at that type and assign to it.
-        // if the field is not a primitive type, figure out its default constructor, take enough arguments, call that, and assign the result.
+        c.declarations.foldRight((Seq(): Seq[YulStatement], sig))(proc)._1
     }
 
-    /**
+    /** given a contract, produce a default constructor that takes enough arguments to instantiate
+      * the fields of the contract, including recursively calling default constructors for non
+      * primitive fields.
+      *
       * @param c  the contract to write a constructor for
-      * @param ct the
-      * @return
+      * @param ct the symbol table that describes the contract c
+      * @return the default constructor
       */
     def writeDefaultConstructor(c: Contract, ct: SymbolTable): FunctionDefinition = {
         val signature: Seq[TypedName] = defaultConstructorSignature(c, ct, "")
