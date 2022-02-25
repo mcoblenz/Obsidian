@@ -199,7 +199,7 @@ object CodeGenYul extends CodeGenerator {
 
                                     (Seq(
                                         // grab some memory for the subcontract
-                                        assign1(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
+                                        decl_1exp(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
 
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
