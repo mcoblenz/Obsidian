@@ -4,7 +4,7 @@ contract TwoIntContainer{
 
     transaction set(int value) {
         x = value;
-	a = value*value;
+        a = value*value;
     }
 
     transaction get() returns int{
