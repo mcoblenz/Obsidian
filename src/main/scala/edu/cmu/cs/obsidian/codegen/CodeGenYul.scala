@@ -207,11 +207,11 @@ object CodeGenYul extends CodeGenerator {
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
                                         , rest)
-                                case _ => (Seq(), sig)
+                                case _ => (acc, sig)
                             }
-                        case _ => (Seq(), sig)
+                        case _ => (acc, sig)
                     }
-                case _ => (Seq(), sig)
+                case _ => (acc, sig)
             }
         }
 
