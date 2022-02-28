@@ -377,33 +377,6 @@ object Util {
         }
     }
 
-    /**
-      * given a contract name and a transaction name, produce the name of the contract in the flat
-      * yul object that corresponds to it
-      *
-      * @param contractName    the name of the contract
-      * @param transactionName the name of the transaction
-      * @return the name of the Yul transaction for that contract
-      */
-    def transactionNameMapping(contractName: String, transactionName: String): String =
-        s"${contractName}___$transactionName"
-
-    /**
-      * if a and b do not contain three underscores in a row, then
-      * transactionNameUnmapping(transactionNameMapping(a,b)) == Some(a,b)
-      *
-      * @param s the string to break
-      * @return the two halves of the string
-      */
-    def transactionNameUnmapping(s: String): Option[(String, String)] = {
-        val halves: Array[String] = s.split("___")
-        if (halves.length != 2) {
-            None
-        } else {
-            Some(halves(0), halves(1))
-        }
-    }
-
     /** given a contract table and a name of a field, produce the expression that computes
       * the address of that field offset into the contract
       *
@@ -412,7 +385,23 @@ object Util {
       * @return the expression computing the offset
       */
     def fieldFromThis(ct: ContractTable, x: String): Expression = {
+        // todo: is hardcoding "this" a good idea? am i ever going to call it anything else?
         apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
+    }
+
+    /** return the expression that sets a field from a contract either in memory or storage as appropriate
+      *
+      * @param ct the information about the contract
+      * @param fieldName the field name to set
+      * @param value the value to set it to
+      * @return the statement that does the check and then sets
+      */
+    def updateField(ct: ContractTable, fieldName: String, value: Expression) : YulStatement = {
+        val address_of_field = fieldFromThis(ct, fieldName)
+        ifInStorge(addr_to_check = address_of_field,
+            true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, value))),
+            false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, value)))
+        )
     }
 
     /** given a function definition, return a function definition that is the same but with an extra
@@ -594,5 +583,30 @@ object Util {
         edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, storage_threshold),
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
+    }
+
+
+    /** given info about a transaction, provide its name in the flattened representation
+      *
+      * @param contractName the name of the contract that the transaction originates from
+      * @param transactionName the name of the transaction itself
+      * @param types if the transaction is a constructor, the sequences of names of types that it takes; none otherwise.
+      * @return
+      */
+    def flattenedName(contractName : String, transactionName : String, types : Option[Seq[String]]): String = {
+        val suffix = types match {
+            case Some(value) => hashOfFunctionName(contractName, value)
+            case None => ""
+        }
+        s"${contractName}___$transactionName" + suffix
+    }
+
+    /** given the name of a contract, return the name of its copying tracer function
+      *
+      * @param name the name of the contract being traced
+      * @return the name of the tracer
+      */
+    def nameTracer(name: String): String = {
+        s"trace_$name"
     }
 }

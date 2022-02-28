@@ -1,8 +1,8 @@
 main contract BoolLiteral{
-    transaction BoolLiteral () {
-	bool x;
-	x = true;
-	x = false;
+    transaction boolliteral () {
+        bool x;
+        x = true;
+        x = false;
     }
 
     transaction main() returns bool {
