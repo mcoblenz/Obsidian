@@ -176,6 +176,8 @@ object CodeGenYul extends CodeGenerator {
                             sig match {
                                 case use +: rest =>
                                     (Seq(LineComment(s"this.${name} := ${use.name}"),
+                                        // todo: (performance) this inserts a check against the storage threshold
+                                        //   every time, which will always be false for the main constructor's first call
                                         updateField(ct.contractLookup(c.name), name, Identifier(use.name))
                                     ) ++ acc,
                                         rest)
