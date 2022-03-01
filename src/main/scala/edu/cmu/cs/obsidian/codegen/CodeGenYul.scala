@@ -119,7 +119,9 @@ object CodeGenYul extends CodeGenerator {
             data = Seq(),
             mainContractTransactions = translateContract(main_contract),
             mainContractSize = sizeOfContractST(main_contract.name, checkedTable),
-            mainConstructorTypeNames = defaultConstructorSignature(main_contract,checkedTable,"").map(tn => tn.typ.toString),
+            mainConstructorTypeNames = defaultConstructorSignature(main_contract,checkedTable,""),
+            // todo: this includes all of the default constructors in the top
+            defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c,checkedTable)),
             otherTransactions = other_contracts.flatMap(translateContract),
             tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )

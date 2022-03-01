@@ -609,4 +609,21 @@ object Util {
     def nameTracer(name: String): String = {
         s"trace_$name"
     }
+
+    /** given a Yul type, provide an appropriate default value for it.
+      *
+      * @param typ the type to provide a default for
+      * @return the default value, if there is one
+      */
+    def defaultInitValue(typ : YulABIType) : Literal = {
+        typ match {
+            case YATAddress() => hexlit("0x0")
+            case YATUInt32() => intlit(0)
+            case YATBool() => boollit(false)
+            case YATString() => stringlit("")
+            case YATContractName(name) => throw new RuntimeException("can't query for a default contract value")
+        }
+    }
+
+
 }
