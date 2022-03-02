@@ -9,9 +9,6 @@ object "{{contractName}}" {
     code {
         {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
         {{memoryInit}}
-        {{! protection against sending Ether }}
-        {{callValueCheck}}
-        {{codeCopy}}
         {{! todo: these are copied from below }}
         function allocate_unbounded() -> memPtr {
             memPtr := mload(0x40)
@@ -42,6 +39,9 @@ object "{{contractName}}" {
         {{! todo: this copies the tracers twice; may want different ones at deploy anyway}}
         {{tracertransactions}}
         {{buildMain}}
+        {{! protection against sending Ether }}
+        {{callValueCheck}}
+        {{codeCopy}}
         {{defaultReturn}}
     }
     object "{{deployedName}}" {
