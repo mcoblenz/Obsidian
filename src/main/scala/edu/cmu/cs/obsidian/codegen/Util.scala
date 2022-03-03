@@ -618,7 +618,7 @@ object Util {
     def defaultInitValue(typ : YulABIType) : Literal = {
         typ match {
             case YATAddress() => hexlit("0x0")
-            case YATUInt32() => intlit(0)
+            case YATUInt32() => intlit(5738) //todo
             case YATBool() => boollit(false)
             case YATString() => stringlit("")
             case YATContractName(name) => throw new RuntimeException("can't query for a default contract value")

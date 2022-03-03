@@ -1,0 +1,30 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int val) {
+        x = val;
+    }
+
+    transaction get() returns int{
+        return x;
+    }
+}
+
+
+main contract SetGetCheckDefaults {
+    IntContainer@Owned ic;
+
+    // this contract does not have a constructor, so that means that the
+    // default one will get emitted. at the time of running this test, i've
+    // changed the value of the default constructor to be 5738 for int
+    // arguments, so ic should get a new IntContinaer with that in it by
+    // default. that should get boxed off to storage by the tracer and the
+    // answer should be 5+5738 = 5743
+
+    transaction main() returns int{
+        int init = ic.get();
+        ic.set(5);
+
+        return (init+ic.get());
+    }
+}

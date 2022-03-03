@@ -274,6 +274,11 @@
             "file": "ICGeneratedCons.obs",
             "expected": "10",
             "shows_that_we_support": "generating default constructors for contracts that lack any"
+        },
+        {
+            "file": "SetGetCheckDefaults.obs",
+            "expected": "5743",
+            "shows_that_we_support": "default constructors + values get written to storage and resurrected on subsequent calls"
         }
     ]
 }
