@@ -624,6 +624,4 @@ object Util {
             case YATContractName(name) => throw new RuntimeException("can't query for a default contract value")
         }
     }
-
-
 }

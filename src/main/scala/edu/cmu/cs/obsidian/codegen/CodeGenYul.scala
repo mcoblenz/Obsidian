@@ -431,13 +431,38 @@ object CodeGenYul extends CodeGenerator {
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         val ct = checkedTable.contractLookup(contractName)
-                        decl_0exp(id) +:
-                            e_yul :+
-                            (if (ct.allFields.exists(f => f.name.equals(x))) {
-                                updateField(ct, x, id)
+
+                        val field_address = fieldFromThis(ct, x)
+
+                        // todo: make this a helper function once you get the address argument figured out
+                        val trace_for_e : Seq[YulStatement] = e.obstype match {
+                            case Some(value) => value match {
+                                case _: PrimitiveType => Seq()
+                                case t: NonPrimitiveType => t match {
+                                    case ContractReferenceType(contractType, _, _) => Seq(ExpressionStatement(apply(nameTracer(contractType.contractName),Identifier("this")))) // todo "this" is almost certainly wrong here.
+                                    case StateType(_, _, _) => assert(assertion=false, "not yet implemented"); Seq()
+                                    case InterfaceContractType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
+                                    case GenericType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
+                                }
+                                case BottomType() => Seq()
+                            }
+                            case None => assert(assertion=false,"encountered an expression without a type annotation"); Seq()
+                        }
+
+                        val update_instructions : Seq[YulStatement] =
+                            if (ct.allFields.exists(f => f.name.equals(x))) {
+                                // todo this is likely to break: i don't think an empty sequence in the false branch produces valid yul
+                                //   and you only want to do the storage check if, statically, you know that e isn't primitive, e.g. that the
+                                //   sequence isn't empty
+                                Seq(updateField(ct, x, id), ifInStorge(field_address,trace_for_e,Seq()))
                             } else {
-                                assign1(Identifier(x), id)
-                            })
+                                Seq(assign1(Identifier(x), id))
+                            }
+
+                        decl_0exp(id) +: (e_yul ++ update_instructions)
+
+                        // look at assignTo. if it's a storage address, then look at the type of e. if it's a primative, ignore it.  if it's a
+                        // contract reference, it needs to get traced first
                     case _ =>
                         assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
