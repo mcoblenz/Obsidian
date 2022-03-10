@@ -47,7 +47,12 @@ object Util {
       * @param b the scala integer
       * @return the corresponding Yul boolean literal
       */
-    def boollit(b: Boolean): Literal = Literal(LiteralKind.boolean, b.toString, "bool")
+    def boollit(b: Boolean): Literal = {
+        b match {
+            case true => intlit(1)
+            case false => intlit(0)
+        }
+    }
 
     /**
       * shorthand for building Yul hex literals
