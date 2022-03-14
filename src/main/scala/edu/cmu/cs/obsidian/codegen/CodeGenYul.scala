@@ -209,6 +209,11 @@ object CodeGenYul extends CodeGenerator {
                                         // grab some memory for the subcontract
                                         decl_1exp(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
 
+                                        // write the address of the subcontract to the corresponding field of this contract
+                                        // todo: is c.name right? should it be contractType.contractName? you need the offset of the field in the contract being elaborated, not the name of the thing that's pointed to
+                                        ExpressionStatement(apply("mstore", fieldFromThis(ct.contractLookup(c.name),name), sub_this)),
+                                           // sub_this, intlit(offsetOfField(ct.contractLookup(c.name), name=name)))),
+
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
                                         , rest)
@@ -280,6 +285,9 @@ object CodeGenYul extends CodeGenerator {
                             Seq()
                         }
 
+                    // todo: the body of load needs to check if it's a ContractReferenceType and add the offset if so;
+                    //   when we copy to storage, REWRITE the value of the pointer.
+
 
                     typ match {
                         case t: NonPrimitiveType => t match {
@@ -287,7 +295,7 @@ object CodeGenYul extends CodeGenerator {
                                 body = body ++ load ++ log ++
                                     Seq(
                                         LineComment("traversal"),
-                                        ExpressionStatement(apply(nameTracer(contractType.contractName), mem_loc))
+                                        ExpressionStatement(apply(nameTracer(contractType.contractName), apply("mload", mem_loc))) // todo: this is the (a) bug, need to dereference this and follow it rather than
                                     )
                                 // todo: this recursive call may not be needed if we generate tracers
                                 //   for every contract in the program
