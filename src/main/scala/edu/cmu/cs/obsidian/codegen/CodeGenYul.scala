@@ -266,10 +266,26 @@ object CodeGenYul extends CodeGenerator {
                     val sto_loc: codegen.Expression = mapToStorageAddress(mem_loc)
                     val log_temp: Identifier = nextTemp()
 
+                    // todo (tidy) this is kind of redundant with the match below
+
+                    // the body of load needs to check if it's a ContractReferenceType and add the offset if so;
+                    //   when we copy to storage, REWRITE the value of the pointer.
+                    val shift_if_addr: codegen.Expression =
+                        typ match {
+                            case primitiveType: PrimitiveType => apply("mload", mem_loc)
+                            case npt: NonPrimitiveType => npt match {
+                                case ContractReferenceType(contractType, permission, remoteReferenceType) => apply("add", storage_threshold, apply("mload", mem_loc))
+                                case StateType(contractType, stateNames, remoteReferenceType) => throw new RuntimeException("unimplemented")
+                                case InterfaceContractType(name, simpleType) => throw new RuntimeException("unimplemented")
+                                case GenericType(gVar, bound) => throw new RuntimeException("unimplemented")
+                            }
+                            case BottomType() => throw new RuntimeException("unimplemented")
+                        }
+
                     val load = Seq(
                         //sstore(add(this,offset), mload(add(this,offset)))
                         LineComment("loading"),
-                        ExpressionStatement(apply("sstore", sto_loc, apply("mload", mem_loc))))
+                        ExpressionStatement(apply("sstore", sto_loc, shift_if_addr)))
 
                     val log: Seq[YulStatement] =
                         if (emit_logs) {
@@ -284,10 +300,7 @@ object CodeGenYul extends CodeGenerator {
                         } else {
                             Seq()
                         }
-
-                    // todo: the body of load needs to check if it's a ContractReferenceType and add the offset if so;
-                    //   when we copy to storage, REWRITE the value of the pointer.
-
+                    
 
                     typ match {
                         case t: NonPrimitiveType => t match {
