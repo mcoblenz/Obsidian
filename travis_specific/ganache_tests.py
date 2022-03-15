@@ -345,6 +345,7 @@ if args.benchmarks:
             bench.write(b)
 
 # if running in CI, dump the benchmarks to std out. todo this isn't what i want forever
+pprint.pprint(os.environ)
 if 'CI' in os.environ and os.environ.get('CI') == "true":
     pprint.pprint(benchmarks)
 
