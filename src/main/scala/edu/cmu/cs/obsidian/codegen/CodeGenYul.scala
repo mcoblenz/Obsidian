@@ -119,9 +119,9 @@ object CodeGenYul extends CodeGenerator {
             data = Seq(),
             mainContractTransactions = translateContract(main_contract),
             mainContractSize = sizeOfContractST(main_contract.name, checkedTable),
-            mainConstructorTypeNames = defaultConstructorSignature(main_contract,checkedTable,""),
+            mainConstructorTypeNames = defaultConstructorSignature(main_contract, checkedTable, ""),
             // todo: this includes all of the default constructors in the top
-            defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c,checkedTable)),
+            defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c, checkedTable)),
             otherTransactions = other_contracts.flatMap(translateContract),
             tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )
@@ -161,9 +161,9 @@ object CodeGenYul extends CodeGenerator {
       * series of assignments that assign the fields of that contract to those arguments, recurring
       * into the subcontracts and calling their default constructors as appropriate.
       *
-      * @param c the contract to generate the assignments for
+      * @param c   the contract to generate the assignments for
       * @param sig the signature of that contracts default constructor
-      * @param ct the context in which the contract exists
+      * @param ct  the context in which the contract exists
       * @return the sequence of assignments for the default constructor
       */
     def defaultConstructorAssignments(c: Contract, sig: Seq[TypedName], ct: SymbolTable): Seq[YulStatement] = {
@@ -211,8 +211,8 @@ object CodeGenYul extends CodeGenerator {
 
                                         // write the address of the subcontract to the corresponding field of this contract
                                         // todo: is c.name right? should it be contractType.contractName? you need the offset of the field in the contract being elaborated, not the name of the thing that's pointed to
-                                        ExpressionStatement(apply("mstore", fieldFromThis(ct.contractLookup(c.name),name), sub_this)),
-                                           // sub_this, intlit(offsetOfField(ct.contractLookup(c.name), name=name)))),
+                                        ExpressionStatement(apply("mstore", fieldFromThis(ct.contractLookup(c.name), name), sub_this)),
+                                        // sub_this, intlit(offsetOfField(ct.contractLookup(c.name), name=name)))),
 
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
@@ -271,16 +271,16 @@ object CodeGenYul extends CodeGenerator {
                     // the body of load needs to check if it's a ContractReferenceType and add the offset if so;
                     //   when we copy to storage, REWRITE the value of the pointer.
                     val shift_if_addr: codegen.Expression =
-                        typ match {
-                            case primitiveType: PrimitiveType => apply("mload", mem_loc)
-                            case npt: NonPrimitiveType => npt match {
-                                case ContractReferenceType(contractType, permission, remoteReferenceType) => apply("add", storage_threshold, apply("mload", mem_loc))
-                                case StateType(contractType, stateNames, remoteReferenceType) => throw new RuntimeException("unimplemented")
-                                case InterfaceContractType(name, simpleType) => throw new RuntimeException("unimplemented")
-                                case GenericType(gVar, bound) => throw new RuntimeException("unimplemented")
-                            }
-                            case BottomType() => throw new RuntimeException("unimplemented")
+                    typ match {
+                        case primitiveType: PrimitiveType => apply("mload", mem_loc)
+                        case npt: NonPrimitiveType => npt match {
+                            case ContractReferenceType(contractType, permission, remoteReferenceType) => apply("add", storage_threshold, apply("mload", mem_loc))
+                            case StateType(contractType, stateNames, remoteReferenceType) => throw new RuntimeException("unimplemented")
+                            case InterfaceContractType(name, simpleType) => throw new RuntimeException("unimplemented")
+                            case GenericType(gVar, bound) => throw new RuntimeException("unimplemented")
                         }
+                        case BottomType() => throw new RuntimeException("unimplemented")
+                    }
 
                     val load = Seq(
                         //sstore(add(this,offset), mload(add(this,offset)))
@@ -300,7 +300,7 @@ object CodeGenYul extends CodeGenerator {
                         } else {
                             Seq()
                         }
-                    
+
 
                     typ match {
                         case t: NonPrimitiveType => t match {
