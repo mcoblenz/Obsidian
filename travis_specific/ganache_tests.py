@@ -187,7 +187,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
                 raise RuntimeError("expected logs to be present for this test but none were in the receipt")
             got_logged_data = [twos_comp(int(log['data'], 16), 8*32) for log in logs]
             if not test_info['logged'] == got_logged_data:
-                raise RuntimeError(f"expected logs {test_info['logged']} but got {got_logged_data}")
+                raise RuntimeError(f"expected logs {test_info['logged']} but got {got_logged_data} raw data: {[str(log['data']) for log in logs]}")
             progress = progress + ["logs matched expected"]
 
     except BaseException as err:
@@ -217,6 +217,8 @@ parser.add_argument("-d", "--dir", help="directory that contains the test json a
 parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 parser.add_argument("-o", "--optimized_yul", help="write optimized yul to disk as well; ignored if -c is set",
+                    action="store_true")
+parser.add_argument("-b", "--benchmarks", help="if specified, gas use bench marks are written to file for each test",
                     action="store_true")
 args = parser.parse_args()
 
@@ -310,31 +312,41 @@ if not jar_path:
 if args.verbose:
     print(f"using top of {pprint.pformat(jar_path)}")
 
-# run each test, keeping track of which ones fail
+# run each test, keeping track of which ones fail and gas usage of each
 failed = []
-timestring = datetime.datetime.now().strftime("%d%b%Y-%H:%M:%S")
-with open(f"benchmarks-{timestring}.csv", 'w') as bench:
-    bench.write("test name,gas used for invoke,gas used for deploy\n")
-    for test in tests_to_run:
-        result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
-        if result['result'] == "pass":
-            print(colored("PASS:", 'green'), test['file'])
-            bench.write(f"{test['file']},{result['gas_invoke']},{result['gas_deploy']}\n")
-        elif result['result'] == "fail":
-            print(colored("FAIL:", 'red'), test['file'])
-            pprint.pprint(result, indent=4)
-            failed = failed + [test['file']]
-            bench.write(f"{test['file']},FAILED,FAILED\n")
-        else:
-            error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
+benchmarks = []
+for test in tests_to_run:
+    result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
+    if result['result'] == "pass":
+        print(colored("PASS:", 'green'), test['file'])
+        benchmarks.append(f"{test['file']},{result['gas_deploy']},{result['gas_invoke']}\n")
+    elif result['result'] == "fail":
+        print(colored("FAIL:", 'red'), test['file'])
+        pprint.pprint(result, indent=4)
+        failed = failed + [test['file']]
+        benchmarks.append(f"{test['file']},FAILED,FAILED\n")
+    else:
+        error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
 
-        if args.clean:
-            name = os.path.splitext(test['file'])[0]
-            warn(f"removing directory for {name}")
-            os.remove(f"{name}/{name}.yul")
-            if args.optimized_yul:
-                os.remove(f"{name}/{name}-pretty.yul")
-            os.rmdir(f"{name}")
+    if args.clean:
+        name = os.path.splitext(test['file'])[0]
+        warn(f"removing directory for {name}")
+        os.remove(f"{name}/{name}.yul")
+        if args.optimized_yul:
+            os.remove(f"{name}/{name}-pretty.yul")
+        os.rmdir(f"{name}")
+
+# if requested, print the bench marks to a file
+if args.benchmarks:
+    timestring = datetime.datetime.now().strftime("%d%b%Y.%H.%M.%S")
+    with open(f"benchmarks-{timestring}.csv", 'w') as bench:
+        bench.write("test name,gas used for deploy,gas used for invoke\n")
+        for b in benchmarks:
+            bench.write(b)
+
+# if running in CI, dump the benchmarks to std out. todo this isn't what i want forever
+if 'CI' in os.environ and os.environ.get('CI') == "true":
+    pprint.pprint(benchmarks)
 
 # print out a quick summary at the bottom of the test run
 if failed:
@@ -345,3 +357,4 @@ if failed:
 else:
     print(colored(f"\nALL {str(len(tests_to_run))} TESTS PASSED", 'green'))
     sys.exit(0)
+
