@@ -348,9 +348,9 @@ if args.benchmarks:
 # if running in CI, dump the benchmarks to std out. todo this isn't what i want forever
 if 'CI' in os.environ and os.environ.get('CI') == "true":
     print("\n")
-    warn("benchmarks:")
+    print(colored(f"BENCHMARKS:", 'blue'))
     print(bench_head)
-    print(*benchmarks, sep="\n")
+    print(*benchmarks)
 
 # print out a quick summary at the bottom of the test run
 if failed:
