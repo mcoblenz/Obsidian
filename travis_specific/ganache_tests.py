@@ -336,18 +336,21 @@ for test in tests_to_run:
             os.remove(f"{name}/{name}-pretty.yul")
         os.rmdir(f"{name}")
 
-# if requested, print the bench marks to a file
+bench_head="test name,gas used for deploy,gas used for invoke"
+# if requested, print the benchmarks to a file
 if args.benchmarks:
     timestring = datetime.datetime.now().strftime("%d%b%Y.%H.%M.%S")
     with open(f"benchmarks-{timestring}.csv", 'w') as bench:
-        bench.write("test name,gas used for deploy,gas used for invoke\n")
+        bench.write(f"{bench_head}\n")
         for b in benchmarks:
             bench.write(b)
 
 # if running in CI, dump the benchmarks to std out. todo this isn't what i want forever
-pprint.pprint(os.environ)
 if 'CI' in os.environ and os.environ.get('CI') == "true":
-    pprint.pprint(benchmarks)
+    print("\n")
+    warn("benchmarks:")
+    print(bench_head)
+    print(*benchmarks, sep="\n")
 
 # print out a quick summary at the bottom of the test run
 if failed:
