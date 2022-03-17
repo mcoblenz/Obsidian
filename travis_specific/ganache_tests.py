@@ -165,7 +165,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         got = twos_comp(int(call_reply.hex(), 16), 8 * 32)
         expected = int(test_info['expected'])
         if not got == expected:
-            raise RuntimeError(f"expected {expected} but got {got}")
+            raise RuntimeError(f"expected {expected} but got {got} UNCHECKED deployment logs were {deploy_transaction_receipt.logs}")
         progress = progress + ["got matched expected"]
 
         ## invoking transaction for effects
@@ -209,7 +209,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         ## if any logs didn't match or weren't present that's a general fail for the test.
         failed_logs = {key: value for (key, value) in logging_status.items() if value['result'] == 'fail' }
         if failed_logs:
-            raise RuntimeError(f"log comparison failure: {pprint.pformat(failed_logs)}")
+            raise RuntimeError(f"log comparison failure: {str(failed_logs)}")
         else:
             progress = progress + [f"all logs matched expected"]
 
