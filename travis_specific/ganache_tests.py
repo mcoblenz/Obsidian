@@ -57,6 +57,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     """
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
+    emitted_logs = {}
 
     #### compile the obsidian file in question to yul with a jar of obsidianc
     run_obsidianc = subprocess.run(
@@ -139,6 +140,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         #### get a transaction receipt to get the contract address
         deploy_transaction_receipt = w3.eth.wait_for_transaction_receipt(deploy_transaction_hash)
         progress = progress + ["got deploy transaction receipt"]
+        emitted_logs['deploy_logged'] = deploy_transaction_receipt.logs
 
         #### use call and the contract address to get the result of running the function locally to
         #### the node for the result of the code
@@ -176,19 +178,40 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
         invoke_transaction_receipt = w3.eth.wait_for_transaction_receipt(invoke_transaction_hash)
         progress = progress + [f"got receipt for invocation"]
+        emitted_logs['invoke_logged'] = invoke_transaction_receipt.logs
 
-        #### get the logs and check against the expected values, if such is present.
-        # todo this is pretty rudimentary and really specific to one test case for now
-        if 'logged' in test_info.keys():
-            logs = invoke_transaction_receipt.logs
-            if verbose:
-                pprint.pprint(logs)
-            if not logs:
-                raise RuntimeError("expected logs to be present for this test but none were in the receipt")
-            got_logged_data = [twos_comp(int(log['data'], 16), 8*32) for log in logs]
-            if not test_info['logged'] == got_logged_data:
-                raise RuntimeError(f"expected logs {test_info['logged']} but got {got_logged_data} raw data: {[str(log['data']) for log in logs]}")
-            progress = progress + ["logs matched expected"]
+        ## check logs from all the transaction recipits generated above
+        logging_status = {}
+        for log_name in ['deploy_logged', 'invoke_logged']:
+            # if the json file doesn't mention this phase, anything goes so we'll skip it entirely
+            if log_name in test_info.keys():
+                # print the logs if needed for debugging
+                if verbose:
+                    pprint.pprint(emitted_logs[log_name])
+
+                # if the json file mentions it but they aren't present, that's a fail
+                if not emitted_logs[log_name]:
+                    logging_status[log_name] = {'result': 'fail',
+                                                'reason': f"expected logs to be present for {log_name} but none were in the receipt"}
+                    continue
+
+                # decode the data assuming it's just one integer, and also collect up the raw data
+                decoded_data = [twos_comp(int(log['data'], 16), 8*32) for log in emitted_logs[log_name]]
+                raw_data = [str(log['data']) for log in emitted_logs[log_name]]
+
+                # compare the decoded data to the values in the JSON file
+                if not test_info[log_name] == decoded_data:
+                    logging_status[log_name] = {'result': 'fail',
+                                                'reason': f"expected logs for {log_name} are {test_info[log_name]} but got {decoded_data} from raw data: {raw_data}"}
+                    continue
+                logging_status[log_name] = {'result': 'pass'}
+
+        ## if any logs didn't match or weren't present that's a general fail for the test.
+        failed_logs = {key: value for (key, value) in logging_status.items() if value['result'] == 'fail' }
+        if failed_logs:
+            raise RuntimeError(f"log comparison failure: {pprint.pformat(failed_logs)}")
+        else:
+            progress = progress + [f"all logs matched expected"]
 
     except BaseException as err:
         run_ganache.kill()
