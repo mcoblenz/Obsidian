@@ -165,7 +165,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         got = twos_comp(int(call_reply.hex(), 16), 8 * 32)
         expected = int(test_info['expected'])
         if not got == expected:
-            raise RuntimeError(f"expected {expected} but got {got} UNCHECKED deployment logs were {deploy_transaction_receipt.logs}")
+            raise RuntimeError(f"expected {expected} but got {got}. the deployment made these logs but they haven't been checked: {deploy_transaction_receipt.logs}")
         progress = progress + ["got matched expected"]
 
         ## invoking transaction for effects
