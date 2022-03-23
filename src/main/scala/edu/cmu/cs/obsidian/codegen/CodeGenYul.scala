@@ -638,7 +638,8 @@ object CodeGenYul extends CodeGenerator {
                         val ct = checkedTable.contractLookup(contractName)
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
-                            Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))), // todo this may be updating in the wrong place beacuse it doesn't check for memory vs storage
+                            Seq(decl_0exp(store_id),
+                                fetchField(ct,x,store_id),
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))

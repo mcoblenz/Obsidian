@@ -402,10 +402,20 @@ object Util {
       * @return the statement that does the check and then sets
       */
     def updateField(ct: ContractTable, fieldName: String, value: Expression) : YulStatement = {
-        val address_of_field = fieldFromThis(ct, fieldName)
-        ifInStorge(addr_to_check = address_of_field,
+        val address_of_field: Expression = fieldFromThis(ct, fieldName)
+        ifInStorge(addr_to_check = apply("sub",address_of_field,intlit(1)),
             true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, value))),
             false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, value)))
+        )
+    }
+
+    // todo document this once it settles; maybe abstract it and the above into a shared helper for less
+    //   dangerous repetition
+    def fetchField(ct: ContractTable, fieldName: String, destination : Identifier) : YulStatement = {
+        val address_of_field = fieldFromThis(ct, fieldName)
+        ifInStorge(addr_to_check = apply("sub",address_of_field,intlit(1)),
+            true_case = Seq(assign1(destination,apply("sload", address_of_field))),
+            false_case = Seq(assign1(destination,apply("mload", address_of_field)))
         )
     }
 
