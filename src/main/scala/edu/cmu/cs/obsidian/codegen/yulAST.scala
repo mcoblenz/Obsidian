@@ -386,7 +386,8 @@ case class YulObject(contractName: String,
             Block(
                 Seq(
                     //let this := allocate_memory({{mainSize}})
-                    decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
+                    //decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
+                    decl_1exp(thisId, storage_threshold)
                 )
             )
         }
