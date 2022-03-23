@@ -267,7 +267,6 @@
             "file": "SetGetConstructorField.obs",
             "expected": "12",
             "deploy_logged" : [0,0],
-            "invoke_logged" : [0,0],
             "shows_that_we_support": "set-get with a field so that the emitted tracer is not trivial, and that uses the constructor for that field ",
             "gas": 9000000000000000
         },
@@ -280,7 +279,6 @@
             "file": "SetGetCheckDefaults.obs",
             "expected": "5743",
             "deploy_logged" : [0,0],
-            "invoke_logged" : [0,0],
             "shows_that_we_support": "default constructors + values get written to storage and resurrected on subsequent calls",
             "gas": 9000000000000000
         }
