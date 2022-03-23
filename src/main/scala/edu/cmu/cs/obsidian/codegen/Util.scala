@@ -403,7 +403,7 @@ object Util {
       */
     def updateField(ct: ContractTable, fieldName: String, value: Expression) : YulStatement = {
         val address_of_field: Expression = fieldFromThis(ct, fieldName)
-        ifInStorge(addr_to_check = apply("sub",address_of_field,intlit(1)),
+        ifInStorge(addr_to_check = address_of_field,
             true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, value))),
             false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, value)))
         )
@@ -413,7 +413,7 @@ object Util {
     //   dangerous repetition
     def fetchField(ct: ContractTable, fieldName: String, destination : Identifier) : YulStatement = {
         val address_of_field = fieldFromThis(ct, fieldName)
-        ifInStorge(addr_to_check = apply("sub",address_of_field,intlit(1)),
+        ifInStorge(addr_to_check = address_of_field,
             true_case = Seq(assign1(destination,apply("sload", address_of_field))),
             false_case = Seq(assign1(destination,apply("mload", address_of_field)))
         )
@@ -595,7 +595,7 @@ object Util {
       * @return the expression performing the check
       */
     def ifInStorge(addr_to_check: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]): YulStatement = {
-        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, storage_threshold),
+        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, apply("sub",storage_threshold,intlit(1))),
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
     }
