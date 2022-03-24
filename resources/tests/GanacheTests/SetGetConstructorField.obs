@@ -21,7 +21,7 @@ main contract SetGetConstructorField{
     }
 
     transaction main() returns int{
-        //SetGetConstructorField local = new SetGetConstructorField();
+        SetGetConstructorField local = new SetGetConstructorField();
         ic = new IntContainer(5);
         ic.set(12);
         return (ic.get());
