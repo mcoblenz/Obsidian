@@ -210,9 +210,7 @@ object CodeGenYul extends CodeGenerator {
                                         decl_1exp(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
 
                                         // write the address of the subcontract to the corresponding field of this contract
-                                        // todo: is c.name right? should it be contractType.contractName? you need the offset of the field in the contract being elaborated, not the name of the thing that's pointed to
                                         ExpressionStatement(apply("mstore", fieldFromThis(ct.contractLookup(c.name), name), sub_this)),
-                                        // sub_this, intlit(offsetOfField(ct.contractLookup(c.name), name=name)))),
 
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
@@ -308,7 +306,7 @@ object CodeGenYul extends CodeGenerator {
                                 body = body ++ load ++ log ++
                                     Seq(
                                         LineComment("traversal"),
-                                        ExpressionStatement(apply(nameTracer(contractType.contractName), apply("mload", mem_loc))) // todo: this is the (a) bug, need to dereference this and follow it rather than
+                                        ExpressionStatement(apply(nameTracer(contractType.contractName), apply("mload", mem_loc)))
                                     )
                                 // todo: this recursive call may not be needed if we generate tracers
                                 //   for every contract in the program
@@ -759,7 +757,7 @@ object CodeGenYul extends CodeGenerator {
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at, call the constructor and the tracer as above
-                    assign1(retvar, id_memaddr)) ++ conCall //++ traceCall
+                    assign1(retvar, id_memaddr)) ++ conCall
 
 
             case StateInitializer(stateName, fieldName, obstype) =>

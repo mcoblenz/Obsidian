@@ -409,9 +409,16 @@ object Util {
         )
     }
 
-    // todo document this once it settles; maybe abstract it and the above into a shared helper for less
-    //   dangerous repetition
+
+    /** given a field name and address, produce code that checks for finding it in memory or storage as appropriate
+      *
+      * @param ct the context of the program
+      * @param fieldName the name of the filed
+      * @param destination the place to store the contents of memory or storage (it must be initialized separately in the output yul)
+      * @return the switch statement that checks and assigns as appropriate
+      */
     def fetchField(ct: ContractTable, fieldName: String, destination: Identifier): YulStatement = {
+        // todo (tidy) there's a lot of repeated code with the above; abstract it out
         val address_of_field = fieldFromThis(ct, fieldName)
         ifInStorge(addr_to_check = address_of_field,
             true_case = Seq(assign1(destination, apply("sload", address_of_field))),
@@ -598,6 +605,7 @@ object Util {
       * @return the expression performing the check
       */
     def ifInStorge(addr_to_check: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]): YulStatement = {
+        // note: gt(x,y) is x > y; to get x >= y, subtract 1 since they're integers
         edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, apply("sub", storage_threshold, intlit(1))),
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
