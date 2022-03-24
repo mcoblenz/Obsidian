@@ -396,12 +396,12 @@ object Util {
 
     /** return the expression that sets a field from a contract either in memory or storage as appropriate
       *
-      * @param ct the information about the contract
+      * @param ct        the information about the contract
       * @param fieldName the field name to set
-      * @param value the value to set it to
+      * @param value     the value to set it to
       * @return the statement that does the check and then sets
       */
-    def updateField(ct: ContractTable, fieldName: String, value: Expression) : YulStatement = {
+    def updateField(ct: ContractTable, fieldName: String, value: Expression): YulStatement = {
         val address_of_field: Expression = fieldFromThis(ct, fieldName)
         ifInStorge(addr_to_check = address_of_field,
             true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, value))),
@@ -411,11 +411,11 @@ object Util {
 
     // todo document this once it settles; maybe abstract it and the above into a shared helper for less
     //   dangerous repetition
-    def fetchField(ct: ContractTable, fieldName: String, destination : Identifier) : YulStatement = {
+    def fetchField(ct: ContractTable, fieldName: String, destination: Identifier): YulStatement = {
         val address_of_field = fieldFromThis(ct, fieldName)
         ifInStorge(addr_to_check = address_of_field,
-            true_case = Seq(assign1(destination,apply("sload", address_of_field))),
-            false_case = Seq(assign1(destination,apply("mload", address_of_field)))
+            true_case = Seq(assign1(destination, apply("sload", address_of_field))),
+            false_case = Seq(assign1(destination, apply("mload", address_of_field)))
         )
     }
 
@@ -592,13 +592,13 @@ object Util {
       * a storage address or not and execute a sequence of statements in either case. if it does not
       * represent an address, the behaviour is undefined.
       *
-      * @param addr_to_check          the expression to check for being in storage
-      * @param true_case  what to do if the address is a storage address
-      * @param false_case what to to if the address is not a storage address
+      * @param addr_to_check the expression to check for being in storage
+      * @param true_case     what to do if the address is a storage address
+      * @param false_case    what to to if the address is not a storage address
       * @return the expression performing the check
       */
     def ifInStorge(addr_to_check: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]): YulStatement = {
-        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, apply("sub",storage_threshold,intlit(1))),
+        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, apply("sub", storage_threshold, intlit(1))),
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
     }
@@ -606,12 +606,12 @@ object Util {
 
     /** given info about a transaction, provide its name in the flattened representation
       *
-      * @param contractName the name of the contract that the transaction originates from
+      * @param contractName    the name of the contract that the transaction originates from
       * @param transactionName the name of the transaction itself
-      * @param types if the transaction is a constructor, the sequences of names of types that it takes; none otherwise.
+      * @param types           if the transaction is a constructor, the sequences of names of types that it takes; none otherwise.
       * @return
       */
-    def flattenedName(contractName : String, transactionName : String, types : Option[Seq[String]]): String = {
+    def flattenedName(contractName: String, transactionName: String, types: Option[Seq[String]]): String = {
         val suffix = types match {
             case Some(value) => hashOfFunctionName(contractName, value)
             case None => ""
@@ -633,7 +633,7 @@ object Util {
       * @param typ the type to provide a default for
       * @return the default value, if there is one
       */
-    def defaultInitValue(typ : YulABIType) : Literal = {
+    def defaultInitValue(typ: YulABIType): Literal = {
         typ match {
             case YATAddress() => hexlit("0x0")
             case YATUInt32() => intlit(5738) //todo

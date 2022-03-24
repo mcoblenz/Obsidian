@@ -252,7 +252,7 @@ case class YulObject(contractName: String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
-                     mainConstructorTypeNames : Seq[TypedName],
+                     mainConstructorTypeNames: Seq[TypedName],
                      defaultCons: Seq[YulStatement],
                      otherTransactions: Seq[YulStatement],
                      tracers: Seq[FunctionDefinition]) extends YulAST {
@@ -375,13 +375,13 @@ case class YulObject(contractName: String,
                     //let this := allocate_memory({{mainSize}})
                     decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
                     // todo call the constructor for the main contract on this and default values for now
-                    ExpressionStatement(apply(flattenedName(contractName,contractName,Some(mainConstructorTypeNames.map(tn => tn.typ.toString))), args :_*)),
-                    ExpressionStatement(apply(nameTracer(contractName),thisId))
+                    ExpressionStatement(apply(flattenedName(contractName, contractName, Some(mainConstructorTypeNames.map(tn => tn.typ.toString))), args: _*)),
+                    ExpressionStatement(apply(nameTracer(contractName), thisId))
                 )
             )
         }
 
-        def invokeMain() : YulStatement = {
+        def invokeMain(): YulStatement = {
             val thisId = Identifier("this")
             Block(
                 Seq(
@@ -422,6 +422,6 @@ case class YulObject(contractName: String,
 
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
 
-        def tracertransactions() : YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
+        def tracertransactions(): YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
     }
 }
