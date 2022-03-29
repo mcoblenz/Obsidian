@@ -9,6 +9,36 @@ object "{{contractName}}" {
     code {
         {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
         {{memoryInit}}
+        {{! todo: these are copied from the runtime part of this file. see if there's a way to def constants or export these from the scala call }}
+        function allocate_unbounded() -> memPtr {
+            memPtr := mload(0x40)
+        }
+
+        function allocate_memory(size) -> memPtr {
+            memPtr := allocate_unbounded()
+            finalize_allocation(memPtr, size)
+        }
+
+        function finalize_allocation(memPtr, size) {
+            let newFreePtr := add(memPtr, round_up_to_mul_of_32(size))
+            // protect against overflow
+            if or(gt(newFreePtr, 0xffffffffffffffff), lt(newFreePtr, memPtr)) {  panic_error_0x41() }
+            mstore(0x40, newFreePtr)
+        }
+
+        function panic_error_0x41() {
+            mstore(0, shl(224, 0x4e487b71))
+            mstore(4, 0x41)
+            revert(0, 0x24)
+        }
+
+        function round_up_to_mul_of_32(value) -> result {
+            result := and(add(value, 31), not(31))
+        }
+        {{defaultConstructors}}
+        {{! todo: this copies the tracers twice; may want different ones at deploy anyway}}
+        {{tracertransactions}}
+        {{buildMain}}
         {{! protection against sending Ether }}
         {{callValueCheck}}
         {{codeCopy}}
@@ -21,10 +51,11 @@ object "{{contractName}}" {
 
             {{! obtain which runtime function is called, https://solidity.readthedocs.io/en/latest/abi-spec.html#function-selector}}
 
+
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
             if iszero(lt(calldatasize(), 4)) {
+                {{invokeMain}}
                 {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
-                let this := allocate_memory({{mainSize}})
                 let selector := shr(224, calldataload(0))
                 {{dispatchTable}}
             }
@@ -56,7 +87,7 @@ object "{{contractName}}" {
             }
 
             function panic_error_0x41() {
-                mstore(0, 35408467139433450592217433187231851964531694900788300625387963629091585785856)
+                mstore(0, shl(224, 0x4e487b71))
                 mstore(4, 0x41)
                 revert(0, 0x24)
             }

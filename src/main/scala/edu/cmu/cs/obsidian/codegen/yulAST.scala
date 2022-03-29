@@ -252,6 +252,8 @@ case class YulObject(contractName: String,
                      data: Seq[Data],
                      mainContractTransactions: Seq[YulStatement],
                      mainContractSize: Int,
+                     mainConstructorTypeNames: Seq[TypedName],
+                     defaultCons: Seq[YulStatement],
                      otherTransactions: Seq[YulStatement],
                      tracers: Seq[FunctionDefinition]) extends YulAST {
     def yulString(): String = {
@@ -285,6 +287,8 @@ case class YulObject(contractName: String,
         // the free memory pointer points to 0x80 initially
         var memoryInit: Expression = apply("mstore", intlit(freeMemPointer), intlit(firstFreeMem))
 
+        def defaultConstructors: YulStatement = Block(defaultCons)
+
         def callValueCheck(): YulStatement = callvaluecheck
 
         val datasize: Expression = apply("datasize", rawstringlit(deployedName))
@@ -292,8 +296,6 @@ case class YulObject(contractName: String,
         def codeCopy(): Expression = apply("codecopy", intlit(0), apply("dataoffset", rawstringlit(deployedName)), datasize)
 
         def defaultReturn(): Expression = apply("return", intlit(0), datasize)
-
-        val mainSize: Int = mainContractSize
 
         // together, these keep track of and create temporary variables for returns in the dispatch table
         var deRetCnt = 0
@@ -365,6 +367,31 @@ case class YulObject(contractName: String,
         //   the decoders and encoders we actually need (i.e. if f only has `this` as a param, the decoder we
         //   emit never gets called and gets optimized away. that's fine enough but why not make it better?)
 
+        def buildMain(): YulStatement = {
+            val thisId = Identifier("this")
+            val args = thisId +: mainConstructorTypeNames.map(tn => defaultInitValue(tn.typ))
+            Block(
+                Seq(
+                    //let this := allocate_memory({{mainSize}})
+                    decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
+                    // todo call the constructor for the main contract on this and default values for now
+                    ExpressionStatement(apply(flattenedName(contractName, contractName, Some(mainConstructorTypeNames.map(tn => tn.typ.toString))), args: _*)),
+                    ExpressionStatement(apply(nameTracer(contractName), thisId))
+                )
+            )
+        }
+
+        def invokeMain(): YulStatement = {
+            val thisId = Identifier("this")
+            Block(
+                Seq(
+                    //let this := allocate_memory({{mainSize}})
+                    //decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
+                    decl_1exp(thisId, first_storage_address)
+                )
+            )
+        }
+
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
         // dispatch table from an allocated instance of the main contract at the top of memory. but the
@@ -395,6 +422,6 @@ case class YulObject(contractName: String,
 
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
 
-        def tracertransactions() : YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
+        def tracertransactions(): YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
     }
 }

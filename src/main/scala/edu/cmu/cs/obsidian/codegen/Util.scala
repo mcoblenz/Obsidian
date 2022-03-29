@@ -47,7 +47,12 @@ object Util {
       * @param b the scala integer
       * @return the corresponding Yul boolean literal
       */
-    def boollit(b: Boolean): Literal = Literal(LiteralKind.boolean, b.toString, "bool")
+    def boollit(b: Boolean): Literal = {
+        b match {
+            case true => intlit(1)
+            case false => intlit(0)
+        }
+    }
 
     /**
       * shorthand for building Yul hex literals
@@ -391,16 +396,33 @@ object Util {
 
     /** return the expression that sets a field from a contract either in memory or storage as appropriate
       *
-      * @param ct the information about the contract
+      * @param ct        the information about the contract
       * @param fieldName the field name to set
-      * @param value the value to set it to
+      * @param value     the value to set it to
       * @return the statement that does the check and then sets
       */
-    def updateField(ct: ContractTable, fieldName: String, value: Expression) : YulStatement = {
-        val address_of_field = fieldFromThis(ct, fieldName)
+    def updateField(ct: ContractTable, fieldName: String, value: Expression): YulStatement = {
+        val address_of_field: Expression = fieldFromThis(ct, fieldName)
         ifInStorge(addr_to_check = address_of_field,
             true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, value))),
             false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, value)))
+        )
+    }
+
+
+    /** given a field name and address, produce code that checks for finding it in memory or storage as appropriate
+      *
+      * @param ct the context of the program
+      * @param fieldName the name of the filed
+      * @param destination the place to store the contents of memory or storage (it must be initialized separately in the output yul)
+      * @return the switch statement that checks and assigns as appropriate
+      */
+    def fetchField(ct: ContractTable, fieldName: String, destination: Identifier): YulStatement = {
+        // todo (tidy) there's a lot of repeated code with the above; abstract it out
+        val address_of_field = fieldFromThis(ct, fieldName)
+        ifInStorge(addr_to_check = address_of_field,
+            true_case = Seq(assign1(destination, apply("sload", address_of_field))),
+            false_case = Seq(assign1(destination, apply("mload", address_of_field)))
         )
     }
 
@@ -561,6 +583,9 @@ object Util {
     // storage is 2**256 big; this is (2**256)/2, which is the same as 1 << 255 or shl(255,1) in yul
     val storage_threshold: Expression = apply("shl", intlit(255), intlit(1))
 
+    // storage addresses start at 0x8...0, but the first one that will actually come out the allocator is 128 above that.
+    val first_storage_address = apply("add", storage_threshold, intlit(128))
+
     /** given an expression representing a memory address its corresponding place in storage
       *
       * @param x the expression representing the memory address
@@ -574,13 +599,14 @@ object Util {
       * a storage address or not and execute a sequence of statements in either case. if it does not
       * represent an address, the behaviour is undefined.
       *
-      * @param addr_to_check          the expression to check for being in storage
-      * @param true_case  what to do if the address is a storage address
-      * @param false_case what to to if the address is not a storage address
+      * @param addr_to_check the expression to check for being in storage
+      * @param true_case     what to do if the address is a storage address
+      * @param false_case    what to to if the address is not a storage address
       * @return the expression performing the check
       */
     def ifInStorge(addr_to_check: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]): YulStatement = {
-        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, storage_threshold),
+        // note: gt(x,y) is x > y; to get x >= y, subtract 1 since they're integers
+        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, apply("sub", storage_threshold, intlit(1))),
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
     }
@@ -588,12 +614,12 @@ object Util {
 
     /** given info about a transaction, provide its name in the flattened representation
       *
-      * @param contractName the name of the contract that the transaction originates from
+      * @param contractName    the name of the contract that the transaction originates from
       * @param transactionName the name of the transaction itself
-      * @param types if the transaction is a constructor, the sequences of names of types that it takes; none otherwise.
+      * @param types           if the transaction is a constructor, the sequences of names of types that it takes; none otherwise.
       * @return
       */
-    def flattenedName(contractName : String, transactionName : String, types : Option[Seq[String]]): String = {
+    def flattenedName(contractName: String, transactionName: String, types: Option[Seq[String]]): String = {
         val suffix = types match {
             case Some(value) => hashOfFunctionName(contractName, value)
             case None => ""
@@ -609,4 +635,21 @@ object Util {
     def nameTracer(name: String): String = {
         s"trace_$name"
     }
+
+    /** given a Yul type, provide an appropriate default value for it.
+      *
+      * @param typ the type to provide a default for
+      * @return the default value, if there is one
+      */
+    def defaultInitValue(typ: YulABIType): Literal = {
+        typ match {
+            case YATAddress() => hexlit("0x0")
+            case YATUInt32() => intlit(5738) //todo
+            case YATBool() => boollit(false)
+            case YATString() => stringlit("")
+            case YATContractName(name) => throw new RuntimeException("can't query for a default contract value")
+        }
+    }
+
+
 }
