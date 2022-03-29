@@ -9,7 +9,7 @@ object "{{contractName}}" {
     code {
         {{! init free memory pointer, see chatper "Layout in Memory" of the Solidity doc}}
         {{memoryInit}}
-        {{! todo: these are copied from below }}
+        {{! todo: these are copied from the runtime part of this file. see if there's a way to def constants or export these from the scala call }}
         function allocate_unbounded() -> memPtr {
             memPtr := mload(0x40)
         }

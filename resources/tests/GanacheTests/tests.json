@@ -268,7 +268,6 @@
             "expected": "12",
             "deploy_logged" : [-57896044618658097711785492504343953926634992332820282019728792003956564819808,5738],
             "shows_that_we_support": "set-get with a field so that the emitted tracer is not trivial, and that uses the constructor for that field ",
-            "gas": 9000000000000000
         },
         {
             "file": "ICGeneratedCons.obs",
@@ -280,7 +279,6 @@
             "expected": "5743",
             "deploy_logged" : [-57896044618658097711785492504343953926634992332820282019728792003956564819808,5738],
             "shows_that_we_support": "default constructors + values get written to storage and resurrected on subsequent calls",
-            "gas": 9000000000000000
         },
         {
             "file": "TraceThis.obs",
