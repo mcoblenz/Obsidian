@@ -119,9 +119,9 @@ object CodeGenYul extends CodeGenerator {
             data = Seq(),
             mainContractTransactions = translateContract(main_contract),
             mainContractSize = sizeOfContractST(main_contract.name, checkedTable),
-            mainConstructorTypeNames = defaultConstructorSignature(main_contract,checkedTable,""),
+            mainConstructorTypeNames = defaultConstructorSignature(main_contract, checkedTable, ""),
             // todo: this includes all of the default constructors in the top
-            defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c,checkedTable)),
+            defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c, checkedTable)),
             otherTransactions = other_contracts.flatMap(translateContract),
             tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )
@@ -161,9 +161,9 @@ object CodeGenYul extends CodeGenerator {
       * series of assignments that assign the fields of that contract to those arguments, recurring
       * into the subcontracts and calling their default constructors as appropriate.
       *
-      * @param c the contract to generate the assignments for
+      * @param c   the contract to generate the assignments for
       * @param sig the signature of that contracts default constructor
-      * @param ct the context in which the contract exists
+      * @param ct  the context in which the contract exists
       * @return the sequence of assignments for the default constructor
       */
     def defaultConstructorAssignments(c: Contract, sig: Seq[TypedName], ct: SymbolTable): Seq[YulStatement] = {
@@ -208,6 +208,9 @@ object CodeGenYul extends CodeGenerator {
                                     (Seq(
                                         // grab some memory for the subcontract
                                         decl_1exp(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
+
+                                        // write the address of the subcontract to the corresponding field of this contract
+                                        ExpressionStatement(apply("mstore", fieldFromThis(ct.contractLookup(c.name), name), sub_this)),
 
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
@@ -261,10 +264,26 @@ object CodeGenYul extends CodeGenerator {
                     val sto_loc: codegen.Expression = mapToStorageAddress(mem_loc)
                     val log_temp: Identifier = nextTemp()
 
+                    // todo (tidy) this is kind of redundant with the match below
+
+                    // the body of load needs to check if it's a ContractReferenceType and add the offset if so;
+                    //   when we copy to storage, REWRITE the value of the pointer.
+                    val shift_if_addr: codegen.Expression =
+                    typ match {
+                        case primitiveType: PrimitiveType => apply("mload", mem_loc)
+                        case npt: NonPrimitiveType => npt match {
+                            case ContractReferenceType(contractType, permission, remoteReferenceType) => apply("add", storage_threshold, apply("mload", mem_loc))
+                            case StateType(contractType, stateNames, remoteReferenceType) => throw new RuntimeException("unimplemented")
+                            case InterfaceContractType(name, simpleType) => throw new RuntimeException("unimplemented")
+                            case GenericType(gVar, bound) => throw new RuntimeException("unimplemented")
+                        }
+                        case BottomType() => throw new RuntimeException("unimplemented")
+                    }
+
                     val load = Seq(
                         //sstore(add(this,offset), mload(add(this,offset)))
                         LineComment("loading"),
-                        ExpressionStatement(apply("sstore", sto_loc, apply("mload", mem_loc))))
+                        ExpressionStatement(apply("sstore", sto_loc, shift_if_addr)))
 
                     val log: Seq[YulStatement] =
                         if (emit_logs) {
@@ -287,7 +306,7 @@ object CodeGenYul extends CodeGenerator {
                                 body = body ++ load ++ log ++
                                     Seq(
                                         LineComment("traversal"),
-                                        ExpressionStatement(apply(nameTracer(contractType.contractName), mem_loc))
+                                        ExpressionStatement(apply(nameTracer(contractType.contractName), apply("mload", mem_loc)))
                                     )
                                 // todo: this recursive call may not be needed if we generate tracers
                                 //   for every contract in the program
@@ -642,7 +661,8 @@ object CodeGenYul extends CodeGenerator {
                         val ct = checkedTable.contractLookup(contractName)
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
-                            Seq(decl_1exp(store_id, apply("mload", Util.fieldFromThis(ct, x))), // todo this may be updating in the wrong place beacuse it doesn't check for memory vs storage
+                            Seq(decl_0exp(store_id),
+                                fetchField(ct, x, store_id),
                                 assign1(retvar, store_id))
                         } else {
                             Seq(assign1(retvar, Identifier(x)))
@@ -762,7 +782,7 @@ object CodeGenYul extends CodeGenerator {
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
                     // return the address that the space starts at, call the constructor and the tracer as above
-                    assign1(retvar, id_memaddr)) ++ conCall ++ traceCall
+                    assign1(retvar, id_memaddr)) ++ conCall
 
 
             case StateInitializer(stateName, fieldName, obstype) =>

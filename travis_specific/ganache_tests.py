@@ -57,6 +57,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
     """
     test_name = os.path.splitext(test_info['file'])[0]
     progress = []
+    emitted_logs = {}
 
     #### compile the obsidian file in question to yul with a jar of obsidianc
     run_obsidianc = subprocess.run(
@@ -139,6 +140,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         #### get a transaction receipt to get the contract address
         deploy_transaction_receipt = w3.eth.wait_for_transaction_receipt(deploy_transaction_hash)
         progress = progress + ["got deploy transaction receipt"]
+        emitted_logs['deploy_logged'] = deploy_transaction_receipt.logs
 
         #### use call and the contract address to get the result of running the function locally to
         #### the node for the result of the code
@@ -163,7 +165,7 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
         got = twos_comp(int(call_reply.hex(), 16), 8 * 32)
         expected = int(test_info['expected'])
         if not got == expected:
-            raise RuntimeError(f"expected {expected} but got {got}")
+            raise RuntimeError(f"expected {expected} but got {got}. the deployment made these logs but they haven't been checked: {deploy_transaction_receipt.logs}")
         progress = progress + ["got matched expected"]
 
         ## invoking transaction for effects
@@ -176,19 +178,40 @@ def run_one_test(test_info, verbose, obsidian_jar, defaults):
 
         invoke_transaction_receipt = w3.eth.wait_for_transaction_receipt(invoke_transaction_hash)
         progress = progress + [f"got receipt for invocation"]
+        emitted_logs['invoke_logged'] = invoke_transaction_receipt.logs
 
-        #### get the logs and check against the expected values, if such is present.
-        # todo this is pretty rudimentary and really specific to one test case for now
-        if 'logged' in test_info.keys():
-            logs = invoke_transaction_receipt.logs
-            if verbose:
-                pprint.pprint(logs)
-            if not logs:
-                raise RuntimeError("expected logs to be present for this test but none were in the receipt")
-            got_logged_data = [twos_comp(int(log['data'], 16), 8*32) for log in logs]
-            if not test_info['logged'] == got_logged_data:
-                raise RuntimeError(f"expected logs {test_info['logged']} but got {got_logged_data}")
-            progress = progress + ["logs matched expected"]
+        ## check logs from all the transaction recipits generated above
+        logging_status = {}
+        for log_name in ['deploy_logged', 'invoke_logged']:
+            # if the json file doesn't mention this phase, anything goes so we'll skip it entirely
+            if log_name in test_info.keys():
+                # print the logs if needed for debugging
+                if verbose:
+                    pprint.pprint(emitted_logs[log_name])
+
+                # if the json file mentions it but they aren't present, that's a fail
+                if not emitted_logs[log_name]:
+                    logging_status[log_name] = {'result': 'fail',
+                                                'reason': f"expected logs to be present for {log_name} but none were in the receipt"}
+                    continue
+
+                # decode the data assuming it's just one integer, and also collect up the raw data
+                decoded_data = [twos_comp(int(log['data'], 16), 8*32) for log in emitted_logs[log_name]]
+                raw_data = [str(log['data']) for log in emitted_logs[log_name]]
+
+                # compare the decoded data to the values in the JSON file
+                if not test_info[log_name] == decoded_data:
+                    logging_status[log_name] = {'result': 'fail',
+                                                'reason': f"expected logs for {log_name} are {test_info[log_name]} but got {decoded_data} from raw data: {raw_data}"}
+                    continue
+                logging_status[log_name] = {'result': 'pass'}
+
+        ## if any logs didn't match or weren't present that's a general fail for the test.
+        failed_logs = {key: value for (key, value) in logging_status.items() if value['result'] == 'fail' }
+        if failed_logs:
+            raise RuntimeError(f"log comparison failure: {str(failed_logs)}")
+        else:
+            progress = progress + [f"all logs matched expected"]
 
     except BaseException as err:
         run_ganache.kill()
@@ -217,6 +240,8 @@ parser.add_argument("-d", "--dir", help="directory that contains the test json a
 parser.add_argument('tests', nargs='*',
                     help='names of tests to run; if this is empty, then we run all the tests', default=[])
 parser.add_argument("-o", "--optimized_yul", help="write optimized yul to disk as well; ignored if -c is set",
+                    action="store_true")
+parser.add_argument("-b", "--benchmarks", help="if specified, gas use bench marks are written to file for each test",
                     action="store_true")
 args = parser.parse_args()
 
@@ -310,31 +335,45 @@ if not jar_path:
 if args.verbose:
     print(f"using top of {pprint.pformat(jar_path)}")
 
-# run each test, keeping track of which ones fail
+# run each test, keeping track of which ones fail and gas usage of each
 failed = []
-timestring = datetime.datetime.now().strftime("%d%b%Y-%H:%M:%S")
-with open(f"benchmarks-{timestring}.csv", 'w') as bench:
-    bench.write("test name,gas used for invoke,gas used for deploy\n")
-    for test in tests_to_run:
-        result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
-        if result['result'] == "pass":
-            print(colored("PASS:", 'green'), test['file'])
-            bench.write(f"{test['file']},{result['gas_invoke']},{result['gas_deploy']}\n")
-        elif result['result'] == "fail":
-            print(colored("FAIL:", 'red'), test['file'])
-            pprint.pprint(result, indent=4)
-            failed = failed + [test['file']]
-            bench.write(f"{test['file']},FAILED,FAILED\n")
-        else:
-            error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
+benchmarks = []
+for test in tests_to_run:
+    result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
+    if result['result'] == "pass":
+        print(colored("PASS:", 'green'), test['file'])
+        benchmarks.append(f"{test['file']},{result['gas_deploy']},{result['gas_invoke']}\n")
+    elif result['result'] == "fail":
+        print(colored("FAIL:", 'red'), test['file'])
+        pprint.pprint(result, indent=4)
+        failed = failed + [test['file']]
+        benchmarks.append(f"{test['file']},FAILED,FAILED\n")
+    else:
+        error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
 
-        if args.clean:
-            name = os.path.splitext(test['file'])[0]
-            warn(f"removing directory for {name}")
-            os.remove(f"{name}/{name}.yul")
-            if args.optimized_yul:
-                os.remove(f"{name}/{name}-pretty.yul")
-            os.rmdir(f"{name}")
+    if args.clean:
+        name = os.path.splitext(test['file'])[0]
+        warn(f"removing directory for {name}")
+        os.remove(f"{name}/{name}.yul")
+        if args.optimized_yul:
+            os.remove(f"{name}/{name}-pretty.yul")
+        os.rmdir(f"{name}")
+
+bench_head="test name,gas used for deploy,gas used for invoke"
+# if requested, print the benchmarks to a file
+if args.benchmarks:
+    timestring = datetime.datetime.now().strftime("%d%b%Y.%H.%M.%S")
+    with open(f"benchmarks-{timestring}.csv", 'w') as bench:
+        bench.write(f"{bench_head}\n")
+        for b in benchmarks:
+            bench.write(b)
+
+# if running in CI, dump the benchmarks to std out. todo this isn't what i want forever
+if 'CI' in os.environ and os.environ.get('CI') == "true":
+    print("\n")
+    print(colored(f"BENCHMARKS:", 'blue'))
+    print(bench_head)
+    print(*benchmarks)
 
 # print out a quick summary at the bottom of the test run
 if failed:
@@ -345,3 +384,4 @@ if failed:
 else:
     print(colored(f"\nALL {str(len(tests_to_run))} TESTS PASSED", 'green'))
     sys.exit(0)
+
