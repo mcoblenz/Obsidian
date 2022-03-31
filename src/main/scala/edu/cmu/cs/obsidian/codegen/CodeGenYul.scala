@@ -456,9 +456,9 @@ object CodeGenYul extends CodeGenerator {
                         // todo: make this a helper function once you get the address argument figured out
                         val trace_for_e : Seq[YulStatement] = e.obstype match {
                             case Some(value) => value match {
-                                case _: PrimitiveType => Seq()
+                                case _: PrimitiveType => Seq()// Do(apply("sstore",mapToStorageAddress(field_address),apply("mload",field_address)))
                                 case t: NonPrimitiveType => t match {
-                                    case ContractReferenceType(contractType, _, _) => Seq(ExpressionStatement(apply(nameTracer(contractType.contractName),Identifier("this")))) // todo "this" is almost certainly wrong here.
+                                    case ContractReferenceType(contractType, _, _) => Seq(edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)), Block(Do(apply(nameTracer(contractType.contractName), field_address)))))// todo
                                     case StateType(_, _, _) => assert(assertion=false, "not yet implemented"); Seq()
                                     case InterfaceContractType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
                                     case GenericType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
@@ -473,7 +473,9 @@ object CodeGenYul extends CodeGenerator {
                                 // todo this is likely to break: i don't think an empty sequence in the false branch produces valid yul
                                 //   and you only want to do the storage check if, statically, you know that e isn't primitive, e.g. that the
                                 //   sequence isn't empty
-                                Seq(updateField(ct, x, id), ifInStorge(field_address,trace_for_e,Seq()))
+                                updateField(ct, x, id) +: trace_for_e
+                                    // edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)), Block(trace_for_e)))
+                                //Seq(updateField(ct, x, id), ifInStorge(field_address,trace_for_e,Seq()))
                             } else {
                                 Seq(assign1(Identifier(x), id))
                             }
@@ -639,7 +641,7 @@ object CodeGenYul extends CodeGenerator {
         // here or not.
         ids.map(id => decl_0exp(id)) ++
             seqs.flatten ++ (width match {
-            case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), thisID +: ids)))
+            case 0 => Do(FunctionCall(Identifier(name), thisID +: ids))
             case 1 =>
                 val id: Identifier = nextTemp()
                 Seq(decl_1exp(id, FunctionCall(Identifier(name), thisID +: ids)), assign1(retvar, id))
@@ -772,7 +774,7 @@ object CodeGenYul extends CodeGenerator {
                 // we only call the tracer after the constructor for the main contract
                 val traceCall =
                     if (isMainContract) {
-                        Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), Identifier("this"))))
+                        Do(apply(nameTracer(contractType.contractName), Identifier("this")))
                     } else {
                         Seq()
                     }
