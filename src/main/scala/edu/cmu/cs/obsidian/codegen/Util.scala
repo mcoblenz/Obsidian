@@ -404,7 +404,7 @@ object Util {
     def updateField(ct: ContractTable, fieldName: String, value: Expression): YulStatement = {
         val address_of_field: Expression = fieldFromThis(ct, fieldName)
         ifInStorge(addr_to_check = address_of_field,
-            true_case = Do(apply("sstore", mapToStorageAddress(address_of_field), value)),
+            true_case = Do(apply("sstore", address_of_field, value)), // todo double check why there isn't a mapToStorageAddr call here; i think it's because you only end up in this branch when `this` is already big enough
             false_case = Do(apply("mstore", address_of_field, value))
         )
     }
