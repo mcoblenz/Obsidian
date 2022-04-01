@@ -453,38 +453,36 @@ object CodeGenYul extends CodeGenerator {
 
                         val field_address = fieldFromThis(ct, x)
 
-                        // todo: make this a helper function once you get the address argument figured out
-                        val trace_for_e : Seq[YulStatement] = e.obstype match {
+                        // look at assignTo. if it's a storage address, then look at the type of e.
+                        // if it's a primitive, ignore it.  if it's a  contract reference, it needs
+                        // to get traced first
+                        val trace_for_e: Seq[YulStatement] = e.obstype match {
                             case Some(value) => value match {
-                                case _: PrimitiveType => Seq()// Do(apply("sstore",mapToStorageAddress(field_address),apply("mload",field_address)))
+                                case _: PrimitiveType => Seq()
                                 case t: NonPrimitiveType => t match {
                                     case ContractReferenceType(contractType, _, _) => // todo
                                         Seq(
-                                            edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)),
-                                                                            Block(Do(apply(nameTracer(contractType.contractName), id))))
+                                            edu.cmu.cs.obsidian.codegen.If(apply("not", compareToThresholdExp(field_address)),
+                                                Block(Do(apply(nameTracer(contractType.contractName), id))))
                                         )
-                                    case StateType(_, _, _) => assert(assertion=false, "not yet implemented"); Seq()
-                                    case InterfaceContractType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
-                                    case GenericType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
+                                    case StateType(_, _, _) => assert(assertion = false, "not yet implemented"); Seq()
+                                    case InterfaceContractType(_, _) => assert(assertion = false, "not yet implemented"); Seq()
+                                    case GenericType(_, _) => assert(assertion = false, "not yet implemented"); Seq()
                                 }
                                 case BottomType() => Seq()
                             }
-                            case None => assert(assertion=false,"encountered an expression without a type annotation"); Seq()
+                            case None => assert(assertion = false, "encountered an expression without a type annotation"); Seq()
                         }
 
-                        val update_instructions : Seq[YulStatement] =
+                        val update_instructions: Seq[YulStatement] =
                             if (ct.allFields.exists(f => f.name.equals(x))) {
                                 trace_for_e :+ updateField(ct, x, id)
-                                // edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)), Block(trace_for_e)))
-                                //Seq(updateField(ct, x, id), ifInStorge(field_address,trace_for_e,Seq()))
                             } else {
                                 Seq(assign1(Identifier(x), id))
                             }
 
                         decl_0exp(id) +: (e_yul ++ update_instructions)
-
-                        // look at assignTo. if it's a storage address, then look at the type of e. if it's a primitive, ignore it.  if it's a
-                        // contract reference, it needs to get traced first
+                        
                     case _ =>
                         assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
