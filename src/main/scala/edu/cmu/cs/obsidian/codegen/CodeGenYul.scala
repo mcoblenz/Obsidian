@@ -458,7 +458,11 @@ object CodeGenYul extends CodeGenerator {
                             case Some(value) => value match {
                                 case _: PrimitiveType => Seq()// Do(apply("sstore",mapToStorageAddress(field_address),apply("mload",field_address)))
                                 case t: NonPrimitiveType => t match {
-                                    case ContractReferenceType(contractType, _, _) => Seq(edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)), Block(Do(apply(nameTracer(contractType.contractName), field_address)))))// todo
+                                    case ContractReferenceType(contractType, _, _) => // todo
+                                        Seq(
+                                            edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)),
+                                                                            Block(Do(apply(nameTracer(contractType.contractName), id))))
+                                        )
                                     case StateType(_, _, _) => assert(assertion=false, "not yet implemented"); Seq()
                                     case InterfaceContractType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
                                     case GenericType(_, _) => assert(assertion=false, "not yet implemented"); Seq()
@@ -470,11 +474,8 @@ object CodeGenYul extends CodeGenerator {
 
                         val update_instructions : Seq[YulStatement] =
                             if (ct.allFields.exists(f => f.name.equals(x))) {
-                                // todo this is likely to break: i don't think an empty sequence in the false branch produces valid yul
-                                //   and you only want to do the storage check if, statically, you know that e isn't primitive, e.g. that the
-                                //   sequence isn't empty
-                                updateField(ct, x, id) +: trace_for_e
-                                    // edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)), Block(trace_for_e)))
+                                trace_for_e :+ updateField(ct, x, id)
+                                // edu.cmu.cs.obsidian.codegen.If(apply("not",compareToThresholdExp(field_address)), Block(trace_for_e)))
                                 //Seq(updateField(ct, x, id), ifInStorge(field_address,trace_for_e,Seq()))
                             } else {
                                 Seq(assign1(Identifier(x), id))
@@ -482,7 +483,7 @@ object CodeGenYul extends CodeGenerator {
 
                         decl_0exp(id) +: (e_yul ++ update_instructions)
 
-                        // look at assignTo. if it's a storage address, then look at the type of e. if it's a primative, ignore it.  if it's a
+                        // look at assignTo. if it's a storage address, then look at the type of e. if it's a primitive, ignore it.  if it's a
                         // contract reference, it needs to get traced first
                     case _ =>
                         assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
