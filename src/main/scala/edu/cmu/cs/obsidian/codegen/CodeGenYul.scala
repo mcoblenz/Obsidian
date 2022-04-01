@@ -450,13 +450,39 @@ object CodeGenYul extends CodeGenerator {
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         val ct = checkedTable.contractLookup(contractName)
-                        decl_0exp(id) +:
-                            e_yul :+
-                            (if (ct.allFields.exists(f => f.name.equals(x))) {
-                                updateField(ct, x, id)
+
+                        val field_address = fieldFromThis(ct, x)
+
+                        // look at assignTo. if it's a storage address, then look at the type of e.
+                        // if it's a primitive, ignore it.  if it's a  contract reference, it needs
+                        // to get traced first
+                        val trace_for_e: Seq[YulStatement] = e.obstype match {
+                            case Some(value) => value match {
+                                case _: PrimitiveType => Seq()
+                                case t: NonPrimitiveType => t match {
+                                    case ContractReferenceType(contractType, _, _) => // todo
+                                        Seq(
+                                            edu.cmu.cs.obsidian.codegen.If(apply("not", compareToThresholdExp(field_address)),
+                                                Block(Do(apply(nameTracer(contractType.contractName), id))))
+                                        )
+                                    case StateType(_, _, _) => assert(assertion = false, "not yet implemented"); Seq()
+                                    case InterfaceContractType(_, _) => assert(assertion = false, "not yet implemented"); Seq()
+                                    case GenericType(_, _) => assert(assertion = false, "not yet implemented"); Seq()
+                                }
+                                case BottomType() => Seq()
+                            }
+                            case None => assert(assertion = false, "encountered an expression without a type annotation"); Seq()
+                        }
+
+                        val update_instructions: Seq[YulStatement] =
+                            if (ct.allFields.exists(f => f.name.equals(x))) {
+                                trace_for_e :+ updateField(ct, x, id)
                             } else {
-                                assign1(Identifier(x), id)
-                            })
+                                Seq(assign1(Identifier(x), id))
+                            }
+
+                        decl_0exp(id) +: (e_yul ++ update_instructions)
+
                     case _ =>
                         assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
@@ -614,7 +640,7 @@ object CodeGenYul extends CodeGenerator {
         // here or not.
         ids.map(id => decl_0exp(id)) ++
             seqs.flatten ++ (width match {
-            case 0 => Seq(ExpressionStatement(FunctionCall(Identifier(name), thisID +: ids)))
+            case 0 => Do(FunctionCall(Identifier(name), thisID +: ids))
             case 1 =>
                 val id: Identifier = nextTemp()
                 Seq(decl_1exp(id, FunctionCall(Identifier(name), thisID +: ids)), assign1(retvar, id))
@@ -747,7 +773,7 @@ object CodeGenYul extends CodeGenerator {
                 // we only call the tracer after the constructor for the main contract
                 val traceCall =
                     if (isMainContract) {
-                        Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), Identifier("this"))))
+                        Do(apply(nameTracer(contractType.contractName), Identifier("this")))
                     } else {
                         Seq()
                     }

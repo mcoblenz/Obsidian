@@ -95,7 +95,7 @@ object Util {
       * @return the yul if-statement doing the check
       */
     def revertIf(cond: Expression): YulStatement =
-        edu.cmu.cs.obsidian.codegen.If(cond, Block(Seq(ExpressionStatement(apply("revert", intlit(0), intlit(0))))))
+        edu.cmu.cs.obsidian.codegen.If(cond, Block(Do(apply("revert", intlit(0), intlit(0)))))
 
     /**
       * @return the yul call value check statement, which makes sure that funds are not spent inappropriately
@@ -111,7 +111,7 @@ object Util {
       * @return the yul if-statement doing the check
       */
     def revertForwardIfZero(id: Expression): YulStatement =
-        edu.cmu.cs.obsidian.codegen.If(apply("iszero", id), Block(Seq(ExpressionStatement(apply("revert_forward_1")))))
+        edu.cmu.cs.obsidian.codegen.If(apply("iszero", id), Block(Do(apply("revert_forward_1"))))
 
     /**
       * shorthand for building yul assignment statements, here assigning one expression to just one
@@ -404,8 +404,8 @@ object Util {
     def updateField(ct: ContractTable, fieldName: String, value: Expression): YulStatement = {
         val address_of_field: Expression = fieldFromThis(ct, fieldName)
         ifInStorge(addr_to_check = address_of_field,
-            true_case = Seq(ExpressionStatement(apply("sstore", address_of_field, value))),
-            false_case = Seq(ExpressionStatement(apply("mstore", address_of_field, value)))
+            true_case = Do(apply("sstore", address_of_field, value)), // todo double check why there isn't a mapToStorageAddr call here; i think it's because you only end up in this branch when `this` is already big enough
+            false_case = Do(apply("mstore", address_of_field, value))
         )
     }
 
@@ -595,6 +595,24 @@ object Util {
         apply("add", x, storage_threshold)
     }
 
+    /** the returned expression evaluates to true iff the argument is above or equal to the storage threshold
+      *
+      * @param addr
+      * @return
+      */
+    def compareToThresholdExp(addr: Expression): Expression = {
+        apply("gt", addr, apply("sub", storage_threshold, intlit(1)))
+    }
+
+    /** convenience function for taking an expression and building a singleton statement sequence
+      *
+      * @param x
+      * @return
+      */
+    def Do(x: Expression): Seq[YulStatement] = {
+        Seq(ExpressionStatement(x))
+    }
+
     /** given an expression that represents an address, compute the yul statement that checks if it's
       * a storage address or not and execute a sequence of statements in either case. if it does not
       * represent an address, the behaviour is undefined.
@@ -606,7 +624,7 @@ object Util {
       */
     def ifInStorge(addr_to_check: Expression, true_case: Seq[YulStatement], false_case: Seq[YulStatement]): YulStatement = {
         // note: gt(x,y) is x > y; to get x >= y, subtract 1 since they're integers
-        edu.cmu.cs.obsidian.codegen.Switch(apply("gt", addr_to_check, apply("sub", storage_threshold, intlit(1))),
+        edu.cmu.cs.obsidian.codegen.Switch(compareToThresholdExp(addr_to_check),
             Seq(Case(boollit(true), Block(true_case)),
                 Case(boollit(false), Block(false_case))))
     }
@@ -650,6 +668,4 @@ object Util {
             case YATContractName(name) => throw new RuntimeException("can't query for a default contract value")
         }
     }
-
-
 }
