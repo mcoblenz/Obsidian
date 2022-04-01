@@ -92,17 +92,35 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        /** return true iff the declaration passed ought to be included in the dispatch table
+          * @param d
+          * @return
+          */
+        def writeInDispatch(d : Declaration) : Boolean = {
+            d match {
+                case declaration: InvokableDeclaration => declaration match {
+                    case Constructor(name, args, resultType, body) => false // constructors cannot be called from the outside
+                    // todo: for now we omit private transactions and constructors only, but this can change over time.
+                    case Transaction(name, params, args, retType, ensures, body, isStatic, isPrivate, thisType, thisFinalType, initialFieldTypes, finalFieldTypes) => ! isPrivate
+                }
+                case TypeDecl(name, typ) => false
+                case Field(isConst, typ, name, availableIn) => false
+                case State(name, fields, isAsset) => false
+                case contract: Contract => false
+            }
+        }
+
         /** given a contract,
           * translate all the declarations it contains into yul and produce that sequence and
           * produce a default constructor for it if it does not have any constructors.
           *
           * @param c the contract to translate
-          * @return the sequence of yul statements for each declaration in the contract
+          * @return the sequence of yul statements for each declaration in the contract paired with a boolean that says if each should be included in the dispatch table
           */
-        def translateContract(c: Contract): Seq[YulStatement] = {
+        def translateContract(c: Contract): Seq[(YulStatement, Boolean)] = {
             c match {
                 case _: ObsidianContractImpl =>
-                    defaultConstructor(c) ++ c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable))
+                    defaultConstructor(c).map(d => (d, false)) ++ c.declarations.map(d => (translateDeclaration(d, c.name, checkedTable).head, writeInDispatch(d)))
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
@@ -122,7 +140,7 @@ object CodeGenYul extends CodeGenerator {
             mainConstructorTypeNames = defaultConstructorSignature(main_contract, checkedTable, ""),
             // todo: this includes all of the default constructors in the top
             defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c, checkedTable)),
-            otherTransactions = other_contracts.flatMap(translateContract),
+            otherTransactions = other_contracts.flatMap(translateContract).map(p => p._1),
             tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
         )
     }

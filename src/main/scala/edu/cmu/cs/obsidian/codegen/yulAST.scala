@@ -250,7 +250,7 @@ case class StringLiteral(content: String) extends YulAST
   */
 case class YulObject(contractName: String,
                      data: Seq[Data],
-                     mainContractTransactions: Seq[YulStatement],
+                     mainContractTransactions: Seq[(YulStatement,Boolean)],
                      mainContractSize: Int,
                      mainConstructorTypeNames: Seq[TypedName],
                      defaultCons: Seq[YulStatement],
@@ -399,13 +399,13 @@ case class YulObject(contractName: String,
         // result from the transaction definitions WITHOUT the `this` argument.
         def dispatchTable(): codegen.Switch =
             codegen.Switch(Identifier("selector"),
-                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
-                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
+                mainContractTransactions.filter(p => p._2).map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t._1.asInstanceOf[FunctionDefinition]))),
+                    Block(dispatchEntry(t._1.asInstanceOf[FunctionDefinition])))))
 
         // traverse the transactions and compute the abi functions we need to emit.
         def abiEncodeTupleFuncs(): YulStatement = Block(
             LineComment("abi encode tuple functions") +:
-                (mainContractTransactions ++ otherTransactions)
+                (mainContractTransactions.map(p => p._1) ++ otherTransactions)
                     .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
                     .distinct
                     .map(write_abi_encode_tuple_from_stack))
@@ -413,15 +413,15 @@ case class YulObject(contractName: String,
         def abiDecodeFuncs(): YulStatement = Block(
             LineComment("abi decode functions") +:
                 (// for each transaction, emit the decoder for the tuple of its arguments
-                    (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
+                    (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t._1.asInstanceOf[FunctionDefinition]))).distinct
                         // for each transaction, collect up the types that it uses, and then emit the decodes for those types
-                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
+                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t._1.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
                         ).distinct
                     )
         )
 
-        def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
+        def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions.map(p => p._1) ++ otherTransactions))
 
-        def tracertransactions(): YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
+        def tracertransxactions(): YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
     }
 }
