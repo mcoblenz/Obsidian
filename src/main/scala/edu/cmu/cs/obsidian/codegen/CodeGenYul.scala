@@ -482,7 +482,7 @@ object CodeGenYul extends CodeGenerator {
                             }
 
                         decl_0exp(id) +: (e_yul ++ update_instructions)
-                        
+
                     case _ =>
                         assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
                         Seq()
