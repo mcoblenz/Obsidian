@@ -797,16 +797,7 @@ object CodeGenYul extends CodeGenerator {
                 } else {
                     Seq()
                 }
-
-                // we only call the tracer after the constructor for the main contract
-                val traceCall =
-                    if (isMainContract) {
-                        Do(apply(nameTracer(contractType.contractName), Identifier("this")))
-                    } else {
-                        Seq()
-                    }
-
-
+                
                 Seq( // grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
