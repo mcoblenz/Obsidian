@@ -11,6 +11,7 @@ import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.codegen.Util._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck.ContractType
+import edu.cmu.cs.obsidian.parser.SymbolTable
 
 object CodeGenYul extends CodeGenerator {
     // we generate new temporary variables with a little bit of global state; i am making the
@@ -61,7 +62,32 @@ object CodeGenYul extends CodeGenerator {
         true
     }
 
-    def translateProgram(program: Program, checkedTable: SymbolTable): YulObject = {
+    def translateProgram(program: Program, poop: SymbolTable): YulObject = {
+        /** given an obsidian contract, return a contract that's identical except that it has an extra field for reference counting
+          * @param c the argument contract
+          * @return the contract with the added field
+          * @throws RuntimeException if the argument is not an obsidian contract
+          * @throws RuntimeException if the argument contract already uses the reserved name
+          */
+        def addRefCount(c : Contract): Contract = {
+            if(c.declarations.exists(d => d.name == refCountName)){
+                throw new RuntimeException(s"yul translation failed because ${c.name} uses reserved name $refCountName: ${c.declarations.map(d => d.name).mkString("; ")}")
+            }
+            c match {
+                case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
+                    ObsidianContractImpl(modifiers, name, params, bound,
+                        Field(isConst = false, IntType(), refCountName, None) +: declarations,
+                        transitions, isInterface, sp)
+                case JavaFFIContractImpl(_, _, _, _, _) =>
+                    throw new RuntimeException("Java contract not supported in yul translation")
+            }
+        }
+
+        // write a new program with a new field for reference counting in every contract, and
+        // build a new symbol table that reflects that
+        val pWithRefCounts = Program(program.imports, program.contracts.map(addRefCount))
+        val ctWithRefCounts = new SymbolTable(pWithRefCounts)
+
         /** returns true iff the argument contract has at least one constructor, false otherwise.
           *
           * @param c the contract to inspect
@@ -88,28 +114,7 @@ object CodeGenYul extends CodeGenerator {
             if (hasConstructor(c)) {
                 Seq()
             } else {
-                Seq(writeDefaultConstructor(c, checkedTable))
-            }
-        }
-
-        /** given an obsidian contract, return a contract that's identical except that it has an extra field for reference counting
-          * @param c the argument contract
-          * @return the contract with the added field
-          * @throws RuntimeException if the argument is not an obsidian contract
-          * @throws RuntimeException if the argument contract already uses the reserved name
-          */
-        def addRefCount(c : Contract): Contract = {
-            if(c.declarations.exists(d => d.name == refCountName)){
-                throw new RuntimeException(s"yul translation failed because ${c.name} uses reserved name $refCountName")
-            }
-
-            val refCountField: Declaration = Field(isConst = false, IntType(), refCountName, None)
-
-            c match {
-                case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
-                    ObsidianContractImpl(modifiers, name, params, bound, refCountField +: declarations, transitions, isInterface, sp)
-                case JavaFFIContractImpl(_, _, _, _, _) =>
-                    throw new RuntimeException("Java contract not supported in yul translation")
+                Seq(writeDefaultConstructor(c, ctWithRefCounts))
             }
         }
 
@@ -122,17 +127,17 @@ object CodeGenYul extends CodeGenerator {
           * @throws RuntimeException if called on a non-obsidian contract
           */
         def translateContract(c: Contract): Seq[YulStatement] = {
-            val cWithRC = addRefCount(c)
-            cWithRC match {
+            c match {
                 case _: ObsidianContractImpl =>
-                    defaultConstructor(cWithRC) ++ cWithRC.declarations.flatMap(d => translateDeclaration(d, cWithRC.name, checkedTable))
+                    defaultConstructor(c) ++ c.declarations.flatMap(d => translateDeclaration(d, c.name, ctWithRefCounts))
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
         }
 
+
         val (main_contract, other_contracts): (Contract, Seq[Contract]) =
-            program.contracts.filter(c => c.name != ContractType.topContractName).partition(c => c.modifiers.contains(IsMain())) match {
+            pWithRefCounts.contracts.filter(c => c.name != ContractType.topContractName).partition(c => c.modifiers.contains(IsMain())) match {
                 case (Seq(x), l) => (x, l)
                 case _ => throw new RuntimeException("program does not have exactly one main contract")
             }
@@ -141,12 +146,12 @@ object CodeGenYul extends CodeGenerator {
         YulObject(contractName = main_contract.name,
             data = Seq(),
             mainContractTransactions = translateContract(main_contract),
-            mainContractSize = sizeOfContractST(main_contract.name, checkedTable),
-            mainConstructorTypeNames = defaultConstructorSignature(main_contract, checkedTable, ""),
+            mainContractSize = sizeOfContractST(main_contract.name, ctWithRefCounts),
+            mainConstructorTypeNames = defaultConstructorSignature(main_contract, ctWithRefCounts, ""),
             // todo: this includes all of the default constructors in the top
-            defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c, checkedTable)),
+            defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c, ctWithRefCounts)),
             otherTransactions = other_contracts.flatMap(translateContract),
-            tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(checkedTable, c.name)).distinctBy(fd => fd.name)
+            tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(ctWithRefCounts, c.name)).distinctBy(fd => fd.name)
         )
     }
 
