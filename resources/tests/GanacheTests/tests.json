@@ -266,7 +266,7 @@
         {
             "file": "SetGetConstructorField.obs",
             "expected": "12",
-            "deploy_logged" : [-57896044618658097711785492504343953926634992332820282019728792003956564819808,5738],
+            "deploy_logged" : [5738, -57896044618658097711785492504343953926634992332820282019728792003956564819776, 5738, 5738],
             "shows_that_we_support": "set-get with a field so that the emitted tracer is not trivial, and that uses the constructor for that field "
         },
         {
@@ -277,7 +277,7 @@
         {
             "file": "SetGetCheckDefaults.obs",
             "expected": "5743",
-            "deploy_logged" : [-57896044618658097711785492504343953926634992332820282019728792003956564819808,5738],
+            "deploy_logged" : [5738, -57896044618658097711785492504343953926634992332820282019728792003956564819776, 5738, 5738],
             "shows_that_we_support": "default constructors + values get written to storage and resurrected on subsequent calls"
         }
     ]
