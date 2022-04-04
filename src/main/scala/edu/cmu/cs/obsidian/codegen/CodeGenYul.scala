@@ -51,7 +51,7 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // translate from obsidian AST to yul AST
-        val translated_obj = translateProgram(checkedTable.ast, checkedTable)
+        val translated_obj = translateProgram(checkedTable.ast)
 
         // generate yul string from yul AST, write to the output file
         val s = translated_obj.yulString()
@@ -62,7 +62,7 @@ object CodeGenYul extends CodeGenerator {
         true
     }
 
-    def translateProgram(program: Program, poop: SymbolTable): YulObject = {
+    def translateProgram(program: Program): YulObject = {
         /** given an obsidian contract, return a contract that's identical except that it has an extra field for reference counting
           * @param c the argument contract
           * @return the contract with the added field
