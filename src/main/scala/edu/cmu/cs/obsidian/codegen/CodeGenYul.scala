@@ -781,9 +781,6 @@ object CodeGenYul extends CodeGenerator {
                         case _ => false
                     }
 
-                // does this constructor belong to the main contract?
-                val isMainContract = checkedTable.contractLookup(contractType.contractName).contract.isMain
-
                 // check to to see if there is a constructor to call, and if so translate the
                 // arguments and invoke the constructor as normal transaction with the hash appended
                 // to the name to call the right one
@@ -797,7 +794,7 @@ object CodeGenYul extends CodeGenerator {
                 } else {
                     Seq()
                 }
-                
+
                 Seq( // grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
