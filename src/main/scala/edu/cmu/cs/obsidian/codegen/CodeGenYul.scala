@@ -810,6 +810,10 @@ object CodeGenYul extends CodeGenerator {
                 Seq( // grab the appropriate amount of space of memory sequentially, off the free memory pointer
                     decl_1exp(id_memaddr, apply("allocate_memory", intlit(sizeOfContractST(contractType.contractName, checkedTable)))),
 
+                    // set the reference count for this object to 1, since we're now referring to it
+                    // todo: i might be able to always write this to storage
+                    updateField(checkedTable.contractLookup(contractType.contractName), refCountName, intlit(1)),
+
                     // return the address that the space starts at, call the constructor and the tracer as above
                     assign1(retvar, id_memaddr)) ++ conCall
 
