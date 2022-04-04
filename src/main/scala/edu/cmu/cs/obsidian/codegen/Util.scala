@@ -668,4 +668,9 @@ object Util {
             case YATContractName(name) => throw new RuntimeException("can't query for a default contract value")
         }
     }
+
+    /** a constant for the name of the added field for counting references to each object
+      * @return
+      */
+    def refCountName: String = "__refcount"
 }

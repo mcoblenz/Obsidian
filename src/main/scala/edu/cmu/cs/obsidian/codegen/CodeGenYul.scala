@@ -92,17 +92,40 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        /** given an obsidian contract, return a contract that's identical except that it has an extra field for reference counting
+          * @param c the argument contract
+          * @return the contract with the added field
+          * @throws RuntimeException if the argument is not an obsidian contract
+          * @throws RuntimeException if the argument contract already uses the reserved name
+          */
+        def addRefCount(c : Contract): Contract = {
+            if(c.declarations.exists(d => d.name == refCountName)){
+                throw new RuntimeException(s"yul translation failed because ${c.name} uses reserved name $refCountName")
+            }
+
+            val refCountField: Declaration = Field(isConst = false, IntType(), refCountName, None)
+
+            c match {
+                case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
+                    ObsidianContractImpl(modifiers, name, params, bound, refCountField +: declarations, transitions, isInterface, sp)
+                case JavaFFIContractImpl(_, _, _, _, _) =>
+                    throw new RuntimeException("Java contract not supported in yul translation")
+            }
+        }
+
         /** given a contract,
           * translate all the declarations it contains into yul and produce that sequence and
           * produce a default constructor for it if it does not have any constructors.
           *
           * @param c the contract to translate
           * @return the sequence of yul statements for each declaration in the contract
+          * @throws RuntimeException if called on a non-obsidian contract
           */
         def translateContract(c: Contract): Seq[YulStatement] = {
-            c match {
+            val cWithRC = addRefCount(c)
+            cWithRC match {
                 case _: ObsidianContractImpl =>
-                    defaultConstructor(c) ++ c.declarations.flatMap(d => translateDeclaration(d, c.name, checkedTable))
+                    defaultConstructor(cWithRC) ++ cWithRC.declarations.flatMap(d => translateDeclaration(d, cWithRC.name, checkedTable))
                 case _: JavaFFIContractImpl =>
                     throw new RuntimeException("Java contract not supported in yul translation")
             }
