@@ -433,7 +433,7 @@ object Util {
       * @return the transformed definition with an added first argument
       */
     def addThisArgument(f: FunctionDefinition): FunctionDefinition = {
-        FunctionDefinition(f.name, Seq(TypedName("this", YATAddress())) ++ f.parameters, f.returnVariables, f.body)
+        FunctionDefinition(f.name, Seq(TypedName("this", YATAddress())) ++ f.parameters, f.returnVariables, f.body, f.inDispatch)
     }
 
     /** given a function definition where the first argument is a named `this`, return the definition
@@ -445,7 +445,7 @@ object Util {
       */
     def dropThisArgument(f: FunctionDefinition): FunctionDefinition = {
         f.parameters match {
-            case TypedName("this", YATAddress()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body)
+            case TypedName("this", YATAddress()) :: tl => FunctionDefinition(f.name, tl, f.returnVariables, f.body, f.inDispatch)
             case _ :: _ => throw new RuntimeException("dropping `this` argument from a sequence of args that doesn't start with `this`")
             case _ => throw new RuntimeException("dropping argument from empty list")
         }
@@ -499,7 +499,7 @@ object Util {
         val bod: Seq[YulStatement] = assign1(Identifier("tail"), apply("add", Identifier("headStart"), intlit(32 * n))) +: encode_lines
         FunctionDefinition(abi_encode_name(n),
             TypedName("headStart", YATUInt32()) +: var_indices.map(i => TypedName("value" + i.toString, YATUInt32())),
-            Seq(TypedName("tail", YATUInt32())), Block(bod))
+            Seq(TypedName("tail", YATUInt32())), Block(bod), inDispatch = false)
     }
 
     /** given an function definition, return the name of the abi tuple decode for that functions
@@ -548,7 +548,8 @@ object Util {
         FunctionDefinition(name = abi_decode_name(t),
             parameters = Seq(offset, end),
             returnVariables = Seq(ret),
-            body = Block(bod))
+            body = Block(bod),
+            inDispatch = false)
     }
 
     /** Given a function definition, provide a function that decodes parameters of the argument type
@@ -577,7 +578,8 @@ object Util {
         FunctionDefinition(name = abi_decode_tuple_name(f),
             parameters = Seq(start, end),
             returnVariables = retVars,
-            body = Block(bod))
+            body = Block(bod),
+            inDispatch = false)
     }
 
     // storage is 2**256 big; this is (2**256)/2, which is the same as 1 << 255 or shl(255,1) in yul
