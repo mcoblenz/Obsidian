@@ -279,6 +279,12 @@
             "expected": "5743",
             "deploy_logged" : [5738, -57896044618658097711785492504343953926634992332820282019728792003956564819776, 5738, 5738],
             "shows_that_we_support": "default constructors + values get written to storage and resurrected on subsequent calls"
+        },
+        {
+            "file": "SetGetRefCount.obs",
+            "expected": "16",
+            "deploy_logged" : [5738, 5738, 5738],
+            "shows_that_we_support": "shows that aliasing works and reference counts get incremented"
         }
     ]
 }
