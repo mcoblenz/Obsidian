@@ -272,10 +272,11 @@ object CodeGenYul extends CodeGenerator {
         ))
     }
 
+    val emit_logs: Boolean = true
+
     def writeTracers(ct: SymbolTable, name: String): Seq[FunctionDefinition] = {
         // this is a stand in for a more robust mechanism for choosing when to emit logs.
         // we'll want to be able to turn it off to do performance testing in the future.
-        val emit_logs: Boolean = true
 
         val c: Contract = ct.contract(name) match {
             case Some(value) => value.contract
@@ -350,6 +351,78 @@ object CodeGenYul extends CodeGenerator {
         }
 
         FunctionDefinition(name = nameTracer(name),
+            parameters = Seq(TypedName("this", YATAddress())),
+            returnVariables = Seq(),
+            body = Block(body :+ Leave())
+        ) +: others.distinctBy(fd => fd.name)
+    }
+
+    // todo: this is copied from writeTracers, above, which means that there's a nicer way to abstract
+    //   the traversal pattern into one higher order function that both of these instantiate.
+    def writeWipers(ct: SymbolTable, name: String): Seq[FunctionDefinition] = {
+        // we assume that the emitted function is only called on a storage pointer
+        val c: Contract = ct.contract(name) match {
+            case Some(value) => value.contract
+            case None => throw new RuntimeException()
+        }
+
+        var body: Seq[YulStatement] = Seq()
+        var others: Seq[FunctionDefinition] = Seq()
+
+        for (d <- c.declarations) {
+            d match {
+                case Field(_, typ, fname, _) =>
+                    // since `this` is a storage address, so is the computed field offset
+                    val sto_loc: codegen.Expression = fieldFromThis(ct.contractLookup(name), fname)
+                    val log_temp: Identifier = nextTemp()
+
+                    val load: Seq[YulStatement] = Seq(
+                        //sstore(add(this,offset), 0)
+                        LineComment("wiping"),
+                        ExpressionStatement(apply("sstore", sto_loc, intlit(0))))
+
+                    val log: Seq[YulStatement] =
+                        if (emit_logs) {
+                            Seq(LineComment("logging"),
+                                // allocate memory to log from
+                                decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
+                                // load what we just wrote to storage to that location
+                                //todo log something helpful here or nothing at all
+                                ExpressionStatement(apply("mstore", log_temp, intlit(20))),
+                                // emit the log
+                                ExpressionStatement(apply("log0", log_temp, intlit(32)))
+                            )
+                        } else {
+                            Seq()
+                        }
+
+                    // inspect the type
+                    typ match {
+                        case t: NonPrimitiveType => t match {
+
+                            // if it's a reference, recurr
+                            case ContractReferenceType(contractType, _, _) =>
+                                body = body ++ load ++ log ++
+                                    Seq(
+                                        LineComment("traversal"),
+                                        ExpressionStatement(apply(nameWiper(contractType.contractName), apply("sload", sto_loc)))
+                                    )
+                                // todo: this recursive call may not be needed if we generate wipers
+                                //   for every contract in the program
+                                others = others ++ writeWipers(ct, contractType.contractName)
+                            case _ => Seq()
+                        }
+
+                        // if it's not, just wipe and log and move on
+                        case _: PrimitiveType =>
+                            body = body ++ load ++ log
+                        case _ => Seq()
+                    }
+                case _ => Seq()
+            }
+        }
+
+        FunctionDefinition(name = nameWiper(name),
             parameters = Seq(TypedName("this", YATAddress())),
             returnVariables = Seq(),
             body = Block(body :+ Leave())

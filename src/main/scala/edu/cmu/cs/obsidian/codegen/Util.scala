@@ -654,6 +654,15 @@ object Util {
         s"trace_$name"
     }
 
+    /** given the name of a contract, return the name of its wiping function
+      *
+      * @param name the name of the contract being traced
+      * @return the name of the tracer
+      */
+    def nameWiper(name: String): String = {
+        s"wipe_$name"
+    }
+
     /** given a Yul type, provide an appropriate default value for it.
       *
       * @param typ the type to provide a default for
