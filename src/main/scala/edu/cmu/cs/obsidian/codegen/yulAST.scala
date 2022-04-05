@@ -255,7 +255,8 @@ case class YulObject(contractName: String,
                      mainConstructorTypeNames: Seq[TypedName],
                      defaultCons: Seq[YulStatement],
                      otherTransactions: Seq[YulStatement],
-                     tracers: Seq[FunctionDefinition]) extends YulAST {
+                     tracers: Seq[FunctionDefinition],
+                     wipers: Seq[FunctionDefinition]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -423,5 +424,7 @@ case class YulObject(contractName: String,
         def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
 
         def tracertransactions(): YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
+
+        def wipertransactions(): YulStatement = Block(LineComment("per contract generated wipers") +: wipers)
     }
 }

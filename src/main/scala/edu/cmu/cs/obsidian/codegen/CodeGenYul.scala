@@ -151,7 +151,8 @@ object CodeGenYul extends CodeGenerator {
             // todo: this includes all of the default constructors in the top
             defaultCons = (main_contract +: other_contracts).map(c => writeDefaultConstructor(c, ctWithRefCounts)),
             otherTransactions = other_contracts.flatMap(translateContract),
-            tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(ctWithRefCounts, c.name)).distinctBy(fd => fd.name)
+            tracers = (main_contract +: other_contracts).flatMap(c => writeTracers(ctWithRefCounts, c.name)).distinctBy(fd => fd.name),
+            wipers = (main_contract +: other_contracts).flatMap(c => writeWipers(ctWithRefCounts, c.name)).distinctBy(fd => fd.name)
         )
     }
 
