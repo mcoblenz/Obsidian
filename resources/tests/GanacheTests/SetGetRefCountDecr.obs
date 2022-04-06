@@ -1,0 +1,20 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int value) {
+        x = value;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+main contract SetGetRefCountDecr{
+    transaction main() returns int{
+        ic1 = new IntContainer();
+        ic1.set(5);
+        int r = ic1.get();
+        ic1.release();  // should see that ic1 actually gets freed
+        return r;
+    }
+}
