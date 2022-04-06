@@ -19,14 +19,14 @@ contract IntContainerContainer {
     // wiper should call dealloc; should be an implementation of this for every contract, it might just be empty
     // generate deallocs if not present
     transaction dealloc() {
-        ic1.release();
+        //ic1.release();
     }
 }
 
 main contract SetGetRefCountNested{
     transaction main() returns int{
-        icc1 = new IntContainerContainer();
-        icc1.release(); // should see that things get cleared out
+        IntContainerContainer icc1 = new IntContainerContainer();
+        //icc1.release(); // should see that things get cleared out
         return 0;
     }
 }
