@@ -288,15 +288,15 @@
         },
         {
             "file": "SetGetRefCountDecr.obs",
-            "expected": "16",
+            "expected": "5",
             "deploy_logged" : [5738, 5738, 5738],
-            "shows_that_we_support": "shows that aliasing works and reference counts get incremented"
+            "shows_that_we_support": "shows that reference counts get decremented"
         },
         {
             "file": "SetGetRefCountNested.obs",
-            "expected": "16",
+            "expected": "0",
             "deploy_logged" : [5738, 5738, 5738],
-            "shows_that_we_support": "shows that aliasing works and reference counts get incremented"
+            "shows_that_we_support": "shows that wipers clear nested structures"
         }
     ]
 }

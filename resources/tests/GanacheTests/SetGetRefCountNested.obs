@@ -27,6 +27,6 @@ main contract SetGetRefCountNested{
     transaction main() returns int{
         icc1 = new IntContainerContainer();
         icc1.release(); // should see that things get cleared out
-        return r;
+        return 0;
     }
 }

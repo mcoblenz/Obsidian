@@ -14,7 +14,7 @@ main contract SetGetRefCountDecr{
         ic1 = new IntContainer();
         ic1.set(5);
         int r = ic1.get();
-        ic1.release();  // should see that ic1 actually gets freed
+        //ic1.release();  // should see that ic1 actually gets freed
         return r;
     }
 }
