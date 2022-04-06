@@ -159,7 +159,8 @@ case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], val
 case class FunctionDefinition(name: String,
                               parameters: Seq[TypedName],
                               returnVariables: Seq[TypedName],
-                              body: Block) extends YulStatement {
+                              body: Block,
+                              inDispatch: Boolean) extends YulStatement {
     override def toString: String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"), "function")
@@ -393,35 +394,42 @@ case class YulObject(contractName: String,
             )
         }
 
+        // this happens to be true, the type info just doesn't get propagated
+        val mainContractTransFD: Seq[FunctionDefinition] = mainContractTransactions.map(t => t.asInstanceOf[FunctionDefinition])
+        val otherContractTransFD: Seq[FunctionDefinition] = otherTransactions.map(t => t.asInstanceOf[FunctionDefinition])
+        val allTransactions: Seq[FunctionDefinition] = mainContractTransFD ++ otherContractTransFD
+
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
         // dispatch table from an allocated instance of the main contract at the top of memory. but the
         // outside world does not see that, so the hashes in the dispatch array are the ones that
         // result from the transaction definitions WITHOUT the `this` argument.
         def dispatchTable(): codegen.Switch =
-            codegen.Switch(Identifier("selector"),
-                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
-                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
+            codegen.Switch(expression = Identifier("selector"),
+                            cases = mainContractTransFD.
+                                filter(fd => fd.inDispatch).
+                                map(fd => codegen.Case(value = hexlit(hashOfFunctionDef(dropThisArgument(fd))),
+                                                        body = Block(dispatchEntry(fd)))))
 
         // traverse the transactions and compute the abi functions we need to emit.
         def abiEncodeTupleFuncs(): YulStatement = Block(
             LineComment("abi encode tuple functions") +:
-                (mainContractTransactions ++ otherTransactions)
-                    .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
+                allTransactions
+                    .map(t => t.returnVariables.length)
                     .distinct
                     .map(write_abi_encode_tuple_from_stack))
 
         def abiDecodeFuncs(): YulStatement = Block(
             LineComment("abi decode functions") +:
                 (// for each transaction, emit the decoder for the tuple of its arguments
-                    (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
+                    (mainContractTransFD.map(t => write_abi_decode_tuple(dropThisArgument(t))).distinct
                         // for each transaction, collect up the types that it uses, and then emit the decodes for those types
-                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
+                        ++ mainContractTransFD.flatMap(t => dropThisArgument(t).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
                         ).distinct
                     )
         )
 
-        def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
+        def transactions(): YulStatement = Block(LineComment("translated transactions") +: allTransactions)
 
         def tracertransactions(): YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
 
