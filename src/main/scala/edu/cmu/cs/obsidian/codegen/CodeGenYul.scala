@@ -69,23 +69,24 @@ object CodeGenYul extends CodeGenerator {
           * @throws RuntimeException if the argument is not an obsidian contract
           * @throws RuntimeException if the argument contract already uses the reserved name
           */
-        def addRefCount(c: Contract): Contract = {
-            if (c.declarations.exists(d => d.name == refCountName)) {
-                throw new RuntimeException(s"yul translation failed because ${c.name} uses reserved name $refCountName: ${c.declarations.map(d => d.name).mkString("; ")}")
-            }
-            c match {
-                case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
-                    ObsidianContractImpl(modifiers, name, params, bound,
-                        Field(isConst = false, IntType(), refCountName, None) +: declarations,
-                        transitions, isInterface, sp)
-                case JavaFFIContractImpl(_, _, _, _, _) =>
-                    throw new RuntimeException("Java contract not supported in yul translation")
-            }
-        }
+//        def addRefCount(c: Contract): Contract = {
+//            if (c.declarations.exists(d => d.name == refCountName)) {
+//                throw new RuntimeException(s"yul translation failed because ${c.name} uses reserved name $refCountName: ${c.declarations.map(d => d.name).mkString("; ")}")
+//            }
+//            c match {
+//                case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
+//                    ObsidianContractImpl(modifiers, name, params, bound,
+//                        Field(isConst = false, IntType(), refCountName, None) +: declarations,
+//                        transitions, isInterface, sp)
+//                case JavaFFIContractImpl(_, _, _, _, _) =>
+//                    throw new RuntimeException("Java contract not supported in yul translation")
+//            }
+//        }
 
         // write a new program with a new field for reference counting in every contract, and
         // build a new symbol table that reflects that
-        val pWithRefCounts = Program(program.imports, program.contracts.map(addRefCount))
+        //val pWithRefCounts = Program(program.imports, program.contracts.map(addRefCount))
+        val pWithRefCounts = Program(program.imports, program.contracts) // todo this is now not needed; testing
         val ctWithRefCounts = new SymbolTable(pWithRefCounts)
 
         /** returns true iff the argument contract has at least one constructor, false otherwise.
