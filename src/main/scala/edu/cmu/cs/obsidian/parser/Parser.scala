@@ -907,8 +907,9 @@ object Parser extends Parsers {
                     )
                 )
             val reserved: Set[String] = Set(refCountName,retainName,deallocName,releaseName)
-            if (c.declarations.exists(d => reserved.contains(d.name))) {
-                throw new RuntimeException(s"yul translation failed because ${c.name} uses reserved name $refCountName: ${c.declarations.map(d => d.name).mkString("; ")}")
+            val overlap: Option[Declaration] = c.declarations.find(d => reserved.contains(d.name))
+            if (overlap.nonEmpty) {
+                throw new RuntimeException(s"parsing failed because ${c.name} uses reserved name ${overlap.get.name}: ${c.declarations.map(d => d.name).mkString("; ")}")
             }
 
             c match {

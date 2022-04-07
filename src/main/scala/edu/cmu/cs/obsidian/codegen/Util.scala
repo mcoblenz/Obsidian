@@ -686,9 +686,21 @@ object Util {
       */
     def refCountName: String = "__refcount"
 
+    /** a constant for the name of the added retain method for reference counting
+      *
+      * @return
+      */
     def retainName: String = "retain"
 
+    /** a constant for the name of the added release method for reference counting
+      *
+      * @return
+      */
     def releaseName: String = "release"
 
+    /** a constant for the name of the added dealloc method for reference counting
+      *
+      * @return
+      */
     def deallocName: String = "dealloc"
 }
