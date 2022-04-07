@@ -1,5 +1,6 @@
 package edu.cmu.cs.obsidian.parser
 
+import edu.cmu.cs.obsidian.codegen.Util.{deallocName, refCountName, retainName}
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.typecheck._
 import org.apache.commons.io.IOUtils
@@ -773,7 +774,64 @@ object Parser extends Parsers {
                             case _ => false
                         }).map(_.asInstanceOf[Declaration])
 
-                        ObsidianContractImpl(mod.toSet, name._1, params, implementBound, decls, transitions, isInterface, srcPath).setLoc(ct)
+                        // insert a field for reference counting into each contract, as well as two methods to interact with it.
+                        val thisTypeArg = ContractReferenceType(implementBound, Owned(), NotRemoteReferenceType())
+                        val gcDecls: Seq[Declaration] =
+                            Seq(
+                                Field(isConst = false, IntType(), refCountName, None),
+                                Transaction(name = retainName,
+                                    params = Seq(),
+                                    args = Seq(),
+                                    retType = None,
+                                    ensures = Seq(),
+                                    body = Seq(
+                                        // todo perhaps the "Some" here should be None, since those annotations will get added by the checker
+                                        Assignment(ReferenceIdentifier(refCountName, Some(IntType())), Add(ReferenceIdentifier(refCountName, Some(IntType())),NumLiteral(1))),
+                                        Return()
+                                    ), // todo
+                                    isStatic = false,
+                                    isPrivate = true,
+                                    thisType = thisTypeArg, //todo is this right?
+                                    thisFinalType = thisTypeArg, //todo is this right?
+                                ),
+                                Transaction(name = retainName,
+                                    params = Seq(),
+                                    args = Seq(),
+                                    retType = None,
+                                    ensures = Seq(),
+                                    body = Seq(
+                                        // todo perhaps the Somes here should be None, since those annotations will get added by the checker
+                                        Assignment(ReferenceIdentifier(refCountName, Some(IntType())), Subtract(ReferenceIdentifier(refCountName, Some(IntType())),NumLiteral(1))),
+                                        If(eCond = Equals(ReferenceIdentifier(refCountName, Some(IntType())),NumLiteral(0)),
+                                            s = Seq(LocalInvocation(name = deallocName,
+                                                    genericParams = Seq(),
+                                                    params = Seq(),
+                                                    args = Seq(),
+                                                    obstype = None))),
+                                        Return()
+                                    ), // todo
+                                    isStatic = false,
+                                    isPrivate = true,
+                                    thisType = thisTypeArg,//todo is this right?
+                                    thisFinalType = thisTypeArg, //todo is this right?
+                                ),
+                                Transaction(name = deallocName,
+                                    params = Seq(),
+                                    args = Seq(),
+                                    retType = None,
+                                    ensures = Seq(),
+                                    body = Seq(
+                                        // the body of dealloc is not Obsidian, it's Yul that relies on the underlying memory layout. so this will get added at translation time.
+                                        Return()
+                                    ), // todo
+                                    isStatic = false,
+                                    isPrivate = true,
+                                    thisType = thisTypeArg,//todo is this right?
+                                    thisFinalType = thisTypeArg, //todo is this right?
+                                )
+                            )
+
+                        ObsidianContractImpl(mod.toSet, name._1, params, implementBound, gcDecls ++ decls, transitions, isInterface, srcPath).setLoc(ct)
                 }
         }
     }

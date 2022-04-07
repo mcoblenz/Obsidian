@@ -685,4 +685,10 @@ object Util {
       * @return
       */
     def refCountName: String = "__refcount"
+
+    def retainName: String = "retain"
+
+    def releaseName: String = "release"
+
+    def deallocName: String = "dealloc"
 }

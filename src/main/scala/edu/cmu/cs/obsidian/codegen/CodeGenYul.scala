@@ -821,7 +821,7 @@ object CodeGenYul extends CodeGenerator {
                     case LessThanOrEquals(e1, e2) => geq_leq("slt", retvar, e1, e2, contractName, checkedTable)
                     case NotEquals(e1, e2) => translateExpr(retvar, LogicalNegation(Equals(e1, e2)), contractName, checkedTable)
                 }
-            case e@LocalInvocation(name, _, _, args, obstype) =>
+            case e@LocalInvocation(name, p, q, args, obstype) =>
                 translateInvocation(flattenedName(contractName, name, None),
                     args, obstype, Identifier("this"), retvar, contractName, checkedTable)
 
