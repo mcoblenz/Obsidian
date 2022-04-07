@@ -11,7 +11,6 @@ import edu.cmu.cs.obsidian.Main.{findMainContract, findMainContractName}
 import edu.cmu.cs.obsidian.codegen.Util._
 import edu.cmu.cs.obsidian.parser._
 import edu.cmu.cs.obsidian.typecheck.ContractType
-import edu.cmu.cs.obsidian.parser.SymbolTable
 
 object CodeGenYul extends CodeGenerator {
     // we generate new temporary variables with a little bit of global state; i am making the
@@ -64,13 +63,14 @@ object CodeGenYul extends CodeGenerator {
 
     def translateProgram(program: Program): YulObject = {
         /** given an obsidian contract, return a contract that's identical except that it has an extra field for reference counting
+          *
           * @param c the argument contract
           * @return the contract with the added field
           * @throws RuntimeException if the argument is not an obsidian contract
           * @throws RuntimeException if the argument contract already uses the reserved name
           */
-        def addRefCount(c : Contract): Contract = {
-            if(c.declarations.exists(d => d.name == refCountName)){
+        def addRefCount(c: Contract): Contract = {
+            if (c.declarations.exists(d => d.name == refCountName)) {
                 throw new RuntimeException(s"yul translation failed because ${c.name} uses reserved name $refCountName: ${c.declarations.map(d => d.name).mkString("; ")}")
             }
             c match {
@@ -522,7 +522,7 @@ object CodeGenYul extends CodeGenerator {
                 parameters = transaction.args.map(v => TypedName(v.varName, obsTypeToYulType(v.typIn))),
                 ret,
                 body = Block(body),
-                inDispatch = ! transaction.isPrivate
+                inDispatch = !transaction.isPrivate
             ))
     }
 

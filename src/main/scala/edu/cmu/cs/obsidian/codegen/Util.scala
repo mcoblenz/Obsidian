@@ -412,8 +412,8 @@ object Util {
 
     /** given a field name and address, produce code that checks for finding it in memory or storage as appropriate
       *
-      * @param ct the context of the program
-      * @param fieldName the name of the filed
+      * @param ct          the context of the program
+      * @param fieldName   the name of the filed
       * @param destination the place to store the contents of memory or storage (it must be initialized separately in the output yul)
       * @return the switch statement that checks and assigns as appropriate
       */
@@ -681,6 +681,7 @@ object Util {
     }
 
     /** a constant for the name of the added field for counting references to each object
+      *
       * @return
       */
     def refCountName: String = "__refcount"

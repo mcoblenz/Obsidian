@@ -360,10 +360,6 @@ case class YulObject(contractName: String,
             )
         }
 
-
-        // TODO here and above in the dispatch table we do not respect privacy; we should iterate
-        //  only over the things in the main contract that are public
-
         // todo: there's a fair amount of repetition here with t.asInstanceOf and dropThisArgument;
         //   tighten that up so it's easier to follow. at the same time think about how to only emit
         //   the decoders and encoders we actually need (i.e. if f only has `this` as a param, the decoder we
@@ -387,14 +383,13 @@ case class YulObject(contractName: String,
             val thisId = Identifier("this")
             Block(
                 Seq(
-                    //let this := allocate_memory({{mainSize}})
-                    //decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
+                    //let this := 0x8...0
                     decl_1exp(thisId, first_storage_address)
                 )
             )
         }
 
-        // this happens to be true, the type info just doesn't get propagated
+        // todo: this happens to be true, the type info just doesn't get propagated. it would be nice to not need to do this.
         val mainContractTransFD: Seq[FunctionDefinition] = mainContractTransactions.map(t => t.asInstanceOf[FunctionDefinition])
         val otherContractTransFD: Seq[FunctionDefinition] = otherTransactions.map(t => t.asInstanceOf[FunctionDefinition])
         val allTransactions: Seq[FunctionDefinition] = mainContractTransFD ++ otherContractTransFD
@@ -406,10 +401,10 @@ case class YulObject(contractName: String,
         // result from the transaction definitions WITHOUT the `this` argument.
         def dispatchTable(): codegen.Switch =
             codegen.Switch(expression = Identifier("selector"),
-                            cases = mainContractTransFD.
-                                filter(fd => fd.inDispatch).
-                                map(fd => codegen.Case(value = hexlit(hashOfFunctionDef(dropThisArgument(fd))),
-                                                        body = Block(dispatchEntry(fd)))))
+                cases = mainContractTransFD.
+                    filter(fd => fd.inDispatch).
+                    map(fd => codegen.Case(value = hexlit(hashOfFunctionDef(dropThisArgument(fd))),
+                        body = Block(dispatchEntry(fd)))))
 
         // traverse the transactions and compute the abi functions we need to emit.
         def abiEncodeTupleFuncs(): YulStatement = Block(
