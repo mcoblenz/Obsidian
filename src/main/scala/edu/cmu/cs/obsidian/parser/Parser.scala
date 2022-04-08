@@ -847,7 +847,6 @@ object Parser extends Parsers {
           *
           * @param c the argument contract
           * @return the contract with the added field
-          * @throws RuntimeException if the argument is not an obsidian contract
           * @throws RuntimeException if the argument contract already uses the reserved name
           */
         def addRefCountingGC(c: Contract) : Contract = {
@@ -870,7 +869,7 @@ object Parser extends Parsers {
                         thisType = thisTypeArg, //todo is this right?
                         thisFinalType = thisTypeArg, //todo is this right?
                     ),
-                    Transaction(name = retainName,
+                    Transaction(name = releaseName,
                         params = Seq(),
                         args = Seq(),
                         retType = None,
