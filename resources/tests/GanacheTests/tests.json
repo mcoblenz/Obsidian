@@ -289,13 +289,13 @@
         {
             "file": "SetGetRefCountDecr.obs",
             "expected": "5",
-            "deploy_logged" : [5738, 5738, 5738],
+            "deploy_logged" : [5738],
             "shows_that_we_support": "shows that reference counts get decremented"
         },
         {
             "file": "SetGetRefCountNested.obs",
             "expected": "0",
-            "deploy_logged" : [5738, 5738, 5738],
+            "deploy_logged" : [5738],
             "shows_that_we_support": "shows that wipers clear nested structures"
         }
     ]
