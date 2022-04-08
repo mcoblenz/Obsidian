@@ -1,6 +1,7 @@
 package edu.cmu.cs.obsidian.typecheck
 
 import edu.cmu.cs.obsidian.ParserUtil
+import edu.cmu.cs.obsidian.codegen.Util.refCountName
 import edu.cmu.cs.obsidian.parser._
 
 import scala.collection.immutable.TreeMap
@@ -2736,7 +2737,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         // But we need to check contract fields separately.
         if (!outputContext.isThrown) {
             for (field <- table.allFields) {
-                if (field.availableIn.isEmpty && !outputContext.localFieldsInitialized.contains(field.name)) {
+                if (field.name != refCountName && field.availableIn.isEmpty && !outputContext.localFieldsInitialized.contains(field.name)) {
                     logError(constr, UninitializedFieldError(field.name))
                 }
             }
