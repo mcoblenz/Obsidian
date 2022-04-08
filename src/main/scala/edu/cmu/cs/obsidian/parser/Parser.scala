@@ -863,11 +863,11 @@ object Parser extends Parsers {
                             // todo perhaps the "Some" here should be None, since those annotations will get added by the checker
                             Assignment(ReferenceIdentifier(refCountName, Some(IntType())), Add(ReferenceIdentifier(refCountName, Some(IntType())), NumLiteral(1))),
                             Return()
-                        ), // todo
+                        ),
                         isStatic = false,
                         isPrivate = true,
-                        thisType = thisTypeArg, //todo is this right?
-                        thisFinalType = thisTypeArg, //todo is this right?
+                        thisType = thisTypeArg,
+                        thisFinalType = thisTypeArg,
                     ),
                     Transaction(name = releaseName,
                         params = Seq(),
@@ -884,11 +884,11 @@ object Parser extends Parsers {
                                     args = Seq(),
                                     obstype = None))),
                             Return()
-                        ), // todo
+                        ),
                         isStatic = false,
                         isPrivate = true,
-                        thisType = thisTypeArg, //todo is this right?
-                        thisFinalType = thisTypeArg, //todo is this right?
+                        thisType = thisTypeArg,
+                        thisFinalType = thisTypeArg,
                     ),
                     Transaction(name = deallocName,
                         params = Seq(),
@@ -898,11 +898,11 @@ object Parser extends Parsers {
                         body = Seq(
                             // the body of dealloc is not Obsidian, it's Yul that relies on the underlying memory layout. so this will get added at translation time.
                             Return()
-                        ), // todo
+                        ),
                         isStatic = false,
                         isPrivate = true,
-                        thisType = thisTypeArg, //todo is this right?
-                        thisFinalType = thisTypeArg, //todo is this right?
+                        thisType = thisTypeArg,
+                        thisFinalType = thisTypeArg,
                     )
                 )
             val reserved: Set[String] = Set(refCountName,retainName,deallocName,releaseName)
