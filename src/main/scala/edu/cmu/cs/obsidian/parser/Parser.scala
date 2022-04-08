@@ -850,7 +850,7 @@ object Parser extends Parsers {
           * @throws RuntimeException if the argument contract already uses the reserved name
           */
         def addRefCountingGC(c: Contract) : Contract = {
-            val thisTypeArg = ContractReferenceType(c.bound, Owned(), NotRemoteReferenceType())
+            val thisTypeArg = ContractReferenceType(ContractType(c.name, c.params), Unowned(), NotRemoteReferenceType())
             val gcDecls: Seq[Declaration] =
                 Seq(
                     Field(isConst = false, IntType(), refCountName, None),
