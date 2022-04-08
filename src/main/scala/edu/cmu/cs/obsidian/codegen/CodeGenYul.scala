@@ -423,7 +423,19 @@ object CodeGenYul extends CodeGenerator {
 
         declaration match {
             case _: Field => Seq() // fields are translated as they are encountered
-            case t: Transaction => Seq(translateTransaction(t, contractName, checkedTable, isCons = false))
+            case t: Transaction =>
+                if (t.name == deallocName){
+                    Seq(
+                        addThisArgument(
+                            FunctionDefinition(name = flattenedName(contractName, t.name, None),
+                            parameters = Seq(),
+                            returnVariables = Seq(),
+                            body = Block(Do(apply(nameWiper(contractName),Identifier("this")))),
+                            inDispatch = false))
+                    )
+                } else {
+                    Seq(translateTransaction(t, contractName, checkedTable, isCons = false))
+                }
             case _: State =>
                 assert(assertion = false, "TODO")
                 Seq()
