@@ -283,7 +283,7 @@
         {
             "file": "SetGetRefCountIncr.obs",
             "expected": "16",
-            "deploy_logged" : [5738, 5738, 5738],
+            "deploy_logged" : [5738, -57896044618658097711785492504343953926634992332820282019728792003956564819744, 5738, 5738, -57896044618658097711785492504343953926634992332820282019728792003956564819680, 5738, 5738],
             "shows_that_we_support": "shows that aliasing works and reference counts get incremented"
         },
         {

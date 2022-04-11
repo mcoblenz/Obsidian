@@ -424,14 +424,14 @@ object CodeGenYul extends CodeGenerator {
         declaration match {
             case _: Field => Seq() // fields are translated as they are encountered
             case t: Transaction =>
-                if (t.name == deallocName){
+                if (t.name == deallocName) {
                     Seq(
                         addThisArgument(
                             FunctionDefinition(name = flattenedName(contractName, t.name, None),
-                            parameters = Seq(),
-                            returnVariables = Seq(),
-                            body = Block(Do(apply(nameWiper(contractName),Identifier("this")))),
-                            inDispatch = false))
+                                parameters = Seq(),
+                                returnVariables = Seq(),
+                                body = Block(Do(apply(nameWiper(contractName), Identifier("this")))),
+                                inDispatch = false))
                     )
                 } else {
                     Seq(translateTransaction(t, contractName, checkedTable, isCons = false))
@@ -537,48 +537,46 @@ object CodeGenYul extends CodeGenerator {
                 }
             case Assignment(assignTo, e) =>
                 assignTo match {
-                    case ReferenceIdentifier(x, obstype) =>
+                    case ReferenceIdentifier(x, _) =>
                         // todo: this assumes that all identifiers are either fields or stack variables.
                         //  it also likely does not work correctly with shadowing.
                         val id = nextTemp()
                         val e_yul = translateExpr(id, e, contractName, checkedTable)
                         val ct = checkedTable.contractLookup(contractName)
 
-                        val field_address = fieldFromThis(ct, x)
-
-                        // look at assignTo. if it's a storage address, then look at the type of e.
-                        // if it's a primitive, ignore it.  if it's a  contract reference, it needs
-                        // to get traced first
-                        val trace_for_e: Seq[YulStatement] = e.obstype match {
-                            case Some(value) => value match {
-                                case _: PrimitiveType => Seq()
-                                case t: NonPrimitiveType => t match {
-                                    case ContractReferenceType(contractType, _, _) => // todo
-                                        Seq(
-                                            edu.cmu.cs.obsidian.codegen.If(apply("not", compareToThresholdExp(field_address)),
-                                                Block(Do(apply(nameTracer(contractType.contractName), id))))
-                                        )
-                                    case StateType(_, _, _) => assert(assertion = false, "not yet implemented"); Seq()
-                                    case InterfaceContractType(_, _) => assert(assertion = false, "not yet implemented"); Seq()
-                                    case GenericType(_, _) => assert(assertion = false, "not yet implemented"); Seq()
-                                }
-                                case BottomType() => Seq()
-                            }
-                            case None => assert(assertion = false, "encountered an expression without a type annotation"); Seq()
-                        }
-
-                        val update_instructions: Seq[YulStatement] =
-                            if (ct.allFields.exists(f => f.name.equals(x))) {
-                                trace_for_e :+ updateField(ct, x, id)
-                            } else {
-                                Seq(assign1(Identifier(x), id))
-                            }
-
-                        decl_0exp(id) +: (e_yul ++ update_instructions)
-
+                        // declare the return variable and then run the translated expression, then
+                        (decl_0exp(id) +: e_yul) ++
+                            // look at the type that the translation came from
+                            (e.obstype match {
+                                case None => throw new RuntimeException("encountered an expression without a type annotation")
+                                case Some(tau) =>
+                                    tau match {
+                                        // if it's primitive, check if it's a field or not and update or assign
+                                        case _: PrimitiveType =>
+                                            if (ct.allFields.exists(f => f.name.equals(x))) {
+                                                Seq(updateField(ct, x, id))
+                                            } else {
+                                                Seq(assign1(Identifier(x), id))
+                                            }
+                                        case npt: NonPrimitiveType => npt match {
+                                            // if it's a contract reference, then we need to trace it and also copy the pointer itself
+                                            case ContractReferenceType(contractType, _, _) =>
+                                                if (ct.allFields.exists(f => f.name.equals(x))) {
+                                                    Seq(
+                                                        codegen.If(condition = apply("not", compareToThresholdExp(fieldFromThis(ct, x))),
+                                                                    body = Block(Do(apply(nameTracer(contractType.contractName), id)))),
+                                                        updateField(ct, x, apply("mload",id))
+                                                    )
+                                                } else {
+                                                    // todo: this branch may need to be changed too, i'm not sure
+                                                    Seq(assign1(Identifier(x), id))
+                                                }
+                                        }
+                                        case _ => assert(assertion=false, s"not yet implemented ${e.obstype}"); Seq()
+                                    }
+                            })
                     case _ =>
-                        assert(assertion = false, "trying to assign to non-assignable: " + e.toString)
-                        Seq()
+                        assert(assertion = false, "trying to assign to non-assignable: " + e.toString); Seq()
                 }
             case IfThenElse(scrutinee, pos, neg) =>
                 // generate a temp to store the last assignment used in either block
