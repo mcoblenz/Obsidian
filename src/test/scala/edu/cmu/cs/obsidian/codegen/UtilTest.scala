@@ -70,32 +70,32 @@ class UtilTest extends JUnitSuite {
 
     @Test def sizeOfSetGetNoArgsNoConstructNoInit(): Unit = {
         runSizeTest("resources/tests/GanacheTests/SetGetNoArgsNoConstructNoInit.obs",
-            Map("SetGetNoArgsNoConstructNoInit" -> 0, "IntContainer" -> 32))
+            Map("SetGetNoArgsNoConstructNoInit" -> 32, "IntContainer" -> 64))
     }
 
     @Test def sizeOfSetGetTwoInts(): Unit = {
         runSizeTest("resources/tests/GanacheTests/SG.obs",
-            Map("SG" -> 0, "IntContainer" -> 4*32))
+            Map("SG" -> 32, "IntContainer" -> 5*32))
     }
 
     @Test def offsetOfXSetGetTwoInts(): Unit = {
-        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "x", 0)
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "x", 32)
     }
 
     @Test def offsetOfYSetGetTwoInts(): Unit = {
-        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "y", 32)
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "y", 64)
     }
 
     @Test def offsetOfZSetGetTwoInts(): Unit = {
-        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "z", 64)
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "z", 96)
     }
 
     @Test def offsetOfFSetGetTwoInts(): Unit = {
-        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "f", 96)
+        runOffsetTest("resources/tests/GanacheTests/SG.obs", "IntContainer", "f", 128)
     }
 
     @Test def sizeOfIntContainerField(): Unit = {
         runSizeTest("resources/tests/GanacheTests/SetGetPointer.obs",
-            Map("SetGetPointer" -> 32, "IntContainer" -> 4*32))
+            Map("SetGetPointer" -> 64, "IntContainer" -> 5*32))
     }
 }
