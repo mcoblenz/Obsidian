@@ -248,6 +248,7 @@ case class StringLiteral(content: String) extends YulAST
   * @param mainContractSize         the number of bytes that the main contract needs when laid out in memory
   * @param otherTransactions        the transactions that came from each of the other contracts in obsidian
   * @param tracers                  the functions to trace memory for each non-zero sized contract
+  * @param wipers                   the functions to wipe instances in storage
   */
 case class YulObject(contractName: String,
                      data: Seq[Data],

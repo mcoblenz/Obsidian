@@ -564,16 +564,16 @@ object CodeGenYul extends CodeGenerator {
                                                 if (ct.allFields.exists(f => f.name.equals(x))) {
                                                     Seq(
                                                         codegen.If(condition = apply("not", compareToThresholdExp(fieldFromThis(ct, x))),
-                                                                    body = Block(Do(apply(nameTracer(contractType.contractName), id)))),
-                                                        updateField(ct, x, apply("mload",id))
+                                                            body = Block(Do(apply(nameTracer(contractType.contractName), id)))),
+                                                        updateField(ct, x, apply("mload", id))
                                                     )
                                                 } else {
                                                     // todo: this branch may need to be changed too, i'm not sure
                                                     Seq(assign1(Identifier(x), id))
                                                 }
-                                            case _ => assert(assertion=false, s"not yet implemented ${e.obstype}"); Seq()
+                                            case _ => assert(assertion = false, s"not yet implemented ${e.obstype}"); Seq()
                                         }
-                                        case _ => assert(assertion=false, s"not yet implemented ${e.obstype}"); Seq()
+                                        case _ => assert(assertion = false, s"not yet implemented ${e.obstype}"); Seq()
                                     }
                             })
                     case _ =>
