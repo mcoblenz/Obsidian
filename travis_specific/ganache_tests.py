@@ -306,7 +306,7 @@ if args.verbose:
 
 # check to make sure the tools we need are installed and print versions; error otherwise
 if not args.quick:
-    cmds = ["ganache-cli", "node", "npm", "java", "docker"]  # todo add: solc
+    cmds = ["ganache", "node", "npm", "java", "docker"]  # todo add: solc
     print("-------- versions --------")
     for c in cmds:
         check_for_command(c)
@@ -384,4 +384,3 @@ if failed:
 else:
     print(colored(f"\nALL {str(len(tests_to_run))} TESTS PASSED", 'green'))
     sys.exit(0)
-
