@@ -19,7 +19,8 @@ class TypeCheckerTests extends JUnitSuite {
     private def runTest(file: String, expectedErrors: Seq[(Error, LineNumber)]): Unit = {
         var prog: Program = null
         try {
-            prog = Parser.parseFileAtPath(file, new FileInputStream(file), printTokens = false)
+            // these tests are *not* specific to Yul generation, so we do not inject GC code
+            prog = Parser.parseFileAtPath(file, new FileInputStream(file), printTokens = false, injectGC = false)
         }
         catch {
             case p: Parser.ParseException =>

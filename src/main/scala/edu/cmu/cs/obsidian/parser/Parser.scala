@@ -1,5 +1,6 @@
 package edu.cmu.cs.obsidian.parser
 
+import edu.cmu.cs.obsidian.codegen.Util.{deallocName, refCountName, releaseName, retainName}
 import edu.cmu.cs.obsidian.lexer._
 import edu.cmu.cs.obsidian.typecheck._
 import org.apache.commons.io.IOUtils
@@ -816,7 +817,7 @@ object Parser extends Parsers {
         }
     }
 
-    def parseFileAtPath(srcPath: String, input: InputStream, printTokens: Boolean): Program = {
+    def parseFileAtPath(srcPath: String, input: InputStream, printTokens: Boolean, injectGC: Boolean): Program = {
         val src = try {
             val writer = new StringWriter()
             IOUtils.copy(input, writer)
@@ -840,6 +841,89 @@ object Parser extends Parsers {
             case Left(msg) => throw new ParseException(msg + " in " + srcPath)
             case Right(tree) => tree
         }
-        ast
+
+        /** given an obsidian contract, return a contract that's identical except that it has an
+          * extra field for reference counting and methods to update it
+          *
+          * @param c the argument contract
+          * @return the contract with the added field
+          * @throws RuntimeException if the argument contract already uses the reserved name
+          */
+        def addRefCountingGC(c: Contract) : Contract = {
+            val thisTypeArg = ContractReferenceType(ContractType(c.name, c.params), Unowned(), NotRemoteReferenceType())
+            val gcDecls: Seq[Declaration] =
+                Seq(
+                    Field(isConst = false, IntType(), refCountName, None),
+                    Transaction(name = retainName,
+                        params = Seq(),
+                        args = Seq(),
+                        retType = None,
+                        ensures = Seq(),
+                        body = Seq(
+                            // todo perhaps the "Some" here should be None, since those annotations will get added by the checker
+                            Assignment(ReferenceIdentifier(refCountName, Some(IntType())), Add(ReferenceIdentifier(refCountName, Some(IntType())), NumLiteral(1))),
+                            Return()
+                        ),
+                        isStatic = false,
+                        isPrivate = true,
+                        thisType = thisTypeArg,
+                        thisFinalType = thisTypeArg,
+                    ),
+                    Transaction(name = releaseName,
+                        params = Seq(),
+                        args = Seq(),
+                        retType = None,
+                        ensures = Seq(),
+                        body = Seq(
+                            // todo perhaps the Somes here should be None, since those annotations will get added by the checker
+                            Assignment(ReferenceIdentifier(refCountName, Some(IntType())), Subtract(ReferenceIdentifier(refCountName, Some(IntType())), NumLiteral(1))),
+                            If(eCond = Equals(ReferenceIdentifier(refCountName, Some(IntType())), NumLiteral(0)),
+                                s = Seq(LocalInvocation(name = deallocName,
+                                    genericParams = Seq(),
+                                    params = Seq(),
+                                    args = Seq(),
+                                    obstype = None))),
+                            Return()
+                        ),
+                        isStatic = false,
+                        isPrivate = true,
+                        thisType = thisTypeArg,
+                        thisFinalType = thisTypeArg,
+                    ),
+                    Transaction(name = deallocName,
+                        params = Seq(),
+                        args = Seq(),
+                        retType = None,
+                        ensures = Seq(),
+                        body = Seq(
+                            // the body of dealloc is not Obsidian, it's Yul that relies on the underlying memory layout. so this will get added at translation time.
+                            Return()
+                        ),
+                        isStatic = false,
+                        isPrivate = true,
+                        thisType = thisTypeArg,
+                        thisFinalType = thisTypeArg,
+                    )
+                )
+            val reserved: Set[String] = Set(refCountName,retainName,deallocName,releaseName)
+            val overlap: Option[Declaration] = c.declarations.find(d => reserved.contains(d.name))
+            if (overlap.nonEmpty) {
+                throw new RuntimeException(s"parsing failed because ${c.name} uses reserved name ${overlap.get.name}: ${c.declarations.map(d => d.name).mkString("; ")}")
+            }
+
+            c match {
+                case ObsidianContractImpl(modifiers, name, params, bound, declarations, transitions, isInterface, sp) =>
+                    ObsidianContractImpl(modifiers, name, params, bound,
+                        gcDecls ++ declarations,
+                        transitions, isInterface, sp)
+                case JavaFFIContractImpl(_, _, _, _, _) => c
+            }
+        }
+
+        if(injectGC) {
+            Program(ast.imports, ast.contracts.map(addRefCountingGC))
+        } else {
+            ast
+        }
     }
 }

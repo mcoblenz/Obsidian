@@ -88,7 +88,7 @@ object ImportProcessor {
         searchPaths(importFilename, importPath, includePaths) match {
             case Some((resolvedImportPath, inputStream)) => {
                 if (!seenFiles.contains(resolvedImportPath)) {
-                    val importedProgram = Parser.parseFileAtPath(resolvedImportPath, inputStream, printTokens = false)
+                    val importedProgram = Parser.parseFileAtPath(resolvedImportPath, inputStream, printTokens = false, injectGC = false)
 
                     var contracts = filterTags(importedProgram.contracts)
 

@@ -1,0 +1,26 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int value) {
+        x = value;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+contract IntContainerContainer {
+    IntContainer@Owned ic1;
+
+    IntContainerContainer@Owned(){
+        ic1 = new IntContainer();
+    }
+}
+
+main contract SetGetRefCountNested{
+    transaction main() returns int{
+        IntContainerContainer icc1 = new IntContainerContainer();
+        icc1.release(); // should see that things get cleared out
+        return 0;
+    }
+}

@@ -1,0 +1,24 @@
+contract IntContainer{
+    int x;
+
+    transaction set(int value) {
+        x = value;
+    }
+    transaction get() returns int{
+        return x;
+    }
+}
+
+main contract SetGetRefCountIncr{
+    IntContainer@Unowned ic1; // this is unowned, now, compared to SetGetLogs
+    IntContainer@Owned ic2;
+
+    transaction main() returns int{
+        ic1 = new IntContainer();
+        ic2 = ic1; // the reference counter field should be 2 after this
+        ic2.retain();
+        ic1.set(5);
+        ic2.set(8);
+        return (ic1.get() + ic2.get()); //16; the 8 should overwrite the 5
+    }
+}

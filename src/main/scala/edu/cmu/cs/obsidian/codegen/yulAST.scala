@@ -159,7 +159,8 @@ case class VariableDeclaration(variables: Seq[(Identifier, Option[String])], val
 case class FunctionDefinition(name: String,
                               parameters: Seq[TypedName],
                               returnVariables: Seq[TypedName],
-                              body: Block) extends YulStatement {
+                              body: Block,
+                              inDispatch: Boolean) extends YulStatement {
     override def toString: String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/function.mustache"), "function")
@@ -247,6 +248,7 @@ case class StringLiteral(content: String) extends YulAST
   * @param mainContractSize         the number of bytes that the main contract needs when laid out in memory
   * @param otherTransactions        the transactions that came from each of the other contracts in obsidian
   * @param tracers                  the functions to trace memory for each non-zero sized contract
+  * @param wipers                   the functions to wipe instances in storage
   */
 case class YulObject(contractName: String,
                      data: Seq[Data],
@@ -255,7 +257,8 @@ case class YulObject(contractName: String,
                      mainConstructorTypeNames: Seq[TypedName],
                      defaultCons: Seq[YulStatement],
                      otherTransactions: Seq[YulStatement],
-                     tracers: Seq[FunctionDefinition]) extends YulAST {
+                     tracers: Seq[FunctionDefinition],
+                     wipers: Seq[FunctionDefinition]) extends YulAST {
     def yulString(): String = {
         val mf = new DefaultMustacheFactory()
         val mustache = mf.compile(new FileReader("Obsidian_Runtime/src/main/yul_templates/object.mustache"), "example")
@@ -358,10 +361,6 @@ case class YulObject(contractName: String,
             )
         }
 
-
-        // TODO here and above in the dispatch table we do not respect privacy; we should iterate
-        //  only over the things in the main contract that are public
-
         // todo: there's a fair amount of repetition here with t.asInstanceOf and dropThisArgument;
         //   tighten that up so it's easier to follow. at the same time think about how to only emit
         //   the decoders and encoders we actually need (i.e. if f only has `this` as a param, the decoder we
@@ -385,12 +384,16 @@ case class YulObject(contractName: String,
             val thisId = Identifier("this")
             Block(
                 Seq(
-                    //let this := allocate_memory({{mainSize}})
-                    //decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
+                    //let this := 0x8...0
                     decl_1exp(thisId, first_storage_address)
                 )
             )
         }
+
+        // todo: this happens to be true, the type info just doesn't get propagated. it would be nice to not need to do this.
+        val mainContractTransFD: Seq[FunctionDefinition] = mainContractTransactions.map(t => t.asInstanceOf[FunctionDefinition])
+        val otherContractTransFD: Seq[FunctionDefinition] = otherTransactions.map(t => t.asInstanceOf[FunctionDefinition])
+        val allTransactions: Seq[FunctionDefinition] = mainContractTransFD ++ otherContractTransFD
 
         // the dispatch table gets one entry for each transaction in the main contract. the transactions
         // elaborations are added below, and those have a `this` argument added, which is supplied in the
@@ -398,30 +401,34 @@ case class YulObject(contractName: String,
         // outside world does not see that, so the hashes in the dispatch array are the ones that
         // result from the transaction definitions WITHOUT the `this` argument.
         def dispatchTable(): codegen.Switch =
-            codegen.Switch(Identifier("selector"),
-                mainContractTransactions.map(t => codegen.Case(hexlit(hashOfFunctionDef(dropThisArgument(t.asInstanceOf[FunctionDefinition]))),
-                    Block(dispatchEntry(t.asInstanceOf[FunctionDefinition])))))
+            codegen.Switch(expression = Identifier("selector"),
+                cases = mainContractTransFD.
+                    filter(fd => fd.inDispatch).
+                    map(fd => codegen.Case(value = hexlit(hashOfFunctionDef(dropThisArgument(fd))),
+                        body = Block(dispatchEntry(fd)))))
 
         // traverse the transactions and compute the abi functions we need to emit.
         def abiEncodeTupleFuncs(): YulStatement = Block(
             LineComment("abi encode tuple functions") +:
-                (mainContractTransactions ++ otherTransactions)
-                    .map(t => t.asInstanceOf[FunctionDefinition].returnVariables.length)
+                allTransactions
+                    .map(t => t.returnVariables.length)
                     .distinct
                     .map(write_abi_encode_tuple_from_stack))
 
         def abiDecodeFuncs(): YulStatement = Block(
             LineComment("abi decode functions") +:
                 (// for each transaction, emit the decoder for the tuple of its arguments
-                    (mainContractTransactions.map(t => write_abi_decode_tuple(dropThisArgument(t.asInstanceOf[FunctionDefinition]))).distinct
+                    (mainContractTransFD.map(t => write_abi_decode_tuple(dropThisArgument(t))).distinct
                         // for each transaction, collect up the types that it uses, and then emit the decodes for those types
-                        ++ mainContractTransactions.flatMap(t => dropThisArgument(t.asInstanceOf[FunctionDefinition]).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
+                        ++ mainContractTransFD.flatMap(t => dropThisArgument(t).parameters.map(tn => tn.typ)).distinct.map(write_abi_decode)
                         ).distinct
                     )
         )
 
-        def transactions(): YulStatement = Block(LineComment("translated transactions") +: (mainContractTransactions ++ otherTransactions))
+        def transactions(): YulStatement = Block(LineComment("translated transactions") +: allTransactions)
 
         def tracertransactions(): YulStatement = Block(LineComment("per contract generated tracers") +: tracers)
+
+        def wipertransactions(): YulStatement = Block(LineComment("per contract generated wipers") +: wipers)
     }
 }
