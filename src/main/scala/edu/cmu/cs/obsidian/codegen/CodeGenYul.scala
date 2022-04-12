@@ -571,6 +571,7 @@ object CodeGenYul extends CodeGenerator {
                                                     // todo: this branch may need to be changed too, i'm not sure
                                                     Seq(assign1(Identifier(x), id))
                                                 }
+                                            case _ => assert(assertion=false, s"not yet implemented ${e.obstype}"); Seq()
                                         }
                                         case _ => assert(assertion=false, s"not yet implemented ${e.obstype}"); Seq()
                                     }

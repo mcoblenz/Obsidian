@@ -221,7 +221,7 @@ object Main {
         val filename = options.inputFiles.head
 
         try {
-            val ast = Parser.parseFileAtPath(filename, new FileInputStream(filename), options.printTokens)
+            val ast = Parser.parseFileAtPath(filename, new FileInputStream(filename), options.printTokens, injectGC = options.target == Target.yul)
 
             if (options.printAST) {
                 println("AST:")

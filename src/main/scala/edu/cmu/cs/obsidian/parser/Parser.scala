@@ -817,7 +817,7 @@ object Parser extends Parsers {
         }
     }
 
-    def parseFileAtPath(srcPath: String, input: InputStream, printTokens: Boolean): Program = {
+    def parseFileAtPath(srcPath: String, input: InputStream, printTokens: Boolean, injectGC: Boolean): Program = {
         val src = try {
             val writer = new StringWriter()
             IOUtils.copy(input, writer)
@@ -920,6 +920,10 @@ object Parser extends Parsers {
             }
         }
 
-        Program(ast.imports, ast.contracts.map(addRefCountingGC))
+        if(injectGC) {
+            Program(ast.imports, ast.contracts.map(addRefCountingGC))
+        } else {
+            ast
+        }
     }
 }

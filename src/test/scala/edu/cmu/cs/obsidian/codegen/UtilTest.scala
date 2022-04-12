@@ -13,7 +13,8 @@ class UtilTest extends JUnitSuite {
     private def pullSymbolTable(file: String): SymbolTable = {
         var prog: Program = null
         try {
-            prog = Parser.parseFileAtPath(file, new FileInputStream(file), printTokens = false)
+            // these tests are for utilities used in Yul elaboration, so we inject the GC code here
+            prog = Parser.parseFileAtPath(file, new FileInputStream(file), printTokens = false, injectGC = true)
         }
         catch {
             case p: Parser.ParseException =>
