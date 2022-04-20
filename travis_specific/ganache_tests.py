@@ -342,12 +342,12 @@ for test in tests_to_run:
     result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
     if result['result'] == "pass":
         print(colored("PASS:", 'green'), test['file'])
-        benchmarks.append(f"{test['file']},{result['gas_deploy']},{result['gas_invoke']}\n")
+        benchmarks.append(f"{test['file']},{result['gas_deploy']},{result['gas_invoke']},{int(result['gas_deploy']) + int(result['gas_invoke'])}\n")
     elif result['result'] == "fail":
         print(colored("FAIL:", 'red'), test['file'])
         pprint.pprint(result, indent=4)
         failed = failed + [test['file']]
-        benchmarks.append(f"{test['file']},FAILED,FAILED\n")
+        benchmarks.append(f"{test['file']},FAILED,FAILED,FAILED\n")
     else:
         error(f"test script error: result from test was neither pass nor fail, got {result['result']}")
 
@@ -359,7 +359,7 @@ for test in tests_to_run:
             os.remove(f"{name}/{name}-pretty.yul")
         os.rmdir(f"{name}")
 
-bench_head="test name,gas used for deploy,gas used for invoke"
+bench_head="test name,gas used for deploy,gas used for invoke,total gas"
 # if requested, print the benchmarks to a file
 if args.benchmarks:
     timestring = datetime.datetime.now().strftime("%d%b%Y.%H.%M.%S")
