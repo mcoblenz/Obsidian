@@ -1,4 +1,37 @@
 \documentclass[sigplan,review,screen]{acmart}
+\usepackage{listings}
+
+\lstdefinelanguage{yul}{
+  keywords={typeof, new, true, false, catch, function, return, null, catch, switch, var, if, in, while, do, else, case, break},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={class, export, boolean, throw, implements, import, this},
+  ndkeywordstyle=\color{darkgray}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=false,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{purple}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]"
+}
+
+\lstset{
+   language=yul,
+   backgroundcolor=\color{lightgray},
+   extendedchars=true,
+   basicstyle=\footnotesize\ttfamily,
+   showstringspaces=false,
+   showspaces=false,
+   numbers=left,
+   numberstyle=\footnotesize,
+   numbersep=9pt,
+   tabsize=2,
+   breaklines=true,
+   showtabs=false,
+   captionpos=b
+}
+
 \begin{document}
 \title{Running Obsidian Smart Contracts On EVM}
 
@@ -39,7 +72,7 @@
 \email{jonathan.aldrich@cs.cmu.edu}
 
 \maketitle
-
+\input{macros}
 
 \section{Introduction}\label{sec:intro}
 \input{intro}

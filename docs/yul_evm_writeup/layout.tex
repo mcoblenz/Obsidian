@@ -1,3 +1,71 @@
-The Obsidian compiler can target either the Fabric framework or Yul. Here
+The Obsidian compiler targets either the Fabric framework or Yul. Here we
 are only concerned with the latter, and the implementations do not
 interact.
+
+To run the emitted Yul code, we invoke \texttt{solc} to produce an EVM
+bytecode and a Python testing harness to interact with a Ganache instance
+via ABI-encoded data in RFC calls. This produces an answer as well as
+logging artifacts and observable changes to storage.
+
+We consider translating a collection of Obsidian contracts, exactly one of
+which is the \emph{main} contract, explicitly denoted with the
+\obssrc{main} keyword. The general shape of the object generated is shown
+in Figure \ref{code.1}.
+
+\begin{figure}[hbtp]
+    \caption{Structure of Generated Yul Object}
+    \label{code.1}
+    \begin{lstlisting}[language=yul,frame=single]
+object "MainContractName" {
+    code { // the deployment block
+        // 1. memory allocation (identical to below)
+        // 2. default constructor for main (identical to below)
+        // 3. generated tracers (identical to below)
+        // 4. build the default main contract instance, trace it
+    }
+    object "MainContractName_deployed" { // the invocation block
+        // 1. sanity checks
+        // 2. dispatch table, inspecting calldataload, using main contract
+          //   in storage
+        // 3. memory allocation
+        // 3. utility functions for abi encoding and decoding
+        // 4. translated transactions, including gc and constructors
+        // 5. generated constructors
+        // 6. generated tracers
+        // 7. generated wipers
+    }
+}
+    \end{lstlisting}
+\end{figure}
+
+TODO: define default constructors (cite C++?). define tracer. define wiper.
+
+\subsection{Deployment}
+
+The main task at deployment time is to build an instance of the main
+contract in memory and then copy that to storage. This copy serves as the
+root object for garbage collection. Note that three of the main components
+in this block are copied verbatim from general purpose versions that exist
+at invocation time, lower in the emitted object; this is a site for future
+optimization.
+
+To that end, the deployment block begins with a copy of the memory
+allocator and associated utility functions, followed by the generated
+default constructors and tracers. Currently we emit all the constructors
+and tracers, although they may not be needed; this is site for future
+optimization. We allocate enough memory for a copy of the main contract,
+use the emitted constructor to build it there, then run the tracer on it to
+copy it to storage. Because we know the first address that allocator will
+give in memory and the mapping the tracer applies to addresses to compute
+their place in storage, we know where this will live in storage and that
+serves as the root.
+
+\subsection{Invocation}
+
+Instances of Obsidian objects can refer to one another, so their
+translations in to Yul must be able to as well. This means at least that
+they must have access to the same memory during execution. To that end, we
+\emph{flatten} the contracts into one object structured as in Figure
+\ref{code.1}. The name of each transaction is prefixed with the name of its
+origin contract in the translation; the structure of Obsidian files
+gaurantees that this is unique. Constructors
