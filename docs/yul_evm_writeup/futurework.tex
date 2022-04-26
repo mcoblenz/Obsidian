@@ -1,0 +1,20 @@
+\subsection{Optimizations}
+
+For each transaction, emit two transactions: one that operates entirely on
+memory and one on storage. this means that before calling a transaction you
+need to check once where its instance lives, but after that there are no
+additional checks. by contrast, now, each transaction checks the location
+of its instance before each interaction with either memory or storage. this
+is always the same, so all but the first check is redundant.
+
+\subsection{Features}
+
+\begin{enumerate} %% from milestones at the very beginning of the project
+\item ethereum addresses
+\item basic data structures: arrays, mappings
+\item revert (1d)
+\item dynamic state tests
+\item dynamic contract allocation
+\item support for ether as an asset type
+\item sending and receiving ether in invocations
+\end{enumerate}
