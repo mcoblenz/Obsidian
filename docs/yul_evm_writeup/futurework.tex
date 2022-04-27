@@ -26,6 +26,21 @@ transaction: one that operates entirely on memory and one on storage. This
 means that before calling a transaction you need to check once where its
 instance lives, but after that there are no additional checks.
 
+The emitted code currently carries a fair amount of repeated code between
+the deployment and invocation blocks. This could be reduced, since the full
+memory allocation infrastructure is not needed at deployment time and the
+shape of the instance to be built is known at compile time because it is
+given by the main contract. A custom allocator could be computed at compile
+time, and indeed one that writes the instance directly to the root position
+in storage rather than choosing to write and then trace.
+
+Currently we are not at all parsimonious with our memory usage for fields;
+adjacent small integers are written to 32-byte wide sections of memory, no
+packing is attempted, etc. This is a well understood place to find
+substantial savings. A way to leverage the existing knowledge would be to
+implement a Yul extension to \todo{that Google thing whose name I can't
+  remember}.
+
 \todo{describe other big picture optimizations, beyond the scope of the Yul
   optimizer, here}
 
