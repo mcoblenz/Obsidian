@@ -3,14 +3,18 @@ are only concerned with the latter, and the implementations do not
 interact.
 
 To run the emitted Yul code, we invoke \texttt{solc} to produce an EVM
-bytecode and a Python testing harness to interact with a Ganache instance
-via ABI-encoded data in RFC calls. This produces an answer as well as
-logging artifacts and observable changes to storage.
+bytecode via testing harness written in Python, which then starts and
+interacts with a Ganache instance via ABI-encoded data in RFC calls via the
+Python web3 library. This process yields an integer answer to a specified
+transaction call against the deployed object, as well as logging artifacts
+and observable changes to storage, which the test harness is responsible
+for comparing to expected values for each test.
 
-We consider translating a collection of Obsidian contracts, exactly one of
-which is the \emph{main} contract, explicitly denoted with the
-\obssrc{main} keyword. The general shape of the object generated is shown
-in Figure \ref{code.1}.
+In each test case, we consider translating a collection of one or more
+Obsidian contracts, exactly one of which is the \emph{main} contract,
+explicitly denoted with the \obssrc{main} keyword. The general shape of the
+Yul object emitted as a result of the translation is given in
+Figure \ref{code.1}.
 
 \begin{figure}[hbtp]
     \caption{Structure of Generated Yul Object}
@@ -38,7 +42,52 @@ object "MainContractName" {
     \end{lstlisting}
 \end{figure}
 
-TODO: define default constructors (cite C++?). define tracer. define wiper.
+The compiler emits a default constructor transaction for any contract that
+lacks a constructor. In the style of C++, this default constructor takes
+enough arguments to populate the fields of the contract. \cite{TODO} Space
+for each argument is allocated in memory and the argument values are
+written there. If a particular field is not of primitive type, then its
+respective default constructor is called recursively with an appropriate
+sized slice of the arguments, and the space allocated in memory for the
+instance of the parent object is populated with a pointer to the instance
+built by the constructor for the child object. In this way, we guarantee
+that there is always a way to build an instance of each object in memory.
+
+The compiler also emits two collections of traversal functions for the
+contracts given in Obsidian.
+
+The first is the collection of \emph{tracers}, of which there is one per
+contract in the source Obsidian file. The purpose of the tracers is to
+traverse the region of memory allocated to an instance of an object in
+memory and copy it to storage. Each tracer takes the address in memory of
+an instance of its respective object and copies its fields to
+storage. Fields of primitive type are copied directly. Fields of
+non-primitive type, that store pointers to instances of other objects, are
+copied by calling the relevant tracer for the contract type recursively on
+the location given by the pointer.
+
+We maintain the invariant that all addresses in memory are less than
+the \emph{threshold} $2^{256}-1$ (a \yulsrc{uint32} that looks
+like \texttt{0x80...0}, which marks the midpoint of the address space of
+storage) and all addresses in storage are greater or equal. This offset
+effectively halves the size of storage, but by doing so allows us to know
+at runtime where an address lives and use the appropriate commands on it,
+i.e. picking between \yulsrc{mload} and \yulsrc{sload}. Since storage is so
+large, the reduced size is not problematic.
+
+To maintain this invariant, when a tracer writes a reference to storage,
+the address value of the pointer itself is increased by the threshold
+value. Since the other tracers do the same, inductively we know that this
+shifting operation will preserve structures as they are copied.
+
+The second is the collection of \emph{wipers}. They follow the same
+recursive call structure induced by the dependency tree of the contracts in
+question, but rather than copying an instance from memory to storage they
+write zeroes to all the storage spaces. Per the Yellow Paper, this triggers
+a 15,000 gas refund against the initial 20,000 gas cost of a cold write to
+storage which is how we amortize the cost of the copying
+operation. \cite{TODO}
+
 
 \subsection{Deployment}
 

@@ -1,20 +1,58 @@
 \subsection{Optimizations}
 
-For each transaction, emit two transactions: one that operates entirely on
-memory and one on storage. this means that before calling a transaction you
-need to check once where its instance lives, but after that there are no
-additional checks. by contrast, now, each transaction checks the location
-of its instance before each interaction with either memory or storage. this
-is always the same, so all but the first check is redundant.
+As described above, the execution pipeline invokes the Yul optimizer built
+into \solc. That is required, at least, because the compiler does not
+attempt to obey the Yul restriction on the number of local variables in the
+process of creating temporary variables. For all the example programs we
+have wanted to run to date, the optimizer is sufficient to fix this
+issue. It is quite aggressive, and its presence in the pipeline goes a long
+way to keeping gas costs low.
+
+That said, information available at compile time from the AST, typing, and
+structural information of an Obsidian program, as well as knowledge about
+the intended layout in memory and its semantics, allows for richer
+structural optimizations than the Yul optimizer can perform and that we
+have not implemented in our prototype so far. We believe that each of these
+will contribute to a more cost-effective runtime, but fine tuning an
+implementation of any one of them to achieve its best result is the subject
+of future work.
+
+In the currently emitted code, the translation of each transaction checks
+the location of its instance before each and every interaction with either
+memory or storage. The answer to this check is always the same within a
+given execution of the transaction, so all but the first check is
+redundant. A solution to this is to emit two Yul transactions per Obsidian
+transaction: one that operates entirely on memory and one on storage. This
+means that before calling a transaction you need to check once where its
+instance lives, but after that there are no additional checks.
+
+\todo{describe other big picture optimizations, beyond the scope of the Yul
+  optimizer, here}
 
 \subsection{Features}
 
+Garbage collection in the current prototype is manual, where we extend the
+Obsidian language to include \obssrc{retain} and \obssrc{release} methods
+for every contract in the style of C\# \cite{todo}. This is sufficient for
+a proof of concept, but it is more of a burden on the programmer than we
+envision: it is well established that explicit memory controls both become
+a substantial cognitive effort even in relatively small programs as well as
+a source of bugs. \cite{todo} In a future version of the Obsidian
+prototype, we plan to implement automatic garbage collection in the style
+of \todo{}. \cite{todo}
+
+We plan to extend the translation of Obsidian into Yul to include a richer
+space of language features, including but not limited to:
 \begin{enumerate} %% from milestones at the very beginning of the project
 \item ethereum addresses
-\item basic data structures: arrays, mappings
-\item revert (1d)
+\item basic data structures like arrays and mappings
+\item the \obssrc{revert} construct
 \item dynamic state tests
 \item dynamic contract allocation
 \item support for ether as an asset type
 \item sending and receiving ether in invocations
 \end{enumerate}
+These features have been on our roadmap since the beginning of this
+project, but the implementation of them was eclipsed by the layout
+described in \ref{sec:layout}, which were both our main concern and more
+intricate than anticipated.
