@@ -3,12 +3,12 @@ are only concerned with the latter, and the implementations do not
 interact.
 
 To run the emitted Yul code, we invoke \texttt{solc} to produce EVM
-bytecode via a testing harness written in Python, which then starts and
-interacts with a Ganache instance with RPC calls and ABI-encoded data
-payloads, relying on the Python web3 library. This process yields an
-integer answer to a specified transaction call against the deployed object
-as well as logging artifacts and observable changes to storage, which the
-harness compares to expected values per test.
+bytecode via a testing harness written in Python. The harness then starts
+and interacts with a Ganache instance via RPC calls and ABI-encoded data
+payloads, relying on the Python web3 library. This yields an integer answer
+to a specified transaction call against the deployed object as well as
+logging artifacts and observable changes to storage, which the harness
+compares to expected values per test.
 
 In each test case, we consider translating a collection of one or more
 Obsidian contracts, exactly one of which is the \emph{main} contract,
@@ -50,19 +50,18 @@ enough arguments to populate the fields of the contract. \cite{TODO} Space
 for each argument is allocated in memory and the argument values are
 written there. If a particular field is not of primitive type, then its
 respective default constructor is called recursively with an appropriate
-sized slice of the arguments, and the space allocated in memory for the
-instance of the parent object is populated with a pointer to the instance
-built by the constructor for the child object. In this way, we guarantee
-that there is always a way to build an instance of each object in memory.
+slice of the arguments and the space allocated in memory for the instance
+of the parent object is populated with a pointer to the instance built by
+the constructor for the child object. In this way, we guarantee that there
+is always a way to build an instance of each object in memory.
 
 The compiler also emits two collections of traversal functions for the
-contracts given in Obsidian.
+contracts given in Obsidian: \emph{tracers} and \emph{wipers}. There is one
+of each for every contract in the Obsidian source.
 
-The first is the collection of \emph{tracers}, of which there is one per
-contract in the source Obsidian file. The purpose of the tracers is to
-traverse the region of memory allocated to an instance of an object in
-memory and copy it to storage. Each tracer takes the address in memory of
-an instance of its respective object and copies its fields to
+The tracers is to traverse the region of memory allocated to an instance of
+an object in memory and copy it to storage. Each tracer takes the address
+in memory of an instance of its respective object and copies its fields to
 storage. Fields of primitive type are copied directly. Fields of
 non-primitive type, that store pointers to instances of other objects, are
 copied by calling the relevant tracer for the contract type recursively on
@@ -84,13 +83,12 @@ the address value of the pointer itself is increased by the threshold
 value. Since the other tracers do the same, inductively we know that this
 shifting operation will preserve structures as they are copied.
 
-The second is the collection of \emph{wipers}. They follow the same
-recursive call structure induced by the dependency tree of the contracts in
-question, but rather than copying an instance from memory to storage they
-write zeroes to all the storage spaces. Per the Yellow Paper, this triggers
-a 15,000 gas refund against the initial 20,000 gas cost of a cold write to
-storage which is how we amortize the cost of the copying
-operation. \cite{TODO}
+The wipers follow the same recursive call structure induced by the
+dependency tree of the contracts in question, but rather than copying an
+instance from memory to storage they write zeroes to all the storage
+spaces. Per the Yellow Paper, this triggers a 15,000 gas refund against the
+initial 20,000 gas cost of a cold write to storage which is how we amortize
+the cost of the copying operation. \cite{TODO}
 
 
 \subsection{The Deployment Block}
@@ -134,13 +132,14 @@ well as the threshold value by which it will have been offset.
 This is followed by a simple memory allocator and functions for
 manipulating data against the ABI specified encoding and decodings.
 
-This is followed by the transactions from the contracts. The name of each
-transaction is prefixed with the name of its origin contract in the
-translation; the structure of Obsidian files guarantees that this is
-unique. Each contract may have multiple constructors, so those are
-additionally prefixed with a hash of their type signature which makes them
-unique. The generated default constructor follows the same convention,
-since it's only emitted when no constructor is present.
+After the allocator, we emit translation of the transactions from the
+contracts. The name of each transaction is prefixed with the name of its
+origin contract in the translation; the structure of Obsidian files
+guarantees that this is unique. Each contract may have multiple
+constructors, so those are additionally prefixed with a hash of their type
+signature which makes them unique. The generated default constructor
+follows the same convention, since it's only emitted when no constructor is
+present.
 
 Each emitted transaction is enhanced with an additional argument
 named \yulsrc{this} in the first position which we assume to be an address
