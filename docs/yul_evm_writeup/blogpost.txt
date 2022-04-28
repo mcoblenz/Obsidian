@@ -1,0 +1,30 @@
+In the last year and a half, we've been extending the Obsidian compiler to
+target the Ethereum Virtual Machine rather than just the Fabric
+Framework. We are proud to be able to share some initial findings with the
+community.
+
+Obsidian is object oriented, which is an under represented language style
+in the blockchain ecosystem. To bridge that paradigm gap and offer the OO
+perspective, we target Yul as an intermediate language, and use some of the
+existing tools in the Solidity tool chain to get the rest of the way to the
+EVM. We flatten the collection of contracts present in an Obsidian program
+into one Yul object, and create instances of those objects in memory.
+
+TODO benefits from typing in Obsidian compared to other block chain
+languages TODO
+
+The main challenge in the translation is memory management. Object Oriented
+languages often feature rich support for automatic memory management of
+persistent data structures. For data to persist between transactions, we
+use space in storage rather than memory for tree-like structures but offer
+reference counting based garbage collection for them to keep the cost
+manageable.
+
+TODO benchmark summary
+
+TODO future
+
+For full details, you can check out our draft white paper here <TODO>. The
+implementation is available on GitHub; the most interesting files to this
+work are <TODO>. The definition of the tests described in the white paper
+are <TODO>
