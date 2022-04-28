@@ -1,0 +1,48 @@
+contract IntLLEnd{
+    int payload;
+
+    IntLLEnd@Owned(int p){
+        payload = p;
+    }
+}
+
+contract IntLL1{
+    int payload;
+    IntLLEnd@Unowned next;
+
+    IntLL1@Owned(int p, IntLLEnd n){
+        payload = p;
+        next = n;
+    }
+}
+
+contract IntLL2{
+    int payload;
+    IntLL1@Unowned next;
+
+    IntLL2@Owned(int p, IntLL1 n){
+        payload = p;
+        next = n;
+    }
+}
+
+contract IntLL3{
+    int payload;
+    IntLL2@Unowned next;
+
+    IntLL3@Owned(int p, IntLL2 n){
+        payload = p;
+        next = n;
+    }
+}
+
+main contract LinkedListShort{
+    transaction main() returns int{
+        IntLLEnd tail = new IntLLEnd(0);
+        IntLL1 e1 = new IntLL1(1, tail);
+        IntLL2 e2 = new IntLL2(1, e1);
+        IntLL3 e3 = new IntLL3(1, e2);
+        e3.release();
+        return 0;
+    }
+}
