@@ -1,3 +1,16 @@
+//contract IntNode {
+//    IntNode@Unowned next;
+//    int payload;
+//
+//    transaction setNext(IntNode@Unowned n){
+//        next = n;
+//    }
+//
+//    transaction setPayload(int p){
+//        payload = p;
+//    }
+//}
+
 contract IntLLEnd{
     int payload;
 
