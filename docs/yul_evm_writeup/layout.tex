@@ -4,7 +4,7 @@ interact.
 
 To run the emitted Yul code, we invoke \texttt{solc} to produce EVM
 bytecode via a testing harness written in Python, which then starts and
-interacts with a Ganache instance with RFC calls and ABI-encoded data
+interacts with a Ganache instance with RPC calls and ABI-encoded data
 payloads, relying on the Python web3 library. This process yields an
 integer answer to a specified transaction call against the deployed object
 as well as logging artifacts and observable changes to storage, which the

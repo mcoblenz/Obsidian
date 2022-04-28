@@ -38,8 +38,7 @@ Currently we are not at all parsimonious with our memory usage for fields;
 adjacent small integers are written to 32-byte wide sections of memory, no
 packing is attempted, etc. This is a well understood place to find
 substantial savings. A way to leverage the existing knowledge would be to
-implement a Yul extension to \todo{that Google thing whose name I can't
-  remember}.
+implement a Yul extension to Protobuf. \cite{todo}
 
 \todo{describe other big picture optimizations, beyond the scope of the Yul
   optimizer, here}
