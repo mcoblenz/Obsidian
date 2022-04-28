@@ -342,7 +342,13 @@ for test in tests_to_run:
     result = run_one_test(test, args.verbose, jar_path[0], tests_data['defaults'])
     if result['result'] == "pass":
         print(colored("PASS:", 'green'), test['file'])
-        benchmarks.append(f"{test['file']},{result['gas_deploy']},{result['gas_invoke']},{int(result['gas_deploy']) + int(result['gas_invoke'])}\n")
+        gassum = None
+        try:
+            gassum = str(int(result['gas_deploy']) + int(result['gas_invoke']))
+        except ValueError:
+            gassum = "n/a"
+
+        benchmarks.append(f"{test['file']},{result['gas_deploy']},{result['gas_invoke']},{gassum}\n")
     elif result['result'] == "fail":
         print(colored("FAIL:", 'red'), test['file'])
         pprint.pprint(result, indent=4)
