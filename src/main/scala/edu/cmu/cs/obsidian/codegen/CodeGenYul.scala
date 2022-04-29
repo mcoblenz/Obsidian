@@ -278,15 +278,16 @@ object CodeGenYul extends CodeGenerator {
                     // the body of load needs to check if it's a ContractReferenceType and add the offset if so;
                     //   when we copy to storage, REWRITE the value of the pointer.
                     val shift_if_addr: codegen.Expression = {
-                    typ match {
-                        case primitiveType: PrimitiveType => apply("mload", mem_loc)
-                        case npt: NonPrimitiveType => npt match {
-                            case ContractReferenceType(contractType, permission, remoteReferenceType) => apply("add", storage_threshold, apply("mload", mem_loc))
-                            case StateType(contractType, stateNames, remoteReferenceType) => throw new RuntimeException("unimplemented")
-                            case InterfaceContractType(name, simpleType) => throw new RuntimeException("unimplemented")
-                            case GenericType(gVar, bound) => throw new RuntimeException("unimplemented")
+                        typ match {
+                            case primitiveType: PrimitiveType => apply("mload", mem_loc)
+                            case npt: NonPrimitiveType => npt match {
+                                case ContractReferenceType(contractType, permission, remoteReferenceType) => apply("add", storage_threshold, apply("mload", mem_loc))
+                                case StateType(contractType, stateNames, remoteReferenceType) => throw new RuntimeException("unimplemented")
+                                case InterfaceContractType(name, simpleType) => throw new RuntimeException("unimplemented")
+                                case GenericType(gVar, bound) => throw new RuntimeException("unimplemented")
+                            }
+                            case BottomType() => throw new RuntimeException("unimplemented")
                         }
-                        case BottomType() => throw new RuntimeException("unimplemented")
                     }
 
                     // the instructions to load the contents of memory into storage
