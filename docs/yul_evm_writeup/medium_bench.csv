@@ -1,0 +1,4 @@
+test name,gas used for deploy,gas used for invoke,total gas
+SetGetPointer.obs,412039,41219,453258
+SetGetNestedPointerPassThrough.obs,203324,33004,236328
+SetGetLogs.obs,394966,54308,449274

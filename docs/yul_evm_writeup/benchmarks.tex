@@ -1,20 +1,58 @@
-%\csvautotabular{gas.csv}
-
 \subsection{Without Pointers}
 
-\todo{overhead here but it's acceptable. optimizer does a lot.}
+\todo{overhead here but it's acceptable. optimizer does a lot. these
+  contracts don't touch memory, so their tracers are all the trivial
+  ones. this gives a sense of the baseline overhead we add.}
+
+\begin{figure}[hbtp]
+    \caption{Benchmarks with Trivial Tracers}
+    \label{data.1}
+    \resizebox{\columnwidth}{!}{
+      \csvautotabular{small_bench.csv}
+    }
+\end{figure}
+
 
 \subsection{With Pointers}
 
 \todo{lots of overhead; it's cheaper to turn off gc, because you're doing
   more work collecting than you get repaid for}
 
+\begin{figure}[hbtp]
+    \caption{Benchmarks with Pointer Fields}
+    \label{data.3}
+    \resizebox{\columnwidth}{!}{
+      \csvautotabular{medium_bench.csv}
+    }
+\end{figure}
+
+
 \subsection{Linked List}
 
-\todo{once you have enough in storage, the rebates take over and are more
-than the cost of collecting them. with a simple LL structure that's around
-XXX. if you imagine a doubly linked list backing a priority / de / queue,
-it'll be faster. that datastructure is known to be hard to implement in the
-sort of associative mappings that are built into solidity, and its use
-might arise very naturally from a smart contract that processes queries in
-arrival order.}
+\todo{the theory is that once you have enough in storage, the rebates take
+  over and are more than the cost of collecting them. these tests are with
+  a simple linked list of 4 and 8 items. if you imagine a doubly linked
+  list backing a priority / de / queue, it'll be faster. that datastructure
+  is known to be hard to implement in the sort of associative mappings that
+  are built into solidity, and its use might arise very naturally from a
+  smart contract that processes queries in arrival order.}
+
+\begin{figure}[hbtp]
+    \caption{Benchmarks With Linked Lists}
+    \label{data.3}
+    \resizebox{\columnwidth}{!}{
+      \csvautotabular{ll_bench.csv}
+    }
+\end{figure}
+
+
+\todo{Note that differences in gas are roughly comparable to the ratio of
+  filesize differences.}
+
+\begin{figure}[hbtp]
+    \caption{Sizes of Optimized GC and non-GC Linked List Benchmarks}
+    \label{data.4}
+    \resizebox{\columnwidth}{!}{
+      \csvautotabular{sizes.csv}
+    }
+\end{figure}
