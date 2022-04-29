@@ -1,0 +1,52 @@
+\documentclass[sigplan,review,screen]{acmart}
+\usepackage{listings}
+\usepackage[l3]{csvsimple}
+\usepackage{graphics}
+\input{macros}
+\input{languagedefs}
+\begin{document}
+\title{Running Obsidian Smart Contracts On EVM}
+
+\author{Ian Ernest Voysey}
+\orcid{0000-0002-6041-2010}
+\cmu{}
+\email{iev@cs.cmu.edu}
+
+\author{Michael Coblenz}
+\orcid{0000-0002-9369-4069}
+\affiliation{
+  \institution{University of Maryland}
+  \streetaddress{8125 Paint Branch Drive}
+  \city{College Park}
+  \state{MD}
+  \postcode{20742}
+  \country{USA}
+}
+\email{mcoblenz@umd.edu}
+
+\author{Jonathan Aldrich}
+\orcid{0000-0003-0631-5591}
+\cmu{}
+\email{jonathan.aldrich@cs.cmu.edu}
+
+\maketitle
+
+\section{Introduction}\label{sec:intro}
+\input{intro}
+
+\section{Target Object Layout and Execution}\label{sec:layout}
+\input{layout}
+
+\section{Benchmarks}\label{sec:benchmarks}
+\input{benchmarks}
+
+\section{Future Work}\label{sec:futurework}
+\input{futurework}
+
+\section{Related Work}\label{sec:relatedwork}
+\input{relatedwork}
+
+\section{Conclusion}\label{sec:conclusion}
+\input{conclusion}
+
+\end{document}

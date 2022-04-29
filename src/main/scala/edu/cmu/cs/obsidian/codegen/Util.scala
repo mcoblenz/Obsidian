@@ -48,6 +48,7 @@ object Util {
       * @return the corresponding Yul boolean literal
       */
     def boollit(b: Boolean): Literal = {
+        // per christian, we do not emit boolean literals for bools even though some versions of solc support it
         b match {
             case true => intlit(1)
             case false => intlit(0)
@@ -404,7 +405,7 @@ object Util {
     def updateField(ct: ContractTable, fieldName: String, value: Expression): YulStatement = {
         val address_of_field: Expression = fieldFromThis(ct, fieldName)
         ifInStorge(addr_to_check = address_of_field,
-            true_case = Do(apply("sstore", address_of_field, value)), // todo double check why there isn't a mapToStorageAddr call here; i think it's because you only end up in this branch when `this` is already big enough
+            true_case = Do(apply("sstore", address_of_field, value)),
             false_case = Do(apply("mstore", address_of_field, value))
         )
     }
@@ -586,7 +587,7 @@ object Util {
     val storage_threshold: Expression = apply("shl", intlit(255), intlit(1))
 
     // storage addresses start at 0x8...0, but the first one that will actually come out the allocator is 128 above that.
-    val first_storage_address = apply("add", storage_threshold, intlit(128))
+    val first_storage_address: Expression = apply("add", storage_threshold, intlit(128))
 
     /** given an expression representing a memory address its corresponding place in storage
       *
@@ -673,10 +674,10 @@ object Util {
     def defaultInitValue(typ: YulABIType): Literal = {
         typ match {
             case YATAddress() => hexlit("0x0")
-            case YATUInt32() => intlit(5738) //todo
+            case YATUInt32() => intlit(5738) //todo: this is an arbitrary non-zero value for debugging. all the logs in the tests depend on it
             case YATBool() => boollit(false)
             case YATString() => stringlit("")
-            case YATContractName(name) => throw new RuntimeException("can't query for a default contract value")
+            case YATContractName(_) => throw new RuntimeException("can't query for a default contract value")
         }
     }
 

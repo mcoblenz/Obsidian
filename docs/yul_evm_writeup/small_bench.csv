@@ -1,0 +1,4 @@
+test name,gas used for deploy,gas used for invoke,total gas
+AssignLocalAdd.obs,95101,21202,116303
+PrimOpsEq.obs,90754,21175,111929
+Return.obs,101152,21227,122379

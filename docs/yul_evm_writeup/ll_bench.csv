@@ -1,0 +1,5 @@
+test name,gas used for deploy,gas used for invoke,total gas
+LinkedListShort.obs,185438,26751,212189
+LinkedListShortNoGC.obs,111895,26499,138394
+LinkedListMed.obs,228890,27139,256029
+LinkedListMedNoGC.obs,118162,26875,145037
