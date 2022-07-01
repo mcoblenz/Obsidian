@@ -38,7 +38,7 @@ Currently we are not at all parsimonious with our memory usage for fields;
 adjacent small integers are written to 32-byte wide sections of memory, no
 packing is attempted, etc. This is a well understood place to find
 substantial savings. A way to leverage the existing knowledge would be to
-implement a Yul extension to Protobuf. \cite{todo}
+implement a Yul extension to Protobuf. \cite{TODO}
 
 \todo{describe other big picture optimizations, beyond the scope of the Yul
   optimizer, here}
@@ -47,13 +47,13 @@ implement a Yul extension to Protobuf. \cite{todo}
 
 Garbage collection in the current prototype is manual, where we extend the
 Obsidian language to include \obssrc{retain} and \obssrc{release} methods
-for every contract in the style of C\# \cite{todo}. This is sufficient for
+for every contract in the style of C\# \cite{TODO}. This is sufficient for
 a proof of concept, but it is more of a burden on the programmer than we
 envision: it is well established that explicit memory controls both become
 a substantial cognitive effort even in relatively small programs as well as
-a source of bugs. \cite{todo} In a future version of the Obsidian
+a source of bugs. \cite{TODO} In a future version of the Obsidian
 prototype, we plan to implement automatic garbage collection in the style
-of \todo{}. \cite{todo}
+of \todo{}. \cite{TODO}
 
 We plan to extend the translation of Obsidian into Yul to include a richer
 space of language features, including but not limited to:

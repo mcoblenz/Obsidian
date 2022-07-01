@@ -1,69 +1,57 @@
-The Obsidian compiler targets eAAither the Fabric framework or Yul. Here we
-are only concerned with the latter, and the implementations do not
-interact.
+In general, an Obsidian program consists of a collection of contracts, one of which is the \obssrc{main} contract. The general shape of the
+Yul object emitted as a result of translating an Obsidian program is given in
+Figure \ref{code.1}. The \emph{deployment block} consists of code that is executed when the main contract is deployed; the \emph{invocation block} contains implementations of all transactions that can be invoked on the deployed contract. The chief responsibility of the deployment block is to initialize the memory allocation mechanism, allocate one instance of the main contract, and persist that instance in storage.
 
-To run the emitted Yul code, we invoke \texttt{solc} to produce EVM
-bytecode via a testing harness written in Python. The harness then starts
-and interacts with a Ganache instance via RPC calls and ABI-encoded data
-payloads, relying on the Python web3 library. This yields an integer answer
-to a specified transaction call against the deployed object as well as
-logging artifacts and observable changes to storage, which the harness
-compares to expected values per test.
-
-In each test case, we consider translating a collection of one or more
-Obsidian contracts, exactly one of which is the \emph{main} contract,
-explicitly denoted with the \obssrc{main} keyword. The general shape of the
-Yul object emitted as a result of the translation is given in
-Figure \ref{code.1}.
 
 \begin{figure}[hbtp]
     \caption{Structure of Generated Yul Object}
     \label{code.1}
-    \begin{lstlisting}[language=yul,frame=single]
+    \begin{lstlisting}[language=yul,frame=single,numbers=none]
 object "MainContractName" {
     code { // the deployment block
-        // 1. memory allocation (identical to below)
-        // 2. default constructor for main (identical to below)
-        // 3. generated tracers (identical to below)
+        // 1. memory allocation 
+        // 2. default constructor for main 
+        // 3. generated tracers (
         // 4. build the default main contract instance, trace it
     }
     object "MainContractName_deployed" { // the invocation block
         // 1. sanity checks
         // 2. dispatch table, inspecting calldataload, using main contract
           //   in storage
-        // 3. memory allocation
-        // 3. utility functions for abi encoding and decoding
-        // 4. translated transactions, including gc and constructors
-        // 5. generated constructors
-        // 6. generated tracers
-        // 7. generated wipers
+        // 3. memory allocation (same as deployment block)
+        // 4. utility functions for abi encoding and decoding
+        // 5. translated transactions, including gc and constructors
+        // 6. generated constructors (for main, same as deployment block)
+        // 7. generated tracers (same as in deployment block)
+        // 8. generated wipers
     }
 }
     \end{lstlisting}
 \end{figure}
 
-In Figure \ref{code.2} we show a simple pair of Obsidian contracts. This
-will be our running example in this section; as we describe different
-aspects of the translation, we provide snippets of the emitted code
-produced on this contract.
+In the rest of this section, we will describe how Obsidian code is translated to Yul, leveraging the running example shown in Figure \ref{code.2}. As we describe different
+aspects of the translation, we provide examples of the emitted code
+produced when translating this contract. 
+
+
 
 \begin{figure}[hbtp]
-    \caption{Example Obsidian Setter Getter Contract Pair}
+    \caption{Example Obsidian Getter/Setter Contract Pair}
     \label{code.2}
-    \begin{lstlisting}[language=obsidian,frame=single]
-contract IntContainer{
+    \begin{lstlisting}[language=obsidian,frame=single,numbers=none]
+contract IntContainer {
     int x;
 
     transaction set(int value) {
         x = value;
     }
-    transaction get() returns int{
+    transaction get() returns int {
         return x;
     }
 }
 
-main contract SetGetWithArgs{
-    transaction main() returns int{
+main contract SetGetWithArgs {
+    transaction main() returns int {
         IntContainer ic = new IntContainer();
         ic.set(5);
         return (ic.get());
@@ -74,14 +62,16 @@ main contract SetGetWithArgs{
 
 
 
-\subsection{Per-contract Generated Transactions}
+\subsection{Default Constructors}
 
-The compiler emits a default constructor transaction for any contract that
-lacks a constructor. In the style of C++, this default constructor takes
-enough arguments to populate the fields of the contract. \cite{TODO} Space
+Constructors are responsible for initializing fields of contracts. The compiler emits a default constructor transaction for any contract that
+lacks a constructor. This default constructor takes
+enough arguments to populate the fields of the contract. Space
 for each argument is allocated in memory and the argument values are
-written there. If a particular field is not of primitive type, then its
-respective default constructor is called recursively with an appropriate
+written there. To allocate fields of nonprimitive type, the compiler computes the size required, allocates space for the referenced object, and calls the appropriate constructor. 
+
+If a particular field is not of primitive type, then its
+respective default constructor is called recursively. with an appropriate
 slice of the arguments and the space allocated in memory for the instance
 of the parent object is populated with a pointer to the instance built by
 the constructor for the child object. In this way, we guarantee that there
@@ -114,17 +104,27 @@ function IntContainer___IntContainer0x13e375fe(this, con_arg____refcount, con_ar
 \end{lstlisting}
 \end{figure}
 
-The compiler also emits two collections of traversal functions for the
-contracts given in Obsidian: \emph{tracers} and \emph{wipers}. There is one
-of each for every contract in the Obsidian source.
-
-The tracers is to traverse the region of memory allocated to an instance of
-an object in memory and copy it to storage. Each tracer takes the address
-in memory of an instance of its respective object and copies its fields to
+\subsection{Tracers}
+In order to maintain the invariant that objects in storage only refer to objects in storage (and not objects in memory), the compiler emits code for each assignment to a field. If the field is in storage and would point to an address in memory, a \emph{tracer} is invoked to trace the referenced object graph and copy each object to storage. The compiler emits one tracer per contract; the tracer takes as input the address
+in memory of an instance and copies its fields to
 storage. Fields of primitive type are copied directly. Fields of
-non-primitive type, that store pointers to instances of other objects, are
+non-primitive type, which store pointers to instances of other objects, are
 copied by calling the relevant tracer for the contract type recursively on
-the location given by the pointer.
+the referenced object. \Cref{fig:tracers} shows example tracers. We show them unoptimized to improve readability; the Yul optimizer makes them significantly more efficient. In lines 3--4, the tracer copies the context of field \obssrc{x}, which is 0 bytes after the start of \obssrc{this} (which is assumed to be in memory), to the corresponding address in storage. If \obssrc{IntContainer} had more fields, we would see additional copy operations; if any of those were references to other objects, we would see calls to the corresponding tracers. This version includes logging code, used for debugging purposes; the logging is more convoluted than one might expect because \yulsrc{log0} takes a pointer, so the tracer must first allocate memory and populate it before invoking \yulsrc{log0}.
+
+To distinguish pointers to storage from pointers to memory, Obsidian only uses memory addresses less than
+a \emph{threshold value} of $2^{256}/2$. In contrast, all addresses in storage are greater or equal to
+the threshold. This offset invariant effectively halves the size of storage, but
+by doing so allows us to know at runtime where an address points and use the
+appropriate commands on it, e.g., choosing between \yulsrc{mload}
+and \yulsrc{sload}. Since storage is so large and the smart contracts we
+are interested in are modest in size, the storage reduction is not
+problematic.
+
+To maintain this invariant, when a tracer writes a reference to storage,
+the address value of the pointer itself is increased by the threshold
+value. Since the other tracers do the same, inductively we know that this
+shifting operation will preserve structures as they are copied.
 
 \begin{figure}[hbtp]
     \caption{Tracers, with logging}
@@ -132,10 +132,12 @@ the location given by the pointer.
     \begin{lstlisting}[language=yul,frame=single]
 function trace_SetGetWithArgs(this) {
     // loading
-    sstore(add(add(this, 0), shl(255, 1)), mload(add(this, 0)))
+    sstore(add(add(this, 0), shl(255, 1)), 
+           mload(add(this, 0)))
     // logging
     let _tmp_37 := allocate_memory(32)
-    mstore(_tmp_37, sload(add(add(this, 0), shl(255, 1))))
+    mstore(_tmp_37, 
+           sload(add(add(this, 0), shl(255, 1))))
     log0(_tmp_37, 32)
     leave
 }
@@ -145,41 +147,28 @@ function trace_IntContainer(this) {
     sstore(add(add(this, 0), shl(255, 1)), mload(add(this, 0)))
     // logging
     let _tmp_38 := allocate_memory(32)
-    mstore(_tmp_38, sload(add(add(this, 0), shl(255, 1))))
+    mstore(_tmp_38, 
+           sload(add(add(this, 0), shl(255, 1))))
     log0(_tmp_38, 32)
     // loading
-    sstore(add(add(this, 32), shl(255, 1)), mload(add(this, 32)))
+    sstore(add(add(this, 32), shl(255, 1)), 
+           mload(add(this, 32)))
     // logging
     let _tmp_39 := allocate_memory(32)
-    mstore(_tmp_39, sload(add(add(this, 32), shl(255, 1))))
+    mstore(_tmp_39, 
+           sload(add(add(this, 32), shl(255, 1))))
     log0(_tmp_39, 32)
     leave
 }
     \end{lstlisting}
+    \label{fig:tracers}
 \end{figure}
 
-We maintain the invariant that all addresses in memory are less than
-a \emph{threshold value} all addresses in storage are greater or equal to
-it. That value is $2^{256}/2$ or, concretely a \yulsrc{uint32} that looks
-like \texttt{0x80...0}, which marks the midpoint of the address space of
-storage. This offset invariant effectively halves the size of storage, but
-by doing so allows us to know at runtime where an address lives and use the
-appropriate commands on it, i.e. picking between \yulsrc{mload}
-and \yulsrc{sload}. Since storage is so large and the smart contracts we
-are interested in are quite modest in size, the storage reduction is not
-problematic.
-
-To maintain this invariant, when a tracer writes a reference to storage,
-the address value of the pointer itself is increased by the threshold
-value. Since the other tracers do the same, inductively we know that this
-shifting operation will preserve structures as they are copied.
-
-The wipers follow the same recursive call structure induced by the
+\subsection{Wipers}
+Assignment to fields may result in \emph{garbage} in storage: allocated space in storage that is no longer referenced by any field in storage. When the reference count of a storage object is decremented to 0, which occurs as a result of a call to \obssrc{release}, the \obssrc{release} implementation invokes the appropriate \obssrc{wipe} function to write zeros to the object's storage. The wipers follow the same recursive call structure induced by the
 dependency tree of the contracts in question, but rather than copying an
 instance from memory to storage they write zeroes to all the storage
-spaces. Per the Yellow Paper, this triggers a 15,000 gas refund against the
-initial 20,000 gas cost of a cold write to storage which is how we amortize
-the cost of the copying operation. \cite{TODO}
+spaces. This triggers a 15,000 gas refund~\cite{YellowPaper} as long as the object had nonzero-value fields. \Cref{code.5} shows an example wiper implementation, including logging for debugging purposes.
 
 \begin{figure}[hbtp]
     \caption{Wipers, with logging}
@@ -214,7 +203,7 @@ function wipe_IntContainer(this) {
 \end{figure}
 
 
-\subsection{The Deployment Block}
+\subsection{Deployment}
 
 The main task at deployment time is to build an instance of the main
 contract in memory and then copy that to storage. This copy serves as the
@@ -223,7 +212,7 @@ in this block are copied verbatim from general purpose versions that exist
 at invocation time, lower in the emitted object; this is a site for future
 optimization.
 
-To that end, the deployment block begins with a copy of the memory
+To that end, the compiler emits a block of Yul for deployment. The block begins with a copy of the memory
 allocator and associated utility functions, followed by the generated
 default constructors and tracers. Currently we emit all the constructors
 and tracers, although they may not be needed; this is site for future
@@ -244,7 +233,7 @@ trace_SetGetWithArgs(this)
     \end{lstlisting}
 \end{figure}
 
-\subsection{The Invocation Block}
+\subsection{Invocation}
 
 Instances of Obsidian objects can refer to one another, so their
 translations in to Yul must be able to as well. This means at least that
@@ -272,7 +261,7 @@ case 0xd1665b62 {// entry for SetGetWithArgs___main
     \end{lstlisting}
 \end{figure}
 
-The block begins with checks against the structure of the call and then
+The block of Yul code that supports invocation begins with checks against the structure of the call and then
 inspects the call data in the dispatch table to determine which transaction
 to run, per the ABI encoding. The available transactions are the ones in
 the main contract that are not private and not constructors. The
@@ -282,13 +271,8 @@ has been run first. We know the address in storage of this root instance
 statically, since we know the first address that the allocator will emit as
 well as the threshold value by which it will have been offset.
 
-This is followed by a simple memory allocator and functions for
-manipulating data against the ABI specified encoding and decodings.
-
-%% omitting code for the allocator, sanity checks, encoders, and decoders
-%% because they are big and not interesting
-
-After the allocator, we emit translation of the transactions from the
+The emitted code includes a simple memory allocator and functions for
+manipulating data against the ABI specified encoding and decodings.  After the allocator, we emit translations of the transactions from the
 contracts. The name of each transaction is prefixed with the name of its
 origin contract in the translation; the structure of Obsidian files
 guarantees that this is unique. Each contract may have multiple
@@ -297,10 +281,12 @@ signature which makes them unique. The generated default constructor
 follows the same convention, since it's only emitted when no constructor is
 present.
 
-Each emitted transaction is enhanced with an additional argument
-named \yulsrc{this} in the first position which we assume to be an address
+Each emitted transaction is enhanced with an additional argument, \yulsrc{this}, in the first position, which we assume to be an address
 in either memory or storage that has the instance upon which the
-transaction should operate. Fields are written into memory in the order in
+transaction should operate. 
+
+\subsection{Memory Management}
+Fields are written into memory in the order in
 which they appear in the Obsidian source; since the size of each is given
 by its type, which is known to the compiler statically, it is easy to
 compute offsets against \yulsrc{this} to locate field values in
@@ -368,68 +354,14 @@ offered methods \obssrc{retain} and \obssrc{release} for every
 object. \obssrc{retain} increments the reference counter field, and is
 called by the programmer to indicate that they are not yet done with a
 particular instance; \obssrc{release} decrements the counter and triggers
-the wiper functions on the relevant storage address if appropriate.
+the wiper functions on the relevant storage address if appropriate. Examples are shown in \cref{code.9} in the appendix.
 
-\begin{figure}[hbtp]
-    \caption{Selected Garbage Collection Methods}
-    \label{code.9}
-    \begin{lstlisting}[language=yul,frame=single]
-function SetGetWithArgs___retain(this) {
-    let _tmp_1
-    let _tmp_2
-    let _tmp_4
-    let _tmp_3
-    switch gt(add(this, 0), sub(shl(255, 1), 1))
-    case 1 {_tmp_3 := sload(add(this, 0))}
-    case 0 {_tmp_3 := mload(add(this, 0))}
 
-    _tmp_2 := _tmp_3
-    _tmp_4 := 1
-    _tmp_1 := add(_tmp_2, _tmp_4)
-    switch gt(add(this, 0), sub(shl(255, 1), 1))
-    case 1 {sstore(add(this, 0), _tmp_1)}
-    case 0 {mstore(add(this, 0), _tmp_1)}
-    leave
-}
-
-function SetGetWithArgs___release(this) {
-    let _tmp_5
-    let _tmp_6
-    let _tmp_8
-    let _tmp_7
-    switch gt(add(this, 0), sub(shl(255, 1), 1))
-    case 1 {_tmp_7 := sload(add(this, 0))}
-    case 0 {_tmp_7 := mload(add(this, 0))}
-
-    _tmp_6 := _tmp_7
-    _tmp_8 := 1
-    _tmp_5 := sub(_tmp_6, _tmp_8)
-    switch gt(add(this, 0), sub(shl(255, 1), 1))
-    case 1 {sstore(add(this, 0), _tmp_5)}
-    case 0 {mstore(add(this, 0), _tmp_5)}
-
-    let _tmp_9
-    let _tmp_10
-    let _tmp_12
-    let _tmp_11
-    switch gt(add(this, 0), sub(shl(255, 1), 1))
-    case 1 {_tmp_11 := sload(add(this, 0))}
-    case 0 {_tmp_11 := mload(add(this, 0))}
-
-    _tmp_10 := _tmp_11
-    _tmp_12 := 0
-    _tmp_9 := eq(_tmp_10, _tmp_12)
-    if _tmp_9 {let _tmp_13
-               SetGetWithArgs___dealloc(this)}
-    leave
-}
-
-function SetGetWithArgs___dealloc(this) {
-    wipe_SetGetWithArgs(this)
-}
-
-    \end{lstlisting}
-\end{figure}
-
-The implementations of these are emitted next in the invocation block,
-followed by the constructors, tracers, and wipers as described above.
+\subsection{Practicalities}
+When passed the \texttt{-{}-yul} flag, the Obsidian compiler targets Ethereum and emits Yul. To run the emitted Yul code, we invoke \texttt{solc} to produce EVM
+bytecode via a testing harness written in Python. The harness then starts
+and interacts with a Ganache instance via RPC calls and ABI-encoded data
+payloads, relying on the Python web3 library. This yields an integer answer
+to a specified transaction call against the deployed object as well as
+logging artifacts and observable changes to storage, which the harness
+compares to expected values per test.

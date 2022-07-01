@@ -1,11 +1,13 @@
-\documentclass[sigplan,review,screen]{acmart}
+\documentclass[sigplan,nonacm,screen]{acmart}
 \usepackage{listings}
 \usepackage[l3]{csvsimple}
 \usepackage{graphics}
+\usepackage{cleveref}
+
 \input{macros}
 \input{languagedefs}
 \begin{document}
-\title{Running Obsidian Smart Contracts On EVM}
+\title{Obsidian for Ethereum: Practical Safer Smart Contracts}
 
 \author{Ian Ernest Voysey}
 \orcid{0000-0002-6041-2010}
@@ -34,7 +36,7 @@
 \section{Introduction}\label{sec:intro}
 \input{intro}
 
-\section{Target Object Layout and Execution}\label{sec:layout}
+\section{Translating Obsidian programs to Yul}\label{sec:layout}
 \input{layout}
 
 \section{Benchmarks}\label{sec:benchmarks}
@@ -48,5 +50,76 @@
 
 \section{Conclusion}\label{sec:conclusion}
 \input{conclusion}
+
+\clearpage
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{obsidian}
+
+\appendix
+\clearpage
+\section{Appendix}
+
+\Cref{code.9} shows the emitted retain and release functions for the SetGetWithArgs example above.
+\begin{figure}[hbtp]
+    \caption{Selected Garbage Collection Methods}
+    \label{code.9}
+    \begin{lstlisting}[language=yul,frame=single]
+function SetGetWithArgs___retain(this) {
+    let _tmp_1
+    let _tmp_2
+    let _tmp_4
+    let _tmp_3
+    switch gt(add(this, 0), sub(shl(255, 1), 1))
+    case 1 {_tmp_3 := sload(add(this, 0))}
+    case 0 {_tmp_3 := mload(add(this, 0))}
+
+    _tmp_2 := _tmp_3
+    _tmp_4 := 1
+    _tmp_1 := add(_tmp_2, _tmp_4)
+    switch gt(add(this, 0), sub(shl(255, 1), 1))
+    case 1 {sstore(add(this, 0), _tmp_1)}
+    case 0 {mstore(add(this, 0), _tmp_1)}
+    leave
+}
+
+function SetGetWithArgs___release(this) {
+    let _tmp_5
+    let _tmp_6
+    let _tmp_8
+    let _tmp_7
+    switch gt(add(this, 0), sub(shl(255, 1), 1))
+    case 1 {_tmp_7 := sload(add(this, 0))}
+    case 0 {_tmp_7 := mload(add(this, 0))}
+
+    _tmp_6 := _tmp_7
+    _tmp_8 := 1
+    _tmp_5 := sub(_tmp_6, _tmp_8)
+    switch gt(add(this, 0), sub(shl(255, 1), 1))
+    case 1 {sstore(add(this, 0), _tmp_5)}
+    case 0 {mstore(add(this, 0), _tmp_5)}
+
+    let _tmp_9
+    let _tmp_10
+    let _tmp_12
+    let _tmp_11
+    switch gt(add(this, 0), sub(shl(255, 1), 1))
+    case 1 {_tmp_11 := sload(add(this, 0))}
+    case 0 {_tmp_11 := mload(add(this, 0))}
+
+    _tmp_10 := _tmp_11
+    _tmp_12 := 0
+    _tmp_9 := eq(_tmp_10, _tmp_12)
+    if _tmp_9 {let _tmp_13
+               SetGetWithArgs___dealloc(this)}
+    leave
+}
+
+function SetGetWithArgs___dealloc(this) {
+    wipe_SetGetWithArgs(this)
+}
+
+    \end{lstlisting}
+\end{figure}
+
 
 \end{document}
