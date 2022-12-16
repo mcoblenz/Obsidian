@@ -842,22 +842,39 @@ object CodeGenYul extends CodeGenerator {
                 // grab an identifier to store memory
                 val id_memaddr = nextTemp()
 
-                // store the names of the types of the arguments
-                val typeNames: Seq[String] = args.map(e => e.obstype.get.toString)
+                // Get the declared types of the arguments so we can do name-mangling correctly
+
+
 
                 // given a declaration, test if it's a constructor with type arguments that match the usage here
                 def isMatchingConstructor(d: Declaration): Boolean =
                     d match {
-                        case c: Constructor => typeNames == c.args.map(v => v.typIn.toString)
+                        case c: Constructor =>
+                            if (c.args.length != args.length) {
+                                return false;
+                            }
+                            else {
+                                for (i <- 0 to args.length - 1) {
+                                    if (Checker.isSubtype(checkedTable, args(i).obstype.get, c.args(i).typIn, false).isDefined) {
+                                        return false;
+                                    }
+                                }
+                            }
+                            true
                         case _ => false
                     }
 
                 // check to to see if there is a constructor to call, and if so translate the
                 // arguments and invoke the constructor as normal transaction with the hash appended
                 // to the name to call the right one
+                val foundDeclaration = checkedTable.contract(contractType.contractName).get.contract.declarations.find(d => isMatchingConstructor(d))
                 val conCall =
-                if (checkedTable.contract(contractType.contractName).get.contract.declarations.exists(d => isMatchingConstructor(d))) {
-                    translateInvocation(name = flattenedName(contractType.contractName, contractType.contractName, Some(typeNames)),
+                if (foundDeclaration.isDefined) {
+                    val declaredArgTypes = foundDeclaration.get.asInstanceOf[Constructor].args.map(a => a.typIn)
+                    // store the names of the types of the arguments
+                    val argTypeNames: Seq[String] = declaredArgTypes.map(e => e.toString)
+
+                    translateInvocation(name = flattenedName(contractType.contractName, contractType.contractName, Some(argTypeNames)),
                         args = args,
                         obstype = Some(UnitType()),
                         thisID = id_memaddr,

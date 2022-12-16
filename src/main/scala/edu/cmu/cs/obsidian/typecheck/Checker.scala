@@ -232,46 +232,18 @@ case class Context(table: DeclarationTable,
     }
 }
 
-class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
-    private def consumptionModeForType(typ: ObsidianType): OwnershipConsumptionMode = {
-        typ match {
-            case np: NonPrimitiveType =>
-                if (np.permission == Shared()) {
-                    ConsumingOwnedGivesShared()
-                } else if (np.isOwned) {
-                    ConsumingOwnedGivesUnowned()
-                } else {
-                    NoOwnershipConsumption()
-                }
-            case _ => NoOwnershipConsumption()
+
+object Checker {
+    def typeBound(table: SymbolTable): ObsidianType => ObsidianType = {
+        case np: NonPrimitiveType => np match {
+            case GenericType(gVar, bound) => bound.referenceType
+            case t => t
         }
+
+        case t => t
     }
 
-    val errors = new collection.mutable.ArrayBuffer[ErrorRecord]()
-    var currentContractSourcePath: String = ""
-
-    /* an error is associated with an AST node to indicate where the error took place */
-    private def logError(where: AST, err: Error): Unit = {
-        assert(where.loc.line >= 1)
-        errors += ErrorRecord(err, where.loc, currentContractSourcePath)
-
-        /* this is helpful for debugging (to find out what function generated an error */
-        if (verbose) {
-            println("Logging Error:")
-            val (msg, loc) = (err.msg, where.loc)
-            println(s"$msg at Location $loc")
-            println()
-            for (ste: StackTraceElement <- Thread.currentThread.getStackTrace) {
-                println(ste)
-            }
-            println("\n\n\n")
-        }
-    }
-
-    //-------------------------------------------------------------------------
-    /* Subtyping definitions */
-
-    def checkArgCompat(table: ContractTable): ((ObsidianType, ObsidianType)) => Boolean = {
+    def checkArgCompat(table: SymbolTable): ((ObsidianType, ObsidianType)) => Boolean = {
         case (np1: NonPrimitiveType, np2: NonPrimitiveType) =>
             if (np1.permission == Inferred()) {
                 np1.withTypeState(np2.permission) == np2
@@ -283,15 +255,25 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         case (c1Arg, c2Arg) => c1Arg == c2Arg
     }
 
+    // returns true iff [p1 <: p2]
+    private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
+        p1 match {
+            case Owned() => true
+            case Unowned() => (p2 == Unowned()) || (p2 == Inferred())
+            case Shared() => (p2 == Shared()) || (p2 == Unowned()) || (p2 == Inferred())
+            case Inferred() => true
+        }
+    }
+
     /* method to check if contract is actually implementing an interface */
-    private def contractIsSubtype(table: ContractTable, c1: ContractType, c2: ContractType, isThis: Boolean): Either[Boolean, Error] = {
+    private def contractIsSubtype(table: SymbolTable, c1: ContractType, c2: ContractType, isThis: Boolean): Either[Boolean, Error] = {
         // Everything is a subtype of Top
         if (c2.contractName == ContractType.topContractName) {
             return Left(true)
         }
 
-        val c1Lookup = globalTable.contract(c1.contractName).map(_.contract)
-        val c2Lookup = globalTable.contract(c2.contractName).map(_.contract)
+        val c1Lookup = table.contract(c1.contractName).map(_.contract)
+        val c2Lookup = table.contract(c2.contractName).map(_.contract)
 
         if (c1Lookup.isEmpty) {
             return Right(ContractUndefinedError(c1.contractName))
@@ -319,17 +301,8 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         })
     }
 
-    private def typeBound(table: ContractTable): ObsidianType => ObsidianType = {
-        case np: NonPrimitiveType => np match {
-            case GenericType(gVar, bound) => bound.referenceType
-            case t => t
-        }
-
-        case t => t
-    }
-
     /* true iff [t1 <: t2] */
-    private def isSubtype(table: ContractTable, t1: ObsidianType, t2: ObsidianType, isThis: Boolean): Option[Error] = {
+    def isSubtype(table: SymbolTable, t1: ObsidianType, t2: ObsidianType, isThis: Boolean): Option[Error] = {
         val isSubtypeRes = (typeBound(table)(t1), typeBound(table)(t2)) match {
             case (BottomType(), _) => true
             case (_, BottomType()) => true
@@ -370,9 +343,51 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
+}
+
+class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
+    private def consumptionModeForType(typ: ObsidianType): OwnershipConsumptionMode = {
+        typ match {
+            case np: NonPrimitiveType =>
+                if (np.permission == Shared()) {
+                    ConsumingOwnedGivesShared()
+                } else if (np.isOwned) {
+                    ConsumingOwnedGivesUnowned()
+                } else {
+                    NoOwnershipConsumption()
+                }
+            case _ => NoOwnershipConsumption()
+        }
+    }
+
+    val errors = new collection.mutable.ArrayBuffer[ErrorRecord]()
+    var currentContractSourcePath: String = ""
+
+    /* an error is associated with an AST node to indicate where the error took place */
+    private def logError(where: AST, err: Error): Unit = {
+        assert(where.loc.line >= 1)
+        errors += ErrorRecord(err, where.loc, currentContractSourcePath)
+
+        /* this is helpful for debugging (to find out what function generated an error */
+        if (verbose) {
+            println("Logging Error:")
+            val (msg, loc) = (err.msg, where.loc)
+            println(s"$msg at Location $loc")
+            println()
+            for (ste: StackTraceElement <- Thread.currentThread.getStackTrace) {
+                println(ste)
+            }
+            println("\n\n\n")
+        }
+    }
+
+    //-------------------------------------------------------------------------
+    /* Subtyping definitions */
+
+
     /* returns [t1] if [t1 <: t2], logs an error and returns [BottomType] otherwise */
     private def checkIsSubtype(table: ContractTable, ast: AST, t1: ObsidianType, t2: ObsidianType, thisAtEndOfTransaction: Boolean = false): ObsidianType = {
-        val errorOpt = isSubtype(table, t1, t2, thisAtEndOfTransaction)
+        val errorOpt = Checker.isSubtype(globalTable, t1, t2, thisAtEndOfTransaction)  // XXX globalTable?
         if (errorOpt.isDefined) {
             logError(ast, errorOpt.get)
             BottomType()
@@ -381,16 +396,6 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         }
     }
 
-
-    // returns true iff [p1 <: p2]
-    private def isSubpermission(p1: Permission, p2: Permission): Boolean = {
-        p1 match {
-            case Owned() => true
-            case Unowned() => (p2 == Unowned()) || (p2 == Inferred())
-            case Shared() => (p2 == Shared()) || (p2 == Unowned()) || (p2 == Inferred())
-            case Inferred() => true
-        }
-    }
 
     //-------------------------------------------------------------------------
     private def nonPrimitiveMergeTypes(
@@ -535,7 +540,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 logError(ast, GenericParameterAssetError(param.gVar.varName, actualArg.baseTypeName))
             }
 
-            if (isSubtype(table, actualArg, substitutedParam, isThis = false).isDefined) {
+            if (Checker.isSubtype(table.symbolTable, actualArg, substitutedParam, isThis = false).isDefined) {
                 logError(ast, GenericParameterError(param, actualArg))
             }
 
@@ -648,7 +653,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 return (BottomType(), contextAfterReceiver, isFFIInvocation, receiverPrime, foundTransaction.get.params, args)
             }
 
-            if (!invokable.isStatic && isSubtype(context.contractTable, receiverType, invokable.thisType, receiver.isInstanceOf[This]).isDefined) {
+            if (!invokable.isStatic && Checker.isSubtype(context.contractTable.symbolTable, receiverType, invokable.thisType, receiver.isInstanceOf[This]).isDefined) {
                 logError(e, ReceiverTypeIncompatibleError(name, receiverType, invokable.thisType))
             }
 
@@ -657,7 +662,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 val currentFieldType = context.lookupCurrentFieldTypeInThis(fieldName)
                 currentFieldType match {
                     case None => ()
-                    case Some(cft) => if (isSubtype(context.contractTable, cft, requiredInitialFieldType, receiver.isInstanceOf[This]).isDefined ||
+                    case Some(cft) => if (Checker.isSubtype(context.contractTable.symbolTable, cft, requiredInitialFieldType, receiver.isInstanceOf[This]).isDefined ||
                         (cft.isOwned != requiredInitialFieldType.isOwned && !cft.isBottom)) {
                         logError(e, FieldSubtypingError(fieldName, cft, requiredInitialFieldType))
                     }
@@ -1104,7 +1109,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 // The field doesn't exist, so there would have been another error generated previously.
                 // Nothing to do here.
                 case Some(declaredFieldType) =>
-                    if (isSubtype(context.contractTable, typ, declaredFieldType, false).isEmpty &&
+                    if (Checker.isSubtype(context.contractTable.symbolTable, typ, declaredFieldType, false).isEmpty &&
                         (typ.isOwned == declaredFieldType.isOwned || declaredFieldType.isBottom)) {
                         resultContext = resultContext.removeThisFieldType(field)
                     }
@@ -1137,7 +1142,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                 case None =>
                 // Nothing to do; there was an assignment to a field type that may not be in scope, so there will be a separate error message.
                 case Some(declaredFieldType) =>
-                    if (isSubtype(context.contractTable, typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
+                    if (Checker.isSubtype(context.contractTable.symbolTable, typ, declaredFieldType, false).isDefined || (typ.isOwned != declaredFieldType.isOwned && !declaredFieldType.isBottom)) {
                         logError(exitLocation, InvalidInconsistentFieldType(field, typ, declaredFieldType))
                     }
             }
@@ -1152,7 +1157,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                     case None =>
                         logError(tx, InvalidFinalFieldTypeDeclarationError(field))
                     case Some(currentTyp) =>
-                        if (isSubtype(context.contractTable, currentTyp, requiredTyp, false).isDefined) {
+                        if (Checker.isSubtype(context.contractTable.symbolTable, currentTyp, requiredTyp, false).isDefined) {
                             logError(tx, InvalidInconsistentFieldType(field, currentTyp, requiredTyp))
                         }
                 }
@@ -1371,7 +1376,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                     case _ => contextAfterArg
                 }
-                if (isSubtype(context.contractTable, argType, specInputType, false).isDefined) {
+                if (Checker.isSubtype(context.contractTable.symbolTable, argType, specInputType, false).isDefined) {
                     val err = ArgumentSubtypingError(decl.name, spec(i).varName, argType, specInputType)
                     errList = (ast, err) :: errList
                 }
@@ -1486,7 +1491,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
     }
 
     def contractTypeCompat(table: ContractTable, ct1: ContractType, ct2: ContractType): Boolean =
-        ct1.contractName == ct2.contractName && ct1.typeArgs.zip(ct2.typeArgs).forall(checkArgCompat(table))
+        ct1.contractName == ct2.contractName && ct1.typeArgs.zip(ct2.typeArgs).forall(Checker.checkArgCompat(table.symbolTable))
 
     private def checkStatement(
                                   decl: InvokableDeclaration,
@@ -1600,7 +1605,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
 
                                     exprType match {
                                         case exprNonPrimitiveType: NonPrimitiveType =>
-                                            if (isSubtype(table, exprNonPrimitiveType, np, isThis = false).isEmpty) {
+                                            if (Checker.isSubtype(table.symbolTable, exprNonPrimitiveType, np, isThis = false).isEmpty) {
                                                 // We only want the permission/states from the expr, not the whole thing
                                                 val tempTyp = np.withTypeState(exprNonPrimitiveType.permission)
                                                 exprNonPrimitiveType match {
@@ -2071,7 +2076,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
                                                 }
                                                 (trueBranchContext, np.permission, falseBranchContext(typeForFalseBranch))
                                             case permission: Permission =>
-                                                logError(e, PermissionCheckRedundant(np.permission, permission, isSubpermission(np.permission, permission)))
+                                                logError(e, PermissionCheckRedundant(np.permission, permission, Checker.isSubpermission(np.permission, permission)))
                                                 return (contextPrime, IfInState(ePrime, ePerm, state, body1, body2).setLoc(s))
                                             case permVar: PermVar =>
                                                 val newType = np.withTypeState(permVar)
@@ -2447,7 +2452,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         for (arg <- tx.args) {
             outputContext.get(arg.varName) match {
                 case Some(actualTypOut) =>
-                    val errorOpt = isSubtype(context.contractTable, actualTypOut, arg.typOut, false)
+                    val errorOpt = Checker.isSubtype(context.contractTable.symbolTable, actualTypOut, arg.typOut, false)
                     if (errorOpt.isDefined) {
                         logError(tx, ArgumentSpecificationError(arg.varName, tx.name, arg.typOut, actualTypOut))
                     }
@@ -2710,7 +2715,7 @@ class Checker(globalTable: SymbolTable, verbose: Boolean = false) {
         for (arg <- constr.args) {
             outputContext.get(arg.varName) match {
                 case Some(actualTypOut) =>
-                    val errorOpt = isSubtype(outputContext.contractTable, actualTypOut, arg.typOut, isThis = false)
+                    val errorOpt = Checker.isSubtype(outputContext.contractTable.symbolTable, actualTypOut, arg.typOut, isThis = false)
                     if (errorOpt.isDefined) {
                         logError(constr, ArgumentSpecificationError(arg.varName, constr.name, arg.typOut, actualTypOut))
                     }

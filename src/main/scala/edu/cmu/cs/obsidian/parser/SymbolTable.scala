@@ -87,7 +87,7 @@ class StateTable(
 
 class ContractTable(
         val contract: Contract,
-        symbolTable: SymbolTable,
+        val symbolTable: SymbolTable,
         parentContract: Option[ContractTable]) extends DeclarationTable {
 
     /**
