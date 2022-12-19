@@ -29,6 +29,8 @@ main contract SetGetPointer {
     transaction main() returns int{
         ic = new IntContainer();
         ic.set();
-        return ic.get();
+        int res = ic.get();
+        ic.release();
+        return res;
     }
 }
