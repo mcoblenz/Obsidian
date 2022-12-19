@@ -183,7 +183,7 @@ object CodeGenYul extends CodeGenerator {
                                     (Seq(LineComment(s"this.${name} := ${use.name}"),
                                         // todo: (performance) this inserts a check against the storage threshold
                                         //   every time, which will always be false for the main constructor's first call
-                                        updateField(ct.contractLookup(c.name), name, Identifier(use.name))
+                                        updateField(ct.contractLookup(c.name), Identifier("this"), name, Identifier(use.name))
                                     ) ++ acc,
                                         rest)
                                 case _ => throw new RuntimeException("ran out of variables building default constructor; this is a bug")
@@ -213,7 +213,7 @@ object CodeGenYul extends CodeGenerator {
                                         decl_1exp(sub_this, apply("allocate_memory", intlit(sizeOfContract(sub_contract_ct)))),
 
                                         // write the address of the subcontract to the corresponding field of this contract
-                                        ExpressionStatement(apply("mstore", fieldFromThis(ct.contractLookup(c.name), name), sub_this)),
+                                        ExpressionStatement(apply("mstore", fieldFromObject(ct.contractLookup(c.name), Identifier("this"), name), sub_this)),
 
                                         // call the constructor on that for the this argument and the right
                                         ExpressionStatement(apply(sub_constructor_name, sub_this +: args_for_sub: _*))) ++ acc
@@ -271,7 +271,7 @@ object CodeGenYul extends CodeGenerator {
         for (d <- c.declarations) {
             d match {
                 case Field(_, typ, fname, _) =>
-                    val mem_loc: codegen.Expression = fieldFromThis(ct.contractLookup(name), fname)
+                    val mem_loc: codegen.Expression = fieldFromObject(ct.contractLookup(name), Identifier("this"), fname)
                     val sto_loc: codegen.Expression = mapToStorageAddress(mem_loc)
                     val log_temp: Identifier = nextTemp()
 
@@ -358,7 +358,7 @@ object CodeGenYul extends CodeGenerator {
             d match {
                 case Field(_, typ, fname, _) =>
                     // since `this` is a storage address, so is the computed field offset
-                    val sto_loc: codegen.Expression = fieldFromThis(ct.contractLookup(name), fname)
+                    val sto_loc: codegen.Expression = fieldFromObject(ct.contractLookup(name), Identifier("this"), fname)
                     val log_temp: Identifier = nextTemp()
 
                     val load: Seq[YulStatement] = Seq(
@@ -562,7 +562,7 @@ object CodeGenYul extends CodeGenerator {
                                         // if it's primitive, check if it's a field or not and update or assign
                                         case _: PrimitiveType =>
                                             if (ct.allFields.exists(f => f.name.equals(x))) {
-                                                Seq(updateField(ct, x, id))
+                                                Seq(updateField(ct, Identifier("this"), x, id))
                                             } else {
                                                 Seq(assign1(Identifier(x), id))
                                             }
@@ -571,9 +571,12 @@ object CodeGenYul extends CodeGenerator {
                                             case ContractReferenceType(contractType, _, _) =>
                                                 if (ct.allFields.exists(f => f.name.equals(x))) {
                                                     Seq(
-                                                        codegen.If(condition = apply("not", compareToThresholdExp(fieldFromThis(ct, x))),
-                                                            body = Block(Do(apply(nameTracer(contractType.contractName), id)))),
-                                                        updateField(ct, x, apply("mload", id))
+                                                        // TODO: shouldn't the tracer make the field point to the new location, not the old?
+                                                        // Need to assign BEFORE tracing because the tracer expects the field to be initialized.
+                                                        updateField(ct, Identifier("this"), x, id),
+                                                        codegen.If(condition = compareToThresholdExp(fieldFromObject(ct, Identifier("this"), x)),
+                                                            body = Block(Do(apply(nameTracer(contractType.contractName), id))))
+
                                                     )
                                                 } else {
                                                     Seq(assign1(Identifier(x), id))
@@ -888,7 +891,7 @@ object CodeGenYul extends CodeGenerator {
 
                     // set the reference count for this object to 1, since we're now referring to it
                     // todo: i might be able to always write this to storage
-                    updateField(checkedTable.contractLookup(contractType.contractName), refCountName, intlit(1)),
+                    updateField(checkedTable.contractLookup(contractType.contractName), id_memaddr, refCountName, intlit(1)),
 
                     // return the address that the space starts at, call the constructor and the tracer as above
                     assign1(retvar, id_memaddr)) ++ conCall

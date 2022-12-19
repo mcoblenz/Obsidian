@@ -4,6 +4,10 @@ contract IntLLEnd{
     IntLLEnd@Owned(int p){
         payload = p;
     }
+
+    transaction payload() returns int {
+        return payload;
+    }
 }
 
 contract IntLL1{
@@ -45,7 +49,6 @@ contract IntLL4{
         next = n;
     }
 }
-
 contract IntLL5{
     int payload;
     IntLL4@Unowned next;
@@ -55,7 +58,6 @@ contract IntLL5{
         next = n;
     }
 }
-
 contract IntLL6{
     int payload;
     IntLL5@Unowned next;
@@ -65,8 +67,7 @@ contract IntLL6{
         next = n;
     }
 }
-
-contract IntLL7{
+contract IntLL7 {
     int payload;
     IntLL6@Unowned next;
 
@@ -76,16 +77,16 @@ contract IntLL7{
     }
 }
 
-main contract LinkedListMed{
-    transaction main() returns int{
-        IntLLEnd tail = new IntLLEnd(0);
-        IntLL1 e1 = new IntLL1(1, tail);
-        IntLL2 e2 = new IntLL2(1, e1);
-        IntLL3 e3 = new IntLL3(1, e2);
-        IntLL4 e4 = new IntLL4(1, e3);
-        IntLL5 e5 = new IntLL5(1, e4);
-        IntLL6 e6 = new IntLL6(1, e5);
-        IntLL7 e7 = new IntLL7(1, e6);
+main contract LinkedListMed {
+    transaction main() returns int {
+        IntLLEnd tail = new IntLLEnd(1);
+        IntLL1 e1 = new IntLL1(2, tail);
+        IntLL2 e2 = new IntLL2(4, e1);
+        IntLL3 e3 = new IntLL3(8, e2);
+        IntLL4 e4 = new IntLL4(16, e3);
+        IntLL5 e5 = new IntLL5(32, e4);
+        IntLL6 e6 = new IntLL6(64, e5);
+        IntLL7 e7 = new IntLL7(128, e6);
         e7.release();
         return 0;
     }

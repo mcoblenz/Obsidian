@@ -390,20 +390,20 @@ object Util {
       * @param x  the field name
       * @return the expression computing the offset
       */
-    def fieldFromThis(ct: ContractTable, x: String): Expression = {
-        // todo: is hardcoding "this" a good idea? am i ever going to call it anything else?
-        apply("add", Identifier("this"), intlit(Util.offsetOfField(ct, x)))
+    def fieldFromObject(ct: ContractTable, objPtr: Expression, x: String): Expression = {
+        apply("add", objPtr, intlit(Util.offsetOfField(ct, x)))
     }
 
     /** return the expression that sets a field from a contract either in memory or storage as appropriate
       *
       * @param ct        the information about the contract
+      * @param objPtr    a pointer to the object in which to set the field
       * @param fieldName the field name to set
       * @param value     the value to set it to
       * @return the statement that does the check and then sets
       */
-    def updateField(ct: ContractTable, fieldName: String, value: Expression): YulStatement = {
-        val address_of_field: Expression = fieldFromThis(ct, fieldName)
+    def updateField(ct: ContractTable, objPtr: Expression, fieldName: String, value: Expression): YulStatement = {
+        val address_of_field: Expression = fieldFromObject(ct, objPtr, fieldName)
         ifInStorge(addr_to_check = address_of_field,
             true_case = Do(apply("sstore", address_of_field, value)),
             false_case = Do(apply("mstore", address_of_field, value))
@@ -414,13 +414,13 @@ object Util {
     /** given a field name and address, produce code that checks for finding it in memory or storage as appropriate
       *
       * @param ct          the context of the program
-      * @param fieldName   the name of the filed
+      * @param fieldName   the name of the field
       * @param destination the place to store the contents of memory or storage (it must be initialized separately in the output yul)
       * @return the switch statement that checks and assigns as appropriate
       */
     def fetchField(ct: ContractTable, fieldName: String, destination: Identifier): YulStatement = {
         // todo (tidy) there's a lot of repeated code with the above; abstract it out
-        val address_of_field = fieldFromThis(ct, fieldName)
+        val address_of_field = fieldFromObject(ct, Identifier("this"), fieldName)
         ifInStorge(addr_to_check = address_of_field,
             true_case = Seq(assign1(destination, apply("sload", address_of_field))),
             false_case = Seq(assign1(destination, apply("mload", address_of_field)))

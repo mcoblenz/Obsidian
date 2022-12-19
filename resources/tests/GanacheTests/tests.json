@@ -323,6 +323,11 @@
             "file": "LinkedListMedNoGC.obs",
             "expected": "0",
             "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
+        },
+        {
+            "file": "LinkedListMedSum.obs",
+            "expected": "255",
+            "shows_that_we_support": "shows that linked lists  work"
         }
     ]
 }
