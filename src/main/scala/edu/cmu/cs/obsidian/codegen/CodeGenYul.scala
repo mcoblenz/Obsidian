@@ -85,11 +85,7 @@ object CodeGenYul extends CodeGenerator {
           *         default constructor if it doesn't have one
           */
         def defaultConstructor(c: Contract): Seq[FunctionDefinition] = {
-            if (hasConstructor(c)) {
-                Seq()
-            } else {
-                Seq(writeDefaultConstructor(c, st))
-            }
+            Seq(writeDefaultConstructor(c, st))
         }
 
         /** given a contract,
