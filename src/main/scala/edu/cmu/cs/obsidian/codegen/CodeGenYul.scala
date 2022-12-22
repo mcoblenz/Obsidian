@@ -567,11 +567,13 @@ object CodeGenYul extends CodeGenerator {
                                             case ContractReferenceType(contractType, _, _) =>
                                                 if (ct.allFields.exists(f => f.name.equals(x))) {
                                                     Seq(
-                                                        // TODO: shouldn't the tracer make the field point to the new location, not the old?
                                                         // Need to assign BEFORE tracing because the tracer expects the field to be initialized.
+                                                        // TODO: make this more efficient (avoid double-assignment to the field).
                                                         updateField(ct, Identifier("this"), x, id),
                                                         codegen.If(condition = compareToThresholdExp(fieldFromObject(ct, Identifier("this"), x)),
-                                                            body = Block(Do(apply(nameTracer(contractType.contractName), id))))
+                                                            body = Block(Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), id)),
+                                                                updateField(ct, Identifier("this"), x, mapToStorageAddress(id))))), // Field should point to new address in storage))),
+
 
                                                     )
                                                 } else {
