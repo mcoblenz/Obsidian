@@ -225,6 +225,19 @@ object CodeGenYul extends CodeGenerator {
         c.declarations.foldRight((Seq(): Seq[YulStatement], sig.reverse))(proc)._1
     }
 
+    def emitLog(comment: String, topic: Int, message: edu.cmu.cs.obsidian.codegen.Expression): Seq[YulStatement] = {
+        val log_temp: Identifier = nextTemp()
+
+        Seq(LineComment(s"LOG: $comment"),
+            // allocate memory to log from
+            decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
+            ExpressionStatement(apply("mstore", log_temp, message)),
+            // emit the log
+            ExpressionStatement(apply("log1", log_temp, intlit(32), intlit(topic))),
+            //ExpressionStatement(apply("free_last_allocation", intlit(32)))
+        )
+    }
+
     /** given a contract, produce a default constructor that takes enough arguments to instantiate
       * the fields of the contract, including recursively calling default constructors for non
       * primitive fields.
@@ -301,7 +314,7 @@ object CodeGenYul extends CodeGenerator {
                                 // load what we just wrote to storage to that location
                                 ExpressionStatement(apply("mstore", log_temp, apply("sload", sto_loc))),
                                 // emit the log
-                                ExpressionStatement(apply("log0", log_temp, intlit(32)))
+                                ExpressionStatement(apply("log1", log_temp, intlit(32), sto_loc))
                             )
                         } else {
                             Seq()
@@ -496,7 +509,7 @@ object CodeGenYul extends CodeGenerator {
         }
 
         // form the body of the transaction by translating each statement found
-        val body: Seq[YulStatement] = transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))
+        val body: Seq[YulStatement] = emitLog("this address", 0x42, Identifier("this")) ++ transaction.body.flatMap((s: Statement) => translateStatement(s, id, contractName, checkedTable))
 
         val type_names =
             if (isCons) {
@@ -572,7 +585,7 @@ object CodeGenYul extends CodeGenerator {
                                                         updateField(ct, Identifier("this"), x, id),
                                                         codegen.If(condition = compareToThresholdExp(fieldFromObject(ct, Identifier("this"), x)),
                                                             body = Block(Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), id)),
-                                                                updateField(ct, Identifier("this"), x, mapToStorageAddress(id))))), // Field should point to new address in storage))),
+                                                                updateField(ct, Identifier("this"), x, mapToStorageAddress(id))))), // Field should point to new address in storage
 
 
                                                     )
