@@ -18,13 +18,14 @@ implementation of any one of them to achieve its best result is the subject
 of future work.
 
 In the currently emitted code, the translation of each transaction checks
-the location of its instance before each and every interaction with either
+the location of its instance before every interaction with either
 memory or storage. The answer to this check is always the same within a
 given execution of the transaction, so all but the first check is
 redundant. A solution to this is to emit two Yul transactions per Obsidian
 transaction: one that operates entirely on memory and one on storage. This
 means that before calling a transaction you need to check once where its
-instance lives, but after that there are no additional checks.
+instance lives, but after that there are no additional checks. This would reduce invocation cost
+but increase deployment cost.
 
 The emitted code currently carries a fair amount of repeated code between
 the deployment and invocation blocks. This could be reduced, since the full

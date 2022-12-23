@@ -306,13 +306,14 @@ object CodeGenYul extends CodeGenerator {
                         ExpressionStatement(apply("sstore", sto_loc, shift_if_addr)))
 
                     // the instructions to allocate memory for the log message and emit it, if set
+//                    val nameLiteral: edu.cmu.cs.obsidian.codegen.Expression = edu.cmu.cs.obsidian.codegen.Literal(LiteralKind.string, name, "string")
                     val log: Seq[YulStatement] =
                         if (emit_logs) {
                             Seq(LineComment("logging"),
                                 // allocate memory to log from
                                 decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
                                 // load what we just wrote to storage to that location
-                                ExpressionStatement(apply("mstore", log_temp, apply("sload", sto_loc))),
+                                ExpressionStatement(apply("mstore", log_temp, apply("mload", mem_loc))),
                                 // emit the log
                                 ExpressionStatement(apply("log1", log_temp, intlit(32), sto_loc))
                             )
@@ -343,10 +344,12 @@ object CodeGenYul extends CodeGenerator {
             }
         }
 
+        val bailIfAlreadyInStorage = edu.cmu.cs.obsidian.codegen.If(compareToThresholdExp(Identifier("this")), Block(Seq(Leave())))
+
         FunctionDefinition(name = nameTracer(name),
             parameters = Seq(TypedName("this", YATAddress())),
             returnVariables = Seq(),
-            body = Block(body :+ Leave()),
+            body = Block(bailIfAlreadyInStorage +: body :+ Leave()),
             inDispatch = false
         ) +: others.distinctBy(fd => fd.name)
     }
@@ -537,7 +540,7 @@ object CodeGenYul extends CodeGenerator {
       * @return
       */
     def translateStatement(s: Statement, retVar: Option[Identifier], contractName: String, checkedTable: SymbolTable): Seq[YulStatement] = {
-        s match {
+        val stmts = s match {
             case Return() =>
                 Seq(Leave())
             case ReturnExpr(e) =>
@@ -571,7 +574,8 @@ object CodeGenYul extends CodeGenerator {
                                         // if it's primitive, check if it's a field or not and update or assign
                                         case _: PrimitiveType =>
                                             if (ct.allFields.exists(f => f.name.equals(x))) {
-                                                Seq(updateField(ct, Identifier("this"), x, id))
+                                                emitLog("primitive field assignment", 0xfa, Identifier("this")) ++
+                                                    Seq(updateField(ct, Identifier("this"), x, id))
                                             } else {
                                                 Seq(assign1(Identifier(x), id))
                                             }
@@ -583,8 +587,8 @@ object CodeGenYul extends CodeGenerator {
                                                         // Need to assign BEFORE tracing because the tracer expects the field to be initialized.
                                                         // TODO: make this more efficient (avoid double-assignment to the field).
                                                         updateField(ct, Identifier("this"), x, id),
-                                                        codegen.If(condition = compareToThresholdExp(fieldFromObject(ct, Identifier("this"), x)),
-                                                            body = Block(Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), id)),
+                                                        codegen.If(condition = compareToThresholdExp(fieldFromObject(ct, Identifier("this"), x)), // if the field resides in storage...
+                                                            body = Block(Seq(ExpressionStatement(apply(nameTracer(contractType.contractName), id)), // make sure the referenced object is also in storage.
                                                                 updateField(ct, Identifier("this"), x, mapToStorageAddress(id))))), // Field should point to new address in storage
 
 
@@ -673,6 +677,8 @@ object CodeGenYul extends CodeGenerator {
                 assert(assertion = false, s"TODO: translateStatement unimplemented for ${s.toString}")
                 Seq()
         }
+
+        LineComment(s.toString) +: stmts
     }
 
     // helper function for a common calling pattern below. todo: there may be a slicker way to do
@@ -775,7 +781,7 @@ object CodeGenYul extends CodeGenerator {
                         val ct = checkedTable.contractLookup(contractName)
                         if (ct.allFields.exists(f => f.name.equals(x))) {
                             val store_id = nextTemp()
-                            Seq(decl_0exp(store_id),
+                            emitLog("fetching field", 0xff, Identifier("this")) ++ Seq(decl_0exp(store_id),
                                 fetchField(ct, x, store_id),
                                 assign1(retvar, store_id))
                         } else {

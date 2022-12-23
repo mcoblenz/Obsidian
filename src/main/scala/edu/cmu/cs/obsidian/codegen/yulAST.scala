@@ -357,6 +357,7 @@ case class YulObject(contractName: String,
                 // nb: the code for these is written dynamically below so we can assume that they exist before they do
                 decl_1exp(Identifier("memEnd"), apply(abi_encode_name(returns_from_call.length), mp_id +: returns_from_call: _*)),
                 //    return(memPos, sub(memEnd, memPos))
+                ExpressionStatement(apply("sstore", intlit(0xcafe), apply("mload", intlit(0x40)))), // Save next free memory pointer
                 codegen.ExpressionStatement(apply("return", mp_id, apply("sub", Identifier("memEnd"), mp_id)))
             )
         }
@@ -369,14 +370,16 @@ case class YulObject(contractName: String,
         def buildMain(): YulStatement = {
             val thisId = Identifier("this")
             val args = thisId +: mainConstructorTypeNames.map(tn => defaultInitValue(tn.typ))
+
             Block(
                 Seq(
                     //let this := allocate_memory({{mainSize}})
                     decl_1exp(thisId, apply("allocate_memory", intlit(mainContractSize))),
                     // todo call the constructor for the main contract on this and default values for now
                     ExpressionStatement(apply(flattenedName(contractName, contractName, Some(mainConstructorTypeNames.map(tn => tn.typ.toString))), args: _*)),
-                    ExpressionStatement(apply(nameTracer(contractName), thisId))
-                )
+                    ExpressionStatement(apply(nameTracer(contractName), thisId)),
+                    ExpressionStatement(apply("sstore", intlit(0xcafe), apply("mload", intlit(0x40)))), // save next free address
+            )
             )
         }
 
@@ -388,6 +391,10 @@ case class YulObject(contractName: String,
                     decl_1exp(thisId, first_storage_address)
                 )
             )
+        }
+
+        def memoryAllocationInit(): YulStatement = {
+            ExpressionStatement(apply("mstore", intlit(0x40), apply("sload", intlit(0xcafe))))
         }
 
         // todo: this happens to be true, the type info just doesn't get propagated. it would be nice to not need to do this.

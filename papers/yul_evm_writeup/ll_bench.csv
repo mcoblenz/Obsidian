@@ -1,5 +1,3 @@
-test name,gas used for deploy,gas used for invoke,total gas
-LinkedListShort.obs,185438,26751,212189
-LinkedListShortNoGC.obs,111895,26499,138394
-LinkedListMed.obs,228890,27139,256029
-LinkedListMedNoGC.obs,118162,26875,145037
+Test,Obsidian depl.,Obsidian inv., Solidity depl., Solidity inv.
+LinkedListShort,371531,44713,178377,392304
+LinkedListMed,642939,56320,187893,406604

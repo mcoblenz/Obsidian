@@ -26,6 +26,10 @@ object "{{contractName}}" {
             mstore(0x40, newFreePtr)
         }
 
+        function free_last_allocation(size) {
+            mstore(0x40, sub(mload(0x40), size))
+        }
+
         function panic_error_0x41() {
             mstore(0, shl(224, 0x4e487b71))
             mstore(4, 0x41)
@@ -55,6 +59,7 @@ object "{{contractName}}" {
             {{! todo: is 4 a magic number or should it be generated based on the object in question? check the ABI }}
             if iszero(lt(calldatasize(), 4)) {
                 {{invokeMain}}
+                {{memoryAllocationInit}}
                 {{! TODO 224 is a magic number offset to shift to follow the spec above; check that it's right }}
                 let selector := shr(224, calldataload(0))
                 {{dispatchTable}}
@@ -84,6 +89,10 @@ object "{{contractName}}" {
                 // protect against overflow
                 if or(gt(newFreePtr, 0xffffffffffffffff), lt(newFreePtr, memPtr)) {  panic_error_0x41() }
                 mstore(0x40, newFreePtr)
+            }
+
+            function free_last_allocation(size) {
+                mstore(0x40, sub(mload(0x40), size))
             }
 
             function panic_error_0x41() {

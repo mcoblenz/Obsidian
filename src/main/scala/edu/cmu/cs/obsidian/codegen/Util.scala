@@ -595,7 +595,8 @@ object Util {
       * @return an expression that computes to the corresponding address in storage
       */
     def mapToStorageAddress(x: Expression): Expression = {
-        apply("add", x, storage_threshold)
+        // This relies on the representation of storage_threshold!
+        apply("or", x, storage_threshold)
     }
 
     /** the returned expression evaluates to true iff the argument is above or equal to the storage threshold

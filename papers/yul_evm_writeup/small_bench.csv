@@ -1,4 +1,4 @@
-test name,gas used for deploy,gas used for invoke,total gas
-AssignLocalAdd.obs,95101,21202,116303
-PrimOpsEq.obs,90754,21175,111929
-Return.obs,101152,21227,122379
+Test,Obsidian depl.,Obsidian inv.,Solidity depl.,Solidity inv.
+AssignLocalAdd,98265,21202,81737,21232
+PrimOpsEq,91314,21183,79135,21213
+Return,106044,21237,85409,21244

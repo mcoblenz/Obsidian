@@ -1,11 +1,9 @@
 \subsection{Without Pointers}
 
-\todo{overhead here but it's acceptable. optimizer does a lot. these
-  contracts don't touch memory, so their tracers are all the trivial
-  ones. this gives a sense of the baseline overhead we add.}
+Obsidian imposes minimal overhead relative to Solidity, resulting in comparable costs.
 
 \begin{figure}[hbtp]
-    \caption{Benchmarks with Trivial Tracers}
+    \caption{Gas Costs with Trivial Tracers}
     \label{data.1}
     \resizebox{\columnwidth}{!}{
       \csvautotabular{small_bench.csv}
@@ -15,44 +13,65 @@
 
 \subsection{With Pointers}
 
-\todo{lots of overhead; it's cheaper to turn off gc, because you're doing
-  more work collecting than you get repaid for}
+When comparing Obsidian contracts that use pointers to Solidity, one must choose which implementation approach to take for the Solidity version. One approach is to use structs, which can be more efficient than Obsidian would be able to do, but in general could require the programmer to implement a memory allocator. The other approach is to texttt{new} operator to instantiate additional contracts, which can be substantially more expensive than Obsidian's approach. The deployment costs for Obsidian are larger primarily due to the memory management code that the compiler emits. We have not made any significant attempt to optimize that code beyond what the \texttt{--optimize} flag does. These benchmarks correspond with the test called \texttt{SetGetPointer} in the repository.
 
-\begin{figure}[hbtp]
-    \caption{Benchmarks with Pointer Fields}
-    \label{data.2}
-    \resizebox{\columnwidth}{!}{
-      \csvautotabular{medium_bench.csv}
-    }
-\end{figure}
+\begin{table}
+\caption{Gas costs with pointer fields}
+\begin{tabular}{lll}
+\toprule
+	 & Deployment & Invocation \\
+	 \midrule
+Obsidian & 451490 & 41240 \\
+Solidity, using a struct & 188599 & 22479 \\
+Solidity, using \texttt{new} & 229136 & 218458 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%\begin{figure}[hbtp]
+%    \caption{Benchmarks with Pointer Fields}
+%    \label{data.2}
+%    \resizebox{\columnwidth}{!}{
+%      \csvautotabular{medium_bench.csv}
+%    }
+%\end{figure}
 
 
 \subsection{Linked List}
 
-\todo{the theory is that once you have enough in storage, the rebates take
-  over and are more than the cost of collecting them. these tests are with
-  a simple linked list of 4 and 8 items. if you imagine a doubly linked
-  list backing a priority / de / queue, it'll be faster. that datastructure
-  is known to be hard to implement in the sort of associative mappings that
-  are built into solidity, and its use might arise very naturally from a
-  smart contract that processes queries in arrival order.}
+Currently, Obsidian requires that the programmer call \texttt{release} to free objects. This enables us to isolate the costs of the collection process and provided a way of measuring costs at the current stage of development, since the collector does not currently run automatically. We show benchmarks both with and without collection.
+
+Collection is only worthwhile once there is enough data to be freed (zeroed); otherwise, the collection cost is not worth the gas. The cost of collection is particularly worthwhile in the case of complicated data structures that may be difficult to implement in Solidity, such as a linked list backing a priority queue. 
+
+The benchmarks below compare an Obsidian linked list implementation (LinkedListMed allocates eight nodes) to a pre-existing Solidity linked list implementation\footnote{https://medium.com/coinmonks/linked-lists-in-solidity-cfd967af389b} that has been adapted to work with Solidity 0.8.0. The repetitive code in LinkedListMed is because Obsidian currently lacks subtype polymorphism; this inflates the deployment cost significantly (because there are eight linked list node contracts instead of just one). The ``small'' test allocates four nodes instead of eight.
+
+We were surprised at the high invocation gas costs of the Solidity linked list implementation. In the 4-node test, replacing the hash computation with a constant reduces invocation costs to 112527. 
+
+%\todo{the theory is that once you have enough in storage, the rebates take
+%  over and are more than the cost of collecting them. these tests are with
+%  a simple linked list of 4 and 8 items. if you imagine a doubly linked
+%  list backing a priority / de / queue, it'll be faster. that datastructure
+%  is known to be hard to implement in the sort of associative mappings that
+%  are built into solidity, and its use might arise very naturally from a
+%  smart contract that processes queries in arrival order.}
 
 \begin{figure}[hbtp]
-    \caption{Benchmarks With Linked Lists}
+    \caption{Gas Costs, Linked Lists}
     \label{data.3}
     \resizebox{\columnwidth}{!}{
       \csvautotabular{ll_bench.csv}
     }
 \end{figure}
 
-
-\todo{Note that differences in gas are roughly comparable to the ratio of
-  filesize differences.}
-
-\begin{figure}[hbtp]
-    \caption{Sizes of Optimized GC and non-GC Linked List Benchmarks}
-    \label{data.4}
-    \resizebox{\columnwidth}{!}{
-      \csvautotabular{sizes.csv}
-    }
-\end{figure}
+%
+%\todo{Note that differences in gas are roughly comparable to the ratio of
+%  filesize differences.}
+%
+%\begin{figure}[hbtp]
+%    \caption{Sizes of Optimized GC and non-GC Linked List Benchmarks}
+%    \label{data.4}
+%    \resizebox{\columnwidth}{!}{
+%      \csvautotabular{sizes.csv}
+%    }
+%\end{figure}
