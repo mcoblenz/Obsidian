@@ -10,4 +10,4 @@ The compiler targets the Yul~\cite{Yul} intermediate language in order to maximi
 
 In the rest of the paper, we describe the approach that we use to translate Obsidian contracts to Yul programs as well as the results of our performance evaluation.
 
-TODO: describe results.
+We benchmarked the generated Yul code and compared with the gas costs of equivalent Solidity code. 	For straightforward programs, the costs are very similar. When memory allocation is required, Obsidian's memory allocation approach is more expensive than manual memory management via Solidity's \texttt{struct} but substantially cheaper than using Solidity's \texttt{new} operator to instantiate new contracts. Although the current Obsidian implementation results in higher gas costs for allocating linked list nodes, the opportunity exists to outperform Solidity in the future because Obsidian's memory management approach obviates the need for expensive hash computations. An optimized version of Obsidian may provide significant convenience to programmers compared to Solidity for contracts that require allocating nontrivial data structures.

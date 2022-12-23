@@ -1,3 +1,5 @@
 Test,Obsidian depl.,Obsidian inv., Solidity depl., Solidity inv.
-LinkedListShort,371531,44713,178377,392304
-LinkedListMed,642939,56320,187893,406604
+LinkedListAllocate4Field,601774,276477,178377,225900
+LinkedListAllocate8Field,1067520,543837,187893,406604
+LinkedListAllocate4Local,340647,41201,N/A,N/A
+LinkedListAllocate8Local,533042,42786,N/A,N/A

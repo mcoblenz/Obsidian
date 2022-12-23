@@ -39,22 +39,21 @@ Currently we are not at all parsimonious with our memory usage for fields;
 adjacent small integers are written to 32-byte wide sections of memory, no
 packing is attempted, etc. This is a well understood place to find
 substantial savings. A way to leverage the existing knowledge would be to
-implement a Yul extension to Protobuf. \cite{TODO}
+implement a Yul extension to Protobuf.
 
-\todo{describe other big picture optimizations, beyond the scope of the Yul
-  optimizer, here}
+Another area of improvement is compacting memory allocation: currently each transaction begins allocating in memory where the previous transaction ended. Because of the way memory costs are calculated, it would be better to re-start allocation at the same offset each time and instead use a mapping to ensure that when objects are copied to storage, they are given fresh addresses. Likewise, the current implementation does not attempt to update other pointers to the relocated objects when relocating objects from memory to storage. Although this is unnecessary for the current test cases, this is required in general.
 
 \subsection{Features}
 
 Garbage collection in the current prototype is manual, where we extend the
 Obsidian language to include \obssrc{retain} and \obssrc{release} methods
-for every contract in the style of C\# \cite{TODO}. This is sufficient for
+for every contract in the style of C\#. This is sufficient for
 a proof of concept, but it is more of a burden on the programmer than we
 envision: it is well established that explicit memory controls both become
 a substantial cognitive effort even in relatively small programs as well as
-a source of bugs. \cite{TODO} In a future version of the Obsidian
-prototype, we plan to implement automatic garbage collection in the style
-of \todo{}. \cite{TODO}
+a source of bugs.  In a future version of the Obsidian
+prototype, we hope to implement automatic garbage collection in the style
+of Java.
 
 We plan to extend the translation of Obsidian into Yul to include a richer
 space of language features, including but not limited to:
@@ -68,12 +67,7 @@ space of language features, including but not limited to:
 \item sending and receiving ether in invocations
 \end{enumerate}
 These features have been on our roadmap since the beginning of this
-project, but the implementation of them was eclipsed by the layout
+project, but the implementation of them was eclipsed by the memory allocation work 
 described in \ref{sec:layout}, which were both our main concern and more
 intricate than anticipated.
 
-The next step for benchmarking is to do a side by side comparison with
-reference Solidity examples, rather than just quantifying what happens in
-the presence of garbage collection or not in our own environment. It would
-be of particular interest to do a comparison to several live implementation
-of linked lists that are actually deployed and used.

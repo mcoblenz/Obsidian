@@ -1,3 +1,5 @@
+Most benchmarks were performed with solc 0.8.11. We ran the linked list iteration benchmarks with solc 0.8.7 via the Remix environment. Optimization was on in all cases.
+
 \subsection{Without Pointers}
 
 Obsidian imposes minimal overhead relative to Solidity, resulting in comparable costs.
@@ -13,7 +15,7 @@ Obsidian imposes minimal overhead relative to Solidity, resulting in comparable 
 
 \subsection{With Pointers}
 
-When comparing Obsidian contracts that use pointers to Solidity, one must choose which implementation approach to take for the Solidity version. One approach is to use structs, which can be more efficient than Obsidian would be able to do, but in general could require the programmer to implement a memory allocator. The other approach is to texttt{new} operator to instantiate additional contracts, which can be substantially more expensive than Obsidian's approach. The deployment costs for Obsidian are larger primarily due to the memory management code that the compiler emits. We have not made any significant attempt to optimize that code beyond what the \texttt{--optimize} flag does. These benchmarks correspond with the test called \texttt{SetGetPointer} in the repository.
+When comparing Obsidian contracts that use pointers to Solidity, one must choose which implementation approach to take for the Solidity version. One approach is to use structs, which can be more efficient than Obsidian would be able to do, but in general could require the programmer to implement a memory allocator. The other approach is to use the \texttt{new} operator to instantiate additional contracts, which can be substantially more expensive than Obsidian's approach. The deployment costs for Obsidian are larger primarily due to the memory management code that the compiler emits. We have not made any significant attempt to optimize that code beyond what the \texttt{--optimize} flag does. These benchmarks correspond with the test called \texttt{SetGetPointer} in the repository.
 
 \begin{table}
 \caption{Gas costs with pointer fields}
@@ -40,13 +42,13 @@ Solidity, using \texttt{new} & 229136 & 218458 \\
 
 \subsection{Linked List}
 
-Currently, Obsidian requires that the programmer call \texttt{release} to free objects. This enables us to isolate the costs of the collection process and provided a way of measuring costs at the current stage of development, since the collector does not currently run automatically. We show benchmarks both with and without collection.
+%Currently, Obsidian requires that the programmer call \texttt{release} to free objects. This enables us to isolate the costs of the collection process and provided a way of measuring costs at the current stage of development, since the collector does not currently run automatically. We show benchmarks both with and without collection.
+%
+%Collection is only worthwhile once there is enough data to be freed (zeroed); otherwise, the collection cost is not worth the gas. The cost of collection is particularly worthwhile in the case of complicated data structures that may be difficult to implement in Solidity, such as a linked list backing a priority queue. 
 
-Collection is only worthwhile once there is enough data to be freed (zeroed); otherwise, the collection cost is not worth the gas. The cost of collection is particularly worthwhile in the case of complicated data structures that may be difficult to implement in Solidity, such as a linked list backing a priority queue. 
+The benchmarks in \cref{data.3} compare an Obsidian linked list implementation to a pre-existing Solidity linked list implementation\footnote{https://medium.com/coinmonks/linked-lists-in-solidity-cfd967af389b} that has been adapted to work with Solidity 0.8.0. The Obsidian linked list implementations include redundant code because Obsidian currently lacks subtype polymorphism; this inflates the deployment cost significantly (e.g., because there are eight linked list node contracts instead of just one). These tests focus on allocation costs rather than traversal costs. In Obsidian, the costs of allocating a linked list that is referenced by a field are much higher than for a local variable since the former must be allocated in storage, whereas the latter can remain in memory.
 
-The benchmarks below compare an Obsidian linked list implementation (LinkedListMed allocates eight nodes) to a pre-existing Solidity linked list implementation\footnote{https://medium.com/coinmonks/linked-lists-in-solidity-cfd967af389b} that has been adapted to work with Solidity 0.8.0. The repetitive code in LinkedListMed is because Obsidian currently lacks subtype polymorphism; this inflates the deployment cost significantly (because there are eight linked list node contracts instead of just one). The ``small'' test allocates four nodes instead of eight.
-
-We were surprised at the high invocation gas costs of the Solidity linked list implementation. In the 4-node test, replacing the hash computation with a constant reduces invocation costs to 112527. 
+The high invocation gas costs of the Solidity linked list implementation are in large part due to using an expensive hash function to compute storage addresses for each node. In the 4-node test, replacing the hash computation with a constant reduces invocation costs to 112527. 
 
 %\todo{the theory is that once you have enough in storage, the rebates take
 %  over and are more than the cost of collecting them. these tests are with
@@ -71,7 +73,23 @@ We were surprised at the high invocation gas costs of the Solidity linked list i
 %\begin{figure}[hbtp]
 %    \caption{Sizes of Optimized GC and non-GC Linked List Benchmarks}
 %    \label{data.4}
-%    \resizebox{\columnwidth}{!}{
+%    \resizebox{\columnwidth}{!}{%    }
 %      \csvautotabular{sizes.csv}
-%    }
+
 %\end{figure}
+
+In addition, we benchmarked iterating through the linked list. Results are shown in \cref{tab:iteration}. Costs are similar in both languages.
+\begin{table}
+\caption{Gas costs for linked list iteration}
+\label{tab:iteration}
+\begin{tabular}{lll}
+\toprule
+& Obsidian sum & Solidity sum \\
+\midrule
+4 nodes & 40907 & 41244 \\
+8 nodes & 58377 & 59068 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+It is not surprising that the Obsidian linked list traversal costs is similar to that of Solidity, since there is no allocation involved. 
