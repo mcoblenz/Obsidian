@@ -226,16 +226,21 @@ object CodeGenYul extends CodeGenerator {
     }
 
     def emitLog(comment: String, topic: Int, message: edu.cmu.cs.obsidian.codegen.Expression): Seq[YulStatement] = {
-        val log_temp: Identifier = nextTemp()
+        if (emit_logs) {
+            val log_temp: Identifier = nextTemp()
 
-        Seq(LineComment(s"LOG: $comment"),
-            // allocate memory to log from
-            decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
-            ExpressionStatement(apply("mstore", log_temp, message)),
-            // emit the log
-            ExpressionStatement(apply("log1", log_temp, intlit(32), intlit(topic))),
-            //ExpressionStatement(apply("free_last_allocation", intlit(32)))
-        )
+            Seq(LineComment(s"LOG: $comment"),
+                // allocate memory to log from
+                decl_1exp(log_temp, apply("allocate_memory", intlit(32))),
+                ExpressionStatement(apply("mstore", log_temp, message)),
+                // emit the log
+                ExpressionStatement(apply("log1", log_temp, intlit(32), intlit(topic))),
+                //ExpressionStatement(apply("free_last_allocation", intlit(32)))
+            )
+        }
+        else {
+            Seq()
+        }
     }
 
     /** given a contract, produce a default constructor that takes enough arguments to instantiate
@@ -257,7 +262,7 @@ object CodeGenYul extends CodeGenerator {
         ))
     }
 
-    val emit_logs: Boolean = true
+    val emit_logs: Boolean = false
 
     /** given a symbol table, emit the collection of copying tracers for the contracts it defines,
       *  starting at the specified name
