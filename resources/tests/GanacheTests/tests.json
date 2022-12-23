@@ -305,30 +305,34 @@
             "shows_that_we_support": "shows that wipers clear nested structures"
         },
         {
-            "file": "LinkedListShort.obs",
-            "expected": "57005",
-            "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
-        },
-        {
-            "file": "LinkedListShortNoGC.obs",
+            "file": "LinkedListAllocate4Field.obs",
             "expected": "0",
             "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
         },
         {
-            "file": "LinkedListMed.obs",
+            "file": "LinkedListAllocate8Field.obs",
             "expected": "0",
             "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
         },
         {
-            "file": "LinkedListMedNoGC.obs",
+            "file": "LinkedListAllocate4Local.obs",
             "expected": "0",
             "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
         },
         {
-            "file": "LinkedListMedSum.obs",
+            "file": "LinkedListAllocate8Local.obs",
             "expected": "0",
-            "shows_that_we_support": "shows that linked lists  work",
-            "trans": "main"
+            "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
+        },
+        {
+            "file": "LinkedListAllocate4Sum.obs",
+            "expected": "0",
+            "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
+        },
+        {
+            "file": "LinkedListAllocate8Sum.obs",
+            "expected": "0",
+            "shows_that_we_support": "shows that wipers follow the nested structure; benchmarking"
         }
     ]
 }

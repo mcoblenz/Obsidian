@@ -60,7 +60,10 @@ main contract LinkedListShort {
     }
 
     transaction main() returns int {
-        list = new IntLLEnd(57005);
+        IntLLEnd tail = new IntLLEnd(1);
+        IntLL1 e1 = new IntLL1(2, tail);
+        IntLL2 e2 = new IntLL2(4, e1);
+        IntLL3 e3 = new IntLL3(8, e2);
         return list.sum();
     }
 
